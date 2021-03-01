@@ -1,9 +1,6 @@
 # Change Log
 
-All notable changes to the "literate" extension will be documented in this file.
-
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
-
-## [Unreleased]
-
-- Initial release
+* Simple code fragments through code fences (tripple backtick or tripple tilde).
+* A code fence creates a new fragment on the info line
+* A code fence extends an existing fragment on the info line
+* Code fences/blocks reference fragments by using their tags
