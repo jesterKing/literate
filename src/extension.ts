@@ -11,6 +11,7 @@ import { grabber_plugin } from './grabber';
 import { pathToFileURL } from 'url';
 
 import MarkdownIt = require("markdown-it");
+import Renderer = require('markdown-it/lib/renderer');
 
 
 /**
@@ -37,7 +38,9 @@ interface GrabbedState {
 
 let FRAGMENT_RE = /(.*):.*<<(.*)>>(=)?(\+)?/;
 let FRAGMENTS_RE = /<<(.*)>>(=)?(\+)?/g;
-
+let FRAGMENT_IN_CODE = /(&lt;&lt.*?&gt;&gt;)/g;
+let CLEAN_FRAGMENT_IN_CODE = /(&lt;&lt.*?&gt;&gt;)/g;
+let oldFence : Renderer.RenderRule | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('Ready to do some Literate Programming');
@@ -53,6 +56,9 @@ export function activate(context: vscode.ExtensionContext) {
 		 */
 		const md = new MarkdownIt()
 			.use(grabber_plugin);
+
+		oldFence = md.renderer.rules.fence;
+		md.renderer.rules.fence = renderCodeFence;
 
 		diagnostics.clear();
 
@@ -202,7 +208,45 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	}))
 	context.subscriptions.push(disposable);
+
+	return {
+		extendMarkdownIt(md: any) {
+			md.use(grabber_plugin);
+			oldFence = md.renderer.rules.fence;
+			md.renderer.rules.fence = renderCodeFence;
+			return md;
+		}
+	};
+};
+
+function codeFragmentCleanup(_: string, p1 : string, __: number, ___: string) {
+	let cleaned = p1.replaceAll(/<.*?>/g, '');
+	return `<span class="fragmentuse">${cleaned}</span>`;
 }
+
+function renderCodeFence(tokens : Token[], idx : number, options : MarkdownIt.Options, env : any, slf : Renderer) {
+	let rendered = '';
+	if (oldFence) {
+		rendered = oldFence(tokens, idx, options, env, slf);
+
+		let token = tokens[idx];
+		if (token.info) {
+			const match = token.info.match(FRAGMENT_RE);
+			if (match) {
+				let [_, lang, name, root, add, ...__] = match;
+				lang = lang.trim();
+				if (name) {
+					root = root || '';
+					add = add || '';
+					rendered = `<div class="codefragment"><div class="fragmentname">&lt;&lt;${name}&gt;&gt;${root}${add}</div><div class="code">${rendered}</div></div>`;
+					rendered = rendered.replaceAll(FRAGMENT_IN_CODE, codeFragmentCleanup);
+				}
+			}
+		}
+	}
+
+	return rendered;
+};
 
 function updateDiagnostics(uri: vscode.Uri, collection: vscode.DiagnosticCollection, diagnostic : vscode.Diagnostic | undefined): void {
 	if (uri) {
