@@ -4,6 +4,10 @@
 
 ## Features
 
+Note: enabling this extension will inject the literate style CSS developed for
+this extension. Disable this extension in workspaces where you don't want the
+style to influence Markdown document previews.
+
 Use the literate programming paradigm to write your programs. Documents that end
 with the extension `.literate` will be processed.
 
