@@ -266,7 +266,7 @@ function updateDiagnostics(uri: vscode.Uri, collection: vscode.DiagnosticCollect
  * @param token Token with code
  * @param env GrabbedState environment the token belongs to, for the filename
  */
-function decorateCodeWithLine(token: Token, env: GrabbedState) : string {
+function decorateCodeWithLine(token: Token, _: GrabbedState) : string {
 	// line number we want is tag location plus one, since code starts on that
 	// next line.
 	/*
