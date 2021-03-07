@@ -269,13 +269,15 @@ function updateDiagnostics(uri: vscode.Uri, collection: vscode.DiagnosticCollect
 function decorateCodeWithLine(token: Token, env: GrabbedState) : string {
 	// line number we want is tag location plus one, since code starts on that
 	// next line.
+	/*
 	let linenumber = locationOfFragment(token) + 1;
 	let code = '';
 	if (linenumber>=0) {
 		code = `#line ${linenumber} "${env.filename}"`;
 	}
 	code = `${code}\n${token.content.trim()}`;
-	return code;
+	*/
+	return token.content.trim();
 }
 
 /**
