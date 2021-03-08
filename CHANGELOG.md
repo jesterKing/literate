@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.0.7
+
+* Allow to specify file name on top code fragment. Use paths relative to the workspace. Subfolders can be part of the path. To save code for `<<Name of Fragment.*>>` to `CodeFile.cs` use:
+<pre>
+```csharp : &lt;&lt;Name of Fragment.*&gt;&gt;= ./CodeFile.cs
+// code here
+```</pre>
+
 ## 0.0.6
 
 * Make _all_ hljs classes black text by default for now

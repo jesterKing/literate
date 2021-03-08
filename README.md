@@ -2,11 +2,11 @@
 
 *Literate* programming for Visual Studio Code.
 
-## Features
-
 Note: enabling this extension will inject the literate style CSS developed for
 this extension. Disable this extension in workspaces where you don't want the
 style to influence Markdown document previews.
+
+## Features
 
 Use the literate programming paradigm to write your programs. Documents that end
 with the extension `.literate` will be processed.
@@ -20,7 +20,8 @@ info line of a code fence.
 Adding to existing fragments is done through `<<some identifying string>>=+`.
 
 A top-level code fragment has a `.*` at the end of the identifying string:
-`<<some identifying string.*>>=`.
+`<<some identifying string.*>>=`. The top-level fragment can also include a file
+name: `<<some top level.*>>= ./CodeFile.cs`.
 
 Code fragments can reference other code fragments in code by using the code
 fragment tag `<<some identifying string>>`.

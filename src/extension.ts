@@ -36,8 +36,8 @@ interface GrabbedState {
 	gstate: StateCore;
 }
 
-let FRAGMENT_RE = /(.*):.*<<(.*)>>(=)?(\+)?/;
-let FRAGMENTS_RE = /<<(.*)>>(=)?(\+)?/g;
+let FRAGMENT_RE = /(.*):.*<<(.*)>>(=)?(\+)?\s*(.*)/;
+let FRAGMENTS_RE = /<<(.*)>>(=)?(\+)?\s*(.*)/g;
 let FRAGMENT_IN_CODE = /(&lt;&lt.*?&gt;&gt;)/g;
 let CLEAN_FRAGMENT_IN_CODE = /(&lt;&lt.*?&gt;&gt;)/g;
 let oldFence : Renderer.RenderRule | undefined;
@@ -100,10 +100,10 @@ export function activate(context: vscode.ExtensionContext) {
 
 		/**
 		 * Map of fragment names and tuples of code fragments for these. The
-		 * tuples contain code language identifier followed by the actual code
-		 * fragment.
+		 * tuples contain code language identifier followed by the filename and
+		 * lastly followed by the actual code fragment.
 		 */
-		const fragments = new Map<string, [string, string]>();
+		const fragments = new Map<string, [string, string, string]>();
 		// Now we have the state, we have access to the tokens
 		// over which we can iterate to extract all the code
 		// fragments and build up the table with the fragments concatenated
@@ -115,7 +115,7 @@ export function activate(context: vscode.ExtensionContext) {
 					const linenumber = locationOfFragment(token);
 					const match = token.info.match(FRAGMENT_RE);
 					if (match) {
-						let [_, lang, name, root, add, ...__] = match;
+						let [_, lang, name, root, add, fileName, ...__] = match;
 						lang = lang.trim();
 						// =+ in the fragment name, we're adding to an existing fragment
 						if (root && add) {
@@ -129,17 +129,19 @@ export function activate(context: vscode.ExtensionContext) {
 								let msg = `Trying to add to non-existant fragment ${name}. ${env.filename}:${linenumber}`;
 								const diag = createErrorDiagnostic(token, msg);
 								updateDiagnostics(env.uri, diagnostics, diag);
-								return vscode.window.showErrorMessage(msg);
+								//return vscode.window.showErrorMessage(msg);
 							}
 						} else if (root && !add) {
 							if (fragments.has(name)) {
 								let msg = `Trying to overwrite existing fragment fragment ${name}. ${env.filename}${linenumber}`;
 								const diag = createErrorDiagnostic(token, msg);
 								updateDiagnostics(env.uri, diagnostics, diag);
-								return vscode.window.showErrorMessage(msg);
+								//return vscode.window.showErrorMessage(msg);
+							} else {
+								fileName = fileName || env.filename;
+								let code = decorateCodeWithLine(token, env);
+								fragments.set(name, [lang, fileName, code]);
 							}
-							let code = decorateCodeWithLine(token, env);
-							fragments.set(name, [lang, code]);
 						}
 					}
 				}
@@ -168,12 +170,12 @@ export function activate(context: vscode.ExtensionContext) {
 					if (!fragments.has(tagName)) {
 						console.log(`could not find fragment ${tag} (${tagName})`);
 					}
-					let code = fragments.get(tagName);
+					let [lang, fileName, code] = fragments.get(tagName) || ['', '', undefined];
 					if (code) {
 						fragmentReplaced = true;
-						codeFromFragment = codeFromFragment.replace(tag, code[1]);
+						codeFromFragment = codeFromFragment.replace(tag, code);
+						fragments.set(fragmentName, [lang, fileName, codeFromFragment]);
 					}
-					fragments.set(fragmentName, [lang, codeFromFragment]);
 				}
 			}
 			if(!fragmentReplaced) {
@@ -184,19 +186,29 @@ export function activate(context: vscode.ExtensionContext) {
 
 		for(const name of fragments.keys()) {
 			if (name.indexOf(".*") >= 0) {
-				let fragment = fragments.get(name);
+				let [extension, fileName, fragment] = fragments.get(name) || ['', '', undefined];
 				if (fragment) {
-					const extension = extensionForLanguage(fragment[0].trim());
-					const fileName = name.replace(".*", "").trim() + `.${extension}`;
-					const encoded = Buffer.from(fragment[1], 'utf-8');
+					extension = extension.trim();
+					fileName = fileName.trim();
+					const encoded = Buffer.from(fragment, 'utf-8');
 					const fileUri = folderUri.with({ path: posix.join(sourceUri.path, fileName) });
 					await vscode.workspace.fs.writeFile(fileUri, encoded);
 				}
 			}
 		}
 
-		// Display a message box to the user
-		return vscode.window.showInformationMessage("Code generated");
+		let hasAnyDiagnostics = false;
+		diagnostics.forEach(function(_: vscode.Uri, diags: readonly vscode.Diagnostic[], __: vscode.DiagnosticCollection) : any {
+			hasAnyDiagnostics ||= (diags.length > 0);
+		}
+		);
+
+		if (hasAnyDiagnostics) {
+			return vscode.window.showErrorMessage("Error encountered during process");
+		}
+		else {
+			return vscode.window.showInformationMessage("Process completed");
+		}
 	});
 
 	if (vscode.window.activeTextEditor) {
@@ -233,7 +245,7 @@ function renderCodeFence(tokens : Token[], idx : number, options : MarkdownIt.Op
 		if (token.info) {
 			const match = token.info.match(FRAGMENT_RE);
 			if (match) {
-				let [_, lang, name, root, add, ...__] = match;
+				let [_, lang, name, root, add, __, ...___] = match;
 				lang = lang.trim();
 				if (name) {
 					root = root || '';
