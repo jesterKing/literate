@@ -37,7 +37,7 @@ interface GrabbedState {
 }
 
 let FRAGMENT_RE = /(.*):.*<<(.*)>>(=)?(\+)?\s*(.*)/;
-let FRAGMENTS_RE = /<<(.*)>>(=)?(\+)?\s*(.*)/g;
+let FRAGMENTS_RE = /<<(.*)>>(=)?(\+)?/g;
 let FRAGMENT_IN_CODE = /(&lt;&lt.*?&gt;&gt;)/g;
 let CLEAN_FRAGMENT_IN_CODE = /(&lt;&lt.*?&gt;&gt;)/g;
 let oldFence : Renderer.RenderRule | undefined;
@@ -120,10 +120,13 @@ export function activate(context: vscode.ExtensionContext) {
 						// =+ in the fragment name, we're adding to an existing fragment
 						if (root && add) {
 							if (fragments.has(name)) {
-								let code = fragments.get(name);
+								let [lang, fileName, code] = fragments.get(name) || ['', '', undefined];
 								if(code) {
 									let additionalCode = decorateCodeWithLine(token, env);
-									code[1] = `${code[1]}\n${additionalCode}`;
+									code =
+`${code}
+${additionalCode}`;
+									fragments.set(name, [lang, fileName, code]);
 								}
 							} else {
 								let msg = `Trying to add to non-existant fragment ${name}. ${env.filename}:${linenumber}`;
@@ -154,12 +157,10 @@ export function activate(context: vscode.ExtensionContext) {
 			pass++;
 			let fragmentReplaced = false;
 			for (let fragmentName of fragments.keys()) {
-				let fragment = fragments.get(fragmentName);
-				if (!fragment) {
+				let [lang, fileName, codeFromFragment] = fragments.get(fragmentName) || ['', '', undefined];
+				if (!codeFromFragment) {
 					continue;
 				}
-				let lang = fragment[0];
-				let codeFromFragment = fragment[1];
 
 				const casesToReplace = [...codeFromFragment.matchAll(FRAGMENTS_RE)];
 				for (let match of casesToReplace) {
@@ -170,7 +171,7 @@ export function activate(context: vscode.ExtensionContext) {
 					if (!fragments.has(tagName)) {
 						console.log(`could not find fragment ${tag} (${tagName})`);
 					}
-					let [lang, fileName, code] = fragments.get(tagName) || ['', '', undefined];
+					let [lang, __, code] = fragments.get(tagName) || ['', '', undefined];
 					if (code) {
 						fragmentReplaced = true;
 						codeFromFragment = codeFromFragment.replace(tag, code);

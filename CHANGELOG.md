@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.0.8
+
+* Complex fragment setup saving was broken. Works again.
+
 ## 0.0.7
 
 * Allow to specify file name on top code fragment. Use paths relative to the workspace. Subfolders can be part of the path. To save code for `<<Name of Fragment.*>>` to `CodeFile.cs` use:
