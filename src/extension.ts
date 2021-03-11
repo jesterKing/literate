@@ -95,7 +95,20 @@ export function activate(context: vscode.ExtensionContext) {
 			const env: GrabbedState = { filename: fname, uri: uri, gstate: new StateCore('', md, {}) };
 			const text = new TextDecoder('utf-8').decode(content);
 			envList.push(env);
-			const _ = md.render(text, env);
+			const rendered = md.render(text, env);
+			const html =
+`<html>
+	<head>
+		<link rel="stylesheet" type="text/css" href="./style.css">
+	</head>
+	<body>
+	${rendered}
+	</body>
+</html>`;
+			const encoded = Buffer.from(html, 'utf-8');
+			fname = fname.replace(".literate", ".html")
+			const fileUri = folderUri.with({ path: posix.join(sourceUri.path, fname) });
+			await vscode.workspace.fs.writeFile(fileUri, encoded);
 		}
 
 		/**
@@ -106,7 +119,7 @@ export function activate(context: vscode.ExtensionContext) {
 		const fragments = new Map<string, [string, string, string]>();
 		// Now we have the state, we have access to the tokens
 		// over which we can iterate to extract all the code
-		// fragments and build up the table with the fragments concatenated
+		// fragments and build up the map with the fragments concatenated
 		// where necessary. We'll extrapolate all fragments in the second
 		// pass.
 		for (let env of envList) {
