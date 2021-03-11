@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.0.9
+
+* Resolve #2: Write out HTML files for literate programs
+* Resolve #1: Don't add src in generated code file path
+
 ## 0.0.8
 
 * Complex fragment setup saving was broken. Works again.
