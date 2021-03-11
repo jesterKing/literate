@@ -76,7 +76,7 @@ export function activate(context: vscode.ExtensionContext) {
 		 */
 		const folderUri = vscode.workspace.workspaceFolders[0].uri;
 		/** The Uri for the parent path where generated code is saved. */
-		const sourceUri = vscode.Uri.joinPath(folderUri, "src");
+		const sourceUri = folderUri;
 
 		// ensure the path exists.
 		vscode.workspace.fs.createDirectory(sourceUri);
