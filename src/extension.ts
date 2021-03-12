@@ -303,7 +303,7 @@ function decorateCodeWithLine(token: Token, _: GrabbedState) : string {
 	}
 	code = `${code}\n${token.content.trim()}`;
 	*/
-	return token.content.trim();
+	return token.content;
 }
 
 /**
