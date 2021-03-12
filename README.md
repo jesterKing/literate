@@ -39,6 +39,10 @@ during code generation .
 Code fragments can reference other code fragments in code by using the code
 fragment tag `<<some identifying string>>`.
 
+If a fragment use is indented the indentation will be maintained for its
+realization. This makes it suitable for use with languages like Python that use
+indentation to denote scope.
+
 The command `Literate: Process` (`literate.process`) will process all
 `.literate` documents found in the (first) workspace folder.
 

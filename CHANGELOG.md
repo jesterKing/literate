@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.1.0
+
+* Resolve #3: Honor indentation in code fragments
+
 ## 0.0.9
 
 * Resolve #2: Write out HTML files for literate programs
