@@ -305,7 +305,7 @@ function renderCodeFence(tokens : Token[], idx : number, options : MarkdownIt.Op
 					root = root || '';
 					add = add || '';
 					rendered = `<div class="codefragment"><div class="fragmentname">&lt;&lt;${name}&gt;&gt;${root}${add}</div><div class="code">${rendered}</div></div>`;
-					rendered = rendered.replaceAll(FRAGMENT_IN_CODE, codeFragmentCleanup);
+					//rendered = rendered.replaceAll(FRAGMENT_IN_CODE, codeFragmentCleanup);
 				}
 			}
 		}

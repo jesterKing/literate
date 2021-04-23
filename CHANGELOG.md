@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.1.1
+
+* Keep syntax highlighting in generated HTML
+
 ## 0.1.0
 
 * Resolve #3: Honor indentation in code fragments
