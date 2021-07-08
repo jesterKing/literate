@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.1.2
+
+* This time actually have syntax highlighting
+  in the code fragments
+
 ## 0.1.1
 
 * Keep syntax highlighting in generated HTML
