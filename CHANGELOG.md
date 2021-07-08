@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.1.3
+
+* Package improvement, no functional changes
+
 ## 0.1.2
 
 * This time actually have syntax highlighting
