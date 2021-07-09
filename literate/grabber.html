@@ -1,0 +1,38 @@
+<html>
+	<head>
+		<link rel="stylesheet" type="text/css" href="./style.css">
+	</head>
+	<body>
+	<h1>The grabber</h1>
+<p>This plug-in adds a <code>grabit</code> rule that captures
+the current StateCore of the <code>MarkdownIt</code> instance
+that is parsing the document.</p>
+<p>The <code>grabit</code> rule is added before the <code>normalize</code>
+rule. The only job is to grab the current state.
+This state we use later to find all the code fragments
+and weave them together.</p>
+<p>I couldn't find clearly what the rule function should
+return. To me it is currently unclear what the difference
+is between returning <code>false</code> and returning <code>true</code>.</p>
+<p>Based on other rules I opted to return <code>false</code>, as I am
+assuming that it means that the next rule is allowed to
+work on the state and token stream.</p>
+<div class="codefragment"><div class="fragmentname">&lt;&lt;grabber plug-in.*&gt;&gt;=</div><div class="code"><pre><code><span class="hljs-keyword">import</span> <span class="hljs-title class_">MarkdownIt</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it&#x27;</span>);
+<span class="hljs-keyword">import</span> <span class="hljs-title class_">Core</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/parser_core&#x27;</span>);
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">grabberPlugin</span>(<span class="hljs-params">md : MarkdownIt</span>) {
+    <span class="hljs-keyword">const</span> grabit : <span class="hljs-title class_">Core</span>.<span class="hljs-property">RuleCore</span> = <span class="hljs-function"><span class="hljs-params">state</span> =&gt;</span> {
+        <span class="hljs-keyword">if</span> (state.<span class="hljs-property">env</span>) {
+            <span class="hljs-comment">/* grab the state */</span>
+            state.<span class="hljs-property">env</span>.<span class="hljs-property">gstate</span> = state;
+        }
+        <span class="hljs-comment">/* return false to allow next rule to process */</span>
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;
+    };
+
+    md.<span class="hljs-property">core</span>.<span class="hljs-property">ruler</span>.<span class="hljs-title function_">before</span>(<span class="hljs-string">&#x27;normalize&#x27;</span>, <span class="hljs-string">&#x27;grabit&#x27;</span>, grabit);
+};
+</code></pre>
+</div></div>
+	</body>
+</html>

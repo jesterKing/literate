@@ -107,7 +107,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 		/** All .literate files found in our workspace */
 		const foundLiterateFiles = await vscode.workspace
-			.findFiles('**/*.literate', undefined, undefined)
+			.findFiles('**/*.literate')
 			.then(files => Promise.all(files.map(file => file)));
 
 		// handle all .literate file, extract code and write out.
