@@ -4,7 +4,45 @@
 	</head>
 	<body>
 	<h1>Literate Programming</h1>
-<div class="codefragment"><div class="fragmentname">&lt;&lt;literate.*&gt;&gt;=</div><div class="code"><pre><code><span class="hljs-keyword">import</span> <span class="hljs-title class_">StateCore</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/rules_core/state_core&#x27;</span>);
+<p>The main idea of the extension is to collect all fragments that are
+created in all <code>.literate</code> files.</p>
+<p>All the fragments are expanded such that eventually there will be
+only the top fragments. A top fragment specifies a file to which
+it will be written.</p>
+<p>The first step is to put each <code>.literate</code> file through the MarkdownIt
+renderer. Each rendering will be given a special environment that will
+be used to collect the state for the render. The state will contain all
+the tokens as recognized by the renderer.</p>
+<div class="codefragment"><div class="fragmentname">&lt;&lt;render and collect state&gt;&gt;=</div><div class="code"><pre><code>		<span class="hljs-comment">// handle all .literate file, extract code and write out.</span>
+		<span class="hljs-keyword">try</span> {
+			<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> fl <span class="hljs-keyword">of</span> foundLiterateFiles) {
+				<span class="hljs-keyword">const</span> uri = vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">file</span>(fl.<span class="hljs-property">path</span>);
+				<span class="hljs-keyword">const</span> content = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">readFile</span>(uri);
+				<span class="hljs-keyword">let</span> fname = fl.<span class="hljs-property">path</span>.<span class="hljs-title function_">replace</span>(folderUri.<span class="hljs-property">path</span>, <span class="hljs-string">&#x27;&#x27;</span>);
+				<span class="hljs-comment">/** Environment where we can grab the state. */</span>
+				<span class="hljs-keyword">const</span> <span class="hljs-attr">env</span>: <span class="hljs-title class_">GrabbedState</span> = { <span class="hljs-attr">literateFileName</span>: fname, <span class="hljs-attr">literateUri</span>: uri, <span class="hljs-attr">gstate</span>: <span class="hljs-keyword">new</span> <span class="hljs-title class_">StateCore</span>(<span class="hljs-string">&#x27;&#x27;</span>, md, {}) };
+				<span class="hljs-keyword">const</span> text = <span class="hljs-keyword">new</span> <span class="hljs-title class_">TextDecoder</span>(<span class="hljs-string">&#x27;utf-8&#x27;</span>).<span class="hljs-title function_">decode</span>(content);
+				envList.<span class="hljs-title function_">push</span>(env);
+				<span class="hljs-keyword">const</span> rendered = md.<span class="hljs-title function_">render</span>(text, env);
+				<span class="hljs-keyword">const</span> html =
+<span class="hljs-string">`&lt;html&gt;
+	&lt;head&gt;
+		&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;./style.css&quot;&gt;
+	&lt;/head&gt;
+	&lt;body&gt;
+	<span class="hljs-subst">${rendered}</span>
+	&lt;/body&gt;
+&lt;/html&gt;`</span>;
+				<span class="hljs-keyword">const</span> encoded = <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(html, <span class="hljs-string">&#x27;utf-8&#x27;</span>);
+				fname = fname.<span class="hljs-title function_">replace</span>(<span class="hljs-string">&quot;.literate&quot;</span>, <span class="hljs-string">&quot;.html&quot;</span>);
+				<span class="hljs-keyword">const</span> fileUri = folderUri.<span class="hljs-title function_">with</span>({ <span class="hljs-attr">path</span>: posix.<span class="hljs-title function_">join</span>(sourceUri.<span class="hljs-property">path</span>, fname) });
+				<span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">writeFile</span>(fileUri, encoded);
+			}
+		} <span class="hljs-keyword">catch</span> (error) {
+			<span class="hljs-variable language_">console</span>.<span class="hljs-title function_">log</span>(error);
+		}
+</code></pre>
+</div></div><div class="codefragment"><div class="fragmentname">&lt;&lt;literate.*&gt;&gt;=</div><div class="code"><pre><code><span class="hljs-keyword">import</span> <span class="hljs-title class_">StateCore</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/rules_core/state_core&#x27;</span>);
 <span class="hljs-keyword">import</span> <span class="hljs-title class_">Token</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/token&#x27;</span>);
 <span class="hljs-keyword">import</span> { <span class="hljs-title class_">TextDecoder</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;util&#x27;</span>;
 <span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> vscode <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;vscode&#x27;</span>;
@@ -115,35 +153,7 @@
 			.<span class="hljs-title function_">findFiles</span>(<span class="hljs-string">&#x27;**/*.literate&#x27;</span>)
 			.<span class="hljs-title function_">then</span>(<span class="hljs-function"><span class="hljs-params">files</span> =&gt;</span> <span class="hljs-title class_">Promise</span>.<span class="hljs-title function_">all</span>(files.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">file</span> =&gt;</span> file)));
 
-		<span class="hljs-comment">// handle all .literate file, extract code and write out.</span>
-		<span class="hljs-keyword">try</span> {
-			<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> fl <span class="hljs-keyword">of</span> foundLiterateFiles) {
-				<span class="hljs-keyword">const</span> uri = vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">file</span>(fl.<span class="hljs-property">path</span>);
-				<span class="hljs-keyword">const</span> content = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">readFile</span>(uri);
-				<span class="hljs-keyword">let</span> fname = fl.<span class="hljs-property">path</span>.<span class="hljs-title function_">replace</span>(folderUri.<span class="hljs-property">path</span>, <span class="hljs-string">&#x27;&#x27;</span>);
-				<span class="hljs-comment">/** Environment where we can grab the state. */</span>
-				<span class="hljs-keyword">const</span> <span class="hljs-attr">env</span>: <span class="hljs-title class_">GrabbedState</span> = { <span class="hljs-attr">literateFileName</span>: fname, <span class="hljs-attr">literateUri</span>: uri, <span class="hljs-attr">gstate</span>: <span class="hljs-keyword">new</span> <span class="hljs-title class_">StateCore</span>(<span class="hljs-string">&#x27;&#x27;</span>, md, {}) };
-				<span class="hljs-keyword">const</span> text = <span class="hljs-keyword">new</span> <span class="hljs-title class_">TextDecoder</span>(<span class="hljs-string">&#x27;utf-8&#x27;</span>).<span class="hljs-title function_">decode</span>(content);
-				envList.<span class="hljs-title function_">push</span>(env);
-				<span class="hljs-keyword">const</span> rendered = md.<span class="hljs-title function_">render</span>(text, env);
-				<span class="hljs-keyword">const</span> html =
-<span class="hljs-string">`&lt;html&gt;
-	&lt;head&gt;
-		&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;./style.css&quot;&gt;
-	&lt;/head&gt;
-	&lt;body&gt;
-	<span class="hljs-subst">${rendered}</span>
-	&lt;/body&gt;
-&lt;/html&gt;`</span>;
-				<span class="hljs-keyword">const</span> encoded = <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(html, <span class="hljs-string">&#x27;utf-8&#x27;</span>);
-				fname = fname.<span class="hljs-title function_">replace</span>(<span class="hljs-string">&quot;.literate&quot;</span>, <span class="hljs-string">&quot;.html&quot;</span>);
-				<span class="hljs-keyword">const</span> fileUri = folderUri.<span class="hljs-title function_">with</span>({ <span class="hljs-attr">path</span>: posix.<span class="hljs-title function_">join</span>(sourceUri.<span class="hljs-property">path</span>, fname) });
-				<span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">writeFile</span>(fileUri, encoded);
-			}
-		} <span class="hljs-keyword">catch</span> (error) {
-			<span class="hljs-variable language_">console</span>.<span class="hljs-title function_">log</span>(error);
-		}
-
+        &lt;&lt;render and collect state&gt;&gt;
 		<span class="hljs-comment">/**
 		 * Map of fragment names and tuples of code fragments for these. The
 		 * tuples contain code language identifier followed by the filename and

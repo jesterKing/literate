@@ -109,35 +109,34 @@ export function activate(context: vscode.ExtensionContext) {
 			.findFiles('**/*.literate')
 			.then(files => Promise.all(files.map(file => file)));
 
-		// handle all .literate file, extract code and write out.
-		try {
-			for (let fl of foundLiterateFiles) {
-				const uri = vscode.Uri.file(fl.path);
-				const content = await vscode.workspace.fs.readFile(uri);
-				let fname = fl.path.replace(folderUri.path, '');
-				/** Environment where we can grab the state. */
-				const env: GrabbedState = { literateFileName: fname, literateUri: uri, gstate: new StateCore('', md, {}) };
-				const text = new TextDecoder('utf-8').decode(content);
-				envList.push(env);
-				const rendered = md.render(text, env);
-				const html =
-`<html>
-	<head>
-		<link rel="stylesheet" type="text/css" href="./style.css">
-	</head>
-	<body>
-	${rendered}
-	</body>
-</html>`;
-				const encoded = Buffer.from(html, 'utf-8');
-				fname = fname.replace(".literate", ".html");
-				const fileUri = folderUri.with({ path: posix.join(sourceUri.path, fname) });
-				await vscode.workspace.fs.writeFile(fileUri, encoded);
-			}
-		} catch (error) {
-			console.log(error);
-		}
-
+        		// handle all .literate file, extract code and write out.
+        		try {
+        			for (let fl of foundLiterateFiles) {
+        				const uri = vscode.Uri.file(fl.path);
+        				const content = await vscode.workspace.fs.readFile(uri);
+        				let fname = fl.path.replace(folderUri.path, '');
+        				/** Environment where we can grab the state. */
+        				const env: GrabbedState = { literateFileName: fname, literateUri: uri, gstate: new StateCore('', md, {}) };
+        				const text = new TextDecoder('utf-8').decode(content);
+        				envList.push(env);
+        				const rendered = md.render(text, env);
+        				const html =
+        `<html>
+        	<head>
+        		<link rel="stylesheet" type="text/css" href="./style.css">
+        	</head>
+        	<body>
+        	${rendered}
+        	</body>
+        </html>`;
+        				const encoded = Buffer.from(html, 'utf-8');
+        				fname = fname.replace(".literate", ".html");
+        				const fileUri = folderUri.with({ path: posix.join(sourceUri.path, fname) });
+        				await vscode.workspace.fs.writeFile(fileUri, encoded);
+        			}
+        		} catch (error) {
+        			console.log(error);
+        		}
 		/**
 		 * Map of fragment names and tuples of code fragments for these. The
 		 * tuples contain code language identifier followed by the filename and
