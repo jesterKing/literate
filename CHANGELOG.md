@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.1.4
+
+* Package improvement was not working out correctly. Revert to old packaging
+  mechanism
 ## 0.1.3
 
 * Package improvement, no functional changes
