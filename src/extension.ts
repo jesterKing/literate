@@ -227,9 +227,11 @@ ${additionalCode}`;
 						updateDiagnostics(fragmentInfo.env.literateUri, diagnostics, diag);
 					}
 					if (!fragments.has(tagName)) {
-						let msg = `could not find fragment ${tag} (${tagName})`;
-						const diag = createErrorDiagnostic(fragmentInfo.tokens[0], msg);
-						updateDiagnostics(fragmentInfo.env.literateUri, diagnostics, diag);
+                        if(tagName !== "(.*)") {
+                            let msg = `Could not find fragment ${tag} (${tagName})`;
+                            const diag = createErrorDiagnostic(fragmentInfo.tokens[0], msg);
+                            updateDiagnostics(fragmentInfo.env.literateUri, diagnostics, diag);
+                        }
 					}
 					let fragmentToReplaceWith = fragments.get(tagName) || undefined;
 					if (fragmentToReplaceWith) {
