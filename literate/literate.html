@@ -1,30 +1,32 @@
 <html>
-	<head>
-		<link rel="stylesheet" type="text/css" href="./style.css">
-	</head>
-	<body>
-	<h1>Literate Programming</h1>
-<p>The main idea of the extension is to collect all fragments that are
-created in all <code>.literate</code> files.</p>
-<p>All the fragments are expanded such that eventually there will be
-only the top fragments. A top fragment specifies a file to which
-it will be written.</p>
-<p>The first step is to put each <code>.literate</code> file through the MarkdownIt
-renderer. Each rendering will be given a special environment that will
-be used to collect the state for the render. The state will contain all
-the tokens as recognized by the renderer.</p>
-<div class="codefragment"><div class="fragmentname">&lt;&lt;render and collect state&gt;&gt;=</div><div class="code"><pre><code>		<span class="hljs-comment">// handle all .literate file, extract code and write out.</span>
-		<span class="hljs-keyword">try</span> {
-			<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> fl <span class="hljs-keyword">of</span> foundLiterateFiles) {
-				<span class="hljs-keyword">const</span> uri = vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">file</span>(fl.<span class="hljs-property">path</span>);
-				<span class="hljs-keyword">const</span> content = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">readFile</span>(uri);
-				<span class="hljs-keyword">let</span> fname = fl.<span class="hljs-property">path</span>.<span class="hljs-title function_">replace</span>(folderUri.<span class="hljs-property">path</span>, <span class="hljs-string">&#x27;&#x27;</span>);
-				<span class="hljs-comment">/** Environment where we can grab the state. */</span>
-				<span class="hljs-keyword">const</span> <span class="hljs-attr">env</span>: <span class="hljs-title class_">GrabbedState</span> = { <span class="hljs-attr">literateFileName</span>: fname, <span class="hljs-attr">literateUri</span>: uri, <span class="hljs-attr">gstate</span>: <span class="hljs-keyword">new</span> <span class="hljs-title class_">StateCore</span>(<span class="hljs-string">&#x27;&#x27;</span>, md, {}) };
-				<span class="hljs-keyword">const</span> text = <span class="hljs-keyword">new</span> <span class="hljs-title class_">TextDecoder</span>(<span class="hljs-string">&#x27;utf-8&#x27;</span>).<span class="hljs-title function_">decode</span>(content);
-				envList.<span class="hljs-title function_">push</span>(env);
-				<span class="hljs-keyword">const</span> rendered = md.<span class="hljs-title function_">render</span>(text, env);
-				<span class="hljs-keyword">const</span> html =
+        	<head>
+        		<link rel="stylesheet" type="text/css" href="./style.css">
+        	</head>
+        	<body>
+        	<h1>Literate Programming</h1>
+<h2>The main loop</h2>
+<p>The main idea of the extension is to collect all fragments that are created in
+all <code>.literate</code> files.</p>
+<p>All the fragments are expanded such that eventually there will be only the top
+fragments. A top fragment specifies a file to which it will be written.</p>
+<p>The first step is to put each <code>.literate</code> file through the MarkdownIt renderer.
+Each rendering will be given a special environment that will be used to collect
+the state for the render. The state will contain all the tokens as recognized by
+the renderer.</p>
+<p>Each rendered file will be saved as a <code>.html</code> file with otherwise the same name
+as the <code>.literate</code> file that was being rendered.</p>
+<div class="codefragment"><div class="fragmentname">&lt;&lt;render and collect state&gt;&gt;=</div><div class="code"><pre><code><span class="hljs-comment">// handle all .literate file, extract code and write out.</span>
+<span class="hljs-keyword">try</span> {
+	<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> fl <span class="hljs-keyword">of</span> foundLiterateFiles) {
+		<span class="hljs-keyword">const</span> uri = vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">file</span>(fl.<span class="hljs-property">path</span>);
+		<span class="hljs-keyword">const</span> content = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">readFile</span>(uri);
+		<span class="hljs-keyword">let</span> fname = fl.<span class="hljs-property">path</span>.<span class="hljs-title function_">replace</span>(folderUri.<span class="hljs-property">path</span>, <span class="hljs-string">&#x27;&#x27;</span>);
+		<span class="hljs-comment">/** Environment where we can grab the state. */</span>
+		<span class="hljs-keyword">const</span> <span class="hljs-attr">env</span>: <span class="hljs-title class_">GrabbedState</span> = { <span class="hljs-attr">literateFileName</span>: fname, <span class="hljs-attr">literateUri</span>: uri, <span class="hljs-attr">gstate</span>: <span class="hljs-keyword">new</span> <span class="hljs-title class_">StateCore</span>(<span class="hljs-string">&#x27;&#x27;</span>, md, {}) };
+		<span class="hljs-keyword">const</span> text = <span class="hljs-keyword">new</span> <span class="hljs-title class_">TextDecoder</span>(<span class="hljs-string">&#x27;utf-8&#x27;</span>).<span class="hljs-title function_">decode</span>(content);
+		envList.<span class="hljs-title function_">push</span>(env);
+		<span class="hljs-keyword">const</span> rendered = md.<span class="hljs-title function_">render</span>(text, env);
+		<span class="hljs-keyword">const</span> html =
 <span class="hljs-string">`&lt;html&gt;
 	&lt;head&gt;
 		&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;./style.css&quot;&gt;
@@ -33,14 +35,113 @@ the tokens as recognized by the renderer.</p>
 	<span class="hljs-subst">${rendered}</span>
 	&lt;/body&gt;
 &lt;/html&gt;`</span>;
-				<span class="hljs-keyword">const</span> encoded = <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(html, <span class="hljs-string">&#x27;utf-8&#x27;</span>);
-				fname = fname.<span class="hljs-title function_">replace</span>(<span class="hljs-string">&quot;.literate&quot;</span>, <span class="hljs-string">&quot;.html&quot;</span>);
-				<span class="hljs-keyword">const</span> fileUri = folderUri.<span class="hljs-title function_">with</span>({ <span class="hljs-attr">path</span>: posix.<span class="hljs-title function_">join</span>(sourceUri.<span class="hljs-property">path</span>, fname) });
-				<span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">writeFile</span>(fileUri, encoded);
+		<span class="hljs-keyword">const</span> encoded = <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(html, <span class="hljs-string">&#x27;utf-8&#x27;</span>);
+		fname = fname.<span class="hljs-title function_">replace</span>(<span class="hljs-string">&quot;.literate&quot;</span>, <span class="hljs-string">&quot;.html&quot;</span>);
+		<span class="hljs-keyword">const</span> fileUri = folderUri.<span class="hljs-title function_">with</span>({ <span class="hljs-attr">path</span>: posix.<span class="hljs-title function_">join</span>(sourceUri.<span class="hljs-property">path</span>, fname) });
+		<span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">writeFile</span>(fileUri, encoded);
+	}
+} <span class="hljs-keyword">catch</span> (error) {
+	<span class="hljs-variable language_">console</span>.<span class="hljs-title function_">log</span>(error);
+}
+</code></pre>
+</div></div><h2>Preparing MarkdownIt</h2>
+<p>We set up the MarkdownIt for our purposes. The highlight function we use to
+ensure our code fragments get syntax highlighting. This simply relies on
+highlight.js to do the work.</p>
+<p>We also tell MarkdownIt to use our <code>grabberPlugin</code>. This plug-in harvests the
+internal states for each document. These states we'll later use to get all the
+different code fragments and to weave them into the code files they describe.</p>
+<p>Finally we replace the default <code>fence</code> rule with our own <code>renderCodeFence</code> rule.
+The intent of that rule will be explained in the section on <code>renderCodeFence</code>.</p>
+<div class="codefragment"><div class="fragmentname">&lt;&lt;set up MarkdownIt&gt;&gt;=</div><div class="code"><pre><code><span class="hljs-comment">/**
+	* MarkdownIt instance with grabber_plugin in use.
+	*/</span>
+<span class="hljs-keyword">const</span> md : <span class="hljs-title class_">MarkdownIt</span> = <span class="hljs-keyword">new</span> <span class="hljs-title class_">MarkdownIt</span>({
+		<span class="hljs-attr">highlight</span>: <span class="hljs-keyword">function</span>(<span class="hljs-params">str: <span class="hljs-built_in">string</span>, lang: <span class="hljs-built_in">string</span>, attrs: <span class="hljs-built_in">string</span></span>) {
+			<span class="hljs-keyword">if</span>(lang &amp;&amp; hljs.<span class="hljs-title function_">getLanguage</span>(lang)) {
+				<span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;&lt;pre&gt;&lt;code&gt;&#x27;</span> +
+				hljs.<span class="hljs-title function_">highlight</span>(str, {language : lang}).<span class="hljs-property">value</span> +
+				<span class="hljs-string">&#x27;&lt;/code&gt;&lt;/pre&gt;&#x27;</span>;
 			}
-		} <span class="hljs-keyword">catch</span> (error) {
-			<span class="hljs-variable language_">console</span>.<span class="hljs-title function_">log</span>(error);
+			<span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;&lt;pre title=&quot;&#x27;</span> + attrs + <span class="hljs-string">&#x27;&quot;&gt;&#x27;</span> + md.<span class="hljs-property">utils</span>.escapeHtml(str) + <span class="hljs-string">&#x27;&lt;/pre&gt;&#x27;</span>;
 		}
+
+	})
+	.<span class="hljs-title function_">use</span>(grabberPlugin);
+
+oldFence = md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">fence</span>;
+md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">fence</span> = renderCodeFence;
+</code></pre>
+</div></div><h2>Gathering all fragments</h2>
+<p>All code fragments are fetched from each environment state. This is done through
+looking for all <code>fence</code> tokens. If the <code>token.info</code> for a <code>fence</code> matches the
+<code>FRAGMENT_RE</code> we can check to see whether the fragment we have currently in our
+hands is a new fragment (<code>root &amp;&amp; !add</code>) or whether this one expands an existing
+one (<code>root &amp;&amp; add</code>).</p>
+<div class="codefragment"><div class="fragmentname">&lt;&lt;build fragment map&gt;&gt;=</div><div class="code"><pre><code><span class="hljs-comment">/**
+ * Map of fragment names and tuples of code fragments for these. The
+ * tuples contain code language identifier followed by the filename and
+ * lastly followed by the actual code fragment.
+ */</span>
+<span class="hljs-keyword">const</span> fragments = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">FragmentInformation</span>&gt;();
+<span class="hljs-comment">// Now we have the state, we have access to the tokens</span>
+<span class="hljs-comment">// over which we can iterate to extract all the code</span>
+<span class="hljs-comment">// fragments and build up the map with the fragments concatenated</span>
+<span class="hljs-comment">// where necessary. We&#x27;ll extrapolate all fragments in the second</span>
+<span class="hljs-comment">// pass.</span>
+<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> env <span class="hljs-keyword">of</span> envList) {
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> token <span class="hljs-keyword">of</span> env.<span class="hljs-property">gstate</span>.<span class="hljs-property">tokens</span>) {
+        <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> === <span class="hljs-string">&#x27;fence&#x27;</span>) {
+            <span class="hljs-keyword">const</span> linenumber = <span class="hljs-title function_">locationOfFragment</span>(token);
+            <span class="hljs-keyword">const</span> match = token.<span class="hljs-property">info</span>.<span class="hljs-title function_">match</span>(<span class="hljs-variable constant_">FRAGMENT_RE</span>);
+            <span class="hljs-keyword">if</span> (match) {
+                <span class="hljs-keyword">let</span> [_, lang, name, root, add, fileName, ...__] = match;
+                lang = lang.<span class="hljs-title function_">trim</span>();
+                <span class="hljs-comment">// =+ in the fragment name, we&#x27;re adding to an existing fragment</span>
+                <span class="hljs-keyword">if</span> (root &amp;&amp; add) {
+                    <span class="hljs-keyword">if</span> (fragments.<span class="hljs-title function_">has</span>(name)) {
+                        <span class="hljs-keyword">let</span> fragmentInfo = fragments.<span class="hljs-title function_">get</span>(name) || <span class="hljs-literal">undefined</span>;
+                        <span class="hljs-keyword">if</span>(fragmentInfo &amp;&amp; fragmentInfo.<span class="hljs-property">code</span>) {
+                            <span class="hljs-keyword">let</span> additionalCode = <span class="hljs-title function_">decorateCodeWithLine</span>(token, env);
+                            fragmentInfo.<span class="hljs-property">code</span> =
+<span class="hljs-string">`<span class="hljs-subst">${fragmentInfo.code}</span>
+<span class="hljs-subst">${additionalCode}</span>`</span>;
+                            fragmentInfo.<span class="hljs-property">tokens</span>.<span class="hljs-title function_">push</span>(token);
+                            fragments.<span class="hljs-title function_">set</span>(name, fragmentInfo);
+                        }
+                    } <span class="hljs-keyword">else</span> {
+                        <span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Trying to add to non-existant fragment <span class="hljs-subst">${name}</span>. <span class="hljs-subst">${env.literateFileName}</span>:<span class="hljs-subst">${linenumber}</span>`</span>;
+                        <span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(token, msg);
+                        <span class="hljs-title function_">updateDiagnostics</span>(env.<span class="hljs-property">literateUri</span>, diagnostics, diag);
+                    }
+                } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (root &amp;&amp; !add) {
+                    <span class="hljs-keyword">if</span> (fragments.<span class="hljs-title function_">has</span>(name)) {
+                        <span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Trying to overwrite existing fragment fragment <span class="hljs-subst">${name}</span>. <span class="hljs-subst">${env.literateFileName}</span><span class="hljs-subst">${linenumber}</span>`</span>;
+                        <span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(token, msg);
+                        <span class="hljs-title function_">updateDiagnostics</span>(env.<span class="hljs-property">literateUri</span>, diagnostics, diag);
+                    } <span class="hljs-keyword">else</span> {
+                        <span class="hljs-keyword">if</span> (!fileName &amp;&amp; name.<span class="hljs-title function_">indexOf</span>(<span class="hljs-string">&quot;*&quot;</span>) &gt; -<span class="hljs-number">1</span>) {
+                            <span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Expected filename for star fragment <span class="hljs-subst">${name}</span>`</span>;
+                            <span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(token, msg);
+                            <span class="hljs-title function_">updateDiagnostics</span>(env.<span class="hljs-property">literateUri</span>, diagnostics, diag);
+                        } <span class="hljs-keyword">else</span> {
+                            <span class="hljs-keyword">let</span> code = <span class="hljs-title function_">decorateCodeWithLine</span>(token, env);
+                            <span class="hljs-keyword">let</span> <span class="hljs-attr">fragmentInfo</span>: <span class="hljs-title class_">FragmentInformation</span> = {
+                                <span class="hljs-attr">lang</span>: lang,
+                                <span class="hljs-attr">literateFileName</span>: env.<span class="hljs-property">literateFileName</span>,
+                                <span class="hljs-attr">sourceFileName</span>: fileName,
+                                <span class="hljs-attr">code</span>: code,
+                                <span class="hljs-attr">tokens</span>: [token],
+                                <span class="hljs-attr">env</span>: env,
+                            };
+                            fragments.<span class="hljs-title function_">set</span>(name, fragmentInfo);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 </code></pre>
 </div></div><div class="codefragment"><div class="fragmentname">&lt;&lt;literate.*&gt;&gt;=</div><div class="code"><pre><code><span class="hljs-keyword">import</span> <span class="hljs-title class_">StateCore</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/rules_core/state_core&#x27;</span>);
 <span class="hljs-keyword">import</span> <span class="hljs-title class_">Token</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/token&#x27;</span>);
@@ -108,24 +209,8 @@ the tokens as recognized by the renderer.</p>
 	<span class="hljs-comment">// Now provide the implementation of the command with registerCommand</span>
 	<span class="hljs-comment">// The commandId parameter must match the command field in package.json</span>
 	<span class="hljs-keyword">let</span> disposable = vscode.<span class="hljs-property">commands</span>.<span class="hljs-title function_">registerCommand</span>(<span class="hljs-string">&#x27;literate.process&#x27;</span>, <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) {
-		<span class="hljs-comment">/**
-		 * MarkdownIt instance with grabber_plugin in use.
-		 */</span>
-		<span class="hljs-keyword">const</span> md : <span class="hljs-title class_">MarkdownIt</span> = <span class="hljs-keyword">new</span> <span class="hljs-title class_">MarkdownIt</span>({
-				<span class="hljs-attr">highlight</span>: <span class="hljs-keyword">function</span>(<span class="hljs-params">str: <span class="hljs-built_in">string</span>, lang: <span class="hljs-built_in">string</span>, attrs: <span class="hljs-built_in">string</span></span>) {
-					<span class="hljs-keyword">if</span>(lang &amp;&amp; hljs.<span class="hljs-title function_">getLanguage</span>(lang)) {
-						<span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;&lt;pre&gt;&lt;code&gt;&#x27;</span> +
-						hljs.<span class="hljs-title function_">highlight</span>(str, {language : lang}).<span class="hljs-property">value</span> +
-						<span class="hljs-string">&#x27;&lt;/code&gt;&lt;/pre&gt;&#x27;</span>;
-					}
-					<span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;&lt;pre title=&quot;&#x27;</span> + attrs + <span class="hljs-string">&#x27;&quot;&gt;&#x27;</span> + md.<span class="hljs-property">utils</span>.escapeHtml(str) + <span class="hljs-string">&#x27;&lt;/pre&gt;&#x27;</span>;
-				}
 
-			})
-			.<span class="hljs-title function_">use</span>(grabberPlugin);
-
-		oldFence = md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">fence</span>;
-		md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">fence</span> = renderCodeFence;
+		&lt;&lt;set up <span class="hljs-title class_">MarkdownIt</span>&gt;&gt;
 
 		diagnostics.<span class="hljs-title function_">clear</span>();
 
@@ -154,70 +239,8 @@ the tokens as recognized by the renderer.</p>
 			.<span class="hljs-title function_">then</span>(<span class="hljs-function"><span class="hljs-params">files</span> =&gt;</span> <span class="hljs-title class_">Promise</span>.<span class="hljs-title function_">all</span>(files.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">file</span> =&gt;</span> file)));
 
         &lt;&lt;render and collect state&gt;&gt;
-		<span class="hljs-comment">/**
-		 * Map of fragment names and tuples of code fragments for these. The
-		 * tuples contain code language identifier followed by the filename and
-		 * lastly followed by the actual code fragment.
-		 */</span>
-		<span class="hljs-keyword">const</span> fragments = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">FragmentInformation</span>&gt;();
-		<span class="hljs-comment">// Now we have the state, we have access to the tokens</span>
-		<span class="hljs-comment">// over which we can iterate to extract all the code</span>
-		<span class="hljs-comment">// fragments and build up the map with the fragments concatenated</span>
-		<span class="hljs-comment">// where necessary. We&#x27;ll extrapolate all fragments in the second</span>
-		<span class="hljs-comment">// pass.</span>
-		<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> env <span class="hljs-keyword">of</span> envList) {
-			<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> token <span class="hljs-keyword">of</span> env.<span class="hljs-property">gstate</span>.<span class="hljs-property">tokens</span>) {
-				<span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> === <span class="hljs-string">&#x27;fence&#x27;</span>) {
-					<span class="hljs-keyword">const</span> linenumber = <span class="hljs-title function_">locationOfFragment</span>(token);
-					<span class="hljs-keyword">const</span> match = token.<span class="hljs-property">info</span>.<span class="hljs-title function_">match</span>(<span class="hljs-variable constant_">FRAGMENT_RE</span>);
-					<span class="hljs-keyword">if</span> (match) {
-						<span class="hljs-keyword">let</span> [_, lang, name, root, add, fileName, ...__] = match;
-						lang = lang.<span class="hljs-title function_">trim</span>();
-						<span class="hljs-comment">// =+ in the fragment name, we&#x27;re adding to an existing fragment</span>
-						<span class="hljs-keyword">if</span> (root &amp;&amp; add) {
-							<span class="hljs-keyword">if</span> (fragments.<span class="hljs-title function_">has</span>(name)) {
-								<span class="hljs-keyword">let</span> fragmentInfo = fragments.<span class="hljs-title function_">get</span>(name) || <span class="hljs-literal">undefined</span>;
-								<span class="hljs-keyword">if</span>(fragmentInfo &amp;&amp; fragmentInfo.<span class="hljs-property">code</span>) {
-									<span class="hljs-keyword">let</span> additionalCode = <span class="hljs-title function_">decorateCodeWithLine</span>(token, env);
-									fragmentInfo.<span class="hljs-property">code</span> =
-<span class="hljs-string">`<span class="hljs-subst">${fragmentInfo.code}</span>
-<span class="hljs-subst">${additionalCode}</span>`</span>;
-									fragmentInfo.<span class="hljs-property">tokens</span>.<span class="hljs-title function_">push</span>(token);
-									fragments.<span class="hljs-title function_">set</span>(name, fragmentInfo);
-								}
-							} <span class="hljs-keyword">else</span> {
-								<span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Trying to add to non-existant fragment <span class="hljs-subst">${name}</span>. <span class="hljs-subst">${env.literateFileName}</span>:<span class="hljs-subst">${linenumber}</span>`</span>;
-								<span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(token, msg);
-								<span class="hljs-title function_">updateDiagnostics</span>(env.<span class="hljs-property">literateUri</span>, diagnostics, diag);
-							}
-						} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (root &amp;&amp; !add) {
-							<span class="hljs-keyword">if</span> (fragments.<span class="hljs-title function_">has</span>(name)) {
-								<span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Trying to overwrite existing fragment fragment <span class="hljs-subst">${name}</span>. <span class="hljs-subst">${env.literateFileName}</span><span class="hljs-subst">${linenumber}</span>`</span>;
-								<span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(token, msg);
-								<span class="hljs-title function_">updateDiagnostics</span>(env.<span class="hljs-property">literateUri</span>, diagnostics, diag);
-							} <span class="hljs-keyword">else</span> {
-								<span class="hljs-keyword">if</span> (!fileName &amp;&amp; name.<span class="hljs-title function_">indexOf</span>(<span class="hljs-string">&quot;*&quot;</span>) &gt; -<span class="hljs-number">1</span>) {
-									<span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Expected filename for star fragment <span class="hljs-subst">${name}</span>`</span>;
-									<span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(token, msg);
-									<span class="hljs-title function_">updateDiagnostics</span>(env.<span class="hljs-property">literateUri</span>, diagnostics, diag);
-								} <span class="hljs-keyword">else</span> {
-									<span class="hljs-keyword">let</span> code = <span class="hljs-title function_">decorateCodeWithLine</span>(token, env);
-									<span class="hljs-keyword">let</span> <span class="hljs-attr">fragmentInfo</span>: <span class="hljs-title class_">FragmentInformation</span> = {
-										<span class="hljs-attr">lang</span>: lang,
-										<span class="hljs-attr">literateFileName</span>: env.<span class="hljs-property">literateFileName</span>,
-										<span class="hljs-attr">sourceFileName</span>: fileName,
-										<span class="hljs-attr">code</span>: code,
-										<span class="hljs-attr">tokens</span>: [token],
-										<span class="hljs-attr">env</span>: env,
-									};
-									fragments.<span class="hljs-title function_">set</span>(name, fragmentInfo);
-								}
-							}
-						}
-					}
-				}
-			}
-		}
+
+		&lt;&lt;build fragment map&gt;&gt;
 
 		<span class="hljs-comment">// for now do several passes</span>
 		<span class="hljs-keyword">let</span> <span class="hljs-attr">pass</span>: <span class="hljs-built_in">number</span> = <span class="hljs-number">0</span>;
@@ -244,9 +267,11 @@ the tokens as recognized by the renderer.</p>
 						<span class="hljs-title function_">updateDiagnostics</span>(fragmentInfo.<span class="hljs-property">env</span>.<span class="hljs-property">literateUri</span>, diagnostics, diag);
 					}
 					<span class="hljs-keyword">if</span> (!fragments.<span class="hljs-title function_">has</span>(tagName)) {
-						<span class="hljs-keyword">let</span> msg = <span class="hljs-string">`could not find fragment <span class="hljs-subst">${tag}</span> (<span class="hljs-subst">${tagName}</span>)`</span>;
-						<span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(fragmentInfo.<span class="hljs-property">tokens</span>[<span class="hljs-number">0</span>], msg);
-						<span class="hljs-title function_">updateDiagnostics</span>(fragmentInfo.<span class="hljs-property">env</span>.<span class="hljs-property">literateUri</span>, diagnostics, diag);
+                        <span class="hljs-keyword">if</span>(tagName !== <span class="hljs-string">&quot;(.*)&quot;</span>) {
+                            <span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Could not find fragment <span class="hljs-subst">${tag}</span> (<span class="hljs-subst">${tagName}</span>)`</span>;
+                            <span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(fragmentInfo.<span class="hljs-property">tokens</span>[<span class="hljs-number">0</span>], msg);
+                            <span class="hljs-title function_">updateDiagnostics</span>(fragmentInfo.<span class="hljs-property">env</span>.<span class="hljs-property">literateUri</span>, diagnostics, diag);
+                        }
 					}
 					<span class="hljs-keyword">let</span> fragmentToReplaceWith = fragments.<span class="hljs-title function_">get</span>(tagName) || <span class="hljs-literal">undefined</span>;
 					<span class="hljs-keyword">if</span> (fragmentToReplaceWith) {
@@ -368,15 +393,13 @@ the tokens as recognized by the renderer.</p>
 <span class="hljs-keyword">function</span> <span class="hljs-title function_">decorateCodeWithLine</span>(<span class="hljs-params">token: Token, _: GrabbedState</span>) : <span class="hljs-built_in">string</span> {
 	<span class="hljs-comment">// line number we want is tag location plus one, since code starts on that</span>
 	<span class="hljs-comment">// next line.</span>
-	<span class="hljs-comment">/*
-	let linenumber = locationOfFragment(token) + 1;
-	let code = &#x27;&#x27;;
-	if (linenumber&gt;=0) {
-		code = `#line ${linenumber} &quot;${env.filename}&quot;`;
+	<span class="hljs-keyword">let</span> linenumber = <span class="hljs-title function_">locationOfFragment</span>(token) + <span class="hljs-number">1</span>;
+	<span class="hljs-keyword">let</span> code = <span class="hljs-string">&#x27;&#x27;</span>;
+	<span class="hljs-keyword">if</span> (linenumber&gt;=<span class="hljs-number">0</span>) {
+		code = <span class="hljs-string">`#line <span class="hljs-subst">${linenumber}</span> &quot;<span class="hljs-subst">${env.filename}</span>&quot;`</span>;
 	}
-	code = `${code}\n${token.content.trim()}`;
-	*/</span>
-	<span class="hljs-keyword">return</span> token.<span class="hljs-property">content</span>;
+	code = <span class="hljs-string">`<span class="hljs-subst">${code}</span>\n<span class="hljs-subst">${token.content}</span>`</span>;
+	<span class="hljs-keyword">return</span> code; <span class="hljs-comment">//token.content;</span>
 }
 
 <span class="hljs-comment">/**
@@ -459,5 +482,5 @@ function extensionForLanguage(lang: string): string
 
 </code></pre>
 </div></div>
-	</body>
-</html>
+        	</body>
+        </html>

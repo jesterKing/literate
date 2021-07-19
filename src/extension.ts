@@ -64,9 +64,10 @@ export function activate(context: vscode.ExtensionContext) {
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
 	let disposable = vscode.commands.registerCommand('literate.process', async function () {
+
 		/**
-		 * MarkdownIt instance with grabber_plugin in use.
-		 */
+			* MarkdownIt instance with grabber_plugin in use.
+			*/
 		const md : MarkdownIt = new MarkdownIt({
 				highlight: function(str: string, lang: string, attrs: string) {
 					if(lang && hljs.getLanguage(lang)) {
@@ -76,10 +77,10 @@ export function activate(context: vscode.ExtensionContext) {
 					}
 					return '<pre title="' + attrs + '">' + md.utils.escapeHtml(str) + '</pre>';
 				}
-
+		
 			})
 			.use(grabberPlugin);
-
+		
 		oldFence = md.renderer.rules.fence;
 		md.renderer.rules.fence = renderCodeFence;
 
@@ -109,18 +110,18 @@ export function activate(context: vscode.ExtensionContext) {
 			.findFiles('**/*.literate')
 			.then(files => Promise.all(files.map(file => file)));
 
-        		// handle all .literate file, extract code and write out.
-        		try {
-        			for (let fl of foundLiterateFiles) {
-        				const uri = vscode.Uri.file(fl.path);
-        				const content = await vscode.workspace.fs.readFile(uri);
-        				let fname = fl.path.replace(folderUri.path, '');
-        				/** Environment where we can grab the state. */
-        				const env: GrabbedState = { literateFileName: fname, literateUri: uri, gstate: new StateCore('', md, {}) };
-        				const text = new TextDecoder('utf-8').decode(content);
-        				envList.push(env);
-        				const rendered = md.render(text, env);
-        				const html =
+        // handle all .literate file, extract code and write out.
+        try {
+        	for (let fl of foundLiterateFiles) {
+        		const uri = vscode.Uri.file(fl.path);
+        		const content = await vscode.workspace.fs.readFile(uri);
+        		let fname = fl.path.replace(folderUri.path, '');
+        		/** Environment where we can grab the state. */
+        		const env: GrabbedState = { literateFileName: fname, literateUri: uri, gstate: new StateCore('', md, {}) };
+        		const text = new TextDecoder('utf-8').decode(content);
+        		envList.push(env);
+        		const rendered = md.render(text, env);
+        		const html =
         `<html>
         	<head>
         		<link rel="stylesheet" type="text/css" href="./style.css">
@@ -129,14 +130,15 @@ export function activate(context: vscode.ExtensionContext) {
         	${rendered}
         	</body>
         </html>`;
-        				const encoded = Buffer.from(html, 'utf-8');
-        				fname = fname.replace(".literate", ".html");
-        				const fileUri = folderUri.with({ path: posix.join(sourceUri.path, fname) });
-        				await vscode.workspace.fs.writeFile(fileUri, encoded);
-        			}
-        		} catch (error) {
-        			console.log(error);
-        		}
+        		const encoded = Buffer.from(html, 'utf-8');
+        		fname = fname.replace(".literate", ".html");
+        		const fileUri = folderUri.with({ path: posix.join(sourceUri.path, fname) });
+        		await vscode.workspace.fs.writeFile(fileUri, encoded);
+        	}
+        } catch (error) {
+        	console.log(error);
+        }
+
 		/**
 		 * Map of fragment names and tuples of code fragments for these. The
 		 * tuples contain code language identifier followed by the filename and
@@ -149,57 +151,57 @@ export function activate(context: vscode.ExtensionContext) {
 		// where necessary. We'll extrapolate all fragments in the second
 		// pass.
 		for (let env of envList) {
-			for (let token of env.gstate.tokens) {
-				if (token.type === 'fence') {
-					const linenumber = locationOfFragment(token);
-					const match = token.info.match(FRAGMENT_RE);
-					if (match) {
-						let [_, lang, name, root, add, fileName, ...__] = match;
-						lang = lang.trim();
-						// =+ in the fragment name, we're adding to an existing fragment
-						if (root && add) {
-							if (fragments.has(name)) {
-								let fragmentInfo = fragments.get(name) || undefined;
-								if(fragmentInfo && fragmentInfo.code) {
-									let additionalCode = decorateCodeWithLine(token, env);
-									fragmentInfo.code =
-`${fragmentInfo.code}
-${additionalCode}`;
-									fragmentInfo.tokens.push(token);
-									fragments.set(name, fragmentInfo);
-								}
-							} else {
-								let msg = `Trying to add to non-existant fragment ${name}. ${env.literateFileName}:${linenumber}`;
-								const diag = createErrorDiagnostic(token, msg);
-								updateDiagnostics(env.literateUri, diagnostics, diag);
-							}
-						} else if (root && !add) {
-							if (fragments.has(name)) {
-								let msg = `Trying to overwrite existing fragment fragment ${name}. ${env.literateFileName}${linenumber}`;
-								const diag = createErrorDiagnostic(token, msg);
-								updateDiagnostics(env.literateUri, diagnostics, diag);
-							} else {
-								if (!fileName && name.indexOf("*") > -1) {
-									let msg = `Expected filename for star fragment ${name}`;
-									const diag = createErrorDiagnostic(token, msg);
-									updateDiagnostics(env.literateUri, diagnostics, diag);
-								} else {
-									let code = decorateCodeWithLine(token, env);
-									let fragmentInfo: FragmentInformation = {
-										lang: lang,
-										literateFileName: env.literateFileName,
-										sourceFileName: fileName,
-										code: code,
-										tokens: [token],
-										env: env,
-									};
-									fragments.set(name, fragmentInfo);
-								}
-							}
-						}
-					}
-				}
-			}
+		    for (let token of env.gstate.tokens) {
+		        if (token.type === 'fence') {
+		            const linenumber = locationOfFragment(token);
+		            const match = token.info.match(FRAGMENT_RE);
+		            if (match) {
+		                let [_, lang, name, root, add, fileName, ...__] = match;
+		                lang = lang.trim();
+		                // =+ in the fragment name, we're adding to an existing fragment
+		                if (root && add) {
+		                    if (fragments.has(name)) {
+		                        let fragmentInfo = fragments.get(name) || undefined;
+		                        if(fragmentInfo && fragmentInfo.code) {
+		                            let additionalCode = decorateCodeWithLine(token, env);
+		                            fragmentInfo.code =
+		`${fragmentInfo.code}
+		${additionalCode}`;
+		                            fragmentInfo.tokens.push(token);
+		                            fragments.set(name, fragmentInfo);
+		                        }
+		                    } else {
+		                        let msg = `Trying to add to non-existant fragment ${name}. ${env.literateFileName}:${linenumber}`;
+		                        const diag = createErrorDiagnostic(token, msg);
+		                        updateDiagnostics(env.literateUri, diagnostics, diag);
+		                    }
+		                } else if (root && !add) {
+		                    if (fragments.has(name)) {
+		                        let msg = `Trying to overwrite existing fragment fragment ${name}. ${env.literateFileName}${linenumber}`;
+		                        const diag = createErrorDiagnostic(token, msg);
+		                        updateDiagnostics(env.literateUri, diagnostics, diag);
+		                    } else {
+		                        if (!fileName && name.indexOf("*") > -1) {
+		                            let msg = `Expected filename for star fragment ${name}`;
+		                            const diag = createErrorDiagnostic(token, msg);
+		                            updateDiagnostics(env.literateUri, diagnostics, diag);
+		                        } else {
+		                            let code = decorateCodeWithLine(token, env);
+		                            let fragmentInfo: FragmentInformation = {
+		                                lang: lang,
+		                                literateFileName: env.literateFileName,
+		                                sourceFileName: fileName,
+		                                code: code,
+		                                tokens: [token],
+		                                env: env,
+		                            };
+		                            fragments.set(name, fragmentInfo);
+		                        }
+		                    }
+		                }
+		            }
+		        }
+		    }
 		}
 
 		// for now do several passes
@@ -353,15 +355,13 @@ function updateDiagnostics(uri: vscode.Uri, collection: vscode.DiagnosticCollect
 function decorateCodeWithLine(token: Token, _: GrabbedState) : string {
 	// line number we want is tag location plus one, since code starts on that
 	// next line.
-	/*
 	let linenumber = locationOfFragment(token) + 1;
 	let code = '';
 	if (linenumber>=0) {
 		code = `#line ${linenumber} "${env.filename}"`;
 	}
-	code = `${code}\n${token.content.trim()}`;
-	*/
-	return token.content;
+	code = `${code}\n${token.content}`;
+	return code; //token.content;
 }
 
 /**
