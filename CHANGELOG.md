@@ -8,6 +8,7 @@
 
 * Package improvement was not working out correctly. Revert to old packaging
   mechanism
+
 ## 0.1.3
 
 * Package improvement, no functional changes
@@ -36,11 +37,15 @@
 
 ## 0.0.7
 
-* Allow to specify file name on top code fragment. Use paths relative to the workspace. Subfolders can be part of the path. To save code for `<<Name of Fragment.*>>` to `CodeFile.cs` use:
-<pre>
+* Allow to specify file name on top code fragment. Use paths relative to the
+  workspace. Subfolders can be part of the path. To save code for `<<Name of
+  Fragment.*>>` to `CodeFile.cs` use:
+
+~~~literate
 ```csharp : &lt;&lt;Name of Fragment.*&gt;&gt;= ./CodeFile.cs
 // code here
-```</pre>
+```
+~~~
 
 ## 0.0.6
 
