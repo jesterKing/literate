@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.1.6
+
+* Minor fixups and dependency updates (dev)
+* Ensure extension works with vscode 1.63.2
+
 ## 0.1.5
 
 * Ensure `literate` can be created the literate way
