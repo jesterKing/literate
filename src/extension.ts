@@ -60,228 +60,227 @@ export function activate(context: vscode.ExtensionContext) {
 	const diagnostics = vscode.languages.createDiagnosticCollection('literate');
 	//setupLanguageMapping();
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('literate.process', async function () {
-
-		/**
-			* MarkdownIt instance with grabber_plugin in use.
-			*/
-		const md : MarkdownIt = new MarkdownIt({
-				highlight: function(str: string, lang: string, attrs: string) {
-					if(lang && hljs.getLanguage(lang)) {
-						return '<pre><code>' +
-						hljs.highlight(str, {language : lang}).value +
-						'</code></pre>';
+	
+		// The command has been defined in the package.json file
+		// Now provide the implementation of the command with registerCommand
+		// The commandId parameter must match the command field in package.json
+		let disposable = vscode.commands.registerCommand('literate.process', async function () {
+	
+			/**
+				* MarkdownIt instance with grabber_plugin in use.
+				*/
+			const md : MarkdownIt = new MarkdownIt({
+					highlight: function(str: string, lang: string, attrs: string) {
+						if(lang && hljs.getLanguage(lang)) {
+							return '<pre><code>' +
+							hljs.highlight(str, {language : lang}).value +
+							'</code></pre>';
+						}
+						return '<pre title="' + attrs + '">' + md.utils.escapeHtml(str) + '</pre>';
 					}
-					return '<pre title="' + attrs + '">' + md.utils.escapeHtml(str) + '</pre>';
-				}
-		
-			})
-			.use(grabberPlugin);
-		
-		oldFence = md.renderer.rules.fence;
-		md.renderer.rules.fence = renderCodeFence;
-
-		diagnostics.clear();
-
-		if (!vscode.workspace.workspaceFolders) {
-			return vscode.window.showInformationMessage("No workspace or folder opened");
-		}
-
-		/**
-		 * Contains environments for each Markup document parsed and rendered.
-		 */
-		const envList: Array<GrabbedState> = new Array<GrabbedState>();
-		/**
-		 * The URI for the workspace folder that will be searched for .literate
-		 * files to generate code and documentation for.
-		 */
-		const folderUri = vscode.workspace.workspaceFolders[0].uri;
-		/** The Uri for the parent path where generated code is saved. */
-		const sourceUri = folderUri;
-
-		// ensure the path exists.
-		vscode.workspace.fs.createDirectory(sourceUri);
-
-		/** All .literate files found in our workspace */
-		const foundLiterateFiles = await vscode.workspace
-			.findFiles('**/*.literate')
-			.then(files => Promise.all(files.map(file => file)));
-
-        // handle all .literate file, extract code and write out.
-        try {
-        	for (let fl of foundLiterateFiles) {
-        		const uri = vscode.Uri.file(fl.path);
-        		const content = await vscode.workspace.fs.readFile(uri);
-        		let fname = fl.path.replace(folderUri.path, '');
-        		/** Environment where we can grab the state. */
-        		const env: GrabbedState = { literateFileName: fname, literateUri: uri, gstate: new StateCore('', md, {}) };
-        		const text = new TextDecoder('utf-8').decode(content);
-        		envList.push(env);
-        		const rendered = md.render(text, env);
-        		const html =
-        `<html>
-        	<head>
-        		<link rel="stylesheet" type="text/css" href="./style.css">
-        	</head>
-        	<body>
-        	${rendered}
-        	</body>
-        </html>`;
-        		const encoded = Buffer.from(html, 'utf-8');
-        		fname = fname.replace(".literate", ".html");
-        		const fileUri = folderUri.with({ path: posix.join(sourceUri.path, fname) });
-        		await vscode.workspace.fs.writeFile(fileUri, encoded);
-        	}
-        } catch (error) {
-        	console.log(error);
-        }
-
-		/**
-		 * Map of fragment names and tuples of code fragments for these. The
-		 * tuples contain code language identifier followed by the filename and
-		 * lastly followed by the actual code fragment.
-		 */
-		const fragments = new Map<string, FragmentInformation>();
-		// Now we have the state, we have access to the tokens
-		// over which we can iterate to extract all the code
-		// fragments and build up the map with the fragments concatenated
-		// where necessary. We'll extrapolate all fragments in the second
-		// pass.
-		for (let env of envList) {
-		    for (let token of env.gstate.tokens) {
-		        if (token.type === 'fence') {
-		            const linenumber = locationOfFragment(token);
-		            const match = token.info.match(FRAGMENT_RE);
-		            if (match) {
-		                let [_, lang, name, root, add, fileName, ...__] = match;
-		                lang = lang.trim();
-		                // =+ in the fragment name, we're adding to an existing fragment
-		                if (root && add) {
-		                    if (fragments.has(name)) {
-		                        let fragmentInfo = fragments.get(name) || undefined;
-		                        if(fragmentInfo && fragmentInfo.code) {
-		                            let additionalCode = token.content;
-		                            fragmentInfo.code =
-		`${fragmentInfo.code}
-		${additionalCode}`;
-		                            fragmentInfo.tokens.push(token);
-		                            fragments.set(name, fragmentInfo);
-		                        }
-		                    } else {
-		                        let msg = `Trying to add to non-existant fragment ${name}. ${env.literateFileName}:${linenumber}`;
-		                        const diag = createErrorDiagnostic(token, msg);
-		                        updateDiagnostics(env.literateUri, diagnostics, diag);
-		                    }
-		                } else if (root && !add) {
-		                    if (fragments.has(name)) {
-		                        let msg = `Trying to overwrite existing fragment fragment ${name}. ${env.literateFileName}${linenumber}`;
-		                        const diag = createErrorDiagnostic(token, msg);
-		                        updateDiagnostics(env.literateUri, diagnostics, diag);
-		                    } else {
-		                        if (!fileName && name.indexOf("*") > -1) {
-		                            let msg = `Expected filename for star fragment ${name}`;
-		                            const diag = createErrorDiagnostic(token, msg);
-		                            updateDiagnostics(env.literateUri, diagnostics, diag);
-		                        } else {
-		                            let code = token.content;
-		                            let fragmentInfo: FragmentInformation = {
-		                                lang: lang,
-		                                literateFileName: env.literateFileName,
-		                                sourceFileName: fileName,
-		                                code: code,
-		                                tokens: [token],
-		                                env: env,
-		                            };
-		                            fragments.set(name, fragmentInfo);
-		                        }
-		                    }
-		                }
-		            }
-		        }
-		    }
-		}
-
-		// for now do several passes
-		let pass: number = 0;
-		do {
-			pass++;
-			let fragmentReplaced = false;
-			for (let fragmentName of fragments.keys()) {
-				let fragmentInfo = fragments.get(fragmentName) || undefined;
-				if (!fragmentInfo) {
-					continue;
-				}
-
-				const casesToReplace = [...fragmentInfo.code.matchAll(FRAGMENTS_RE)];
-				for (let match of casesToReplace) {
-					let [tag, indent, tagName, root, add, ...rest] = match;
-					if (root) {
-						let msg = `Found '=': incorrect fragment tag in fragment, ${tag}`;
-						const diag = createErrorDiagnostic(fragmentInfo.tokens[0], msg);
-						updateDiagnostics(fragmentInfo.env.literateUri, diagnostics, diag);
-					}
-					if (add) {
-						let msg = `Found '+': incorrect fragment tag in fragment: ${tag}`;
-						const diag = createErrorDiagnostic(fragmentInfo.tokens[0], msg);
-						updateDiagnostics(fragmentInfo.env.literateUri, diagnostics, diag);
-					}
-					if (!fragments.has(tagName)) {
-                        if(tagName !== "(.*)") {
-                            let msg = `Could not find fragment ${tag} (${tagName})`;
-                            const diag = createErrorDiagnostic(fragmentInfo.tokens[0], msg);
-                            updateDiagnostics(fragmentInfo.env.literateUri, diagnostics, diag);
-                        }
-					}
-					let fragmentToReplaceWith = fragments.get(tagName) || undefined;
-					if (fragmentToReplaceWith) {
-						let code = fragmentToReplaceWith.code;
-						let lines = code.split("\n").slice(0, -1);
-						let indentedLines = lines.flatMap(function (e, _) {
-							return indent + e;
-
-						});
-						let newcode = indentedLines.join("\n");
-						fragmentReplaced = true;
-						fragmentInfo.code = fragmentInfo.code.replace(tag, newcode);
-						fragments.set(fragmentName, fragmentInfo);
-					}
-				}
+			
+				})
+				.use(grabberPlugin);
+			
+			oldFence = md.renderer.rules.fence;
+			md.renderer.rules.fence = renderCodeFence;
+	
+			diagnostics.clear();
+	
+			if (!vscode.workspace.workspaceFolders) {
+				return vscode.window.showInformationMessage("No workspace or folder opened");
 			}
-			if(!fragmentReplaced) {
-				break;
-			}
-		}
-		while (pass < 25);
-
-		/* now write out the source files. */
-		for(const name of fragments.keys()) {
-			if (name.indexOf(".*") >= 0) {
-				let fragmentInfo = fragments.get(name) || undefined;
-				if (fragmentInfo) {
-					let fileName = fragmentInfo.sourceFileName.trim();
-					const encoded = Buffer.from(fragmentInfo.code, 'utf-8');
-					const fileUri = folderUri.with({ path: posix.join(sourceUri.path, fileName) });
+	
+			/**
+			 * Contains environments for each Markup document parsed and rendered.
+			 */
+			const envList: Array<GrabbedState> = new Array<GrabbedState>();
+			/**
+			 * The URI for the workspace folder that will be searched for .literate
+			 * files to generate code and documentation for.
+			 */
+			const folderUri = vscode.workspace.workspaceFolders[0].uri;
+			/** The Uri for the parent path where generated code is saved. */
+			const sourceUri = folderUri;
+	
+			// ensure the path exists.
+			vscode.workspace.fs.createDirectory(sourceUri);
+	
+			/** All .literate files found in our workspace */
+			const foundLiterateFiles = await vscode.workspace
+				.findFiles('**/*.literate')
+				.then(files => Promise.all(files.map(file => file)));
+	
+			// handle all .literate file, extract code and write out.
+			try {
+				for (let fl of foundLiterateFiles) {
+					const uri = vscode.Uri.file(fl.path);
+					const content = await vscode.workspace.fs.readFile(uri);
+					let fname = fl.path.replace(folderUri.path, '');
+					/** Environment where we can grab the state. */
+					const env: GrabbedState = { literateFileName: fname, literateUri: uri, gstate: new StateCore('', md, {}) };
+					const text = new TextDecoder('utf-8').decode(content);
+					envList.push(env);
+					const rendered = md.render(text, env);
+					const html =
+			`<html>
+				<head>
+					<link rel="stylesheet" type="text/css" href="./style.css">
+				</head>
+				<body>
+				${rendered}
+				</body>
+			</html>`;
+					const encoded = Buffer.from(html, 'utf-8');
+					fname = fname.replace(".literate", ".html");
+					const fileUri = folderUri.with({ path: posix.join(sourceUri.path, fname) });
 					await vscode.workspace.fs.writeFile(fileUri, encoded);
 				}
+			} catch (error) {
+				console.log(error);
 			}
-		}
-
-		let hasAnyDiagnostics = false;
-		diagnostics.forEach(function(_: vscode.Uri, diags: readonly vscode.Diagnostic[], __: vscode.DiagnosticCollection) : any {
-			hasAnyDiagnostics ||= (diags.length > 0);
-		}
-		);
-
-		if (hasAnyDiagnostics) {
-			return vscode.window.showErrorMessage("Error encountered during process");
-		}
-		else {
-			return vscode.window.showInformationMessage("Process completed");
-		}
-	});
+	
+			/**
+			 * Map of fragment names and tuples of code fragments for these. The
+			 * tuples contain code language identifier followed by the filename and
+			 * lastly followed by the actual code fragment.
+			 */
+			const fragments = new Map<string, FragmentInformation>();
+			// Now we have the state, we have access to the tokens
+			// over which we can iterate to extract all the code
+			// fragments and build up the map with the fragments concatenated
+			// where necessary. We'll extrapolate all fragments in the second
+			// pass.
+			for (let env of envList) {
+			    for (let token of env.gstate.tokens) {
+			        if (token.type === 'fence') {
+			            const linenumber = locationOfFragment(token);
+			            const match = token.info.match(FRAGMENT_RE);
+			            if (match) {
+			                let [_, lang, name, root, add, fileName, ...__] = match;
+			                lang = lang.trim();
+			                // =+ in the fragment name, we're adding to an existing fragment
+			                if (root && add) {
+			                    if (fragments.has(name)) {
+			                        let fragmentInfo = fragments.get(name) || undefined;
+			                        if(fragmentInfo && fragmentInfo.code) {
+			                            let additionalCode = token.content;
+			                            fragmentInfo.code =
+			`${fragmentInfo.code}
+			${additionalCode}`;
+			                            fragmentInfo.tokens.push(token);
+			                            fragments.set(name, fragmentInfo);
+			                        }
+			                    } else {
+			                        let msg = `Trying to add to non-existant fragment ${name}. ${env.literateFileName}:${linenumber}`;
+			                        const diag = createErrorDiagnostic(token, msg);
+			                        updateDiagnostics(env.literateUri, diagnostics, diag);
+			                    }
+			                } else if (root && !add) {
+			                    if (fragments.has(name)) {
+			                        let msg = `Trying to overwrite existing fragment fragment ${name}. ${env.literateFileName}${linenumber}`;
+			                        const diag = createErrorDiagnostic(token, msg);
+			                        updateDiagnostics(env.literateUri, diagnostics, diag);
+			                    } else {
+			                        if (!fileName && name.indexOf("*") > -1) {
+			                            let msg = `Expected filename for star fragment ${name}`;
+			                            const diag = createErrorDiagnostic(token, msg);
+			                            updateDiagnostics(env.literateUri, diagnostics, diag);
+			                        } else {
+			                            let code = token.content;
+			                            let fragmentInfo: FragmentInformation = {
+			                                lang: lang,
+			                                literateFileName: env.literateFileName,
+			                                sourceFileName: fileName,
+			                                code: code,
+			                                tokens: [token],
+			                                env: env,
+			                            };
+			                            fragments.set(name, fragmentInfo);
+			                        }
+			                    }
+			                }
+			            }
+			        }
+			    }
+			}
+	
+			// for now do several passes
+			let pass: number = 0;
+			do {
+				pass++;
+				let fragmentReplaced = false;
+				for (let fragmentName of fragments.keys()) {
+					let fragmentInfo = fragments.get(fragmentName) || undefined;
+					if (!fragmentInfo) {
+						continue;
+					}
+	
+					const casesToReplace = [...fragmentInfo.code.matchAll(FRAGMENTS_RE)];
+					for (let match of casesToReplace) {
+						let [tag, indent, tagName, root, add, ...rest] = match;
+						if (root) {
+							let msg = `Found '=': incorrect fragment tag in fragment, ${tag}`;
+							const diag = createErrorDiagnostic(fragmentInfo.tokens[0], msg);
+							updateDiagnostics(fragmentInfo.env.literateUri, diagnostics, diag);
+						}
+						if (add) {
+							let msg = `Found '+': incorrect fragment tag in fragment: ${tag}`;
+							const diag = createErrorDiagnostic(fragmentInfo.tokens[0], msg);
+							updateDiagnostics(fragmentInfo.env.literateUri, diagnostics, diag);
+						}
+						if (!fragments.has(tagName) && tagName !== "(.*)") {
+							let msg = `Could not find fragment ${tag} (${tagName})`;
+							const diag = createErrorDiagnostic(fragmentInfo.tokens[0], msg);
+							updateDiagnostics(fragmentInfo.env.literateUri, diagnostics, diag);
+						}
+						let fragmentToReplaceWith = fragments.get(tagName) || undefined;
+						if (fragmentToReplaceWith) {
+							let code = fragmentToReplaceWith.code;
+							let lines = code.split("\n").slice(0, -1);
+							let indentedLines = lines.flatMap(function (e, _) {
+								return indent + e;
+	
+							});
+							let newcode = indentedLines.join("\n");
+							fragmentReplaced = true;
+							fragmentInfo.code = fragmentInfo.code.replace(tag, newcode);
+							fragments.set(fragmentName, fragmentInfo);
+						}
+					}
+				}
+				if(!fragmentReplaced) {
+					break;
+				}
+			}
+			while (pass < 25);
+	
+			/* now write out the source files. */
+			for(const name of fragments.keys()) {
+				if (name.indexOf(".*") >= 0) {
+					let fragmentInfo = fragments.get(name) || undefined;
+					if (fragmentInfo) {
+						let fileName = fragmentInfo.sourceFileName.trim();
+						const encoded = Buffer.from(fragmentInfo.code, 'utf-8');
+						const fileUri = folderUri.with({ path: posix.join(sourceUri.path, fileName) });
+						await vscode.workspace.fs.writeFile(fileUri, encoded);
+					}
+				}
+			}
+	
+			let hasAnyDiagnostics = false;
+			diagnostics.forEach(function(_: vscode.Uri, diags: readonly vscode.Diagnostic[], __: vscode.DiagnosticCollection) : any {
+				hasAnyDiagnostics ||= (diags.length > 0);
+			}
+			);
+	
+			if (hasAnyDiagnostics) {
+				return vscode.window.showErrorMessage("Error encountered during process");
+			}
+			else {
+				return vscode.window.setStatusBarMessage("Process completed", 1000);
+			}
+		});
 
 	if (vscode.window.activeTextEditor) {
 		updateDiagnostics(vscode.window.activeTextEditor.document.uri, diagnostics, undefined);
@@ -291,6 +290,7 @@ export function activate(context: vscode.ExtensionContext) {
 			updateDiagnostics(editor.document.uri, diagnostics, undefined);
 		}
 	}));
+
 	context.subscriptions.push(disposable);
 
 	return {
