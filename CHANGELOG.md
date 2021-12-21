@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.1.5
+
+* Ensure `literate` can be created the literate way
+
 ## 0.1.4
 
 * Package improvement was not working out correctly. Revert to old packaging
