@@ -1,5 +1,16 @@
 # Change Log
 
+## 0.1.8
+
+* More literate text explaining the workings of the plug-in. Most of the new
+  text is about fragments
+* Don't bundle node_modules unnecessarily
+
+## 0.1.7
+
+* Add LICENSE file (MIT)
+* Bump engines dependency to 1.63.2
+
 ## 0.1.6
 
 * Minor fixups and dependency updates (dev)
