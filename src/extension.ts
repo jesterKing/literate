@@ -49,10 +49,10 @@ interface FragmentInformation {
 	env: GrabbedState;
 }
 
-let FRAGMENT_RE = /(.*):.*<<(.*)>>(=)?(\+)?\s*(.*)/;
-let FRAGMENTS_RE = /([ \t]*)<<(.*)>>(=)?(\+)?/g;
-let FRAGMENT_IN_CODE = /(&lt;&lt.*?&gt;&gt;)/g;
-let CLEAN_FRAGMENT_IN_CODE = /(&lt;&lt.*?&gt;&gt;)/g;
+//let HTML_ENCODED_FRAGMENT_TAG_RE = /(&lt;&lt.*?&gt;&gt;)/g;
+let FRAGMENT_USE_IN_CODE_RE = /([ \t]*)<<(.*)>>(=)?(\+)?/g;
+
+			let FRAGMENT_RE = /(.*):.*<<(.*)>>(=)?(\+)?\s*(.*)/;
 let oldFence : Renderer.RenderRule | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
@@ -63,7 +63,7 @@ export function activate(context: vscode.ExtensionContext) {
 		// The command has been defined in the package.json file
 		// Now provide the implementation of the command with registerCommand
 		// The commandId parameter must match the command field in package.json
-		let disposable = vscode.commands.registerCommand('literate.process', async function () {
+		let literateProcessDisposable = vscode.commands.registerCommand('literate.process', async function () {
 	
 			/**
 				* MarkdownIt instance with grabber_plugin in use.
@@ -153,53 +153,51 @@ export function activate(context: vscode.ExtensionContext) {
 			for (let env of envList) {
 			    for (let token of env.gstate.tokens) {
 			        if (token.type === 'fence') {
-			            const linenumber = locationOfFragment(token);
-			            const match = token.info.match(FRAGMENT_RE);
-			            if (match) {
-			                let [_, lang, name, root, add, fileName, ...__] = match;
-			                lang = lang.trim();
-			                // =+ in the fragment name, we're adding to an existing fragment
-			                if (root && add) {
-			                    if (fragments.has(name)) {
-			                        let fragmentInfo = fragments.get(name) || undefined;
-			                        if(fragmentInfo && fragmentInfo.code) {
-			                            let additionalCode = token.content;
-			                            fragmentInfo.code =
-			`${fragmentInfo.code}
-			${additionalCode}`;
-			                            fragmentInfo.tokens.push(token);
-			                            fragments.set(name, fragmentInfo);
-			                        }
-			                    } else {
-			                        let msg = `Trying to add to non-existant fragment ${name}. ${env.literateFileName}:${linenumber}`;
-			                        const diag = createErrorDiagnostic(token, msg);
-			                        updateDiagnostics(env.literateUri, diagnostics, diag);
-			                    }
-			                } else if (root && !add) {
-			                    if (fragments.has(name)) {
-			                        let msg = `Trying to overwrite existing fragment fragment ${name}. ${env.literateFileName}${linenumber}`;
-			                        const diag = createErrorDiagnostic(token, msg);
-			                        updateDiagnostics(env.literateUri, diagnostics, diag);
-			                    } else {
-			                        if (!fileName && name.indexOf("*") > -1) {
-			                            let msg = `Expected filename for star fragment ${name}`;
-			                            const diag = createErrorDiagnostic(token, msg);
-			                            updateDiagnostics(env.literateUri, diagnostics, diag);
-			                        } else {
-			                            let code = token.content;
-			                            let fragmentInfo: FragmentInformation = {
-			                                lang: lang,
-			                                literateFileName: env.literateFileName,
-			                                sourceFileName: fileName,
-			                                code: code,
-			                                tokens: [token],
-			                                env: env,
-			                            };
-			                            fragments.set(name, fragmentInfo);
-			                        }
-			                    }
-			                }
-			            }
+			        	const linenumber = locationOfFragment(token);
+			        	const match = token.info.match(FRAGMENT_RE);
+			        	if (match) {
+			        		let [_, lang, name, root, add, fileName, ...__] = match;
+			        		lang = lang.trim();
+			        		if (root && add) {
+			        			if (fragments.has(name)) {
+			        				let fragmentInfo = fragments.get(name) || undefined;
+			        				if(fragmentInfo && fragmentInfo.code) {
+			        					let additionalCode = token.content;
+			        					fragmentInfo.code = `${fragmentInfo.code}${additionalCode}`;
+			        					fragmentInfo.tokens.push(token);
+			        					fragments.set(name, fragmentInfo);
+			        				}
+			        			} else {
+			        				let msg = `Trying to add to non-existant fragment ${name}. ${env.literateFileName}:${linenumber}`;
+			        				const diag = createErrorDiagnostic(token, msg);
+			        				updateDiagnostics(env.literateUri, diagnostics, diag);
+			        			}
+			        		}
+			        		if (root && !add) {
+			        			if (fragments.has(name)) {
+			        				let msg = `Trying to overwrite existing fragment fragment ${name}. ${env.literateFileName}${linenumber}`;
+			        				const diag = createErrorDiagnostic(token, msg);
+			        				updateDiagnostics(env.literateUri, diagnostics, diag);
+			        			} else {
+			        				if (!fileName && name.indexOf(".*") > -1) {
+			        					let msg = `Expected filename for star fragment ${name}`;
+			        					const diag = createErrorDiagnostic(token, msg);
+			        					updateDiagnostics(env.literateUri, diagnostics, diag);
+			        				} else {
+			        					let code = token.content;
+			        					let fragmentInfo: FragmentInformation = {
+			        						lang: lang,
+			        						literateFileName: env.literateFileName,
+			        						sourceFileName: fileName,
+			        						code: code,
+			        						tokens: [token],
+			        						env: env,
+			        					};
+			        					fragments.set(name, fragmentInfo);
+			        				}
+			        			}
+			        		}
+			        	}
 			        }
 			    }
 			}
@@ -214,8 +212,8 @@ export function activate(context: vscode.ExtensionContext) {
 					if (!fragmentInfo) {
 						continue;
 					}
-	
-					const casesToReplace = [...fragmentInfo.code.matchAll(FRAGMENTS_RE)];
+			
+					const casesToReplace = [...fragmentInfo.code.matchAll(FRAGMENT_USE_IN_CODE_RE)];
 					for (let match of casesToReplace) {
 						let [tag, indent, tagName, root, add, ...rest] = match;
 						if (root) {
@@ -239,7 +237,7 @@ export function activate(context: vscode.ExtensionContext) {
 							let lines = code.split("\n").slice(0, -1);
 							let indentedLines = lines.flatMap(function (e, _) {
 								return indent + e;
-	
+			
 							});
 							let newcode = indentedLines.join("\n");
 							fragmentReplaced = true;
@@ -277,7 +275,7 @@ export function activate(context: vscode.ExtensionContext) {
 				return vscode.window.showErrorMessage("Error encountered during process");
 			}
 			else {
-				return vscode.window.setStatusBarMessage("Process completed", 1000);
+				return vscode.window.setStatusBarMessage("Literate Process completed", 5000);
 			}
 		});
 
@@ -290,7 +288,7 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	}));
 
-	context.subscriptions.push(disposable);
+	context.subscriptions.push(literateProcessDisposable);
 
 	return {
 		extendMarkdownIt(md: any) {
@@ -324,7 +322,7 @@ function renderCodeFence(tokens : Token[], idx : number, options : MarkdownIt.Op
 					root = root || '';
 					add = add || '';
 					rendered = `<div class="codefragment"><div class="fragmentname">&lt;&lt;${name}&gt;&gt;${root}${add}</div><div class="code">${rendered}</div></div>`;
-					//rendered = rendered.replaceAll(FRAGMENT_IN_CODE, codeFragmentCleanup);
+					//rendered = rendered.replaceAll(HTML_ENCODED_FRAGMENT_TAG_RE, codeFragmentCleanup);
 				}
 			}
 		}
