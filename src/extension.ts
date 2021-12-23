@@ -14,7 +14,6 @@ import { grabberPlugin } from './grabber';
 import MarkdownIt = require("markdown-it");
 import Renderer = require('markdown-it/lib/renderer');
 
-
 /**
  * Interface for environment to hold the Markdown file name and the StateCore
  * grabbed by the grabberPlugin.
@@ -36,23 +35,40 @@ interface GrabbedState {
 	 */
 	gstate: StateCore;
 }
-
 /**
  * Interface denoting a fragment and related information
  */
 interface FragmentInformation {
+	/**
+	 * Programming language identifier for fragment.
+	 */
 	lang: string;
+	/**
+	 * Filename of literate file.
+	 */
 	literateFileName: string;
+	/**
+	 * Filename of target source file. This is set when the fragment
+	 * is a top fragment.
+	 */
 	sourceFileName: string;
+	/**
+	 * The code fragment.
+	 */
 	code: string;
+	/**
+	 * List of tokens that make up the entire code fragment.
+	 */
 	tokens: Token[];
+	/**
+	 * The GrabbedState related to this fragment.
+	 */
 	env: GrabbedState;
 }
-
 //let HTML_ENCODED_FRAGMENT_TAG_RE = /(&lt;&lt.*?&gt;&gt;)/g;
 let FRAGMENT_USE_IN_CODE_RE = /([ \t]*)<<(.*)>>(=)?(\+)?/g;
+let FRAGMENT_RE = /(.*):.*<<(.*)>>(=)?(\+)?\s*(.*)/;
 
-			let FRAGMENT_RE = /(.*):.*<<(.*)>>(=)?(\+)?\s*(.*)/;
 let oldFence : Renderer.RenderRule | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
@@ -109,7 +125,7 @@ export function activate(context: vscode.ExtensionContext) {
 			const foundLiterateFiles = await vscode.workspace
 				.findFiles('**/*.literate')
 				.then(files => Promise.all(files.map(file => file)));
-	
+			
 			// handle all .literate file, extract code and write out.
 			try {
 				for (let fl of foundLiterateFiles) {
