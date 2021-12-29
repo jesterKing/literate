@@ -1,6 +1,37 @@
 # Literate Programming
 
-## The approach
+**Literate programming** is a programming paradigm introduced by Donald Knuth. A
+program is written in a natural language with snippets of code interspersed.
+From this text usable source code is generated, as well as a well formated
+human-readable document.
+
+The most important influence for this **literate programming** extension is the
+[PBR Book](https://pbr-book.org).
+
+This extension provides a set of tools that help the programmer writing literate
+programs. Snippets in this extension are called code fragments.
+
+The approach for this extension is based on Markdown documents. The Markdown
+specification is only slightly adapted to make supporting **literate
+programming** easy. The code fragments are expressed in code fences as per the
+Markdown specification, either with surrounding tripple backticks or tripple
+tildes. Along with the programming language identifier the opening line has been
+extended to contain the fragment name and type as essentially options to the
+code fence. This opening line thus will look like `py : <<fragment name>>` to
+create a new fragment, or like `py : <<fragment name>>=+` to amend an existing
+fragment.
+
+To create actual source files a fragment creation line needs to be used with a
+slightly extended form of the creation tag mentioned above. The name has to be
+postixed with the string `.*` betueen the angle brackets. Furthermore a file
+name needs to be specied after the equal sign. This is essentially a relative
+path that is going to be appended each workspace folder as the root. A top level
+fragment looks like `py : <<top-level fragment.*>> ./src/source.py`. The
+name of this fragment is `top-level fragment`, and once it has been fully
+extrapolated will be written to a file in the workspace folder under `src` as
+the file `source.py`.
+
+## Iterating all literate files
 
 The main idea of the extension is to collect all fragments that are created in
 all `.literate` files.
@@ -19,41 +50,39 @@ saved in the list of `GrabbedState`s `envList`.
 
 Each rendered file will be saved as a `HTML` file with the same name
 as the `.literate` file that was being rendered, but with the extension replaced
-with `.html`.
+with `.html`. This will be handled by the `WriteRenderCallback` if one is passed
+to `iterateLiterateFiles`.
 
 ```ts : <<render and collect state>>=
-/** All .literate files found in our workspace */
-const foundLiterateFiles = await vscode.workspace
-	.findFiles('**/*.literate')
-	.then(files => Promise.all(files.map(file => file)));
+async function iterateLiterateFiles(workspaceFolder : vscode.WorkspaceFolder, writeHtml : WriteRenderCallback | undefined | null, envList : Array<GrabbedState>, md : MarkdownIt)
+{
+	const folderUri = workspaceFolder.uri;
+	const sourceUri = folderUri;
+	const literateFilesInWorkspace : vscode.RelativePattern = new vscode.RelativePattern(workspaceFolder, '**/*.literate');
 
-// handle all .literate file, extract code and write out.
-try {
-	for (let fl of foundLiterateFiles) {
-		const uri = vscode.Uri.file(fl.path);
-		const content = await vscode.workspace.fs.readFile(uri);
-		let fname = fl.path.replace(folderUri.path, '');
-		/** Environment where we can grab the state. */
-		const env: GrabbedState = { literateFileName: fname, literateUri: uri, gstate: new StateCore('', md, {}) };
-		const text = new TextDecoder('utf-8').decode(content);
-		envList.push(env);
-		const rendered = md.render(text, env);
-		const html =
-`<html>
-	<head>
-		<link rel="stylesheet" type="text/css" href="./style.css">
-	</head>
-	<body>
-	${rendered}
-	</body>
-</html>`;
-		const encoded = Buffer.from(html, 'utf-8');
-		fname = fname.replace(".literate", ".html");
-		const fileUri = folderUri.with({ path: posix.join(sourceUri.path, fname) });
-		await vscode.workspace.fs.writeFile(fileUri, encoded);
+	/** All .literate files found in our workspace */
+	const foundLiterateFiles = await vscode.workspace
+		.findFiles(literateFilesInWorkspace)
+		.then(files => Promise.all(files.map(file => file)));
+
+	try {
+		for (let fl of foundLiterateFiles) {
+			const uri = vscode.Uri.file(fl.path);
+			const content = await vscode.workspace.fs.readFile(uri);
+			let fname = fl.path.replace(folderUri.path, '');
+			/** Environment where we can grab the state. */
+			const env: GrabbedState = { literateFileName: fname, literateUri: uri, gstate: new StateCore('', md, {}) };
+			const text = new TextDecoder('utf-8').decode(content);
+			envList.push(env);
+			const rendered = md.render(text, env);
+			if(writeHtml)
+			{
+				await writeHtml(fname, folderUri, sourceUri, rendered);
+			}
+		}
+	} catch (error) {
+		console.log(error);
 	}
-} catch (error) {
-	console.log(error);
 }
 ```
 
@@ -108,21 +137,7 @@ The intent of that rule will be explained in the section on `renderCodeFence`.
 /**
 	* MarkdownIt instance with grabber_plugin in use.
 	*/
-const md : MarkdownIt = new MarkdownIt({
-		highlight: function(str: string, lang: string, attrs: string) {
-			if(lang && hljs.getLanguage(lang)) {
-				return '<pre><code>' +
-				hljs.highlight(str, {language : lang}).value +
-				'</code></pre>';
-			}
-			return '<pre title="' + attrs + '">' + md.utils.escapeHtml(str) + '</pre>';
-		}
-
-	})
-	.use(grabberPlugin);
-
-oldFence = md.renderer.rules.fence;
-md.renderer.rules.fence = renderCodeFence;
+const md : MarkdownIt = createMarkdownItParserForLiterate();
 ```
 
 ## Fragment structure and regular expressions
@@ -199,6 +214,46 @@ looking for all `fence` tokens. If the `token.info` for a `fence` matches the
 hands is a new fragment (`root && !add`) or whether this one expands an existing
 one (`root && add`), as will be explained in more detail further down.
 
+```ts : <<handle fragments>>=
+async function handleFragments(workspaceFolder : vscode.WorkspaceFolder, envList : Array<GrabbedState>, diagnostics : vscode.DiagnosticCollection, extrapolateFragments : boolean, writeSource : WriteSourceCallback | undefined) : Promise<Map<string, FragmentInformation>>
+{
+	const folderUri = workspaceFolder.uri;
+	const sourceUri = folderUri;
+	<<build fragment map>>
+
+	if(extrapolateFragments)
+	{
+		<<extrapolate fragments>>
+	}
+
+	if(writeSource) {
+		writeSource(workspaceFolder, fragments);
+	}
+
+	return Promise.resolve(fragments);
+}
+```
+
+```ts : <<write out source files>>=
+async function writeSourceFiles(workspaceFolder : vscode.WorkspaceFolder, fragments : Map<string, FragmentInformation>)
+{
+	const folderUri = workspaceFolder.uri;
+	const sourceUri = folderUri;
+	/* now write out the source files. */
+	for(const name of fragments.keys()) {
+		if (name.indexOf(".*") >= 0) {
+			let fragmentInfo = fragments.get(name) || undefined;
+			if (fragmentInfo) {
+				let fileName = fragmentInfo.sourceFileName.trim();
+				const encoded = Buffer.from(fragmentInfo.code, 'utf-8');
+				const fileUri = folderUri.with({ path: path.posix.join(sourceUri.path, fileName) });
+				await vscode.workspace.fs.writeFile(fileUri, encoded);
+			}
+		}
+	}
+}
+```
+
 ### Populating the fragment map
 
 First we build a map of all available fragments. These will go into `fragments`,
@@ -218,9 +273,9 @@ const fragments = new Map<string, FragmentInformation>();
 // where necessary. We'll extrapolate all fragments in the second
 // pass.
 for (let env of envList) {
-    for (let token of env.gstate.tokens) {
-        <<handle fence tokens>>
-    }
+	for (let token of env.gstate.tokens) {
+		<<handle fence tokens>>
+	}
 }
 ```
 
@@ -487,66 +542,333 @@ diagnostic message will block execution of a task if it were used as prelaunch
 task. That is obviously not good for the workflow.
 
 ```ts : <<register literate.process>>=
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	let literateProcessDisposable = vscode.commands.registerCommand('literate.process', async function () {
+// The command has been defined in the package.json file
+// Now provide the implementation of the command with registerCommand
+// The commandId parameter must match the command field in package.json
+let literateProcessDisposable = vscode.commands.registerCommand('literate.process', async function () {
 
-		<<set up MarkdownIt>>
+	<<set up MarkdownIt>>
 
-		diagnostics.clear();
+	diagnostics.clear();
 
-		if (!vscode.workspace.workspaceFolders) {
-			return vscode.window.showInformationMessage("No workspace or folder opened");
-		}
+	if (!vscode.workspace.workspaceFolders) {
+		return vscode.window.showInformationMessage("No workspace or folder opened");
+	}
 
-		/**
-		 * Contains environments for each Markup document parsed and rendered.
-		 */
+
+	const writeOutHtml : WriteRenderCallback = (fname : string, folderUri : vscode.Uri, sourceUri : vscode.Uri, rendered : string) : Thenable<void> => {
+		const html =
+`<html>
+	<head>
+		<link rel="stylesheet" type="text/css" href="./style.css">
+	</head>
+	<body>
+	${rendered}
+	</body>
+</html>`;
+		const encoded = Buffer.from(html, 'utf-8');
+		fname = fname.replace(".literate", ".html");
+		const fileUri = folderUri.with({ path: path.posix.join(sourceUri.path, fname) });
+		return Promise.resolve(vscode.workspace.fs.writeFile(fileUri, encoded));
+	};
+
+	for(const workspaceFolder of vscode.workspace.workspaceFolders) {
 		const envList: Array<GrabbedState> = new Array<GrabbedState>();
-		/**
-		 * The URI for the workspace folder that will be searched for .literate
-		 * files to generate code and documentation for.
-		 */
-		const folderUri = vscode.workspace.workspaceFolders[0].uri;
-		/** The Uri for the parent path where generated code is saved. */
-		const sourceUri = folderUri;
+		await iterateLiterateFiles(workspaceFolder, writeOutHtml, envList, md);
+        let _ = await handleFragments(workspaceFolder, envList, diagnostics, true, writeSourceFiles);
+	}
 
-		// ensure the path exists.
-		vscode.workspace.fs.createDirectory(sourceUri);
+	let hasAnyDiagnostics = false;
+	diagnostics.forEach(function(_: vscode.Uri, diags: readonly vscode.Diagnostic[], __: vscode.DiagnosticCollection) : any {
+		hasAnyDiagnostics ||= (diags.length > 0);
+	}
+	);
 
-		<<render and collect state>>
+	if (hasAnyDiagnostics) {
+		return vscode.window.showErrorMessage("Error encountered during process");
+	}
+	else {
+		return vscode.window.setStatusBarMessage("Literate Process completed", 5000);
+	}
+});
+```
 
-		<<build fragment map>>
+## Fragment tree provider
 
-		<<extrapolate fragments>>
+The Literate Fragment Explorer needs a
+[`TreeDataProvider`](https://code.visualstudio.com/api/extension-guides/tree-view)
+implementation to present the fragment structure to Visual Studio Code so that
+the data can be visualized in the `literateFragments` custom view.
 
-		/* now write out the source files. */
-		for(const name of fragments.keys()) {
-			if (name.indexOf(".*") >= 0) {
-				let fragmentInfo = fragments.get(name) || undefined;
-				if (fragmentInfo) {
-					let fileName = fragmentInfo.sourceFileName.trim();
-					const encoded = Buffer.from(fragmentInfo.code, 'utf-8');
-					const fileUri = folderUri.with({ path: posix.join(sourceUri.path, fileName) });
-					await vscode.workspace.fs.writeFile(fileUri, encoded);
-				}
+The class `FragmentNodeProvider` implements a `TreeDataProvider` with
+`FragmentNode` as the tree item.
+
+``` ts : <<fragment tree provider>>=
+class FragmentNodeProvider implements vscode.TreeDataProvider<FragmentNode>
+{
+	<<fragment node provider members>>
+	<<fragment node provider API>>
+}
+```
+
+The constructor takes care of all necessary initialization.
+
+``` ts : <<fragment node provider API>>=
+constructor()
+{
+	<<initialize fragment node provider>>
+}
+```
+
+The constructor for the `FragmentNodeProvider` creates an instance of the
+`MarkdownIt` module, fully configured for our **literate programming** needs.
+Additionally a `DiagnosticCollection` is created so that it can be passed on to
+the `handleFragments` function that is utilized in the `FragmentNodeProvider`.
+
+``` ts : <<initialize fragment node provider>>=
+this.md = createMarkdownItParserForLiterate();
+this.diagnostics = vscode.languages.createDiagnosticCollection('literate-treeview');
+```
+
+This means we need two members to hold these instances.
+
+``` ts : <<fragment node provider members>>=
+private md : MarkdownIt;
+private diagnostics : vscode.DiagnosticCollection;
+```
+
+The API for `FragmentNodeProvider` gives as method to update the tree view
+
+``` ts : <<fragment node provider API>>=+
+refresh(): void {
+	<<refresh fragment node provider>>
+}
+```
+
+The current implementation simply fires the `onDidChangeTreeData` event but
+could do more work if needed. To that end there is a private member for emitting
+the event, and the actual event to which the event emitter is published.
+
+``` ts : <<fragment node provider members>>=+
+private _onDidChangeTreeData: vscode.EventEmitter<FragmentNode | undefined | void> = new vscode.EventEmitter<FragmentNode | undefined | void>();
+readonly onDidChangeTreeData : vscode.Event<FragmentNode | undefined | void> = this._onDidChangeTreeData.event;
+```
+
+With those two in place the `refresh` function can fire the event whenever
+called.
+
+``` ts : <<refresh fragment node provider>>=
+this._onDidChangeTreeData.fire();
+```
+
+The `TreeDataProvider` implementation provided by `FragmentNodeProvider` is
+completed by `getTreeItem` and `getChildren`. The first one is simple, it just
+returns the element that is passed to it, as there is no need to find out more
+information about this. Instead, elements have been already created by the
+`getChildren` function, where all `FragmentNode` instances are created with all
+the data necessary.
+
+``` ts : <<fragment node provider API>>=+
+getTreeItem(element : FragmentNode): vscode.TreeItem {
+	<<get fragment tree item>>
+}
+```
+
+As said, the `getTreeItem` implementation remains simple
+
+``` ts : <<get fragment tree item>>=
+return element;
+```
+
+On the other hand the `getChildren` function is more involved. Its job is
+simple: get all `FragmentNode`s that represent the direct children of the
+element given.
+
+``` ts : <<fragment node provider API>>=+
+async getChildren(element? : FragmentNode): Promise<FragmentNode[]>
+{
+	<<get direct children>>
+}
+```
+
+When the workspace has no workspace folders at all there will be no children to
+return, as there are no **literate** documents to begin with.
+
+``` ts : <<get direct children>>=
+if(!vscode.workspace.workspaceFolders || (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length < 1)) {
+	vscode.window.showInformationMessage('No fragments in empty workspace');
+	return Promise.resolve([]);
+}
+```
+
+If we do have workspace folders, but no element is given to look for children we
+need to look at the all the fragments available in all documents across all
+workspace folders. If on the other hand an element is given then its children
+are retrieved.
+
+``` ts : <<get direct children>>=+
+if(!element)
+{
+	<<get children for workspace folders>>
+}
+else
+{
+	<<get children for element>>
+}
+```
+
+When no element is passed we now we want the root of all the branches, where
+each workspace folder is the root of its own branch.
+
+To this end the children are all essentially the workspace folder names. Since
+these are the work folders the fragments representing them have no `parentName`
+specified. As `folderName` we pass on the workspace folder name. This is a
+property all its children and the rest of its offspring inherit. The
+`folderName` is used to find the correct workspace folder to search for the
+given element and its offspring.
+
+``` ts : <<get children for workspace folders>>=
+let arr = new Array<FragmentNode>();
+for(const wsFolder of vscode.workspace.workspaceFolders)
+{
+	arr.push(new FragmentNode(wsFolder.name, "Workspace folder", "Top folder containing a literate project", vscode.TreeItemCollapsibleState.Collapsed, wsFolder.name, undefined));
+}
+return Promise.resolve(arr);
+```
+
+Getting the children for a given element is a bit more involved. First we set
+up a constant `folderName` for ease of access. Then we also creat an array of
+`FragmentNode`s.
+
+``` ts : <<get children for element>>=
+const folderName : string = element.folderName;
+let arr = new Array<FragmentNode>();
+```
+
+We only want to parse **literate** files of the workspace folder the given
+element is for, so we start by searching for the correct workspace folder for
+our given element. With the `fragments` map of the workspace folder in hand we
+can iterate over the keys in the `fragments` map.
+
+There are essentially two cases we need to check for. If the given element has
+no `parentName` set we know it is a fragment in the document level, so a
+fragment that was created. In contrast for a fragment there are child fragments,
+meaning that in the fragment code block other fragments were used. These are
+presented in the tree view as children to that fragment.
+
+``` ts : <<get children for element>>=+
+for(const fldr of vscode.workspace.workspaceFolders)
+{
+	if (fldr.name === folderName) {
+		<<get fragment family for offspring search>>
+		for(const fragmentName of fragments.keys() )
+		{
+			if(!element.parentName) {
+				<<create fragment node for document level>>
+			}
+			else if (fragmentName === element.label) {
+				<<create fragment node for fragment parent>>
 			}
 		}
+	}
+}
 
-		let hasAnyDiagnostics = false;
-		diagnostics.forEach(function(_: vscode.Uri, diags: readonly vscode.Diagnostic[], __: vscode.DiagnosticCollection) : any {
-			hasAnyDiagnostics ||= (diags.length > 0);
-		}
-		);
+return Promise.resolve(arr);
+```
 
-		if (hasAnyDiagnostics) {
-			return vscode.window.showErrorMessage("Error encountered during process");
-		}
-		else {
-			return vscode.window.setStatusBarMessage("Literate Process completed", 5000);
-		}
-	});
+To find the fragment information to build `FragmentNode`s from iterate over the
+**literate** files in the workspace folder that we determined we need to search.
+Then build the fragment map based on the tokens generated by the iteration pass.
+As a reminder the fragments map has the fragment name as key and the
+corresponding `FragmentInformation` as the value to that key.
+
+``` ts : <<get fragment family for offspring search>>=
+		let envList: Array<GrabbedState> = new Array<GrabbedState>();
+		await iterateLiterateFiles(fldr, undefined, envList, this.md);
+		const fragments = await handleFragments(fldr, envList, this.diagnostics, false, undefined);
+```
+
+When we have found the fragment the passed in element represents we can find the
+child fragment names, that is the fragment names used in this fragment. All
+matches against `FRAGMENT_USE_IN_CODE_RE` are found and for each case a
+corresponding `FragmentNode` is created to function as a child to our parent
+element.
+
+``` ts : <<create fragment node for fragment parent>>=
+let fragmentInfo = fragments.get(fragmentName) || undefined;
+if (fragmentInfo) {
+	const casesToReplace = [...fragmentInfo.code.matchAll(FRAGMENT_USE_IN_CODE_RE)];
+	for (let match of casesToReplace) {
+		let [tag, indent, tagName, root, add, ...rest] = match;
+		arr.push(new FragmentNode(tagName, `${fragmentInfo.literateFileName}`, `${fragmentName}`, vscode.TreeItemCollapsibleState.Collapsed, folderName, element.label));
+	}
+}
+```
+
+### Fragment on document level
+
+When the workspace folder is given as the element, or rather the `parentName`
+of the given element is undefined, we have a fragment on document level. There
+are two types of fragments we want to discern beetween: top level fragments, or
+fragments that also tell us what file to create, and other fragments. A
+**literate** document can contain multiple top level fragments. But each top
+level fragment will generate only one source code file.
+
+``` ts : <<create fragment node for document level>>=
+let fragmentType : string;
+let fragmentInfo = fragments.get(fragmentName) || undefined;
+if (fragmentInfo) {
+	if(fragmentName.indexOf(".*") >= 0)
+	{
+		fragmentType = `Top level fragment in ${fragmentInfo.literateFileName}`;
+	}
+	else
+	{
+		fragmentType = `Fragment in ${fragmentInfo.literateFileName}`;
+	}
+	arr.push(new FragmentNode(fragmentName, `${fragmentType}`, fragmentInfo.literateFileName, vscode.TreeItemCollapsibleState.Collapsed, folderName, element.label));
+}
+```
+
+## Fragment node for tree view
+
+Each node in the tree view represents a fragment.
+
+``` ts : <<fragment node>>=
+class FragmentNode extends vscode.TreeItem
+{
+	constructor (
+		public readonly label : string,
+		public readonly _tooltip : string,
+		public readonly _description : string,
+		public readonly collapsibleState : vscode.TreeItemCollapsibleState,
+		public readonly folderName: string,
+		public readonly parentName : string | undefined
+	)
+	{
+		super(label, collapsibleState);
+		this.tooltip = `${_tooltip}`;
+		this.description = `${_description}`;
+	}
+
+	contextValue = 'literate_fragment';
+
+	iconPath = {
+		'light' : path.join(__filename, '..', 'media', 'fragment.svg'),
+		'dark' : path.join(__filename, '..', 'media', 'fragment.svg')
+	};
+}
+```
+
+## registering FragmentNodeProvider
+
+The `FragmentNodeProvide` needs to be registered with Visual Studio Code so it
+can work when literate files are found in a work space.
+
+``` ts : <<register fragment tree view>>=
+const fragmentNodeProvider = new FragmentNodeProvider();
+vscode.window.registerTreeDataProvider('literateFragments', fragmentNodeProvider);
+vscode.commands.registerCommand('literateFragments.refreshEntry', () => fragmentNodeProvider.refresh());
 ```
 
 ## The extension file
@@ -565,7 +887,8 @@ import StateCore = require('markdown-it/lib/rules_core/state_core');
 import Token = require('markdown-it/lib/token');
 import { TextDecoder } from 'util';
 import * as vscode from 'vscode';
-import { posix } from 'path';
+import * as path from 'path';
+import * as fs from 'fs';
 
 // `import` here fails so instead we require the highlight module
 // this way. Not sure why import fails. It would be great to find
@@ -577,18 +900,34 @@ import { grabberPlugin } from './grabber';
 import MarkdownIt = require("markdown-it");
 import Renderer = require('markdown-it/lib/renderer');
 
+let oldFence : Renderer.RenderRule | undefined;
+
+interface WriteRenderCallback { (fname : string, folderUri : vscode.Uri, sourceUri : vscode.Uri, content : string) : Thenable<void> };
+interface WriteSourceCallback { (workspaceFolder : vscode.WorkspaceFolder, fragments : Map<string, FragmentInformation>) : Thenable<void> };
+
 <<grabbed state type>>
 <<fragment information type>>
 <<fragment regular expressions>>
 
-let oldFence : Renderer.RenderRule | undefined;
+<<fragment node>>
+<<fragment tree provider>>
+
+<<render and collect state>>
+
+<<handle fragments>>
+
+<<write out source files>>
 
 export function activate(context: vscode.ExtensionContext) {
+	const rootPath = (vscode.workspace.workspaceFolders && (vscode.workspace.workspaceFolders.length > 0))
+		? vscode.workspace.workspaceFolders[0].uri.fsPath : undefined;
+
 	console.log('Ready to do some Literate Programming');
 	const diagnostics = vscode.languages.createDiagnosticCollection('literate');
 	//setupLanguageMapping();
 
 	<<register literate.process>>
+	<<register fragment tree view>>
 
 	if (vscode.window.activeTextEditor) {
 		updateDiagnostics(vscode.window.activeTextEditor.document.uri, diagnostics, undefined);
@@ -618,6 +957,27 @@ function codeFragmentCleanup(_: string, p1 : string, __: number, ___: string) {
 }
 
 <<renderCodeFence rule>>
+
+function createMarkdownItParserForLiterate() : MarkdownIt
+{
+	const md : MarkdownIt = new MarkdownIt({
+					highlight: function(str: string, lang: string, attrs: string) {
+						if(lang && hljs.getLanguage(lang)) {
+							return '<pre><code>' +
+							hljs.highlight(str, {language : lang}).value +
+							'</code></pre>';
+						}
+						return '<pre title="' + attrs + '">' + md.utils.escapeHtml(str) + '</pre>';
+					}
+			
+				})
+				.use(grabberPlugin);
+			
+			oldFence = md.renderer.rules.fence;
+			md.renderer.rules.fence = renderCodeFence;
+	return md;
+}
+
 
 function updateDiagnostics(uri: vscode.Uri, collection: vscode.DiagnosticCollection, diagnostic : vscode.Diagnostic | undefined): void {
 	if (uri) {
