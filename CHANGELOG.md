@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.2.0
+
+* Rewrite code to enable parsing and handling of fragments outside of the
+  `literatep.process` command
+* Add rough version of the fragment explorer
+
 ## 0.1.8
 
 * More literate text explaining the workings of the plug-in. Most of the new
