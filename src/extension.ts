@@ -79,24 +79,20 @@ class FragmentNode extends vscode.TreeItem
 {
 	constructor (
 		public readonly label : string,
-		public readonly _tooltip : string,
-		public readonly _description : string,
+		public readonly tooltip : vscode.MarkdownString,
+		public readonly description : string,
 		public readonly collapsibleState : vscode.TreeItemCollapsibleState,
 		public readonly folderName: string,
 		public readonly parentName : string | undefined
 	)
 	{
 		super(label, collapsibleState);
-		this.tooltip = `${_tooltip}`;
-		this.description = `${_description}`;
+		this.tooltip = tooltip;
+		this.description = description;
+		this.iconPath = this.parentName ? new vscode.ThemeIcon('code') : new vscode.ThemeIcon('book');
 	}
 
 	contextValue = 'literate_fragment';
-
-	iconPath = {
-		'light' : path.join(__filename, '..', 'media', 'fragment.svg'),
-		'dark' : path.join(__filename, '..', 'media', 'fragment.svg')
-	};
 }
 class FragmentNodeProvider implements vscode.TreeDataProvider<FragmentNode>
 {
@@ -126,7 +122,7 @@ class FragmentNodeProvider implements vscode.TreeDataProvider<FragmentNode>
 			let arr = new Array<FragmentNode>();
 			for(const wsFolder of vscode.workspace.workspaceFolders)
 			{
-				arr.push(new FragmentNode(wsFolder.name, "Workspace folder", "Top folder containing a literate project", vscode.TreeItemCollapsibleState.Collapsed, wsFolder.name, undefined));
+			    arr.push(new FragmentNode(wsFolder.name, new vscode.MarkdownString('$(book) (workspace folder)', true), 'Workspace folder containing a literate project', vscode.TreeItemCollapsibleState.Collapsed, wsFolder.name, undefined));
 			}
 			return Promise.resolve(arr);
 		}
@@ -143,18 +139,18 @@ class FragmentNodeProvider implements vscode.TreeDataProvider<FragmentNode>
 					for(const fragmentName of fragments.keys() )
 					{
 						if(!element.parentName) {
-							let fragmentType : string;
+							let fragmentType : vscode.MarkdownString;
 							let fragmentInfo = fragments.get(fragmentName) || undefined;
 							if (fragmentInfo) {
 								if(fragmentName.indexOf(".*") >= 0)
 								{
-									fragmentType = `Top level fragment in ${fragmentInfo.literateFileName}`;
+									fragmentType = new vscode.MarkdownString(`$(globe): ${fragmentInfo.literateFileName}`, true);
 								}
 								else
 								{
-									fragmentType = `Fragment in ${fragmentInfo.literateFileName}`;
+									fragmentType = new vscode.MarkdownString(`$(code): ${fragmentInfo.literateFileName}`, true);
 								}
-								arr.push(new FragmentNode(fragmentName, `${fragmentType}`, fragmentInfo.literateFileName, vscode.TreeItemCollapsibleState.Collapsed, folderName, element.label));
+								arr.push(new FragmentNode(fragmentName, fragmentType, fragmentInfo.literateFileName, vscode.TreeItemCollapsibleState.Collapsed, folderName, element.label));
 							}
 						}
 						else if (fragmentName === element.label) {
@@ -163,7 +159,7 @@ class FragmentNodeProvider implements vscode.TreeDataProvider<FragmentNode>
 								const casesToReplace = [...fragmentInfo.code.matchAll(FRAGMENT_USE_IN_CODE_RE)];
 								for (let match of casesToReplace) {
 									let [tag, indent, tagName, root, add, ...rest] = match;
-									arr.push(new FragmentNode(tagName, `${fragmentInfo.literateFileName}`, `${fragmentName}`, vscode.TreeItemCollapsibleState.Collapsed, folderName, element.label));
+							        arr.push(new FragmentNode(tagName, new vscode.MarkdownString(`$(symbol-file) ${fragmentInfo.literateFileName}`, true), `${fragmentName}`, vscode.TreeItemCollapsibleState.Collapsed, folderName, element.label));
 								}
 							}
 						}
