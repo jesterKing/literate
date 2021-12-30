@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.2.3
+
+* Move error message from dialog to statusbar. In conjunction with the Problems
+  view developers get currently enough information that is already properly
+  integrated.
+
 ## 0.2.2
 
 * Unbreak extension. Incorrect setup and general inadequate skill level caused

@@ -182,7 +182,6 @@ export class FragmentExplorer {
 			}
 		));
 		context.subscriptions.push(this.fragmentView);
-
 	}
 }
 
@@ -415,7 +414,7 @@ export function activate(context: vscode.ExtensionContext) {
 		);
 	
 		if (hasAnyDiagnostics) {
-			return vscode.window.showErrorMessage("Error encountered during process");
+	        return vscode.window.setStatusBarMessage((new vscode.MarkdownString("$(error) Error encountered during process")).value, 2000);
 		}
 		else {
 			return vscode.window.setStatusBarMessage("Literate Process completed", 5000);
