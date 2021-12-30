@@ -1,9 +1,18 @@
 # Change Log
 
+## 0.2.1
+
+* Fragment explorer automatically updates on changes made to literate documents
+* The `literate.process` command is executed on each literate document change
+* Literate document parsing takes into account `TextDocument`s, that is
+  documents in text editors that may have changes different from what is on
+  disk. This can be especially useful with other extensions in use, like
+  linting and lsp interaction
+
 ## 0.2.0
 
 * Rewrite code to enable parsing and handling of fragments outside of the
-  `literatep.process` command
+  `literate.process` command
 * Add rough version of the fragment explorer
 
 ## 0.1.8
