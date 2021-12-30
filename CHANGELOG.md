@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.2.2
+
+* Unbreak extension. Incorrect setup and general inadequate skill level caused
+  the extension to no longer function correctly.
+
 ## 0.2.1
 
 * Fragment explorer automatically updates on changes made to literate documents
