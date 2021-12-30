@@ -547,10 +547,10 @@ its type parameter.</p>
 	<span class="hljs-keyword">private</span> fragmentView : vscode.<span class="hljs-property">TreeView</span>&lt;<span class="hljs-title class_">FragmentNode</span>&gt;;
 	<span class="hljs-title function_">constructor</span>(<span class="hljs-params">context : vscode.ExtensionContext</span>) {
 		<span class="hljs-keyword">const</span> fragmentNodeProvider = <span class="hljs-keyword">new</span> <span class="hljs-title class_">FragmentNodeProvider</span>();
-		context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(vscode.<span class="hljs-property">window</span>.<span class="hljs-title function_">registerTreeDataProvider</span>(<span class="hljs-string">&#x27;literateFragments&#x27;</span>, fragmentNodeProvider));
+		context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(vscode.<span class="hljs-property">window</span>.<span class="hljs-title function_">registerTreeDataProvider</span>(<span class="hljs-string">&#x27;fragmentExplorer&#x27;</span>, fragmentNodeProvider));
 		<span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentView</span> = vscode.<span class="hljs-property">window</span>.<span class="hljs-title function_">createTreeView</span>(<span class="hljs-string">&#x27;fragmentExplorer&#x27;</span>, {treeDataProvider : fragmentNodeProvider});
 
-		context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(vscode.<span class="hljs-property">commands</span>.<span class="hljs-title function_">registerCommand</span>(<span class="hljs-string">&#x27;literateFragments.refreshEntry&#x27;</span>, <span class="hljs-function">() =&gt;</span> fragmentNodeProvider.<span class="hljs-title function_">refresh</span>()));
+		context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(vscode.<span class="hljs-property">commands</span>.<span class="hljs-title function_">registerCommand</span>(<span class="hljs-string">&#x27;fragmentExplorer.refreshEntry&#x27;</span>, <span class="hljs-function">() =&gt;</span> fragmentNodeProvider.<span class="hljs-title function_">refresh</span>()));
 		context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title function_">onDidChangeTextDocument</span>(
 			<span class="hljs-function"><span class="hljs-params">_</span> =&gt;</span> {
 				fragmentNodeProvider.<span class="hljs-title function_">refresh</span>();
@@ -565,7 +565,7 @@ its type parameter.</p>
 <p>The Literate Fragment Explorer needs a
 <a href="https://code.visualstudio.com/api/extension-guides/tree-view"><code>TreeDataProvider</code></a>
 implementation to present the fragment structure to Visual Studio Code so that
-the data can be visualized in the <code>literateFragments</code> custom view.</p>
+the data can be visualized in the <code>fragmentExplorer</code> custom view.</p>
 <p>The class <code>FragmentNodeProvider</code> implements a <code>TreeDataProvider</code> with
 <code>FragmentNode</code> as the tree item.</p>
 <div class="codefragment"><div class="fragmentname">&lt;&lt;fragment tree provider&gt;&gt;=</div><div class="code"><pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">FragmentNodeProvider</span> <span class="hljs-keyword">implements</span> vscode.<span class="hljs-property">TreeDataProvider</span>&lt;<span class="hljs-title class_">FragmentNode</span>&gt;
@@ -791,8 +791,8 @@ get the theme icon for <code>'code'</code>.</p>
 can work when literate files are found in a work space.</p>
 <div class="codefragment"><div class="fragmentname">&lt;&lt;register fragment tree view&gt;&gt;=</div><div class="code"><pre><code><span class="hljs-keyword">new</span> <span class="hljs-title class_">FragmentExplorer</span>(context);
 <span class="hljs-comment">/*const fragmentNodeProvider = new FragmentNodeProvider();
-vscode.window.registerTreeDataProvider(&#x27;literateFragments&#x27;, fragmentNodeProvider);
-vscode.commands.registerCommand(&#x27;literateFragments.refreshEntry&#x27;, () =&gt; fragmentNodeProvider.refresh());*/</span>
+vscode.window.registerTreeDataProvider(&#x27;fragmentExplorer&#x27;, fragmentNodeProvider);
+vscode.commands.registerCommand(&#x27;fragmentExplorer.refreshEntry&#x27;, () =&gt; fragmentNodeProvider.refresh());*/</span>
 </code></pre>
 </div></div><h2>The extension file</h2>
 <p>Our Visual Studio Code entry file is the <code>extension.ts</code> file. While developing

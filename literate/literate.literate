@@ -651,10 +651,10 @@ export class FragmentExplorer {
 	private fragmentView : vscode.TreeView<FragmentNode>;
 	constructor(context : vscode.ExtensionContext) {
 		const fragmentNodeProvider = new FragmentNodeProvider();
-		context.subscriptions.push(vscode.window.registerTreeDataProvider('literateFragments', fragmentNodeProvider));
+		context.subscriptions.push(vscode.window.registerTreeDataProvider('fragmentExplorer', fragmentNodeProvider));
 		this.fragmentView = vscode.window.createTreeView('fragmentExplorer', {treeDataProvider : fragmentNodeProvider});
 
-		context.subscriptions.push(vscode.commands.registerCommand('literateFragments.refreshEntry', () => fragmentNodeProvider.refresh()));
+		context.subscriptions.push(vscode.commands.registerCommand('fragmentExplorer.refreshEntry', () => fragmentNodeProvider.refresh()));
 		context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(
 			_ => {
 				fragmentNodeProvider.refresh();
@@ -671,7 +671,7 @@ export class FragmentExplorer {
 The Literate Fragment Explorer needs a
 [`TreeDataProvider`](https://code.visualstudio.com/api/extension-guides/tree-view)
 implementation to present the fragment structure to Visual Studio Code so that
-the data can be visualized in the `literateFragments` custom view.
+the data can be visualized in the `fragmentExplorer` custom view.
 
 The class `FragmentNodeProvider` implements a `TreeDataProvider` with
 `FragmentNode` as the tree item.
@@ -976,8 +976,8 @@ can work when literate files are found in a work space.
 ``` ts : <<register fragment tree view>>=
 new FragmentExplorer(context);
 /*const fragmentNodeProvider = new FragmentNodeProvider();
-vscode.window.registerTreeDataProvider('literateFragments', fragmentNodeProvider);
-vscode.commands.registerCommand('literateFragments.refreshEntry', () => fragmentNodeProvider.refresh());*/
+vscode.window.registerTreeDataProvider('fragmentExplorer', fragmentNodeProvider);
+vscode.commands.registerCommand('fragmentExplorer.refreshEntry', () => fragmentNodeProvider.refresh());*/
 ```
 
 ## The extension file

@@ -172,10 +172,10 @@ export class FragmentExplorer {
 	private fragmentView : vscode.TreeView<FragmentNode>;
 	constructor(context : vscode.ExtensionContext) {
 		const fragmentNodeProvider = new FragmentNodeProvider();
-		context.subscriptions.push(vscode.window.registerTreeDataProvider('literateFragments', fragmentNodeProvider));
+		context.subscriptions.push(vscode.window.registerTreeDataProvider('fragmentExplorer', fragmentNodeProvider));
 		this.fragmentView = vscode.window.createTreeView('fragmentExplorer', {treeDataProvider : fragmentNodeProvider});
 
-		context.subscriptions.push(vscode.commands.registerCommand('literateFragments.refreshEntry', () => fragmentNodeProvider.refresh()));
+		context.subscriptions.push(vscode.commands.registerCommand('fragmentExplorer.refreshEntry', () => fragmentNodeProvider.refresh()));
 		context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(
 			_ => {
 				fragmentNodeProvider.refresh();
@@ -423,8 +423,8 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 	new FragmentExplorer(context);
 	/*const fragmentNodeProvider = new FragmentNodeProvider();
-	vscode.window.registerTreeDataProvider('literateFragments', fragmentNodeProvider);
-	vscode.commands.registerCommand('literateFragments.refreshEntry', () => fragmentNodeProvider.refresh());*/
+	vscode.window.registerTreeDataProvider('fragmentExplorer', fragmentNodeProvider);
+	vscode.commands.registerCommand('fragmentExplorer.refreshEntry', () => fragmentNodeProvider.refresh());*/
 
 	if (vscode.window.activeTextEditor) {
 		updateDiagnostics(vscode.window.activeTextEditor.document.uri, diagnostics, undefined);
