@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.2.4
+
+* Rework introduction
+* Improve explanation of high level mechanism of the extension
+* Improve fragment regular expressions through using named groups
+* Adapt top fragment diagnostic check to take into account named group
+* Move to using space indentation, width 2
+
 ## 0.2.3
 
 * Move error message from dialog to statusbar. In conjunction with the Problems
