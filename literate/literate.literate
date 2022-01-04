@@ -552,7 +552,7 @@ do {
       if(!match || !match.groups) {
         continue;
       }
-      let tag = match[0].trim();
+      let tag = match[0];
       let indent = match.groups.indent;
       let tagName = match.groups.tagName;
       let root = match.groups.root;
@@ -1006,7 +1006,7 @@ if (fragmentInfo) {
     {
       continue;
     }
-    let tag = match[0].trim();
+    let tag = match[0];
     let ident = match.groups.ident;
     let tagName = match.groups.tagName;
     let root = match.groups.root;
@@ -1282,112 +1282,9 @@ icon in the completion list pop-up.
   }
 ```
 
-## The extension file
+## Diagnostics
 
-Our Visual Studio Code entry file is the `extension.ts` file. While developing
-the plug-in the JavaScript version created from this, in `out/extension.js` is
-set as the entry point for the extension, in `package.json`. But when it is
-prepared for release on the Visual Studio Code marketplace this needs to be
-changed to the minified and bundled version that gets realized as `out/main.js`.
-This ensures, together with a properly set up `.vscodeignore` that the published
-package stays small in size. Without that the package is easily over 2MB in
-size, but properly configured it is under 400KB.
-
-```ts : <<literate.*>>= ./src/extension.ts
-import StateCore = require('markdown-it/lib/rules_core/state_core');
-import Token = require('markdown-it/lib/token');
-import { TextDecoder } from 'util';
-import * as vscode from 'vscode';
-import * as path from 'path';
-import * as fs from 'fs';
-
-// `import` here fails so instead we require the highlight module
-// this way. Not sure why import fails. It would be great to find
-// out the reason.
-const hljs = require('highlight.js');
-
-import { grabberPlugin } from './grabber';
-
-import MarkdownIt = require("markdown-it");
-import Renderer = require('markdown-it/lib/renderer');
-
-let oldFence : Renderer.RenderRule | undefined;
-
-interface WriteRenderCallback {
-  (
-    fname : string,
-    folderUri : vscode.Uri,
-    content : string
-  ) : Thenable<void>
-};
-interface WriteSourceCallback {
-  (
-    workspaceFolder : vscode.WorkspaceFolder,
-    fragments : Map<string, FragmentInformation>
-  ) : Thenable<void>
-};
-
-<<grabbed state type>>
-<<fragment information type>>
-<<fragment regular expressions>>
-
-<<fragment node>>
-<<fragment tree provider>>
-<<fragment explorer>>
-
-<<render and collect state>>
-
-<<handle fragments>>
-
-<<write out source files>>
-
-export function activate(context: vscode.ExtensionContext) {
-  const rootPath = (vscode.workspace.workspaceFolders && (vscode.workspace.workspaceFolders.length > 0))
-    ? vscode.workspace.workspaceFolders[0].uri.fsPath : undefined;
-
-  console.log('Ready to do some Literate Programming');
-  const diagnostics = vscode.languages.createDiagnosticCollection('literate');
-
-  <<register literate.process>>
-  <<register fragment tree view>>
-  <<register completion item provider>>
-
-  if (vscode.window.activeTextEditor) {
-    updateDiagnostics(vscode.window.activeTextEditor.document.uri, diagnostics, undefined);
-  }
-  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor => {
-    if (editor) {
-      updateDiagnostics(editor.document.uri, diagnostics, undefined);
-    }
-  }));
-
-  context.subscriptions.push(literateProcessDisposable);
-  context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(
-    _ => {
-      vscode.commands.executeCommand('literate.process');
-    }
-  ));
-
-  return {
-    extendMarkdownIt(md: any) {
-      md.use(grabberPlugin);
-      oldFence = md.renderer.rules.fence;
-      md.renderer.rules.fence = renderCodeFence;
-      return md;
-    }
-  };
-};
-
-// eslint-disable-next-line @typescript-eslint/naming-convention
-function codeFragmentCleanup(_: string, p1 : string, __: number, ___: string) {
-  let cleaned = p1.replaceAll(/<.*?>/g, '');
-  return `<span class="fragmentuse">${cleaned}</span>`;
-}
-
-<<renderCodeFence rule>>
-
-<<create markdownit parser>>
-
+``` ts : <<diagnostic updating>>=
 function updateDiagnostics(
   uri: vscode.Uri,
   collection: vscode.DiagnosticCollection,
@@ -1452,7 +1349,199 @@ function fragmentRange(token: Token): vscode.Range {
   let range: vscode.Range = new vscode.Range(start, end);
   return range;
 }
+```
 
-export function deactivate() {}
+## The extension
+
+Our Visual Studio Code entry file is the `extension.ts` file. While developing
+the plug-in the JavaScript version created from this, in `out/extension.js` is
+set as the entry point for the extension, in `package.json`. But when it is
+prepared for release on the Visual Studio Code marketplace this needs to be
+changed to the minified and bundled version that gets realized as `out/main.js`.
+This ensures, together with a properly set up `.vscodeignore` that the published
+package stays small in size. Without that the package is easily over 2MB in
+size, but properly configured it is under 400KB.
+
+The extension main entry lies in the activation of the extension, as given by
+`<<activate the extension>>`, but before we get there we need to set up several
+bits and pieces that are required for the proper functioning of the tools.
+
+First of all we import all the functionality and modules we are going to need.
+
+``` ts : <<literate.*>>= ./src/extension.ts
+/* Literate Programming by Nathan 'jesterKing' Letwory */
+
+<<import necessary modules for literate>>
+```
+
+After the imports we introduce the `oldFence` where we will keep a hold of the
+fence rule from the default *MarkdownIt* parser. I was not entirely sure how to
+best tackle it, so for now it is here.
+
+``` ts : <<literate.*>>=+
+let oldFence : Renderer.RenderRule | undefined;
+```
+
+With that out of the way we introduce the interfaces we use in the Literate
+Programming extension.
+
+``` ts : <<literate.*>>=+
+<<introduce interfaces>>
 
 ```
+
+Next we set up the fragment regular expressions and define everything needed to
+implement the fragment explorer. This explorer will show up in the Explorer bar
+when a literate project is open. We need a representation for a node in the tree
+view, a data provider for the tree view and then the actual tree view explorer
+itself.
+
+``` ts : <<literate.*>>=+
+<<fragment regular expressions>>
+
+<<fragment node>>
+
+<<fragment tree provider>>
+
+<<fragment explorer>>
+
+```
+
+For our extension we need to override the code fence rule since we want to
+augment the rendering of the code fences. Specifically we want to add the
+fragment line prior to the code block. This is explained in the section on
+`<<renderCodeFence rule>>`.
+
+Also we have a way to create a *MarkdownIt* parser the way we need it. It is
+explained in more detail in the section on `<<create markdownit parser>>`.
+
+``` ts : <<literate.*>>=+
+<<renderCodeFence rule>>
+
+<<create markdownit parser>>
+
+```
+
+The central mechanism of the **Literate Programming** extension, the tools it
+provides, are expressed in `<<render and collect state>>`,
+`<<handle fragments>>` and `<<write out source files>>`. These all ensure that
+all **literate** files can be iterated, parsed, rendered. And that from the
+parsed state all the code fragments can be collected and extrapolated into the
+source file or source files as written in the **literate** program.
+
+``` ts : <<literate.*>>=+
+<<render and collect state>>
+<<handle fragments>>
+<<write out source files>>
+```
+
+Although the fragments mentioned above are the soul of the extension they are
+not of much use without the proper activation. With this `activate`
+implementation all providers and commands are registered with Visual Studio
+Code.
+
+``` ts : <<literate.*>>=+
+<<activate the extension>>
+```
+
+``` ts : <<literate.*>>=+
+<<diagnostic updating>>
+```
+
+``` ts : <<literate.*>>=+
+export function deactivate() {}
+```
+
+### The imports
+
+``` ts : <<import necessary modules for literate>>=
+import { TextDecoder } from 'util';
+import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
+
+import StateCore = require('markdown-it/lib/rules_core/state_core');
+import Token = require('markdown-it/lib/token');
+import MarkdownIt = require("markdown-it");
+import Renderer = require('markdown-it/lib/renderer');
+
+// `import` here fails so instead we require the highlight module
+// this way. Not sure why import fails. It would be great to find
+// out the reason.
+const hljs = require('highlight.js');
+
+import { grabberPlugin } from './grabber';
+```
+
+### Interfaces used in Literate Programming
+
+``` ts : <<introduce interfaces>>=
+interface WriteRenderCallback {
+  (
+    fname : string,
+    folderUri : vscode.Uri,
+    content : string
+  ) : Thenable<void>
+};
+interface WriteSourceCallback {
+  (
+    workspaceFolder : vscode.WorkspaceFolder,
+    fragments : Map<string, FragmentInformation>
+  ) : Thenable<void>
+};
+
+<<grabbed state type>>
+<<fragment information type>>
+```
+
+### Extension activation
+
+``` ts : <<activate the extension>>=
+export function activate(context: vscode.ExtensionContext) {
+  const rootPath = (vscode.workspace.workspaceFolders && (vscode.workspace.workspaceFolders.length > 0))
+    ? vscode.workspace.workspaceFolders[0].uri.fsPath : undefined;
+
+  console.log('Ready to do some Literate Programming');
+  const diagnostics = vscode.languages.createDiagnosticCollection('literate');
+
+  <<register literate.process>>
+  <<register fragment tree view>>
+  <<register completion item provider>>
+
+  if (vscode.window.activeTextEditor) {
+    updateDiagnostics(vscode.window.activeTextEditor.document.uri, diagnostics, undefined);
+  }
+  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor => {
+    if (editor) {
+      updateDiagnostics(editor.document.uri, diagnostics, undefined);
+    }
+  }));
+
+  context.subscriptions.push(literateProcessDisposable);
+  context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(
+    _ => {
+      vscode.commands.executeCommand('literate.process');
+    }
+  ));
+
+  return {
+    extendMarkdownIt(md: any) {
+      md.use(grabberPlugin);
+      oldFence = md.renderer.rules.fence;
+      md.renderer.rules.fence = renderCodeFence;
+      return md;
+    }
+  };
+};
+```
+
+## Afterword
+
+So you have made it this far - or perhaps you just skipped over a lot of text.
+If you actually read all the text up to this point you have read also all of the
+code for the entire **Literate Programming**. I appreciate you took the time to
+read this document. I hope it helped you get more interested in the **literate
+programming** paradigm.
+
+I invite you to install the **Literate Programming** extension for Visual Studio
+Code and start using it in your daily work.

@@ -459,7 +459,7 @@ fragments can be combined into source code.</p>
       <span class="hljs-keyword">if</span>(!match || !match.<span class="hljs-property">groups</span>) {
         <span class="hljs-keyword">continue</span>;
       }
-      <span class="hljs-keyword">let</span> tag = match[<span class="hljs-number">0</span>].<span class="hljs-title function_">trim</span>();
+      <span class="hljs-keyword">let</span> tag = match[<span class="hljs-number">0</span>];
       <span class="hljs-keyword">let</span> indent = match.<span class="hljs-property">groups</span>.<span class="hljs-property">indent</span>;
       <span class="hljs-keyword">let</span> tagName = match.<span class="hljs-property">groups</span>.<span class="hljs-property">tagName</span>;
       <span class="hljs-keyword">let</span> root = match.<span class="hljs-property">groups</span>.<span class="hljs-property">root</span>;
@@ -837,7 +837,7 @@ element.</p>
     {
       <span class="hljs-keyword">continue</span>;
     }
-    <span class="hljs-keyword">let</span> tag = match[<span class="hljs-number">0</span>].<span class="hljs-title function_">trim</span>();
+    <span class="hljs-keyword">let</span> tag = match[<span class="hljs-number">0</span>];
     <span class="hljs-keyword">let</span> ident = match.<span class="hljs-property">groups</span>.<span class="hljs-property">ident</span>;
     <span class="hljs-keyword">let</span> tagName = match.<span class="hljs-property">groups</span>.<span class="hljs-property">tagName</span>;
     <span class="hljs-keyword">let</span> root = match.<span class="hljs-property">groups</span>.<span class="hljs-property">root</span>;
@@ -1054,110 +1054,8 @@ icon in the completion list pop-up.</p>
     completionItems.<span class="hljs-title function_">push</span>(fragmentCompletion);
   }
 </code></pre>
-<h2>The extension file</h2>
-<p>Our Visual Studio Code entry file is the <code>extension.ts</code> file. While developing
-the plug-in the JavaScript version created from this, in <code>out/extension.js</code> is
-set as the entry point for the extension, in <code>package.json</code>. But when it is
-prepared for release on the Visual Studio Code marketplace this needs to be
-changed to the minified and bundled version that gets realized as <code>out/main.js</code>.
-This ensures, together with a properly set up <code>.vscodeignore</code> that the published
-package stays small in size. Without that the package is easily over 2MB in
-size, but properly configured it is under 400KB.</p>
-<pre><code><span class="hljs-keyword">import</span> <span class="hljs-title class_">StateCore</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/rules_core/state_core&#x27;</span>);
-<span class="hljs-keyword">import</span> <span class="hljs-title class_">Token</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/token&#x27;</span>);
-<span class="hljs-keyword">import</span> { <span class="hljs-title class_">TextDecoder</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;util&#x27;</span>;
-<span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> vscode <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;vscode&#x27;</span>;
-<span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> path <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;path&#x27;</span>;
-<span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> fs <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;fs&#x27;</span>;
-
-<span class="hljs-comment">// `import` here fails so instead we require the highlight module</span>
-<span class="hljs-comment">// this way. Not sure why import fails. It would be great to find</span>
-<span class="hljs-comment">// out the reason.</span>
-<span class="hljs-keyword">const</span> hljs = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;highlight.js&#x27;</span>);
-
-<span class="hljs-keyword">import</span> { grabberPlugin } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./grabber&#x27;</span>;
-
-<span class="hljs-keyword">import</span> <span class="hljs-title class_">MarkdownIt</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;markdown-it&quot;</span>);
-<span class="hljs-keyword">import</span> <span class="hljs-title class_">Renderer</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/renderer&#x27;</span>);
-
-<span class="hljs-keyword">let</span> oldFence : <span class="hljs-title class_">Renderer</span>.<span class="hljs-property">RenderRule</span> | <span class="hljs-literal">undefined</span>;
-
-<span class="hljs-keyword">interface</span> <span class="hljs-title class_">WriteRenderCallback</span> {
-  (
-    fname : <span class="hljs-built_in">string</span>,
-    folderUri : vscode.<span class="hljs-property">Uri</span>,
-    content : <span class="hljs-built_in">string</span>
-  ) : <span class="hljs-title class_">Thenable</span>&lt;<span class="hljs-built_in">void</span>&gt;
-};
-<span class="hljs-keyword">interface</span> <span class="hljs-title class_">WriteSourceCallback</span> {
-  (
-    workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span>,
-    fragments : <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">FragmentInformation</span>&gt;
-  ) : <span class="hljs-title class_">Thenable</span>&lt;<span class="hljs-built_in">void</span>&gt;
-};
-
-&lt;&lt;grabbed state <span class="hljs-keyword">type</span>&gt;&gt;
-&lt;&lt;fragment information <span class="hljs-keyword">type</span>&gt;&gt;
-&lt;&lt;fragment regular expressions&gt;&gt;
-
-&lt;&lt;fragment node&gt;&gt;
-&lt;&lt;fragment tree provider&gt;&gt;
-&lt;&lt;fragment explorer&gt;&gt;
-
-&lt;&lt;render and collect state&gt;&gt;
-
-&lt;&lt;handle fragments&gt;&gt;
-
-&lt;&lt;write out source files&gt;&gt;
-
-<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">activate</span>(<span class="hljs-params">context: vscode.ExtensionContext</span>) {
-  <span class="hljs-keyword">const</span> rootPath = (vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span> &amp;&amp; (vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span>.<span class="hljs-property">length</span> &gt; <span class="hljs-number">0</span>))
-    ? vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span>[<span class="hljs-number">0</span>].<span class="hljs-property">uri</span>.<span class="hljs-property">fsPath</span> : <span class="hljs-literal">undefined</span>;
-
-  <span class="hljs-variable language_">console</span>.<span class="hljs-title function_">log</span>(<span class="hljs-string">&#x27;Ready to do some Literate Programming&#x27;</span>);
-  <span class="hljs-keyword">const</span> diagnostics = vscode.<span class="hljs-property">languages</span>.<span class="hljs-title function_">createDiagnosticCollection</span>(<span class="hljs-string">&#x27;literate&#x27;</span>);
-
-  &lt;&lt;register literate.<span class="hljs-property">process</span>&gt;&gt;
-  &lt;&lt;register fragment tree view&gt;&gt;
-  &lt;&lt;register completion item provider&gt;&gt;
-
-  <span class="hljs-keyword">if</span> (vscode.<span class="hljs-property">window</span>.<span class="hljs-property">activeTextEditor</span>) {
-    <span class="hljs-title function_">updateDiagnostics</span>(vscode.<span class="hljs-property">window</span>.<span class="hljs-property">activeTextEditor</span>.<span class="hljs-property">document</span>.<span class="hljs-property">uri</span>, diagnostics, <span class="hljs-literal">undefined</span>);
-  }
-  context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(vscode.<span class="hljs-property">window</span>.<span class="hljs-title function_">onDidChangeActiveTextEditor</span>(<span class="hljs-function"><span class="hljs-params">editor</span> =&gt;</span> {
-    <span class="hljs-keyword">if</span> (editor) {
-      <span class="hljs-title function_">updateDiagnostics</span>(editor.<span class="hljs-property">document</span>.<span class="hljs-property">uri</span>, diagnostics, <span class="hljs-literal">undefined</span>);
-    }
-  }));
-
-  context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(literateProcessDisposable);
-  context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title function_">onDidChangeTextDocument</span>(
-    <span class="hljs-function"><span class="hljs-params">_</span> =&gt;</span> {
-      vscode.<span class="hljs-property">commands</span>.<span class="hljs-title function_">executeCommand</span>(<span class="hljs-string">&#x27;literate.process&#x27;</span>);
-    }
-  ));
-
-  <span class="hljs-keyword">return</span> {
-    <span class="hljs-title function_">extendMarkdownIt</span>(<span class="hljs-params">md: <span class="hljs-built_in">any</span></span>) {
-      md.<span class="hljs-title function_">use</span>(grabberPlugin);
-      oldFence = md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">fence</span>;
-      md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">fence</span> = renderCodeFence;
-      <span class="hljs-keyword">return</span> md;
-    }
-  };
-};
-
-<span class="hljs-comment">// eslint-disable-next-line @typescript-eslint/naming-convention</span>
-<span class="hljs-keyword">function</span> <span class="hljs-title function_">codeFragmentCleanup</span>(<span class="hljs-params">_: <span class="hljs-built_in">string</span>, p1 : <span class="hljs-built_in">string</span>, __: <span class="hljs-built_in">number</span>, ___: <span class="hljs-built_in">string</span></span>) {
-  <span class="hljs-keyword">let</span> cleaned = p1.<span class="hljs-title function_">replaceAll</span>(<span class="hljs-regexp">/&lt;.*?&gt;/g</span>, <span class="hljs-string">&#x27;&#x27;</span>);
-  <span class="hljs-keyword">return</span> <span class="hljs-string">`&lt;span class=&quot;fragmentuse&quot;&gt;<span class="hljs-subst">${cleaned}</span>&lt;/span&gt;`</span>;
-}
-
-&lt;&lt;renderCodeFence rule&gt;&gt;
-
-&lt;&lt;create markdownit parser&gt;&gt;
-
-<span class="hljs-keyword">function</span> <span class="hljs-title function_">updateDiagnostics</span>(<span class="hljs-params">
+<h2>Diagnostics</h2>
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">updateDiagnostics</span>(<span class="hljs-params">
   uri: vscode.Uri,
   collection: vscode.DiagnosticCollection,
   diagnostic : vscode.Diagnostic | <span class="hljs-literal">undefined</span></span>): <span class="hljs-built_in">void</span> {
@@ -1221,10 +1119,161 @@ size, but properly configured it is under 400KB.</p>
   <span class="hljs-keyword">let</span> <span class="hljs-attr">range</span>: vscode.<span class="hljs-property">Range</span> = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(start, end);
   <span class="hljs-keyword">return</span> range;
 }
+</code></pre>
+<h2>The extension</h2>
+<p>Our Visual Studio Code entry file is the <code>extension.ts</code> file. While developing
+the plug-in the JavaScript version created from this, in <code>out/extension.js</code> is
+set as the entry point for the extension, in <code>package.json</code>. But when it is
+prepared for release on the Visual Studio Code marketplace this needs to be
+changed to the minified and bundled version that gets realized as <code>out/main.js</code>.
+This ensures, together with a properly set up <code>.vscodeignore</code> that the published
+package stays small in size. Without that the package is easily over 2MB in
+size, but properly configured it is under 400KB.</p>
+<p>The extension main entry lies in the activation of the extension, as given by
+<code>&lt;&lt;activate the extension&gt;&gt;</code>, but before we get there we need to set up several
+bits and pieces that are required for the proper functioning of the tools.</p>
+<p>First of all we import all the functionality and modules we are going to need.</p>
+<pre><code><span class="hljs-comment">/* Literate Programming by Nathan &#x27;jesterKing&#x27; Letwory */</span>
 
-<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">deactivate</span>(<span class="hljs-params"></span>) {}
+&lt;&lt;<span class="hljs-keyword">import</span> necessary modules <span class="hljs-keyword">for</span> literate&gt;&gt;
+</code></pre>
+<p>After the imports we introduce the <code>oldFence</code> where we will keep a hold of the
+fence rule from the default <em>MarkdownIt</em> parser. I was not entirely sure how to
+best tackle it, so for now it is here.</p>
+<pre><code><span class="hljs-keyword">let</span> oldFence : <span class="hljs-title class_">Renderer</span>.<span class="hljs-property">RenderRule</span> | <span class="hljs-literal">undefined</span>;
+</code></pre>
+<p>With that out of the way we introduce the interfaces we use in the Literate
+Programming extension.</p>
+<pre><code>&lt;&lt;introduce interfaces&gt;&gt;
 
 </code></pre>
+<p>Next we set up the fragment regular expressions and define everything needed to
+implement the fragment explorer. This explorer will show up in the Explorer bar
+when a literate project is open. We need a representation for a node in the tree
+view, a data provider for the tree view and then the actual tree view explorer
+itself.</p>
+<pre><code>&lt;&lt;fragment regular expressions&gt;&gt;
+
+&lt;&lt;fragment node&gt;&gt;
+
+&lt;&lt;fragment tree provider&gt;&gt;
+
+&lt;&lt;fragment explorer&gt;&gt;
+
+</code></pre>
+<p>For our extension we need to override the code fence rule since we want to
+augment the rendering of the code fences. Specifically we want to add the
+fragment line prior to the code block. This is explained in the section on
+<code>&lt;&lt;renderCodeFence rule&gt;&gt;</code>.</p>
+<p>Also we have a way to create a <em>MarkdownIt</em> parser the way we need it. It is
+explained in more detail in the section on <code>&lt;&lt;create markdownit parser&gt;&gt;</code>.</p>
+<pre><code>&lt;&lt;renderCodeFence rule&gt;&gt;
+
+&lt;&lt;create markdownit parser&gt;&gt;
+
+</code></pre>
+<p>The central mechanism of the <strong>Literate Programming</strong> extension, the tools it
+provides, are expressed in <code>&lt;&lt;render and collect state&gt;&gt;</code>,
+<code>&lt;&lt;handle fragments&gt;&gt;</code> and <code>&lt;&lt;write out source files&gt;&gt;</code>. These all ensure that
+all <strong>literate</strong> files can be iterated, parsed, rendered. And that from the
+parsed state all the code fragments can be collected and extrapolated into the
+source file or source files as written in the <strong>literate</strong> program.</p>
+<pre><code>&lt;&lt;render and collect state&gt;&gt;
+&lt;&lt;handle fragments&gt;&gt;
+&lt;&lt;write out source files&gt;&gt;
+</code></pre>
+<p>Although the fragments mentioned above are the soul of the extension they are
+not of much use without the proper activation. With this <code>activate</code>
+implementation all providers and commands are registered with Visual Studio
+Code.</p>
+<pre><code>&lt;&lt;activate the extension&gt;&gt;
+</code></pre>
+<pre><code>&lt;&lt;diagnostic updating&gt;&gt;
+</code></pre>
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">deactivate</span>(<span class="hljs-params"></span>) {}
+</code></pre>
+<h3>The imports</h3>
+<pre><code><span class="hljs-keyword">import</span> { <span class="hljs-title class_">TextDecoder</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;util&#x27;</span>;
+<span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> vscode <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;vscode&#x27;</span>;
+<span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> path <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;path&#x27;</span>;
+<span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> fs <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;fs&#x27;</span>;
+
+<span class="hljs-keyword">import</span> <span class="hljs-title class_">StateCore</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/rules_core/state_core&#x27;</span>);
+<span class="hljs-keyword">import</span> <span class="hljs-title class_">Token</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/token&#x27;</span>);
+<span class="hljs-keyword">import</span> <span class="hljs-title class_">MarkdownIt</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;markdown-it&quot;</span>);
+<span class="hljs-keyword">import</span> <span class="hljs-title class_">Renderer</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/renderer&#x27;</span>);
+
+<span class="hljs-comment">// `import` here fails so instead we require the highlight module</span>
+<span class="hljs-comment">// this way. Not sure why import fails. It would be great to find</span>
+<span class="hljs-comment">// out the reason.</span>
+<span class="hljs-keyword">const</span> hljs = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;highlight.js&#x27;</span>);
+
+<span class="hljs-keyword">import</span> { grabberPlugin } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./grabber&#x27;</span>;
+</code></pre>
+<h3>Interfaces used in Literate Programming</h3>
+<pre><code><span class="hljs-keyword">interface</span> <span class="hljs-title class_">WriteRenderCallback</span> {
+  (
+    fname : <span class="hljs-built_in">string</span>,
+    folderUri : vscode.<span class="hljs-property">Uri</span>,
+    content : <span class="hljs-built_in">string</span>
+  ) : <span class="hljs-title class_">Thenable</span>&lt;<span class="hljs-built_in">void</span>&gt;
+};
+<span class="hljs-keyword">interface</span> <span class="hljs-title class_">WriteSourceCallback</span> {
+  (
+    workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span>,
+    fragments : <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">FragmentInformation</span>&gt;
+  ) : <span class="hljs-title class_">Thenable</span>&lt;<span class="hljs-built_in">void</span>&gt;
+};
+
+&lt;&lt;grabbed state <span class="hljs-keyword">type</span>&gt;&gt;
+&lt;&lt;fragment information <span class="hljs-keyword">type</span>&gt;&gt;
+</code></pre>
+<h3>Extension activation</h3>
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">activate</span>(<span class="hljs-params">context: vscode.ExtensionContext</span>) {
+  <span class="hljs-keyword">const</span> rootPath = (vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span> &amp;&amp; (vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span>.<span class="hljs-property">length</span> &gt; <span class="hljs-number">0</span>))
+    ? vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span>[<span class="hljs-number">0</span>].<span class="hljs-property">uri</span>.<span class="hljs-property">fsPath</span> : <span class="hljs-literal">undefined</span>;
+
+  <span class="hljs-variable language_">console</span>.<span class="hljs-title function_">log</span>(<span class="hljs-string">&#x27;Ready to do some Literate Programming&#x27;</span>);
+  <span class="hljs-keyword">const</span> diagnostics = vscode.<span class="hljs-property">languages</span>.<span class="hljs-title function_">createDiagnosticCollection</span>(<span class="hljs-string">&#x27;literate&#x27;</span>);
+
+  &lt;&lt;register literate.<span class="hljs-property">process</span>&gt;&gt;
+  &lt;&lt;register fragment tree view&gt;&gt;
+  &lt;&lt;register completion item provider&gt;&gt;
+
+  <span class="hljs-keyword">if</span> (vscode.<span class="hljs-property">window</span>.<span class="hljs-property">activeTextEditor</span>) {
+    <span class="hljs-title function_">updateDiagnostics</span>(vscode.<span class="hljs-property">window</span>.<span class="hljs-property">activeTextEditor</span>.<span class="hljs-property">document</span>.<span class="hljs-property">uri</span>, diagnostics, <span class="hljs-literal">undefined</span>);
+  }
+  context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(vscode.<span class="hljs-property">window</span>.<span class="hljs-title function_">onDidChangeActiveTextEditor</span>(<span class="hljs-function"><span class="hljs-params">editor</span> =&gt;</span> {
+    <span class="hljs-keyword">if</span> (editor) {
+      <span class="hljs-title function_">updateDiagnostics</span>(editor.<span class="hljs-property">document</span>.<span class="hljs-property">uri</span>, diagnostics, <span class="hljs-literal">undefined</span>);
+    }
+  }));
+
+  context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(literateProcessDisposable);
+  context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title function_">onDidChangeTextDocument</span>(
+    <span class="hljs-function"><span class="hljs-params">_</span> =&gt;</span> {
+      vscode.<span class="hljs-property">commands</span>.<span class="hljs-title function_">executeCommand</span>(<span class="hljs-string">&#x27;literate.process&#x27;</span>);
+    }
+  ));
+
+  <span class="hljs-keyword">return</span> {
+    <span class="hljs-title function_">extendMarkdownIt</span>(<span class="hljs-params">md: <span class="hljs-built_in">any</span></span>) {
+      md.<span class="hljs-title function_">use</span>(grabberPlugin);
+      oldFence = md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">fence</span>;
+      md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">fence</span> = renderCodeFence;
+      <span class="hljs-keyword">return</span> md;
+    }
+  };
+};
+</code></pre>
+<h2>Afterword</h2>
+<p>So you have made it this far - or perhaps you just skipped over a lot of text.
+If you actually read all the text up to this point you have read also all of the
+code for the entire <strong>Literate Programming</strong>. I appreciate you took the time to
+read this document. I hope it helped you get more interested in the <strong>literate
+programming</strong> paradigm.</p>
+<p>I invite you to install the <strong>Literate Programming</strong> extension for Visual Studio
+Code and start using it in your daily work.</p>
 
     </body>
   </html>

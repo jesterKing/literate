@@ -1,9 +1,14 @@
-import StateCore = require('markdown-it/lib/rules_core/state_core');
-import Token = require('markdown-it/lib/token');
+/* Literate Programming by Nathan 'jesterKing' Letwory */
+
 import { TextDecoder } from 'util';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+
+import StateCore = require('markdown-it/lib/rules_core/state_core');
+import Token = require('markdown-it/lib/token');
+import MarkdownIt = require("markdown-it");
+import Renderer = require('markdown-it/lib/renderer');
 
 // `import` here fails so instead we require the highlight module
 // this way. Not sure why import fails. It would be great to find
@@ -11,12 +16,7 @@ import * as fs from 'fs';
 const hljs = require('highlight.js');
 
 import { grabberPlugin } from './grabber';
-
-import MarkdownIt = require("markdown-it");
-import Renderer = require('markdown-it/lib/renderer');
-
 let oldFence : Renderer.RenderRule | undefined;
-
 interface WriteRenderCallback {
   (
     fname : string,
@@ -82,6 +82,7 @@ interface FragmentInformation {
    */
   env: GrabbedState;
 }
+
 //let HTML_ENCODED_FRAGMENT_TAG_RE = /(&lt;&lt.*?&gt;&gt;)/g;
 let FRAGMENT_USE_IN_CODE_RE =
   /(?<indent>[ \t]*)<<(?<tagName>.*)>>(?<root>=)?(?<add>\+)?/g;
@@ -110,6 +111,7 @@ class FragmentNode extends vscode.TreeItem
     this.contextValue = 'literate_fragment';
   }
 }
+
 export class FragmentNodeProvider implements vscode.TreeDataProvider<FragmentNode>
 {
     private md : MarkdownIt;
@@ -212,7 +214,7 @@ export class FragmentNodeProvider implements vscode.TreeDataProvider<FragmentNod
               {
                 continue;
               }
-              let tag = match[0].trim();
+              let tag = match[0];
               let ident = match.groups.ident;
               let tagName = match.groups.tagName;
               let root = match.groups.root;
@@ -238,6 +240,7 @@ export class FragmentNodeProvider implements vscode.TreeDataProvider<FragmentNod
     }
   }
 }
+
 export class FragmentExplorer {
   private fragmentView : vscode.TreeView<FragmentNode>;
   constructor(context : vscode.ExtensionContext) {
@@ -266,6 +269,62 @@ export class FragmentExplorer {
     ));
     context.subscriptions.push(this.fragmentView);
   }
+}
+
+function renderCodeFence(tokens : Token[],
+             idx : number,
+             options : MarkdownIt.Options,
+             env : any,
+             slf : Renderer) {
+  let rendered = '';
+  if (oldFence) {
+    rendered = oldFence(tokens, idx, options, env, slf);
+
+    let token = tokens[idx];
+    if (token.info) {
+      const match = token.info.match(FRAGMENT_RE);
+      if (match && match.groups) {
+        let lang = match.groups.lang.trim();
+        let name = match.groups.name;
+        let root = match.groups.root;
+        let add = match.groups.add;
+        let fileName = match.groups.fileName;
+        if (name) {
+          root = root || '';
+          add = add || '';
+          rendered =
+`<div class="codefragment">
+<div class="fragmentname">&lt;&lt;${name}&gt;&gt;${root}${add}</div>
+<div class="code">
+${rendered}
+</div>
+</div>`;
+        }
+      }
+    }
+  }
+
+  return rendered;
+};
+
+function createMarkdownItParserForLiterate() : MarkdownIt
+{
+  const md : MarkdownIt = new MarkdownIt({
+          highlight: function(str: string, lang: string, attrs: string) {
+            if(lang && hljs.getLanguage(lang)) {
+              return '<pre><code>' +
+              hljs.highlight(str, {language : lang}).value +
+              '</code></pre>';
+            }
+            return '<pre title="' + attrs + '">' + md.utils.escapeHtml(str) + '</pre>';
+          }
+      
+        })
+        .use(grabberPlugin);
+      
+      oldFence = md.renderer.rules.fence;
+      md.renderer.rules.fence = renderCodeFence;
+  return md;
 }
 
 async function iterateLiterateFiles(workspaceFolder : vscode.WorkspaceFolder,
@@ -307,7 +366,6 @@ async function iterateLiterateFiles(workspaceFolder : vscode.WorkspaceFolder,
     console.log(error);
   }
 }
-
 async function handleFragments(
   workspaceFolder : vscode.WorkspaceFolder,
   envList : Array<GrabbedState>,
@@ -400,7 +458,7 @@ async function handleFragments(
           if(!match || !match.groups) {
             continue;
           }
-          let tag = match[0].trim();
+          let tag = match[0];
           let indent = match.groups.indent;
           let tagName = match.groups.tagName;
           let root = match.groups.root;
@@ -448,7 +506,6 @@ async function handleFragments(
 
   return Promise.resolve(fragments);
 }
-
 async function writeSourceFiles(workspaceFolder : vscode.WorkspaceFolder,
                 fragments : Map<string, FragmentInformation>)
 {
@@ -466,7 +523,6 @@ async function writeSourceFiles(workspaceFolder : vscode.WorkspaceFolder,
     }
   }
 }
-
 export function activate(context: vscode.ExtensionContext) {
   const rootPath = (vscode.workspace.workspaceFolders && (vscode.workspace.workspaceFolders.length > 0))
     ? vscode.workspace.workspaceFolders[0].uri.fsPath : undefined;
@@ -544,13 +600,13 @@ export function activate(context: vscode.ExtensionContext) {
         ..._
       )
       {
-                let completionItems : Array<vscode.CompletionItem> =
+              let completionItems : Array<vscode.CompletionItem> =
             new Array<vscode.CompletionItem>();
         let envForCompletion : Array<GrabbedState> = new Array<GrabbedState>();
             new Array<vscode.CompletionItem>();
         const diagnostics = vscode.languages.createDiagnosticCollection('literate-completionitems');
         const md : MarkdownIt = createMarkdownItParserForLiterate();
-                const workspaceFolder : vscode.WorkspaceFolder | undefined = ((document : vscode.TextDocument) => {
+              const workspaceFolder : vscode.WorkspaceFolder | undefined = ((document : vscode.TextDocument) => {
           if(!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0)
           {
             return undefined;
@@ -567,9 +623,9 @@ export function activate(context: vscode.ExtensionContext) {
         }
         )(document);
         if(!workspaceFolder) { return []; }
-                  await iterateLiterateFiles(workspaceFolder, undefined, envForCompletion, md);
+                await iterateLiterateFiles(workspaceFolder, undefined, envForCompletion, md);
           let fragments = await handleFragments(workspaceFolder, envForCompletion, diagnostics, false, writeSourceFiles);
-                  for(const fragmentName of fragments.keys())
+                for(const fragmentName of fragments.keys())
           {
             const fragment : FragmentInformation | undefined = fragments.get(fragmentName);
             if(!fragment) {
@@ -610,69 +666,6 @@ export function activate(context: vscode.ExtensionContext) {
     }
   };
 };
-
-// eslint-disable-next-line @typescript-eslint/naming-convention
-function codeFragmentCleanup(_: string, p1 : string, __: number, ___: string) {
-  let cleaned = p1.replaceAll(/<.*?>/g, '');
-  return `<span class="fragmentuse">${cleaned}</span>`;
-}
-
-function renderCodeFence(tokens : Token[],
-             idx : number,
-             options : MarkdownIt.Options,
-             env : any,
-             slf : Renderer) {
-  let rendered = '';
-  if (oldFence) {
-    rendered = oldFence(tokens, idx, options, env, slf);
-
-    let token = tokens[idx];
-    if (token.info) {
-      const match = token.info.match(FRAGMENT_RE);
-      if (match && match.groups) {
-        let lang = match.groups.lang.trim();
-        let name = match.groups.name;
-        let root = match.groups.root;
-        let add = match.groups.add;
-        let fileName = match.groups.fileName;
-        if (name) {
-          root = root || '';
-          add = add || '';
-          rendered =
-`<div class="codefragment">
-<div class="fragmentname">&lt;&lt;${name}&gt;&gt;${root}${add}</div>
-<div class="code">
-${rendered}
-</div>
-</div>`;
-        }
-      }
-    }
-  }
-
-  return rendered;
-};
-
-function createMarkdownItParserForLiterate() : MarkdownIt
-{
-  const md : MarkdownIt = new MarkdownIt({
-          highlight: function(str: string, lang: string, attrs: string) {
-            if(lang && hljs.getLanguage(lang)) {
-              return '<pre><code>' +
-              hljs.highlight(str, {language : lang}).value +
-              '</code></pre>';
-            }
-            return '<pre title="' + attrs + '">' + md.utils.escapeHtml(str) + '</pre>';
-          }
-      
-        })
-        .use(grabberPlugin);
-      
-      oldFence = md.renderer.rules.fence;
-      md.renderer.rules.fence = renderCodeFence;
-  return md;
-}
-
 function updateDiagnostics(
   uri: vscode.Uri,
   collection: vscode.DiagnosticCollection,
@@ -737,6 +730,4 @@ function fragmentRange(token: Token): vscode.Range {
   let range: vscode.Range = new vscode.Range(start, end);
   return range;
 }
-
 export function deactivate() {}
-
