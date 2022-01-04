@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.3.0
+
+* Add code completion for code fragments. Typing an opening chevron `<` will
+  show all code fragment names known in the current project.
+* Completion item detail will show fragment code
+
 ## 0.2.4
 
 * Rework introduction

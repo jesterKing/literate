@@ -473,7 +473,6 @@ export function activate(context: vscode.ExtensionContext) {
 
   console.log('Ready to do some Literate Programming');
   const diagnostics = vscode.languages.createDiagnosticCollection('literate');
-  //setupLanguageMapping();
 
     let literateProcessDisposable = vscode.commands.registerCommand(
     'literate.process',
@@ -538,9 +537,53 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
     new FragmentExplorer(context);
-  /*const fragmentNodeProvider = new FragmentNodeProvider();
-  vscode.window.registerTreeDataProvider('fragmentExplorer', fragmentNodeProvider);
-  vscode.commands.registerCommand('fragmentExplorer.refreshEntry', () => fragmentNodeProvider.refresh());*/
+    const completionItemProvider =
+    vscode.languages.registerCompletionItemProvider('markdown', {
+          async provideCompletionItems(
+        document : vscode.TextDocument,
+        ..._
+      )
+      {
+                let completionItems : Array<vscode.CompletionItem> =
+            new Array<vscode.CompletionItem>();
+        let envForCompletion : Array<GrabbedState> = new Array<GrabbedState>();
+            new Array<vscode.CompletionItem>();
+        const diagnostics = vscode.languages.createDiagnosticCollection('literate-completionitems');
+        const md : MarkdownIt = createMarkdownItParserForLiterate();
+                const workspaceFolder : vscode.WorkspaceFolder | undefined = ((document : vscode.TextDocument) => {
+          if(!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0)
+          {
+            return undefined;
+          }
+          for(const ws of vscode.workspace.workspaceFolders)
+          {
+            const relativePath = path.relative(ws.uri.toString(), document.uri.toString());
+            if(!relativePath.startsWith('..'))
+            {
+              return ws;
+            }
+          }
+          return undefined;
+        }
+        )(document);
+        if(!workspaceFolder) { return []; }
+                  await iterateLiterateFiles(workspaceFolder, undefined, envForCompletion, md);
+          let fragments = await handleFragments(workspaceFolder, envForCompletion, diagnostics, false, writeSourceFiles);
+                  for(const fragmentName of fragments.keys())
+          {
+            const fragment : FragmentInformation | undefined = fragments.get(fragmentName);
+            if(!fragment) {
+              continue;
+            }
+            const fragmentCompletion = new vscode.CompletionItem(fragmentName);
+            fragmentCompletion.detail = fragment.code;
+            fragmentCompletion.kind = vscode.CompletionItemKind.Reference;
+            completionItems.push(fragmentCompletion);
+          }
+        return completionItems;
+      }
+  }, '<');
+  context.subscriptions.push(completionItemProvider);
 
   if (vscode.window.activeTextEditor) {
     updateDiagnostics(vscode.window.activeTextEditor.document.uri, diagnostics, undefined);
@@ -695,31 +738,5 @@ function fragmentRange(token: Token): vscode.Range {
   return range;
 }
 
-/*
-let languageMapping = new Map<string, string>();
-function setupLanguageMapping() {
-  languageMapping.set("csharp", "cs");
-}
-
-function extensionForLanguage(lang: string): string
-{
-  lang = lang.trim();
-  if (lang.length <= 2) {
-    return lang;
-  }
-
-  if (languageMapping.has(lang)) {
-    let extension = languageMapping.get(lang);
-    if (extension) {
-      return extension;
-    }
-  }
-
-  return 'xx';
-}
-
-*/
-
-// this method is called when your extension is deactivated
 export function deactivate() {}
 

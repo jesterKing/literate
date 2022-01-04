@@ -940,9 +940,119 @@ get the theme icon for <code>'code'</code>.</p>
 <p>The <code>FragmentNodeProvide</code> needs to be registered with Visual Studio Code so it
 can work when literate files are found in a work space.</p>
 <pre><code><span class="hljs-keyword">new</span> <span class="hljs-title class_">FragmentExplorer</span>(context);
-<span class="hljs-comment">/*const fragmentNodeProvider = new FragmentNodeProvider();
-vscode.window.registerTreeDataProvider(&#x27;fragmentExplorer&#x27;, fragmentNodeProvider);
-vscode.commands.registerCommand(&#x27;fragmentExplorer.refreshEntry&#x27;, () =&gt; fragmentNodeProvider.refresh());*/</span>
+</code></pre>
+<h2>Code completion</h2>
+<p>A simple implementation to provide code completion will help authors writing
+their literate programs. Having possible tag names suggested will help
+decreasing the cognitive load of remembering all code fragment names in a
+literate project. This project itself has well over 50 fragments, and having to
+remember them by name is not easy.</p>
+<p>Until there is a good <strong>literate</strong> file type integration with Visual Studio Code
+we'll be relying on the built-in <strong>Markdown</strong> functionality.</p>
+<pre><code><span class="hljs-keyword">const</span> completionItemProvider =
+  vscode.<span class="hljs-property">languages</span>.<span class="hljs-title function_">registerCompletionItemProvider</span>(<span class="hljs-string">&#x27;markdown&#x27;</span>, {
+    &lt;&lt;implement provide completion items&gt;&gt;
+}, <span class="hljs-string">&#x27;&lt;&#x27;</span>);
+context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(completionItemProvider);
+</code></pre>
+<h3>Providing completion items</h3>
+<p>The completion item provider will generate a <code>CompletionItem</code> for each fragment
+we currently know of. Although the provider gets passed in the <code>TextDocument</code>
+for which it was triggered we will present fragments from the entire project.</p>
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-title function_">provideCompletionItems</span>(<span class="hljs-params">
+  <span class="hljs-variable language_">document</span> : vscode.TextDocument,
+  ..._
+</span>)
+{
+</code></pre>
+<p>After setting up the necessary variables with
+<code>&lt;&lt;setup variables for providing completion items&gt;&gt;</code> we figure out to which
+workspace folder the current <code>TextDocument</code>. If no workspace folder can be
+determined we return an empty array. This can happen with an unsaved new file,
+or when documents were opened that are not part of the workspace.</p>
+<pre><code>  &lt;&lt;setup variables <span class="hljs-keyword">for</span> providing completion items&gt;&gt;
+  &lt;&lt;get workspace <span class="hljs-keyword">for</span> <span class="hljs-title class_">TextDocument</span>&gt;&gt;
+</code></pre>
+<p>After the workspace folder has been determined we can gather all fragments in
+our project.</p>
+<pre><code>  &lt;&lt;get fragments <span class="hljs-keyword">for</span> completion items&gt;&gt;
+</code></pre>
+<p>Finally we generate the completion items into the array <code>completionItems</code> that
+we return when done.</p>
+<pre><code>  &lt;&lt;<span class="hljs-keyword">for</span> each fragment create a completion item&gt;&gt;
+  <span class="hljs-keyword">return</span> completionItems;
+}
+</code></pre>
+<h4>Setting up variables</h4>
+<p>Completion items are going to be collected in an <code>Array&lt;CompletionItem&gt;</code>.
+Further,  creating completion items for code completion needs to parse the
+entire project, so we need an <code>Array&lt;GrabbedState&gt;</code>. Iterating and parsing
+through the project also needs a <code>DiagnosticCollection</code>, although we won't be
+using it any further. Lastly we create an instance of the <em>MarkdownIt</em> parser to
+give to <code>iterateLiterateFiles</code>.</p>
+<pre><code><span class="hljs-keyword">let</span> completionItems : <span class="hljs-title class_">Array</span>&lt;vscode.<span class="hljs-property">CompletionItem</span>&gt; =
+    <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;vscode.<span class="hljs-property">CompletionItem</span>&gt;();
+<span class="hljs-keyword">let</span> envForCompletion : <span class="hljs-title class_">Array</span>&lt;<span class="hljs-title class_">GrabbedState</span>&gt; = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;<span class="hljs-title class_">GrabbedState</span>&gt;();
+    <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;vscode.<span class="hljs-property">CompletionItem</span>&gt;();
+<span class="hljs-keyword">const</span> diagnostics = vscode.<span class="hljs-property">languages</span>.<span class="hljs-title function_">createDiagnosticCollection</span>(<span class="hljs-string">&#x27;literate-completionitems&#x27;</span>);
+<span class="hljs-keyword">const</span> md : <span class="hljs-title class_">MarkdownIt</span> = <span class="hljs-title function_">createMarkdownItParserForLiterate</span>();
+</code></pre>
+<h4>Workspace folder for TextDocument</h4>
+<p>Determining the workspace folder for the given TextDocument is done by creating
+relative paths from each workspace folder to the document. If the path does not
+start with <code>..</code> we found the workspace folder where the document is from.</p>
+<p>If no workspace folders were found, or if the TextDocument did not have a
+workspace folder we essentially end up returning an empty array from the
+completion item provider.</p>
+<pre><code><span class="hljs-keyword">const</span> workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span> | <span class="hljs-literal">undefined</span> = (<span class="hljs-function">(<span class="hljs-params"><span class="hljs-variable language_">document</span> : vscode.TextDocument</span>) =&gt;</span> {
+  <span class="hljs-keyword">if</span>(!vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span> || vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span>.<span class="hljs-property">length</span> === <span class="hljs-number">0</span>)
+  {
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
+  }
+  <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> ws <span class="hljs-keyword">of</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span>)
+  {
+    <span class="hljs-keyword">const</span> relativePath = path.<span class="hljs-title function_">relative</span>(ws.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>(), <span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>());
+    <span class="hljs-keyword">if</span>(!relativePath.<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&#x27;..&#x27;</span>))
+    {
+      <span class="hljs-keyword">return</span> ws;
+    }
+  }
+  <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
+}
+)(<span class="hljs-variable language_">document</span>);
+<span class="hljs-keyword">if</span>(!workspaceFolder) { <span class="hljs-keyword">return</span> []; }
+</code></pre>
+<h4>Retrieving fragments of project</h4>
+<p>Getting the fragments for our project means we <code>iterateLiterateFiles</code>with the
+<code>envForCompletion</code> given, along with the workspace folder and the <em>MarkdownIt</em>
+parser. Once we have iterated over all files, and thus <code>envForCompletion</code> now
+contains all literate documents tokenized we can pass those to <code>handleFragments</code>
+so we can end up with a map of all fragments. We pass in <code>false</code> to the function
+to ensure fragments aren't extrapolated: we want to show the fragments as they
+are in code completion.</p>
+<pre><code>  <span class="hljs-keyword">await</span> <span class="hljs-title function_">iterateLiterateFiles</span>(workspaceFolder, <span class="hljs-literal">undefined</span>, envForCompletion, md);
+  <span class="hljs-keyword">let</span> fragments = <span class="hljs-keyword">await</span> <span class="hljs-title function_">handleFragments</span>(workspaceFolder, envForCompletion, diagnostics, <span class="hljs-literal">false</span>, writeSourceFiles);
+</code></pre>
+<h4>Creating the CompletionItems</h4>
+<p>With all fragments in the map we iterate over all the keys. For each key we
+fetch the corresponding <code>FragmentInformation</code>. Now we can create the
+<code>CompletionItem</code> with the <code>fragmentName</code> as its content.</p>
+<p>Further the fragment code is set to be the detail of the completion item. This
+will provide a tooltip with the code fragment readable, so that it is easy to
+understand what fragment is currently highlighted in the completion list.</p>
+<p>Finally the set the completion item kind to <code>Reference</code> so that we get a nice
+icon in the completion list pop-up.</p>
+<pre><code>  <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> fragmentName <span class="hljs-keyword">of</span> fragments.<span class="hljs-title function_">keys</span>())
+  {
+    <span class="hljs-keyword">const</span> fragment : <span class="hljs-title class_">FragmentInformation</span> | <span class="hljs-literal">undefined</span> = fragments.<span class="hljs-title function_">get</span>(fragmentName);
+    <span class="hljs-keyword">if</span>(!fragment) {
+      <span class="hljs-keyword">continue</span>;
+    }
+    <span class="hljs-keyword">const</span> fragmentCompletion = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">CompletionItem</span>(fragmentName);
+    fragmentCompletion.<span class="hljs-property">detail</span> = fragment.<span class="hljs-property">code</span>;
+    fragmentCompletion.<span class="hljs-property">kind</span> = vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Reference</span>;
+    completionItems.<span class="hljs-title function_">push</span>(fragmentCompletion);
+  }
 </code></pre>
 <h2>The extension file</h2>
 <p>Our Visual Studio Code entry file is the <code>extension.ts</code> file. While developing
@@ -1006,10 +1116,10 @@ size, but properly configured it is under 400KB.</p>
 
   <span class="hljs-variable language_">console</span>.<span class="hljs-title function_">log</span>(<span class="hljs-string">&#x27;Ready to do some Literate Programming&#x27;</span>);
   <span class="hljs-keyword">const</span> diagnostics = vscode.<span class="hljs-property">languages</span>.<span class="hljs-title function_">createDiagnosticCollection</span>(<span class="hljs-string">&#x27;literate&#x27;</span>);
-  <span class="hljs-comment">//setupLanguageMapping();</span>
 
   &lt;&lt;register literate.<span class="hljs-property">process</span>&gt;&gt;
   &lt;&lt;register fragment tree view&gt;&gt;
+  &lt;&lt;register completion item provider&gt;&gt;
 
   <span class="hljs-keyword">if</span> (vscode.<span class="hljs-property">window</span>.<span class="hljs-property">activeTextEditor</span>) {
     <span class="hljs-title function_">updateDiagnostics</span>(vscode.<span class="hljs-property">window</span>.<span class="hljs-property">activeTextEditor</span>.<span class="hljs-property">document</span>.<span class="hljs-property">uri</span>, diagnostics, <span class="hljs-literal">undefined</span>);
@@ -1112,32 +1222,6 @@ size, but properly configured it is under 400KB.</p>
   <span class="hljs-keyword">return</span> range;
 }
 
-<span class="hljs-comment">/*
-let languageMapping = new Map&lt;string, string&gt;();
-function setupLanguageMapping() {
-  languageMapping.set(&quot;csharp&quot;, &quot;cs&quot;);
-}
-
-function extensionForLanguage(lang: string): string
-{
-  lang = lang.trim();
-  if (lang.length &lt;= 2) {
-    return lang;
-  }
-
-  if (languageMapping.has(lang)) {
-    let extension = languageMapping.get(lang);
-    if (extension) {
-      return extension;
-    }
-  }
-
-  return &#x27;xx&#x27;;
-}
-
-*/</span>
-
-<span class="hljs-comment">// this method is called when your extension is deactivated</span>
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">deactivate</span>(<span class="hljs-params"></span>) {}
 
 </code></pre>

@@ -1130,9 +1130,156 @@ can work when literate files are found in a work space.
 
 ``` ts : <<register fragment tree view>>=
 new FragmentExplorer(context);
-/*const fragmentNodeProvider = new FragmentNodeProvider();
-vscode.window.registerTreeDataProvider('fragmentExplorer', fragmentNodeProvider);
-vscode.commands.registerCommand('fragmentExplorer.refreshEntry', () => fragmentNodeProvider.refresh());*/
+```
+
+## Code completion
+
+A simple implementation to provide code completion will help authors writing
+their literate programs. Having possible tag names suggested will help
+decreasing the cognitive load of remembering all code fragment names in a
+literate project. This project itself has well over 50 fragments, and having to
+remember them by name is not easy.
+
+Until there is a good **literate** file type integration with Visual Studio Code
+we'll be relying on the built-in **Markdown** functionality.
+
+``` ts : <<register completion item provider>>=
+const completionItemProvider =
+  vscode.languages.registerCompletionItemProvider('markdown', {
+    <<implement provide completion items>>
+}, '<');
+context.subscriptions.push(completionItemProvider);
+```
+
+### Providing completion items
+
+The completion item provider will generate a `CompletionItem` for each fragment
+we currently know of. Although the provider gets passed in the `TextDocument`
+for which it was triggered we will present fragments from the entire project.
+
+``` ts : <<implement provide completion items>>=
+async provideCompletionItems(
+  document : vscode.TextDocument,
+  ..._
+)
+{
+```
+
+After setting up the necessary variables with
+`<<setup variables for providing completion items>>` we figure out to which
+workspace folder the current `TextDocument`. If no workspace folder can be
+determined we return an empty array. This can happen with an unsaved new file,
+or when documents were opened that are not part of the workspace.
+
+``` ts : <<implement provide completion items>>=+
+  <<setup variables for providing completion items>>
+  <<get workspace for TextDocument>>
+```
+
+After the workspace folder has been determined we can gather all fragments in
+our project.
+
+``` ts : <<implement provide completion items>>=+
+  <<get fragments for completion items>>
+```
+
+Finally we generate the completion items into the array `completionItems` that
+we return when done.
+
+``` ts : <<implement provide completion items>>=+
+  <<for each fragment create a completion item>>
+  return completionItems;
+}
+```
+
+#### Setting up variables
+
+Completion items are going to be collected in an `Array<CompletionItem>`.
+Further,  creating completion items for code completion needs to parse the
+entire project, so we need an `Array<GrabbedState>`. Iterating and parsing
+through the project also needs a `DiagnosticCollection`, although we won't be
+using it any further. Lastly we create an instance of the *MarkdownIt* parser to
+give to `iterateLiterateFiles`.
+
+``` ts : <<setup variables for providing completion items>>=
+let completionItems : Array<vscode.CompletionItem> =
+    new Array<vscode.CompletionItem>();
+let envForCompletion : Array<GrabbedState> = new Array<GrabbedState>();
+    new Array<vscode.CompletionItem>();
+const diagnostics = vscode.languages.createDiagnosticCollection('literate-completionitems');
+const md : MarkdownIt = createMarkdownItParserForLiterate();
+```
+
+#### Workspace folder for TextDocument
+
+Determining the workspace folder for the given TextDocument is done by creating
+relative paths from each workspace folder to the document. If the path does not
+start with `..` we found the workspace folder where the document is from.
+
+If no workspace folders were found, or if the TextDocument did not have a
+workspace folder we essentially end up returning an empty array from the
+completion item provider.
+
+``` ts : <<get workspace for TextDocument>>=
+const workspaceFolder : vscode.WorkspaceFolder | undefined = ((document : vscode.TextDocument) => {
+  if(!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0)
+  {
+    return undefined;
+  }
+  for(const ws of vscode.workspace.workspaceFolders)
+  {
+    const relativePath = path.relative(ws.uri.toString(), document.uri.toString());
+    if(!relativePath.startsWith('..'))
+    {
+      return ws;
+    }
+  }
+  return undefined;
+}
+)(document);
+if(!workspaceFolder) { return []; }
+```
+
+#### Retrieving fragments of project
+
+Getting the fragments for our project means we `iterateLiterateFiles`with the
+`envForCompletion` given, along with the workspace folder and the *MarkdownIt*
+parser. Once we have iterated over all files, and thus `envForCompletion` now
+contains all literate documents tokenized we can pass those to `handleFragments`
+so we can end up with a map of all fragments. We pass in `false` to the function
+to ensure fragments aren't extrapolated: we want to show the fragments as they
+are in code completion.
+
+``` ts : <<get fragments for completion items>>=
+  await iterateLiterateFiles(workspaceFolder, undefined, envForCompletion, md);
+  let fragments = await handleFragments(workspaceFolder, envForCompletion, diagnostics, false, writeSourceFiles);
+```
+
+#### Creating the CompletionItems
+
+With all fragments in the map we iterate over all the keys. For each key we
+fetch the corresponding `FragmentInformation`. Now we can create the
+`CompletionItem` with the `fragmentName` as its content.
+
+Further the fragment code is set to be the detail of the completion item. This
+will provide a tooltip with the code fragment readable, so that it is easy to
+understand what fragment is currently highlighted in the completion list.
+
+Finally the set the completion item kind to `Reference` so that we get a nice
+icon in the completion list pop-up.
+
+``` ts : <<for each fragment create a completion item>>=
+  for(const fragmentName of fragments.keys())
+  {
+    const fragment : FragmentInformation | undefined = fragments.get(fragmentName);
+    if(!fragment) {
+      continue;
+    }
+    const fragmentCompletion = new vscode.CompletionItem(fragmentName);
+    fragmentCompletion.detail = fragment.code;
+    fragmentCompletion.kind = vscode.CompletionItemKind.Reference;
+    completionItems.push(fragmentCompletion);
+  }
 ```
 
 ## The extension file
@@ -1200,10 +1347,10 @@ export function activate(context: vscode.ExtensionContext) {
 
   console.log('Ready to do some Literate Programming');
   const diagnostics = vscode.languages.createDiagnosticCollection('literate');
-  //setupLanguageMapping();
 
   <<register literate.process>>
   <<register fragment tree view>>
+  <<register completion item provider>>
 
   if (vscode.window.activeTextEditor) {
     updateDiagnostics(vscode.window.activeTextEditor.document.uri, diagnostics, undefined);
@@ -1306,32 +1453,6 @@ function fragmentRange(token: Token): vscode.Range {
   return range;
 }
 
-/*
-let languageMapping = new Map<string, string>();
-function setupLanguageMapping() {
-  languageMapping.set("csharp", "cs");
-}
-
-function extensionForLanguage(lang: string): string
-{
-  lang = lang.trim();
-  if (lang.length <= 2) {
-    return lang;
-  }
-
-  if (languageMapping.has(lang)) {
-    let extension = languageMapping.get(lang);
-    if (extension) {
-      return extension;
-    }
-  }
-
-  return 'xx';
-}
-
-*/
-
-// this method is called when your extension is deactivated
 export function deactivate() {}
 
 ```
