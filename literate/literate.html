@@ -654,7 +654,7 @@ its type parameter.</p>
   }
 }
 </code></pre>
-<h2>Fragment tree provider</h2>
+<h3>Fragment tree provider</h3>
 <p>The Literate Fragment Explorer needs a
 <a href="https://code.visualstudio.com/api/extension-guides/tree-view"><code>TreeDataProvider</code></a>
 implementation to present the fragment structure to Visual Studio Code so that
@@ -891,7 +891,7 @@ level fragment will generate only one source code file.</p>
       <span class="hljs-literal">undefined</span>));
 }
 </code></pre>
-<h2>Fragment node for tree view</h2>
+<h3>Fragment node for tree view</h3>
 <p>A fragment node represents a <strong>literate</strong> project fragment in a Visual Studio
 Code tree view. The class <code>FragmentNode</code> extends the <code>vscode.TreeItem</code>. Apart
 from just showing basic information like the fragment name and the file it is
@@ -936,7 +936,7 @@ get the theme icon for <code>'code'</code>.</p>
           : <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">ThemeIcon</span>(<span class="hljs-string">&#x27;book&#x27;</span>);
 <span class="hljs-variable language_">this</span>.<span class="hljs-property">contextValue</span> = <span class="hljs-string">&#x27;literate_fragment&#x27;</span>;
 </code></pre>
-<h2>registering FragmentNodeProvider</h2>
+<h3>registering FragmentNodeProvider</h3>
 <p>The <code>FragmentNodeProvide</code> needs to be registered with Visual Studio Code so it
 can work when literate files are found in a work space.</p>
 <pre><code><span class="hljs-keyword">new</span> <span class="hljs-title class_">FragmentExplorer</span>(context);
@@ -1004,22 +1004,7 @@ start with <code>..</code> we found the workspace folder where the document is f
 <p>If no workspace folders were found, or if the TextDocument did not have a
 workspace folder we essentially end up returning an empty array from the
 completion item provider.</p>
-<pre><code><span class="hljs-keyword">const</span> workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span> | <span class="hljs-literal">undefined</span> = (<span class="hljs-function">(<span class="hljs-params"><span class="hljs-variable language_">document</span> : vscode.TextDocument</span>) =&gt;</span> {
-  <span class="hljs-keyword">if</span>(!vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span> || vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span>.<span class="hljs-property">length</span> === <span class="hljs-number">0</span>)
-  {
-    <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
-  }
-  <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> ws <span class="hljs-keyword">of</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span>)
-  {
-    <span class="hljs-keyword">const</span> relativePath = path.<span class="hljs-title function_">relative</span>(ws.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>(), <span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>());
-    <span class="hljs-keyword">if</span>(!relativePath.<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&#x27;..&#x27;</span>))
-    {
-      <span class="hljs-keyword">return</span> ws;
-    }
-  }
-  <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
-}
-)(<span class="hljs-variable language_">document</span>);
+<pre><code><span class="hljs-keyword">const</span> workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span> | <span class="hljs-literal">undefined</span> = <span class="hljs-title function_">determineWorkspaceFolder</span>(<span class="hljs-variable language_">document</span>);
 <span class="hljs-keyword">if</span>(!workspaceFolder) { <span class="hljs-keyword">return</span> []; }
 </code></pre>
 <h4>Retrieving fragments of project</h4>
@@ -1053,6 +1038,84 @@ icon in the completion list pop-up.</p>
     fragmentCompletion.<span class="hljs-property">kind</span> = vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Reference</span>;
     completionItems.<span class="hljs-title function_">push</span>(fragmentCompletion);
   }
+</code></pre>
+<h2>Hover elements</h2>
+<p>In addition to code completion we can provide hover information. We want to see
+the implementation of fragments when hovering of fragment usages. That way code
+inspection can be easier done.</p>
+<p>We'll create <code>FragmentHoverProvider</code> which implements <code>HoverProvider</code>.</p>
+<pre><code><span class="hljs-keyword">class</span> <span class="hljs-title class_">FragmentHoverProvider</span> <span class="hljs-keyword">implements</span> vscode.<span class="hljs-property">HoverProvider</span> {
+  &lt;&lt;hover provider method&gt;&gt;
+}
+</code></pre>
+<p>The <code>FragmentHoverProvider</code> implements <code>provideHover</code>. This will create the
+<code>Hover</code> item if under the current cursor position there is a fragment, including
+its opening and closing double chevrons.</p>
+<pre><code><span class="hljs-keyword">public</span> <span class="hljs-keyword">async</span> <span class="hljs-title function_">provideHover</span>(<span class="hljs-params">
+  <span class="hljs-variable language_">document</span> : vscode.TextDocument,
+  position : vscode.Position,
+  _: vscode.CancellationToken
+</span>)
+{
+  &lt;&lt;get current line&gt;&gt;
+  &lt;&lt;find workspace folder <span class="hljs-keyword">for</span> hover detection&gt;&gt;
+  &lt;&lt;create hover item <span class="hljs-keyword">for</span> fragment&gt;&gt;
+  <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>;
+}
+</code></pre>
+<p>We get the current line of text from the document. We are going to look only for
+tags that are on one line. In the future it would be nice to add support for
+cases where mentioning a fragment in explaining text is split over several lines
+due to word wrapping, but with the current implementation we'll look only at
+those that are on one line.</p>
+<pre><code><span class="hljs-keyword">const</span> currentLine = <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">lineAt</span>(position.<span class="hljs-property">line</span>);
+</code></pre>
+<p>Next we need to know the the workspace folder for the given document so that we
+can query the correct project for the fragments. If no workspace folder was
+determined return <code>null</code>, as there is no literate project associated with the
+given document.</p>
+<pre><code><span class="hljs-keyword">const</span> workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span> | <span class="hljs-literal">undefined</span> = <span class="hljs-title function_">determineWorkspaceFolder</span>(<span class="hljs-variable language_">document</span>);
+<span class="hljs-keyword">if</span>(!workspaceFolder) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+</code></pre>
+<p>Fragments are now available so we can see if we have a fragment under our
+cursor. If we do, and the fragment is not one that defines or appends to a
+fragment we know our cursor is over either fragment usage in a code fence or a
+fragment mention in explaining text. For this we can create a <code>Hover</code> with the
+code of the fragment as a <code>MarkdownString</code> in a code fence.</p>
+<p>If that is not the case our <code>provideHover</code> implementation will return <code>null</code>.</p>
+<pre><code><span class="hljs-keyword">const</span> matchesOnLine = [...currentLine.<span class="hljs-property">text</span>.<span class="hljs-title function_">matchAll</span>(<span class="hljs-variable constant_">FRAGMENT_USE_IN_CODE_RE</span>)];
+<span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> match <span class="hljs-keyword">of</span> matchesOnLine)
+{
+  <span class="hljs-keyword">if</span>(!match || !match.<span class="hljs-property">groups</span>) {
+    <span class="hljs-keyword">continue</span>;
+  }
+  <span class="hljs-keyword">const</span> foundIndex = currentLine.<span class="hljs-property">text</span>.<span class="hljs-title function_">indexOf</span>(match[<span class="hljs-number">0</span>]);
+  <span class="hljs-keyword">if</span>(foundIndex&gt;-<span class="hljs-number">1</span>) {
+    &lt;&lt;get fragments <span class="hljs-keyword">for</span> hover detection&gt;&gt;
+    <span class="hljs-keyword">if</span>(foundIndex &lt;= position.<span class="hljs-property">character</span> &amp;&amp; position.<span class="hljs-property">character</span> &lt;= foundIndex + match[<span class="hljs-number">0</span>].<span class="hljs-property">length</span> &amp;&amp; fragments.<span class="hljs-title function_">has</span>(match.<span class="hljs-property">groups</span>.<span class="hljs-property">tagName</span>))
+    {
+      <span class="hljs-keyword">const</span> startPosition = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Position</span>(currentLine.<span class="hljs-property">lineNumber</span>, foundIndex);
+      <span class="hljs-keyword">const</span> endPosition = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Position</span>(currentLine.<span class="hljs-property">lineNumber</span>, foundIndex + match[<span class="hljs-number">0</span>].<span class="hljs-property">length</span>);
+      <span class="hljs-keyword">let</span> range : vscode.<span class="hljs-property">Range</span> = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(startPosition, endPosition);
+      <span class="hljs-keyword">let</span> fragment = fragments.<span class="hljs-title function_">get</span>(match.<span class="hljs-property">groups</span>.<span class="hljs-property">tagName</span>) || <span class="hljs-literal">undefined</span>;
+      <span class="hljs-keyword">if</span> (fragment &amp;&amp; !match.<span class="hljs-property">groups</span>.<span class="hljs-property">root</span>) {
+        <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Hover</span>(
+          <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">MarkdownString</span>(<span class="hljs-string">`~~~ <span class="hljs-subst">${fragment.lang}</span>\n<span class="hljs-subst">${fragment.code}</span>\n~~~`</span>, <span class="hljs-literal">true</span>),
+          range);
+      }
+    }
+  }
+}
+</code></pre>
+<p>With the workspace folder in hand we can iterate over all literate files in the
+workspace and get the fragments for the project. We don't want extrapolated
+fragments, we want to see them as they are with fragment usages intact.</p>
+<pre><code><span class="hljs-keyword">const</span> diagnostics = vscode.<span class="hljs-property">languages</span>.<span class="hljs-title function_">createDiagnosticCollection</span>(<span class="hljs-string">&#x27;literate-completionitems&#x27;</span>);
+<span class="hljs-keyword">const</span> md : <span class="hljs-title class_">MarkdownIt</span> = <span class="hljs-title function_">createMarkdownItParserForLiterate</span>();
+<span class="hljs-keyword">let</span> envForCompletion : <span class="hljs-title class_">Array</span>&lt;<span class="hljs-title class_">GrabbedState</span>&gt; = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;<span class="hljs-title class_">GrabbedState</span>&gt;();
+    <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;vscode.<span class="hljs-property">CompletionItem</span>&gt;();
+<span class="hljs-keyword">await</span> <span class="hljs-title function_">iterateLiterateFiles</span>(workspaceFolder, <span class="hljs-literal">undefined</span>, envForCompletion, md);
+<span class="hljs-keyword">let</span> fragments = <span class="hljs-keyword">await</span> <span class="hljs-title function_">handleFragments</span>(workspaceFolder, envForCompletion, diagnostics, <span class="hljs-literal">false</span>, writeSourceFiles);
 </code></pre>
 <h2>Diagnostics</h2>
 <pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">updateDiagnostics</span>(<span class="hljs-params">
@@ -1160,6 +1223,7 @@ itself.</p>
 
 &lt;&lt;fragment explorer&gt;&gt;
 
+&lt;&lt;fragment hover provider&gt;&gt;
 </code></pre>
 <p>For our extension we need to override the code fence rule since we want to
 augment the rendering of the code fences. Specifically we want to add the
@@ -1181,6 +1245,24 @@ source file or source files as written in the <strong>literate</strong> program.
 <pre><code>&lt;&lt;render and collect state&gt;&gt;
 &lt;&lt;handle fragments&gt;&gt;
 &lt;&lt;write out source files&gt;&gt;
+</code></pre>
+<p>Utility function to determine the workspace folder for a TextDocument</p>
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">determineWorkspaceFolder</span>(<span class="hljs-params"><span class="hljs-variable language_">document</span> : vscode.TextDocument</span>) : vscode.<span class="hljs-property">WorkspaceFolder</span> | <span class="hljs-literal">undefined</span>
+{
+  <span class="hljs-keyword">if</span>(!vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span> || vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span>.<span class="hljs-property">length</span> === <span class="hljs-number">0</span>)
+  {
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
+  }
+  <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> ws <span class="hljs-keyword">of</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span>)
+  {
+    <span class="hljs-keyword">const</span> relativePath = path.<span class="hljs-title function_">relative</span>(ws.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>(), <span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>());
+    <span class="hljs-keyword">if</span>(!relativePath.<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&#x27;..&#x27;</span>))
+    {
+      <span class="hljs-keyword">return</span> ws;
+    }
+  }
+  <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
+}
 </code></pre>
 <p>Although the fragments mentioned above are the soul of the extension they are
 not of much use without the proper activation. With this <code>activate</code>
@@ -1239,6 +1321,10 @@ Code.</p>
   &lt;&lt;register literate.<span class="hljs-property">process</span>&gt;&gt;
   &lt;&lt;register fragment tree view&gt;&gt;
   &lt;&lt;register completion item provider&gt;&gt;
+
+  context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(
+    vscode.<span class="hljs-property">languages</span>.<span class="hljs-title function_">registerHoverProvider</span>(<span class="hljs-string">&#x27;markdown&#x27;</span>, <span class="hljs-keyword">new</span> <span class="hljs-title class_">FragmentHoverProvider</span>())
+  );
 
   <span class="hljs-keyword">if</span> (vscode.<span class="hljs-property">window</span>.<span class="hljs-property">activeTextEditor</span>) {
     <span class="hljs-title function_">updateDiagnostics</span>(vscode.<span class="hljs-property">window</span>.<span class="hljs-property">activeTextEditor</span>.<span class="hljs-property">document</span>.<span class="hljs-property">uri</span>, diagnostics, <span class="hljs-literal">undefined</span>);

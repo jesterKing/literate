@@ -271,6 +271,47 @@ export class FragmentExplorer {
   }
 }
 
+class FragmentHoverProvider implements vscode.HoverProvider {
+    public async provideHover(
+    document : vscode.TextDocument,
+    position : vscode.Position,
+    _: vscode.CancellationToken
+  )
+  {
+        const currentLine = document.lineAt(position.line);
+        const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
+    if(!workspaceFolder) { return null; }
+        const matchesOnLine = [...currentLine.text.matchAll(FRAGMENT_USE_IN_CODE_RE)];
+    for(const match of matchesOnLine)
+    {
+      if(!match || !match.groups) {
+        continue;
+      }
+      const foundIndex = currentLine.text.indexOf(match[0]);
+      if(foundIndex>-1) {
+            const diagnostics = vscode.languages.createDiagnosticCollection('literate-completionitems');
+        const md : MarkdownIt = createMarkdownItParserForLiterate();
+        let envForCompletion : Array<GrabbedState> = new Array<GrabbedState>();
+            new Array<vscode.CompletionItem>();
+        await iterateLiterateFiles(workspaceFolder, undefined, envForCompletion, md);
+        let fragments = await handleFragments(workspaceFolder, envForCompletion, diagnostics, false, writeSourceFiles);
+        if(foundIndex <= position.character && position.character <= foundIndex + match[0].length && fragments.has(match.groups.tagName))
+        {
+          const startPosition = new vscode.Position(currentLine.lineNumber, foundIndex);
+          const endPosition = new vscode.Position(currentLine.lineNumber, foundIndex + match[0].length);
+          let range : vscode.Range = new vscode.Range(startPosition, endPosition);
+          let fragment = fragments.get(match.groups.tagName) || undefined;
+          if (fragment && !match.groups.root) {
+            return new vscode.Hover(
+              new vscode.MarkdownString(`~~~ ${fragment.lang}\n${fragment.code}\n~~~`, true),
+              range);
+          }
+        }
+      }
+    }
+    return null;
+  }
+}
 function renderCodeFence(tokens : Token[],
              idx : number,
              options : MarkdownIt.Options,
@@ -523,6 +564,22 @@ async function writeSourceFiles(workspaceFolder : vscode.WorkspaceFolder,
     }
   }
 }
+function determineWorkspaceFolder(document : vscode.TextDocument) : vscode.WorkspaceFolder | undefined
+{
+  if(!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0)
+  {
+    return undefined;
+  }
+  for(const ws of vscode.workspace.workspaceFolders)
+  {
+    const relativePath = path.relative(ws.uri.toString(), document.uri.toString());
+    if(!relativePath.startsWith('..'))
+    {
+      return ws;
+    }
+  }
+  return undefined;
+}
 export function activate(context: vscode.ExtensionContext) {
   const rootPath = (vscode.workspace.workspaceFolders && (vscode.workspace.workspaceFolders.length > 0))
     ? vscode.workspace.workspaceFolders[0].uri.fsPath : undefined;
@@ -606,22 +663,7 @@ export function activate(context: vscode.ExtensionContext) {
             new Array<vscode.CompletionItem>();
         const diagnostics = vscode.languages.createDiagnosticCollection('literate-completionitems');
         const md : MarkdownIt = createMarkdownItParserForLiterate();
-              const workspaceFolder : vscode.WorkspaceFolder | undefined = ((document : vscode.TextDocument) => {
-          if(!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0)
-          {
-            return undefined;
-          }
-          for(const ws of vscode.workspace.workspaceFolders)
-          {
-            const relativePath = path.relative(ws.uri.toString(), document.uri.toString());
-            if(!relativePath.startsWith('..'))
-            {
-              return ws;
-            }
-          }
-          return undefined;
-        }
-        )(document);
+              const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
         if(!workspaceFolder) { return []; }
                 await iterateLiterateFiles(workspaceFolder, undefined, envForCompletion, md);
           let fragments = await handleFragments(workspaceFolder, envForCompletion, diagnostics, false, writeSourceFiles);
@@ -640,6 +682,10 @@ export function activate(context: vscode.ExtensionContext) {
       }
   }, '<');
   context.subscriptions.push(completionItemProvider);
+
+  context.subscriptions.push(
+    vscode.languages.registerHoverProvider('markdown', new FragmentHoverProvider())
+  );
 
   if (vscode.window.activeTextEditor) {
     updateDiagnostics(vscode.window.activeTextEditor.document.uri, diagnostics, undefined);

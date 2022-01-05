@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.4.0
+
+* Add hovers when mousing over fragment usage or fragment mention.
+
 ## 0.3.0
 
 * Add code completion for code fragments. Typing an opening chevron `<` will
