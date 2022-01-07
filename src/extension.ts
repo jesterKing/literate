@@ -301,7 +301,7 @@ function renderCodeFence(tokens : Token[],
       const match = token.info.match(FRAGMENT_RE);
       if (match && match.groups) {
         let lang = match.groups.lang.trim();
-        let name = match.groups.name;
+        let name = match.groups.tagName;
         let root = match.groups.root;
         let add = match.groups.add;
         let fileName = match.groups.fileName;

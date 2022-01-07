@@ -1,9 +1,9 @@
 <html>
-    <head>
-      <link rel="stylesheet" type="text/css" href="./style.css">
-    </head>
-    <body>
-    <h1>Code completion</h1>
+          <head>
+            <link rel="stylesheet" type="text/css" href="./style.css">
+          </head>
+          <body>
+          <h1>Code completion</h1>
 <p>A simple implementation to provide code completion will help authors writing
 their literate programs. Having possible tag names suggested will help
 decreasing the cognitive load of remembering all code fragment names in a
@@ -11,65 +11,105 @@ literate project. This project itself has well over 50 fragments, and having to
 remember them by name is not easy.</p>
 <p>Until there is a good <strong>literate</strong> file type integration with Visual Studio Code
 we'll be relying on the built-in <strong>Markdown</strong> functionality.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;register completion item provider&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">const</span> completionItemProvider =
   vscode.<span class="hljs-property">languages</span>.<span class="hljs-title function_">registerCompletionItemProvider</span>(<span class="hljs-string">&#x27;markdown&#x27;</span>, {
     &lt;&lt;implement provide completion items&gt;&gt;
 }, <span class="hljs-string">&#x27;&lt;&#x27;</span>);
 context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(completionItemProvider);
 </code></pre>
-<h2>Providing completion items</h2>
+
+</div>
+</div><h2>Providing completion items</h2>
 <p>The completion item provider will generate a <code>CompletionItem</code> for each fragment
 we currently know of. Although the provider gets passed in the <code>TextDocument</code>
 for which it was triggered we will present fragments from the entire project.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;implement provide completion items&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">async</span> <span class="hljs-title function_">provideCompletionItems</span>(<span class="hljs-params">
   <span class="hljs-variable language_">document</span> : vscode.TextDocument,
   ..._
 </span>)
 {
 </code></pre>
-<p>After setting up the necessary variables with
+
+</div>
+</div><p>After setting up the necessary variables with
 <code>&lt;&lt;setup variables for providing completion items&gt;&gt;</code> we figure out to which
 workspace folder the current <code>TextDocument</code>. If no workspace folder can be
 determined we return an empty array. This can happen with an unsaved new file,
 or when documents were opened that are not part of the workspace.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;implement provide completion items&gt;&gt;=+</div>
+<div class="code">
 <pre><code>  &lt;&lt;setup variables <span class="hljs-keyword">for</span> providing completion items&gt;&gt;
   &lt;&lt;get workspace <span class="hljs-keyword">for</span> <span class="hljs-title class_">TextDocument</span>&gt;&gt;
 </code></pre>
-<p>After the workspace folder has been determined we can gather all fragments in
+
+</div>
+</div><p>After the workspace folder has been determined we can gather all fragments in
 our project.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;implement provide completion items&gt;&gt;=+</div>
+<div class="code">
 <pre><code>  &lt;&lt;get fragments <span class="hljs-keyword">for</span> completion items&gt;&gt;
 </code></pre>
-<p>Finally we generate the completion items into the array <code>completionItems</code> that
+
+</div>
+</div><p>Finally we generate the completion items into the array <code>completionItems</code> that
 we return when done.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;implement provide completion items&gt;&gt;=+</div>
+<div class="code">
 <pre><code>  &lt;&lt;<span class="hljs-keyword">for</span> each fragment create a completion item&gt;&gt;
   <span class="hljs-keyword">return</span> completionItems;
 }
 </code></pre>
-<h3>Setting up variables</h3>
+
+</div>
+</div><h3>Setting up variables</h3>
 <p>Completion items are going to be collected in an <code>Array&lt;CompletionItem&gt;</code>.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;setup variables for providing completion items&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">let</span> completionItems : <span class="hljs-title class_">Array</span>&lt;vscode.<span class="hljs-property">CompletionItem</span>&gt; =
     <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;vscode.<span class="hljs-property">CompletionItem</span>&gt;();
 </code></pre>
-<h3>Workspace folder for TextDocument</h3>
+
+</div>
+</div><h3>Workspace folder for TextDocument</h3>
 <p>Determining the workspace folder for the given TextDocument is done by creating
 relative paths from each workspace folder to the document. If the path does not
 start with <code>..</code> we found the workspace folder where the document is from.</p>
 <p>If no workspace folders were found, or if the TextDocument did not have a
 workspace folder we essentially end up returning an empty array from the
 completion item provider.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;get workspace for TextDocument&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">const</span> workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span> | <span class="hljs-literal">undefined</span> = <span class="hljs-title function_">determineWorkspaceFolder</span>(<span class="hljs-variable language_">document</span>);
 <span class="hljs-keyword">if</span>(!workspaceFolder) { <span class="hljs-keyword">return</span> []; }
 </code></pre>
-<h3>Retrieving fragments of project</h3>
+
+</div>
+</div><h3>Retrieving fragments of project</h3>
 <p>Code completion item providers run essentially on document changes. The
 <code>FragmentRepository</code> in most cases handles processing of <strong>literate</strong> files
 automatically, but it skips that when a change is caused by typing <code>&lt;</code>, the
 opening chevron. That means we need to ensure <strong>literate</strong> files are processed
 before getting the fragment map for our workspace folder.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;get fragments for completion items&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">await</span> theOneRepository.<span class="hljs-title function_">processLiterateFiles</span>(workspaceFolder);
 <span class="hljs-keyword">let</span> fragments = theOneRepository.<span class="hljs-title function_">getFragments</span>(workspaceFolder).<span class="hljs-property">map</span>;
 </code></pre>
-<h3>Creating the CompletionItems</h3>
+
+</div>
+</div><h3>Creating the CompletionItems</h3>
 <p>With all fragments in the map we iterate over all the keys. For each key we
 fetch the corresponding <code>FragmentInformation</code>. Now we can create the
 <code>CompletionItem</code> with the <code>fragmentName</code> as its content.</p>
@@ -78,6 +118,9 @@ will provide a tooltip with the code fragment readable, so that it is easy to
 understand what fragment is currently highlighted in the completion list.</p>
 <p>Finally the set the completion item kind to <code>Reference</code> so that we get a nice
 icon in the completion list pop-up.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;for each fragment create a completion item&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> fragmentName <span class="hljs-keyword">of</span> fragments.<span class="hljs-title function_">keys</span>())
 {
   <span class="hljs-keyword">const</span> fragment : <span class="hljs-title class_">FragmentInformation</span> | <span class="hljs-literal">undefined</span> = fragments.<span class="hljs-title function_">get</span>(fragmentName);
@@ -91,5 +134,7 @@ icon in the completion list pop-up.</p>
 }
 </code></pre>
 
-    </body>
-  </html>
+</div>
+</div>
+          </body>
+        </html>

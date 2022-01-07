@@ -1,12 +1,15 @@
 <html>
-    <head>
-      <link rel="stylesheet" type="text/css" href="./style.css">
-    </head>
-    <body>
-    <h1>Fragment explorer</h1>
+          <head>
+            <link rel="stylesheet" type="text/css" href="./style.css">
+          </head>
+          <body>
+          <h1>Fragment explorer</h1>
 <p>The Literate Fragment Explorer is a <code>TreeView</code> that uses <code>FragmentNodeProvider</code>
 to show fragments available in a workspace. The tree view has <code>FragmentNode</code> as
 its type parameter.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;fragment explorer&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">FragmentExplorer</span> {
   <span class="hljs-keyword">private</span> fragmentView : vscode.<span class="hljs-property">TreeView</span>&lt;<span class="hljs-title class_">FragmentNode</span>&gt;;
   <span class="hljs-title function_">constructor</span>(<span class="hljs-params">context : vscode.ExtensionContext</span>) {
@@ -37,27 +40,42 @@ its type parameter.</p>
   }
 }
 </code></pre>
-<h2>Fragment tree provider</h2>
+
+</div>
+</div><h2>Fragment tree provider</h2>
 <p>The Literate Fragment Explorer needs a
 <a href="https://code.visualstudio.com/api/extension-guides/tree-view"><code>TreeDataProvider</code></a>
 implementation to present the fragment structure to Visual Studio Code so that
 the data can be visualized in the <code>fragmentExplorer</code> custom view.</p>
 <p>The class <code>FragmentNodeProvider</code> implements a <code>TreeDataProvider</code> with
 <code>FragmentNode</code> as the tree item.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;fragment tree provider&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">FragmentNodeProvider</span> <span class="hljs-keyword">implements</span> vscode.<span class="hljs-property">TreeDataProvider</span>&lt;<span class="hljs-title class_">FragmentNode</span>&gt;
 {
   &lt;&lt;fragment node provider members&gt;&gt;
   &lt;&lt;fragment node provider <span class="hljs-variable constant_">API</span>&gt;&gt;
 }
 </code></pre>
-<p>The API for <code>FragmentNodeProvider</code> gives as method to update the tree view</p>
+
+</div>
+</div><p>The API for <code>FragmentNodeProvider</code> gives as method to update the tree view</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;fragment node provider API&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-title function_">refresh</span>(): <span class="hljs-built_in">void</span> {
   &lt;&lt;refresh fragment node provider&gt;&gt;
 }
 </code></pre>
-<p>The current implementation simply fires the <code>onDidChangeTreeData</code> event but
+
+</div>
+</div><p>The current implementation simply fires the <code>onDidChangeTreeData</code> event but
 could do more work if needed. To that end there is a private member for emitting
 the event, and the actual event to which the event emitter is published.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;fragment node provider members&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">private</span> <span class="hljs-attr">_onDidChangeTreeData</span>:
   vscode.<span class="hljs-property">EventEmitter</span>&lt;
     <span class="hljs-title class_">FragmentNode</span> |
@@ -71,33 +89,58 @@ the event, and the actual event to which the event emitter is published.</p>
     <span class="hljs-built_in">void</span>
   &gt; = <span class="hljs-variable language_">this</span>.<span class="hljs-property">_onDidChangeTreeData</span>.<span class="hljs-property">event</span>;
 </code></pre>
-<p>With those two in place the <code>refresh</code> function can fire the event whenever
+
+</div>
+</div><p>With those two in place the <code>refresh</code> function can fire the event whenever
 called.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;refresh fragment node provider&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-variable language_">this</span>.<span class="hljs-property">_onDidChangeTreeData</span>.<span class="hljs-title function_">fire</span>();
 </code></pre>
-<p>The <code>TreeDataProvider</code> implementation provided by <code>FragmentNodeProvider</code> is
+
+</div>
+</div><p>The <code>TreeDataProvider</code> implementation provided by <code>FragmentNodeProvider</code> is
 completed by <code>getTreeItem</code> and <code>getChildren</code>. The first one is simple, it just
 returns the element that is passed to it, as there is no need to find out more
 information about this. Instead, elements have been already created by the
 <code>getChildren</code> function, where all <code>FragmentNode</code> instances are created with all
 the data necessary.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;fragment node provider API&gt;&gt;=+</div>
+<div class="code">
 <pre><code><span class="hljs-title function_">getTreeItem</span>(element : <span class="hljs-title class_">FragmentNode</span>): vscode.<span class="hljs-property">TreeItem</span> {
   &lt;&lt;get fragment tree item&gt;&gt;
 }
 </code></pre>
-<p>As said, the <code>getTreeItem</code> implementation remains simple</p>
+
+</div>
+</div><p>As said, the <code>getTreeItem</code> implementation remains simple</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;get fragment tree item&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">return</span> element;
 </code></pre>
-<p>On the other hand the <code>getChildren</code> function is more involved. Yet its job is
+
+</div>
+</div><p>On the other hand the <code>getChildren</code> function is more involved. Yet its job is
 simple: get all <code>FragmentNode</code>s that represent the direct children of the
 element given.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;fragment node provider API&gt;&gt;=+</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">async</span> <span class="hljs-title function_">getChildren</span>(element? : <span class="hljs-title class_">FragmentNode</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-title class_">FragmentNode</span>[]&gt;
 {
   &lt;&lt;get direct children&gt;&gt;
 }
 </code></pre>
-<p>When the workspace has no workspace folders at all there will be no children to
+
+</div>
+</div><p>When the workspace has no workspace folders at all there will be no children to
 return, as there are no <strong>literate</strong> documents to begin with.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;get direct children&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">if</span>(!vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span> ||
   (
     vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span> &amp;&amp;
@@ -107,10 +150,15 @@ return, as there are no <strong>literate</strong> documents to begin with.</p>
   <span class="hljs-keyword">return</span> <span class="hljs-title class_">Promise</span>.<span class="hljs-title function_">resolve</span>([]);
 }
 </code></pre>
-<p>If we do have workspace folders, but no element is given to look for children we
+
+</div>
+</div><p>If we do have workspace folders, but no element is given to look for children we
 need to look at the all the fragments available in all documents across all
 workspace folders. If on the other hand an element is given then its children
 are retrieved.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;get direct children&gt;&gt;=+</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">if</span>(!element)
 {
   &lt;&lt;get children <span class="hljs-keyword">for</span> workspace folders&gt;&gt;
@@ -120,7 +168,9 @@ are retrieved.</p>
   &lt;&lt;get children <span class="hljs-keyword">for</span> element&gt;&gt;
 }
 </code></pre>
-<p>When no element is passed we want the root of all the branches, where each
+
+</div>
+</div><p>When no element is passed we want the root of all the branches, where each
 workspace folder is the root of its own branch.</p>
 <p>To this end the children are all essentially the workspace folder names. Since
 these are the work folders the fragments representing them have no <code>parentName</code>
@@ -128,6 +178,9 @@ specified. As <code>folderName</code> we pass on the workspace folder name. This
 property all its children and the rest of its offspring inherit. The
 <code>folderName</code> is used to find the correct workspace folder to search for the
 given element and its offspring.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;get children for workspace folders&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">let</span> arr = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;<span class="hljs-title class_">FragmentNode</span>&gt;();
 <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> wsFolder <span class="hljs-keyword">of</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span>)
 {
@@ -144,14 +197,21 @@ given element and its offspring.</p>
 }
 <span class="hljs-keyword">return</span> <span class="hljs-title class_">Promise</span>.<span class="hljs-title function_">resolve</span>(arr);
 </code></pre>
-<p>Getting the children for a given element is a bit more involved. First we set
+
+</div>
+</div><p>Getting the children for a given element is a bit more involved. First we set
 up a constant <code>folderName</code> for ease of access. Then we also creat an array of
 <code>FragmentNode</code>s.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;get children for element&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">const</span> folderName : <span class="hljs-built_in">string</span> = element.<span class="hljs-property">folderName</span>;
 <span class="hljs-keyword">const</span> fldr : vscode.<span class="hljs-property">WorkspaceFolder</span> = element.<span class="hljs-property">workspaceFolder</span>;
 <span class="hljs-keyword">let</span> arr = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;<span class="hljs-title class_">FragmentNode</span>&gt;();
 </code></pre>
-<p>From the element we already learned the workspace folder for its project, so we
+
+</div>
+</div><p>From the element we already learned the workspace folder for its project, so we
 can use that directly to parse the <strong>literate</strong> content. With the <code>fragments</code>
 map of the workspace folder in hand we can iterate over the keys in the
 <code>fragments</code> map.</p>
@@ -160,6 +220,9 @@ no <code>parentName</code> set we know it is a fragment in the document level, s
 fragment that was created. In contrast for a fragment there are child fragments,
 meaning that in the fragment code block other fragments were used. These are
 presented in the tree view as children to that fragment.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;get children for element&gt;&gt;=+</div>
+<div class="code">
 <pre><code>&lt;&lt;get fragment family <span class="hljs-keyword">for</span> offspring search&gt;&gt;
 <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> fragmentName <span class="hljs-keyword">of</span> fragments.<span class="hljs-title function_">keys</span>() )
 {
@@ -173,15 +236,22 @@ presented in the tree view as children to that fragment.</p>
 
 <span class="hljs-keyword">return</span> <span class="hljs-title class_">Promise</span>.<span class="hljs-title function_">resolve</span>(arr);
 </code></pre>
-<h2>Getting all fragments</h2>
+
+</div>
+</div><h2>Getting all fragments</h2>
 <p>To find the fragment information to build <code>FragmentNode</code>s from iterate over the
 <strong>literate</strong> files in the workspace folder that we determined we need to search.
 Then build the fragment map based on the tokens generated by the iteration pass.
 As a reminder the fragments map has the fragment name as key and the
 corresponding <code>FragmentInformation</code> as the value to that key.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;get fragment family for offspring search&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">const</span> fragments = theOneRepository.<span class="hljs-title function_">getFragments</span>(fldr).<span class="hljs-property">map</span>;
 </code></pre>
-<h2>TODO: build proper fragment hierarchy from fragments map</h2>
+
+</div>
+</div><h2>TODO: build proper fragment hierarchy from fragments map</h2>
 <p>Still to do. Right now essentially the map structure is shown, but that isn't
 very useful. What we really need is a hierarchical form with each fragment under
 its parent fragment so that the structure of the literate program can be seen.</p>
@@ -193,6 +263,9 @@ child fragment names, that is the fragment names used in this fragment. All
 matches against <code>FRAGMENT_USE_IN_CODE_RE</code> are found and for each case a
 corresponding <code>FragmentNode</code> is created to function as a child to our parent
 element.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;create fragment node for fragment parent&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">let</span> fragmentInfo = fragments.<span class="hljs-title function_">get</span>(fragmentName) || <span class="hljs-literal">undefined</span>;
 <span class="hljs-keyword">if</span> (fragmentInfo) {
   <span class="hljs-keyword">const</span> casesToReplace = [...fragmentInfo.<span class="hljs-property">code</span>.<span class="hljs-title function_">matchAll</span>(<span class="hljs-variable constant_">FRAGMENT_USE_IN_CODE_RE</span>)];
@@ -221,13 +294,18 @@ element.</p>
   }
 }
 </code></pre>
-<h2>Fragment on document level</h2>
+
+</div>
+</div><h2>Fragment on document level</h2>
 <p>When the workspace folder is given as the element, or rather the <code>parentName</code>
 of the given element is undefined, we have a fragment on document level. There
 are two types of fragments we want to discern beetween: top level fragments, or
 fragments that also tell us what file to create, and other fragments. A
 <strong>literate</strong> document can contain multiple top level fragments. But each top
 level fragment will generate only one source code file.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;create fragment node for document level&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">let</span> fragmentType : vscode.<span class="hljs-property">MarkdownString</span>;
 <span class="hljs-keyword">let</span> fragmentInfo = fragments.<span class="hljs-title function_">get</span>(fragmentName) || <span class="hljs-literal">undefined</span>;
 <span class="hljs-keyword">if</span> (fragmentInfo) {
@@ -255,7 +333,9 @@ level fragment will generate only one source code file.</p>
       <span class="hljs-literal">undefined</span>));
 }
 </code></pre>
-<h2>Fragment node for tree view</h2>
+
+</div>
+</div><h2>Fragment node for tree view</h2>
 <p>A fragment node represents a <strong>literate</strong> project fragment in a Visual Studio
 Code tree view. The class <code>FragmentNode</code> extends the <code>vscode.TreeItem</code>. Apart
 from just showing basic information like the fragment name and the file it is
@@ -264,6 +344,9 @@ is hosted in as well as the text document if there is one. Text documents are
 documents the workspace currently has opened. We need to take these into
 account so that we can directly use these as part of the <strong>literate</strong> document
 parsing.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;fragment node&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">class</span> <span class="hljs-title class_">FragmentNode</span> <span class="hljs-keyword">extends</span> <span class="hljs-title class_ inherited__">vscode.TreeItem</span>
 {
   <span class="hljs-title function_">constructor</span> (
@@ -274,24 +357,39 @@ parsing.</p>
   }
 }
 </code></pre>
-<p>For the visualization part we need a <code>label</code>, a <code>tooltip</code>, a <code>description</code> and a
+
+</div>
+</div><p>For the visualization part we need a <code>label</code>, a <code>tooltip</code>, a <code>description</code> and a
 <code>collapsibleState</code>. These are the only pieces of information needed that show up
 in the tree view.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;fragment node readonly members&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> label : <span class="hljs-built_in">string</span>,
 <span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> tooltip : vscode.<span class="hljs-property">MarkdownString</span>,
 <span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> description : <span class="hljs-built_in">string</span>,
 <span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> collapsibleState : vscode.<span class="hljs-property">TreeItemCollapsibleState</span>,
 </code></pre>
-<p>We further encode some more information in <code>FragmentNode</code> so that subsequent
+
+</div>
+</div><p>We further encode some more information in <code>FragmentNode</code> so that subsequent
 parsing can be done much more efficiently.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;fragment node readonly members&gt;&gt;=+</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> <span class="hljs-attr">folderName</span>: <span class="hljs-built_in">string</span>,
 <span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> parentName : <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>,
 <span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span>,
 <span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> textDocument : vscode.<span class="hljs-property">TextDocument</span> | <span class="hljs-literal">undefined</span>
 </code></pre>
-<p>Each node in the tree view represents a fragment. When the tree item is used to
+
+</div>
+</div><p>Each node in the tree view represents a fragment. When the tree item is used to
 denote a workspace folder the theme icon for <code>'book'</code> is used. Actual fragments
 get the theme icon for <code>'code'</code>.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;fragment node initialization&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-variable language_">super</span>(label, collapsibleState);
 <span class="hljs-variable language_">this</span>.<span class="hljs-property">tooltip</span> = tooltip;
 <span class="hljs-variable language_">this</span>.<span class="hljs-property">description</span> = description;
@@ -300,11 +398,18 @@ get the theme icon for <code>'code'</code>.</p>
           : <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">ThemeIcon</span>(<span class="hljs-string">&#x27;book&#x27;</span>);
 <span class="hljs-variable language_">this</span>.<span class="hljs-property">contextValue</span> = <span class="hljs-string">&#x27;literate_fragment&#x27;</span>;
 </code></pre>
-<h2>registering FragmentNodeProvider</h2>
+
+</div>
+</div><h2>registering FragmentNodeProvider</h2>
 <p>The <code>FragmentNodeProvide</code> needs to be registered with Visual Studio Code so it
 can work when literate files are found in a work space.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;register fragment tree view&gt;&gt;=</div>
+<div class="code">
 <pre><code><span class="hljs-keyword">new</span> <span class="hljs-title class_">FragmentExplorer</span>(context);
 </code></pre>
 
-    </body>
-  </html>
+</div>
+</div>
+          </body>
+        </html>
