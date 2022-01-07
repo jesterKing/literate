@@ -1,0 +1,97 @@
+# Hover elements
+
+In addition to code completion we can provide hover information. We want to see
+the implementation of fragments when hovering of fragment usages. That way code
+inspection can be easier done.
+
+We'll create `FragmentHoverProvider` which implements `HoverProvider`.
+
+``` ts : <<fragment hover provider>>=
+export class FragmentHoverProvider implements vscode.HoverProvider {
+  readonly fragmentRepository : FragmentRepository;
+  constructor(repository : FragmentRepository)
+  {
+    this.fragmentRepository = repository;
+  }
+  <<hover provider method>>
+}
+```
+
+The `FragmentHoverProvider` implements `provideHover`. This will create the
+`Hover` item if under the current cursor position there is a fragment, including
+its opening and closing double chevrons.
+
+``` ts : <<hover provider method>>=
+public async provideHover(
+  document : vscode.TextDocument,
+  position : vscode.Position,
+  _: vscode.CancellationToken
+)
+{
+  <<get current line>>
+  <<find workspace folder for hover detection>>
+  <<create hover item for fragment>>
+  return null;
+}
+```
+
+We get the current line of text from the document. We are going to look only for
+tags that are on one line. In the future it would be nice to add support for
+cases where mentioning a fragment in explaining text is split over several lines
+due to word wrapping, but with the current implementation we'll look only at
+those that are on one line.
+
+``` ts : <<get current line>>=
+const currentLine = document.lineAt(position.line);
+```
+
+Next we need to know the the workspace folder for the given document so that we
+can query the correct project for the fragments. If no workspace folder was
+determined return `null`, as there is no literate project associated with the
+given document.
+
+``` ts : <<find workspace folder for hover detection>>=
+const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
+if(!workspaceFolder) { return null; }
+```
+
+Fragments are now available so we can see if we have a fragment under our
+cursor. If we do, and the fragment is not one that defines or appends to a
+fragment we know our cursor is over either fragment usage in a code fence or a
+fragment mention in explaining text. For this we can create a `Hover` with the
+code of the fragment as a `MarkdownString` in a code fence.
+
+If that is not the case our `provideHover` implementation will return `null`.
+
+``` ts : <<create hover item for fragment>>=
+const matchesOnLine = [...currentLine.text.matchAll(FRAGMENT_USE_IN_CODE_RE)];
+for(const match of matchesOnLine)
+{
+  if(!match || !match.groups) {
+    continue;
+  }
+  const foundIndex = currentLine.text.indexOf(match[0]);
+  if(foundIndex>-1) {
+    <<get fragments for hover detection>>
+    if(foundIndex <= position.character && position.character <= foundIndex + match[0].length && fragments.has(match.groups.tagName))
+    {
+      const startPosition = new vscode.Position(currentLine.lineNumber, foundIndex);
+      const endPosition = new vscode.Position(currentLine.lineNumber, foundIndex + match[0].length);
+      let range : vscode.Range = new vscode.Range(startPosition, endPosition);
+      let fragment = fragments.get(match.groups.tagName) || undefined;
+      if (fragment && !match.groups.root) {
+        return new vscode.Hover(
+          new vscode.MarkdownString(`~~~ ${fragment.lang}\n${fragment.code}\n~~~`, true),
+          range);
+      }
+    }
+  }
+}
+```
+
+With the workspace folder in hand we can ask the `FragmentRepository` for the
+fragment map that has been generated for the workspace folder.
+
+``` ts : <<get fragments for hover detection>>=
+let fragments = this.fragmentRepository.getFragments(workspaceFolder).map;
+```

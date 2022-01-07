@@ -1,0 +1,377 @@
+# Fragment explorer
+
+The Literate Fragment Explorer is a `TreeView` that uses `FragmentNodeProvider`
+to show fragments available in a workspace. The tree view has `FragmentNode` as
+its type parameter.
+
+``` ts : <<fragment explorer>>=
+export class FragmentExplorer {
+  private fragmentView : vscode.TreeView<FragmentNode>;
+  constructor(context : vscode.ExtensionContext) {
+    const fragmentNodeProvider = new FragmentNodeProvider();
+    context.subscriptions.push(
+      vscode.window.registerTreeDataProvider(
+        'fragmentExplorer',
+        fragmentNodeProvider
+      )
+    );
+    this.fragmentView = vscode.window.createTreeView(
+                  'fragmentExplorer',
+                  {
+                    treeDataProvider : fragmentNodeProvider
+                  });
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand(
+                'fragmentExplorer.refreshEntry',
+                () => fragmentNodeProvider.refresh())
+              );
+    context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(
+      _ => {
+        fragmentNodeProvider.refresh();
+      }
+    ));
+    context.subscriptions.push(this.fragmentView);
+  }
+}
+```
+
+## Fragment tree provider
+
+The Literate Fragment Explorer needs a
+[`TreeDataProvider`](https://code.visualstudio.com/api/extension-guides/tree-view)
+implementation to present the fragment structure to Visual Studio Code so that
+the data can be visualized in the `fragmentExplorer` custom view.
+
+The class `FragmentNodeProvider` implements a `TreeDataProvider` with
+`FragmentNode` as the tree item.
+
+``` ts : <<fragment tree provider>>=
+export class FragmentNodeProvider implements vscode.TreeDataProvider<FragmentNode>
+{
+  <<fragment node provider members>>
+  <<fragment node provider API>>
+}
+```
+
+The API for `FragmentNodeProvider` gives as method to update the tree view
+
+``` ts : <<fragment node provider API>>=
+refresh(): void {
+  <<refresh fragment node provider>>
+}
+```
+
+The current implementation simply fires the `onDidChangeTreeData` event but
+could do more work if needed. To that end there is a private member for emitting
+the event, and the actual event to which the event emitter is published.
+
+``` ts : <<fragment node provider members>>=
+private _onDidChangeTreeData:
+  vscode.EventEmitter<
+    FragmentNode |
+    undefined |
+    void
+  > = new vscode.EventEmitter<FragmentNode | undefined | void>();
+readonly onDidChangeTreeData :
+  vscode.Event<
+    FragmentNode |
+    undefined |
+    void
+  > = this._onDidChangeTreeData.event;
+```
+
+With those two in place the `refresh` function can fire the event whenever
+called.
+
+``` ts : <<refresh fragment node provider>>=
+this._onDidChangeTreeData.fire();
+```
+
+The `TreeDataProvider` implementation provided by `FragmentNodeProvider` is
+completed by `getTreeItem` and `getChildren`. The first one is simple, it just
+returns the element that is passed to it, as there is no need to find out more
+information about this. Instead, elements have been already created by the
+`getChildren` function, where all `FragmentNode` instances are created with all
+the data necessary.
+
+``` ts : <<fragment node provider API>>=+
+getTreeItem(element : FragmentNode): vscode.TreeItem {
+  <<get fragment tree item>>
+}
+```
+
+As said, the `getTreeItem` implementation remains simple
+
+``` ts : <<get fragment tree item>>=
+return element;
+```
+
+On the other hand the `getChildren` function is more involved. Yet its job is
+simple: get all `FragmentNode`s that represent the direct children of the
+element given.
+
+``` ts : <<fragment node provider API>>=+
+async getChildren(element? : FragmentNode): Promise<FragmentNode[]>
+{
+  <<get direct children>>
+}
+```
+
+When the workspace has no workspace folders at all there will be no children to
+return, as there are no **literate** documents to begin with.
+
+``` ts : <<get direct children>>=
+if(!vscode.workspace.workspaceFolders ||
+  (
+    vscode.workspace.workspaceFolders &&
+    vscode.workspace.workspaceFolders.length < 1
+  )) {
+  vscode.window.showInformationMessage('No fragments in empty workspace');
+  return Promise.resolve([]);
+}
+```
+
+If we do have workspace folders, but no element is given to look for children we
+need to look at the all the fragments available in all documents across all
+workspace folders. If on the other hand an element is given then its children
+are retrieved.
+
+``` ts : <<get direct children>>=+
+if(!element)
+{
+  <<get children for workspace folders>>
+}
+else
+{
+  <<get children for element>>
+}
+```
+
+When no element is passed we want the root of all the branches, where each
+workspace folder is the root of its own branch.
+
+To this end the children are all essentially the workspace folder names. Since
+these are the work folders the fragments representing them have no `parentName`
+specified. As `folderName` we pass on the workspace folder name. This is a
+property all its children and the rest of its offspring inherit. The
+`folderName` is used to find the correct workspace folder to search for the
+given element and its offspring.
+
+``` ts : <<get children for workspace folders>>=
+let arr = new Array<FragmentNode>();
+for(const wsFolder of vscode.workspace.workspaceFolders)
+{
+    arr.push(
+    new FragmentNode(
+      wsFolder.name,
+      new vscode.MarkdownString('$(book) (workspace folder)', true),
+      'Workspace folder containing a literate project',
+      vscode.TreeItemCollapsibleState.Collapsed,
+      wsFolder.name,
+      undefined,
+      wsFolder,
+      undefined));
+}
+return Promise.resolve(arr);
+```
+
+Getting the children for a given element is a bit more involved. First we set
+up a constant `folderName` for ease of access. Then we also creat an array of
+`FragmentNode`s.
+
+``` ts : <<get children for element>>=
+const folderName : string = element.folderName;
+const fldr : vscode.WorkspaceFolder = element.workspaceFolder;
+let arr = new Array<FragmentNode>();
+```
+
+From the element we already learned the workspace folder for its project, so we
+can use that directly to parse the **literate** content. With the `fragments`
+map of the workspace folder in hand we can iterate over the keys in the
+`fragments` map.
+
+There are essentially two cases we need to check for. If the given element has
+no `parentName` set we know it is a fragment in the document level, so a
+fragment that was created. In contrast for a fragment there are child fragments,
+meaning that in the fragment code block other fragments were used. These are
+presented in the tree view as children to that fragment.
+
+``` ts : <<get children for element>>=+
+<<get fragment family for offspring search>>
+for(const fragmentName of fragments.keys() )
+{
+  if(!element.parentName) {
+    <<create fragment node for document level>>
+  }
+  else if (fragmentName === element.label) {
+    <<create fragment node for fragment parent>>
+  }
+}
+
+return Promise.resolve(arr);
+```
+
+## Getting all fragments
+
+To find the fragment information to build `FragmentNode`s from iterate over the
+**literate** files in the workspace folder that we determined we need to search.
+Then build the fragment map based on the tokens generated by the iteration pass.
+As a reminder the fragments map has the fragment name as key and the
+corresponding `FragmentInformation` as the value to that key.
+
+``` ts : <<get fragment family for offspring search>>=
+const fragments = theOneRepository.getFragments(fldr).map;
+```
+
+## TODO: build proper fragment hierarchy from fragments map
+
+Still to do. Right now essentially the map structure is shown, but that isn't
+very useful. What we really need is a hierarchical form with each fragment under
+its parent fragment so that the structure of the literate program can be seen.
+
+Another improvement we could make is to show Markdown outline of chapters, with
+fragment occurance under that shown.
+
+## Fragment used in other fragment
+
+When we have found the fragment the passed in element represents we can find the
+child fragment names, that is the fragment names used in this fragment. All
+matches against `FRAGMENT_USE_IN_CODE_RE` are found and for each case a
+corresponding `FragmentNode` is created to function as a child to our parent
+element.
+
+``` ts : <<create fragment node for fragment parent>>=
+let fragmentInfo = fragments.get(fragmentName) || undefined;
+if (fragmentInfo) {
+  const casesToReplace = [...fragmentInfo.code.matchAll(FRAGMENT_USE_IN_CODE_RE)];
+  for (let match of casesToReplace) {
+    if(!match || !match.groups)
+    {
+      continue;
+    }
+    let tag = match[0];
+    let ident = match.groups.ident;
+    let tagName = match.groups.tagName;
+    let root = match.groups.root;
+    let add = match.groups.add;
+    arr.push(
+      new FragmentNode(
+        tagName,
+                new vscode.MarkdownString(`$(symbol-file) ${fragmentInfo.literateFileName}`, true),
+        fragmentName,
+        vscode.TreeItemCollapsibleState.Collapsed,
+        folderName,
+        element.label,
+        element.workspaceFolder,
+        undefined
+      )
+    );
+  }
+}
+```
+
+## Fragment on document level
+
+When the workspace folder is given as the element, or rather the `parentName`
+of the given element is undefined, we have a fragment on document level. There
+are two types of fragments we want to discern beetween: top level fragments, or
+fragments that also tell us what file to create, and other fragments. A
+**literate** document can contain multiple top level fragments. But each top
+level fragment will generate only one source code file.
+
+``` ts : <<create fragment node for document level>>=
+let fragmentType : vscode.MarkdownString;
+let fragmentInfo = fragments.get(fragmentName) || undefined;
+if (fragmentInfo) {
+  if(fragmentName.indexOf(".*") >= 0)
+  {
+    fragmentType = new vscode.MarkdownString(
+              `$(globe): ${fragmentInfo.literateFileName}`,
+              true);
+  }
+  else
+  {
+    fragmentType = new vscode.MarkdownString(
+              `$(code): ${fragmentInfo.literateFileName}`,
+              true);
+  }
+    arr.push(
+    new FragmentNode(
+      fragmentName,
+      fragmentType,
+      fragmentInfo.literateFileName,
+      vscode.TreeItemCollapsibleState.Collapsed,
+      folderName,
+      element.label,
+      element.workspaceFolder,
+      undefined));
+}
+```
+
+## Fragment node for tree view
+
+A fragment node represents a **literate** project fragment in a Visual Studio
+Code tree view. The class `FragmentNode` extends the `vscode.TreeItem`. Apart
+from just showing basic information like the fragment name and the file it is
+defined in we use `FragmentNode` also to keep track of the workspace folder it
+is hosted in as well as the text document if there is one. Text documents are
+documents the workspace currently has opened. We need to take these into
+account so that we can directly use these as part of the **literate** document
+parsing.
+
+``` ts : <<fragment node>>=
+class FragmentNode extends vscode.TreeItem
+{
+  constructor (
+    <<fragment node readonly members>>
+  )
+  {
+    <<fragment node initialization>>
+  }
+}
+```
+
+For the visualization part we need a `label`, a `tooltip`, a `description` and a
+`collapsibleState`. These are the only pieces of information needed that show up
+in the tree view.
+
+``` ts : <<fragment node readonly members>>=
+public readonly label : string,
+public readonly tooltip : vscode.MarkdownString,
+public readonly description : string,
+public readonly collapsibleState : vscode.TreeItemCollapsibleState,
+```
+
+We further encode some more information in `FragmentNode` so that subsequent
+parsing can be done much more efficiently.
+
+``` ts : <<fragment node readonly members>>=+
+public readonly folderName: string,
+public readonly parentName : string | undefined,
+public readonly workspaceFolder : vscode.WorkspaceFolder,
+public readonly textDocument : vscode.TextDocument | undefined
+```
+
+Each node in the tree view represents a fragment. When the tree item is used to
+denote a workspace folder the theme icon for `'book'` is used. Actual fragments
+get the theme icon for `'code'`.
+
+``` ts : <<fragment node initialization>>=
+super(label, collapsibleState);
+this.tooltip = tooltip;
+this.description = description;
+this.iconPath = this.parentName ?
+          new vscode.ThemeIcon('code')
+          : new vscode.ThemeIcon('book');
+this.contextValue = 'literate_fragment';
+```
+
+## registering FragmentNodeProvider
+
+The `FragmentNodeProvide` needs to be registered with Visual Studio Code so it
+can work when literate files are found in a work space.
+
+``` ts : <<register fragment tree view>>=
+new FragmentExplorer(context);
+```

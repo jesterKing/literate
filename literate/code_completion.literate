@@ -1,0 +1,123 @@
+# Code completion
+
+A simple implementation to provide code completion will help authors writing
+their literate programs. Having possible tag names suggested will help
+decreasing the cognitive load of remembering all code fragment names in a
+literate project. This project itself has well over 50 fragments, and having to
+remember them by name is not easy.
+
+Until there is a good **literate** file type integration with Visual Studio Code
+we'll be relying on the built-in **Markdown** functionality.
+
+``` ts : <<register completion item provider>>=
+const completionItemProvider =
+  vscode.languages.registerCompletionItemProvider('markdown', {
+    <<implement provide completion items>>
+}, '<');
+context.subscriptions.push(completionItemProvider);
+```
+
+## Providing completion items
+
+The completion item provider will generate a `CompletionItem` for each fragment
+we currently know of. Although the provider gets passed in the `TextDocument`
+for which it was triggered we will present fragments from the entire project.
+
+``` ts : <<implement provide completion items>>=
+async provideCompletionItems(
+  document : vscode.TextDocument,
+  ..._
+)
+{
+```
+
+After setting up the necessary variables with
+`<<setup variables for providing completion items>>` we figure out to which
+workspace folder the current `TextDocument`. If no workspace folder can be
+determined we return an empty array. This can happen with an unsaved new file,
+or when documents were opened that are not part of the workspace.
+
+``` ts : <<implement provide completion items>>=+
+  <<setup variables for providing completion items>>
+  <<get workspace for TextDocument>>
+```
+
+After the workspace folder has been determined we can gather all fragments in
+our project.
+
+``` ts : <<implement provide completion items>>=+
+  <<get fragments for completion items>>
+```
+
+Finally we generate the completion items into the array `completionItems` that
+we return when done.
+
+``` ts : <<implement provide completion items>>=+
+  <<for each fragment create a completion item>>
+  return completionItems;
+}
+```
+
+### Setting up variables
+
+Completion items are going to be collected in an `Array<CompletionItem>`.
+
+``` ts : <<setup variables for providing completion items>>=
+let completionItems : Array<vscode.CompletionItem> =
+    new Array<vscode.CompletionItem>();
+```
+
+### Workspace folder for TextDocument
+
+Determining the workspace folder for the given TextDocument is done by creating
+relative paths from each workspace folder to the document. If the path does not
+start with `..` we found the workspace folder where the document is from.
+
+If no workspace folders were found, or if the TextDocument did not have a
+workspace folder we essentially end up returning an empty array from the
+completion item provider.
+
+``` ts : <<get workspace for TextDocument>>=
+const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
+if(!workspaceFolder) { return []; }
+```
+
+### Retrieving fragments of project
+
+Code completion item providers run essentially on document changes. The
+`FragmentRepository` in most cases handles processing of **literate** files
+automatically, but it skips that when a change is caused by typing `<`, the
+opening chevron. That means we need to ensure **literate** files are processed
+before getting the fragment map for our workspace folder.
+
+``` ts : <<get fragments for completion items>>=
+await theOneRepository.processLiterateFiles(workspaceFolder);
+let fragments = theOneRepository.getFragments(workspaceFolder).map;
+```
+
+### Creating the CompletionItems
+
+With all fragments in the map we iterate over all the keys. For each key we
+fetch the corresponding `FragmentInformation`. Now we can create the
+`CompletionItem` with the `fragmentName` as its content.
+
+Further the fragment code is set to be the detail of the completion item. This
+will provide a tooltip with the code fragment readable, so that it is easy to
+understand what fragment is currently highlighted in the completion list.
+
+Finally the set the completion item kind to `Reference` so that we get a nice
+icon in the completion list pop-up.
+
+``` ts : <<for each fragment create a completion item>>=
+for(const fragmentName of fragments.keys())
+{
+  const fragment : FragmentInformation | undefined = fragments.get(fragmentName);
+  if(!fragment) {
+    continue;
+  }
+  const fragmentCompletion = new vscode.CompletionItem(fragmentName);
+  fragmentCompletion.detail = fragment.code;
+  fragmentCompletion.kind = vscode.CompletionItemKind.Reference;
+  completionItems.push(fragmentCompletion);
+}
+```

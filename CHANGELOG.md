@@ -1,5 +1,17 @@
 # Change Log
 
+## 0.4.1
+
+* Overhauling literate file processing. There is now one class responsible for
+  handling the parsing and rendering of literate files and for creation of
+  fragment maps. Different parts use the new central fragment repository. This
+  has been done with future enhancements in mind.
+* Literate program split up into several documents. TOC, chapter linking and
+  similar features have become important, but for now accept that browsing the
+  literate program isn't the easiest. Something to be address better through #7,
+  #10 and #11.
+* Diagnostics don't repeat unnecessarily.
+
 ## 0.4.0
 
 * Add hovers when mousing over fragment usage or fragment mention.

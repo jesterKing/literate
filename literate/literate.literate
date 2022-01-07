@@ -45,6 +45,382 @@ create multiple source files within just one **literate** document.
 This text describes the **Literate Programming** extension as a **literate**
 program.
 
+## Fragment Model
+
+The tools provided by the **Literate Programming** extension are built around
+one repository of the project providing all necessary information around
+fragments.
+
+The fragment repository handles parsing of **literate** documents, reacting to
+changes made by users. The repository provides all fragments found in the
+projects added to the current workspace. Additionally the repository will write
+out source files and rendered HTML files.
+
+The fragment model is defined in the `FragmentRepository` class, which will be
+described in detail after introducing a couple of classes that help the
+repository.
+
+### FragmentMap class
+
+The `FragmentMap` class holds a map of strings, the fragment names, and their
+associated `FragmentInformation`. This map is available through the `map`
+property. The class provides also a `clear` method and a `dispose` method.
+
+``` ts : <<fragment map>>=
+class FragmentMap {
+  map : Map<string, FragmentInformation>;
+  
+  constructor()
+  {
+    this.map = new Map<string, FragmentInformation>();
+  }
+
+  clear()
+  {
+    this.map.clear();
+  }
+
+  dispose()
+  {
+    this.map.clear();
+  }
+};
+```
+
+### List of GrabbedState
+
+The class `GrabbedStateList` holds an array of `GrabbedState` accessible through
+the `list` property. The class provides `clear` and `dispose` properties.
+
+``` ts : <<list of grabbed states>>=
+class GrabbedStateList {
+  list : Array<GrabbedState>;
+
+  constructor()
+  {
+    this.list = new Array<GrabbedState>();
+  }
+
+  clear()
+  {
+    this.list = new Array<GrabbedState>();
+  }
+  
+  dispose()
+  {
+    while(this.list.length>0)
+    {
+      this.list.pop();
+    }
+  }
+};
+```
+
+### The FragmentRepository class
+
+The `FragmentRepository` uses several helper classes, these we introduce right
+before defining the repository class.
+
+``` ts : <<fragment repository>>=
+<<fragment map>>
+<<list of grabbed states>>
+
+export class FragmentRepository {
+  <<fragment repository member variables>>
+  <<fragment repository constructor>>
+  <<fragment generation method>>
+
+  <<method to get fragments from repository>>
+
+  dispose() {
+    for(let fragmentMap of this.fragmentsForWorkspaceFolders.values())
+    {
+      fragmentMap.dispose();
+    }
+    this.fragmentsForWorkspaceFolders.clear();
+
+    for(let grabbedState of this.grabbedStateForWorkspaceFolders.values())
+    {
+      grabbedState.dispose();
+    }
+    this.grabbedStateForWorkspaceFolders.clear();
+  }
+}
+```
+
+#### Member variables
+
+Our `FragmentRepository` needs a couple of member variables to function
+properly. We'll need an instance of a properly configured *MarkdownIt* parser.
+
+``` ts : <<fragment repository member variables>>=
+private md : MarkdownIt;
+```
+
+Since we work with a multi-root workspace we'll create a map of maps. The keys
+for this top-level map will be the workspace folder names. The actual
+`FragmentMap`s will be the values to each workspace folder.
+
+``` ts : <<fragment repository member variables>>=+
+readonly fragmentsForWorkspaceFolders : Map<string, FragmentMap>;
+```
+
+For our parsing functionality we need an `Array<GrabbedState>`, which we have
+encapsulated in the class `GrabbedStateList` and is available through the `list`
+property. Each `GrabbedStateList` is saved to the map of workspace folder name
+and list key-value pair.
+
+``` ts : <<fragment repository member variables>>=+
+readonly grabbedStateForWorkspaceFolders : Map<string, GrabbedStateList>;
+```
+
+Finally we need a `DiagnosticCollection` to be able to keep track of detected
+problems in **literate** projects. TBD: this probably needs to be changed into a
+map of `DiagnosticCollection`, again with the workspace folder names as keys.
+
+``` ts : <<fragment repository member variables>>=+
+readonly diagnostics : vscode.DiagnosticCollection;
+```
+
+#### Constructor
+
+The constructor takes an extension context to register any disposables there.
+
+``` ts : <<fragment repository constructor>>=
+constructor(
+  context : vscode.ExtensionContext
+)
+{
+  <<initializing the fragment repository members>>
+
+  <<subscribe to text document changes>>
+  <<subscribe to workspace changes>>
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeWorkspaceFolders(
+      async (e : vscode.WorkspaceFoldersChangeEvent) =>
+      {
+        for(const addedWorkspaceFolder of e.added) {
+          await this.processLiterateFiles(addedWorkspaceFolder);
+        }
+        for(const removedWorkspaceFolder of e.removed)
+        {
+          this.fragmentsForWorkspaceFolders.delete(removedWorkspaceFolder.name);
+          this.grabbedStateForWorkspaceFolders.delete(removedWorkspaceFolder.name);
+        }
+      }
+    )
+  );
+}
+```
+
+##### Initializing members
+
+``` ts : <<initializing the fragment repository members>>=
+this.md = createMarkdownItParserForLiterate();
+this.fragmentsForWorkspaceFolders = new Map<string, FragmentMap>();
+this.grabbedStateForWorkspaceFolders = new Map<string, GrabbedStateList>();
+this.diagnostics = vscode.languages.createDiagnosticCollection('literate');
+context.subscriptions.push(this.diagnostics);
+```
+
+##### Subscribing to text document changes
+
+The repository subscribes to the `onDidChangeTextDocument` event on the
+workspace. It could process **literate** files on each change, but the
+completion item provider needs to trigger itself processing of literate files.
+Since completion item provider gets called on typing a opening chevron (`<`) we
+skip triggering the processing here when such a character has been typed.
+
+``` ts :  <<subscribe to text document changes>>=
+context.subscriptions.push(
+  vscode.workspace.onDidChangeTextDocument(
+    async (e : vscode.TextDocumentChangeEvent) =>
+    {
+      if(!(e.contentChanges.length>0 && e.contentChanges[0].text.startsWith('<')))
+      {
+        await this.processLiterateFiles(e.document);
+      }
+    }
+  )
+);
+```
+
+##### Subscribing to workspace changes
+
+Triggering of processing **literate** documents is necessary when new workspace
+folders have been added. Additionally we need to clean up fragment maps and
+grabbed states for those workspace folders that have been removed from the
+workspace folder.
+
+``` ts : <<subscribe to workspace changes>>=
+context.subscriptions.push(
+  vscode.workspace.onDidChangeWorkspaceFolders(
+    async (e : vscode.WorkspaceFoldersChangeEvent) =>
+    {
+      for(const addedWorkspaceFolder of e.added) {
+        await this.processLiterateFiles(addedWorkspaceFolder);
+      }
+      for(const removedWorkspaceFolder of e.removed)
+      {
+        this.fragmentsForWorkspaceFolders.delete(removedWorkspaceFolder.name);
+        this.grabbedStateForWorkspaceFolders.delete(removedWorkspaceFolder.name);
+      }
+    }
+  )
+);
+```
+
+#### Processing literate files
+
+The parsing and setting up of the `fragments` map is handled with the method
+`processLiterateFiles`. Additionally the method will write out all specified
+source files.
+
+Processing the literate files is started generally in one of three cases: 1) change
+in workspace due to addition or removal of a workspace folder, 2) change to a
+literate document or through triggering of the `literate.process` command.
+
+``` ts : <<fragment generation method>>=
+async processLiterateFiles(
+  trigger :
+    vscode.WorkspaceFolder
+    | vscode.TextDocument
+    | undefined) {
+      <<set up workspace folder array>>
+      <<iterate over workspace folders and parse>>
+}
+```
+
+First we determine the workspace folder or workspace folders to process. In the
+case where `trigger` is a workspace folder or a text document we use the given
+workspace folder or determine the one to which the text document belongs. In
+these cases we'll have an array with just the one workspace folder as element.
+When the trigger is `undefined` we'll use all workspace folders registered to
+this workspace.
+
+``` ts : <<set up workspace folder array>>=
+const workspaceFolders : Array<vscode.WorkspaceFolder> | undefined = (() => {
+  if(trigger)
+  {
+    <<get workspace if text document>>
+    <<else just use passed in workspace>>
+    if("eol" in trigger) {
+      const ws = determineWorkspaceFolder(trigger);
+      if(ws)
+      {
+        return [ws];
+      }
+    } else {
+      return [trigger];
+    }
+  }
+  if(vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length>0) {
+    let folders = new Array<vscode.WorkspaceFolder>();
+    for(const ws of vscode.workspace.workspaceFolders)
+    {
+      folders.push(ws);
+    }
+    return folders;
+  }
+  return undefined;
+}
+)();
+```
+
+We can check if our `trigger` is a `TextDocument` to see if `eol` is a property.
+Otherwise it is a `Workspace`.
+
+``` ts : <<get workspace if text document>>=
+if("eol" in trigger) {
+  const ws = determineWorkspaceFolder(trigger);
+  if(ws)
+  {
+    return [ws];
+  }
+} 
+```
+
+``` ts : <<else just use passed in workspace>>=
+else
+{
+  return [trigger];
+}
+```
+
+``` ts : <<iterate over workspace folders and parse>>=
+if(workspaceFolders) {
+  const writeOutHtml : WriteRenderCallback =
+      (fname : string,
+       folderUri : vscode.Uri,
+       rendered : string) : Thenable<void> => {
+    const html =
+`<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="./style.css">
+  </head>
+  <body>
+  ${rendered}
+  </body>
+</html>`;
+    const encoded = Buffer.from(html, 'utf-8');
+    fname = fname.replace(".literate", ".html");
+    const fileUri = vscode.Uri.joinPath(folderUri, fname);
+    return Promise.resolve(vscode.workspace.fs.writeFile(fileUri, encoded));
+  };
+  for(const folder of workspaceFolders)
+  {
+    if(!this.fragmentsForWorkspaceFolders.has(folder.name))
+    {
+      this.fragmentsForWorkspaceFolders.set(folder.name, new FragmentMap());
+    }
+    if(!this.grabbedStateForWorkspaceFolders.has(folder.name))
+    {
+      this.grabbedStateForWorkspaceFolders.set(folder.name, new GrabbedStateList());
+    }
+    const fragments = this.fragmentsForWorkspaceFolders.get(folder.name);
+    const grabbedStateList = this.grabbedStateForWorkspaceFolders.get(folder.name);
+    if(fragments && grabbedStateList) {
+      fragments.clear();
+      grabbedStateList.clear();
+      await iterateLiterateFiles(folder,
+                                 writeOutHtml, /*     writeHtml : WriteRenderCallback*/
+                                 grabbedStateList.list,
+                                 this.md);
+      this.diagnostics.clear();
+      fragments.map = await handleFragments(folder, grabbedStateList.list, this.diagnostics, false, undefined);
+      this.diagnostics.clear();
+      await handleFragments(folder, grabbedStateList.list, this.diagnostics, true, writeSourceFiles);
+    }
+  }
+}
+```
+
+#### Fetching fragments for workspace folder
+
+When we call `getFragments` we assume the **literate** projects have all been
+process properly. In most cases that is triggered automatically, but it may be
+necessary to trigger the processing manually before calling `getFragments`. When
+the projects have been properly processed, though, this function returns the
+`FragmentMap` for the given workspace folder.
+
+``` ts : <<method to get fragments from repository>>=
+getFragments(workspaceFolder : vscode.WorkspaceFolder) : FragmentMap
+{
+  let fragmentMap : FragmentMap = new FragmentMap();
+  this.fragmentsForWorkspaceFolders.forEach(
+    (value, key, _) =>
+    {
+      if(key===workspaceFolder.name)
+      {
+        fragmentMap = value;
+      }
+    }
+  );
+
+  return fragmentMap;
+}
+```
+
 ## Iterating all literate files
 
 As mentioned in the introduction the main idea of the extension is to collect
@@ -164,26 +540,15 @@ are passed to a *MarkdownIt* renderer. The renderer will have the
 states of each rendered file. The grabbed state is collected in `gstate`, which
 is an instance of the `StateCore`, provided by *MarkdownIt*.
 
+The interface defines `literateFileName`, which is the filename of the
+**literate** document to which the grabbed state belongs. `literateUri` is the
+full uri for this document. Finally `gstate` holds the `StateCore` of the
+parsing result.
+
 ``` ts : <<grabbed state type>>=
-/**
- * Interface for environment to hold the Markdown file name and the StateCore
- * grabbed by the grabberPlugin.
- * The gstate we use to access all the tokens generated by the MarkdownIt parser.
- *
- * @see StateCore
- */
 interface GrabbedState {
-  /**
-   * File name of the Markdown document to which the state belongs.
-   */
   literateFileName: string;
-  /**
-   * Uri for the Markdown document.
-   */
   literateUri: vscode.Uri;
-  /**
-   * State grabbed from the MarkdownIt parser.
-   */
   gstate: StateCore;
 }
 ```
@@ -193,9 +558,6 @@ interface GrabbedState {
 In the `iterateLiterateFiles` we start by setting up the *MarkdownIt* parser.
 
 ``` ts : <<set up MarkdownIt>>=
-/**
-  * MarkdownIt instance with grabber_plugin in use.
-  */
 const md : MarkdownIt = createMarkdownItParserForLiterate();
 ```
 
@@ -261,7 +623,7 @@ of fragments in code we use `FRAGMENT_USE_IN_CODE_RE`.
 ``` ts : <<fragment regular expressions>>=
 //let HTML_ENCODED_FRAGMENT_TAG_RE = /(&lt;&lt.*?&gt;&gt;)/g;
 let FRAGMENT_USE_IN_CODE_RE =
-  /(?<indent>[ \t]*)<<(?<tagName>.*)>>(?<root>=)?(?<add>\+)?/g;
+  /(?<indent>[ \t]*)<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?/g;
 ```
 
 The regular expression captures four groups. A match will give us 5 or more
@@ -289,7 +651,7 @@ following the language specifier.
 
 ``` ts : <<fragment regular expressions>>=+
 let FRAGMENT_RE =
-  /(?<lang>.*):.*<<(?<tagName>.*)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*)/;
+  /(?<lang>.*):.*<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*)/;
 ```
 
 Most of the groups correspond to the ones defined by `FRAGMENT_USE_IN_CODE_RE`
@@ -363,17 +725,10 @@ which is of type `Map<string, FragmentInformation>`. The name of a fragment will
 function as the key, and an instance of `FragmentInformation` will be the value.
 
 ```ts : <<build fragment map>>=
-/**
- * Map of fragment names and tuples of code fragments for these. The
- * tuples contain code language identifier followed by the filename and
- * lastly followed by the actual code fragment.
- */
 const fragments = new Map<string, FragmentInformation>();
-// Now we have the state, we have access to the tokens
-// over which we can iterate to extract all the code
-// fragments and build up the map with the fragments concatenated
-// where necessary. We'll extrapolate all fragments in the second
-// pass.
+const overwriteAttempts = new Array<string>();
+const missingFilenames = new Array<string>();
+const addingToNonExistant = new Array<string>();
 for (let env of envList) {
   for (let token of env.gstate.tokens) {
     <<handle fence tokens>>
@@ -424,15 +779,17 @@ added to the `fragments` map.
 
 ``` ts : <<create a new fragment>>=
 if (root && !add) {
-  if (fragments.has(name)) {
+  if (fragments.has(name) && !overwriteAttempts.includes(name)) {
     let msg = `Trying to overwrite existing fragment fragment ${name}. ${env.literateFileName}${linenumber}`;
     const diag = createErrorDiagnostic(token, msg);
     updateDiagnostics(env.literateUri, diagnostics, diag);
+    overwriteAttempts.push(name);
   } else {
-    if (!fileName && name.indexOf(".*") > -1) {
+    if (!fileName && name.indexOf(".*") > -1 && !missingFilenames.includes(name)) {
       let msg = `Expected filename for star fragment ${name}`;
       const diag = createErrorDiagnostic(token, msg);
       updateDiagnostics(env.literateUri, diagnostics, diag);
+      missingFilenames.push(name);
     } else {
       let code = token.content;
       let fragmentInfo: FragmentInformation = {
@@ -475,9 +832,12 @@ if (root && add) {
       fragments.set(name, fragmentInfo);
     }
   } else {
-    let msg = `Trying to add to non-existant fragment ${name}. ${env.literateFileName}:${linenumber}`;
-    const diag = createErrorDiagnostic(token, msg);
-    updateDiagnostics(env.literateUri, diagnostics, diag);
+    if(!addingToNonExistant.includes(name)) {
+      let msg = `Trying to add to non-existant fragment ${name}. ${env.literateFileName}:${linenumber}`;
+      const diag = createErrorDiagnostic(token, msg);
+      updateDiagnostics(env.literateUri, diagnostics, diag);
+      addingToNonExistant.push(name);
+    }
   }
 }
 ```
@@ -538,6 +898,9 @@ fragments can be combined into source code.
 ``` ts : <<extrapolate fragments>>=
 // for now do several passes
 let pass: number = 0;
+const rootIncorrect = new Array<string>();
+const addIncorrect = new Array<string>();
+const fragmentNotFound = new Array<string>();
 do {
   pass++;
   let fragmentReplaced = false;
@@ -557,20 +920,23 @@ do {
       let tagName = match.groups.tagName;
       let root = match.groups.root;
       let add = match.groups.add;
-      if (root) {
+      if (root && !rootIncorrect.includes(tag)) {
         let msg = `Found '=': incorrect fragment tag in fragment, ${tag}`;
         const diag = createErrorDiagnostic(fragmentInfo.tokens[0], msg);
         updateDiagnostics(fragmentInfo.env.literateUri, diagnostics, diag);
+        rootIncorrect.push(tag);
       }
-      if (add) {
+      if (add && !addIncorrect.includes(tag)) {
         let msg = `Found '+': incorrect fragment tag in fragment: ${tag}`;
         const diag = createErrorDiagnostic(fragmentInfo.tokens[0], msg);
         updateDiagnostics(fragmentInfo.env.literateUri, diagnostics, diag);
+        addIncorrect.push(tag);
       }
-      if (!fragments.has(match.groups.tagName) && tagName !== "(?<tagName>.*)") {
+      if (!fragments.has(match.groups.tagName) && tagName !== "(?<tagName>.+)" && !fragmentNotFound.includes(tagName)) {
         let msg = `Could not find fragment ${tag} (${tagName})`;
         const diag = createErrorDiagnostic(fragmentInfo.tokens[0], msg);
         updateDiagnostics(fragmentInfo.env.literateUri, diagnostics, diag);
+        fragmentNotFound.push(tagName);
       }
       let fragmentToReplaceWith = fragments.get(tagName) || undefined;
       if (fragmentToReplaceWith) {
@@ -648,8 +1014,7 @@ ${rendered}
 
 The command `literate.process` is registered with Visual Studio Code. The
 disposable that gets returned by `registerCommand` is held in
-`literateProcessDisposable` so that it can be used later on, for instance for
-diagnostics management.
+`literateProcessDisposable` so that we can push it into `context.subscriptions`.
 
 Here we find the main program of our `literate.process` command. Our
 *MarkdownIt* is set up, `.literate` files are searched and iterated. Each
@@ -668,702 +1033,9 @@ task. That is obviously not good for the workflow.
 let literateProcessDisposable = vscode.commands.registerCommand(
   'literate.process',
   async function () {
-
-  <<set up MarkdownIt>>
-
-  diagnostics.clear();
-
-  if (!vscode.workspace.workspaceFolders) {
-    return vscode.window.showInformationMessage("No workspace or folder opened");
-  }
-
-
-  const writeOutHtml : WriteRenderCallback =
-      (fname : string,
-       folderUri : vscode.Uri,
-       rendered : string) : Thenable<void> => {
-    const html =
-`<html>
-  <head>
-    <link rel="stylesheet" type="text/css" href="./style.css">
-  </head>
-  <body>
-  ${rendered}
-  </body>
-</html>`;
-    const encoded = Buffer.from(html, 'utf-8');
-    fname = fname.replace(".literate", ".html");
-    const fileUri = vscode.Uri.joinPath(folderUri, fname);
-    return Promise.resolve(vscode.workspace.fs.writeFile(fileUri, encoded));
-  };
-
-  for(const workspaceFolder of vscode.workspace.workspaceFolders) {
-    const envList: Array<GrabbedState> = new Array<GrabbedState>();
-    await iterateLiterateFiles(workspaceFolder, writeOutHtml, envList, md);
-        let _ = await handleFragments(workspaceFolder, envList, diagnostics, true, writeSourceFiles);
-  }
-
-  let hasAnyDiagnostics = false;
-  diagnostics.forEach(
-    function(
-      _: vscode.Uri,
-      diags: readonly vscode.Diagnostic[],
-      __: vscode.DiagnosticCollection
-    ) : any {
-      hasAnyDiagnostics ||= (diags.length > 0);
-    }
-  );
-
-  if (hasAnyDiagnostics) {
-        return vscode.window.setStatusBarMessage(
-            (new vscode.MarkdownString(
-        "$(error) Error encountered during process"
-      )).value, 2000);
-  }
-  else {
+    theOneRepository.processLiterateFiles(undefined);
     return vscode.window.setStatusBarMessage("Literate Process completed", 5000);
-  }
 });
-```
-
-## Fragment explorer
-
-The Literate Fragment Explorer is a `TreeView` that uses `FragmentNodeProvider`
-to show fragments available in a workspace. The tree view has `FragmentNode` as
-its type parameter.
-
-``` ts : <<fragment explorer>>=
-export class FragmentExplorer {
-  private fragmentView : vscode.TreeView<FragmentNode>;
-  constructor(context : vscode.ExtensionContext) {
-    const fragmentNodeProvider = new FragmentNodeProvider();
-    context.subscriptions.push(
-      vscode.window.registerTreeDataProvider(
-        'fragmentExplorer',
-        fragmentNodeProvider
-      )
-    );
-    this.fragmentView = vscode.window.createTreeView(
-                  'fragmentExplorer',
-                  {
-                    treeDataProvider : fragmentNodeProvider
-                  });
-
-    context.subscriptions.push(
-      vscode.commands.registerCommand(
-                'fragmentExplorer.refreshEntry',
-                () => fragmentNodeProvider.refresh())
-              );
-    context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(
-      _ => {
-        fragmentNodeProvider.refresh();
-      }
-    ));
-    context.subscriptions.push(this.fragmentView);
-  }
-}
-```
-
-### Fragment tree provider
-
-The Literate Fragment Explorer needs a
-[`TreeDataProvider`](https://code.visualstudio.com/api/extension-guides/tree-view)
-implementation to present the fragment structure to Visual Studio Code so that
-the data can be visualized in the `fragmentExplorer` custom view.
-
-The class `FragmentNodeProvider` implements a `TreeDataProvider` with
-`FragmentNode` as the tree item.
-
-``` ts : <<fragment tree provider>>=
-export class FragmentNodeProvider implements vscode.TreeDataProvider<FragmentNode>
-{
-  <<fragment node provider members>>
-  <<fragment node provider API>>
-}
-```
-
-The constructor takes care of all necessary initialization.
-
-``` ts : <<fragment node provider API>>=
-constructor()
-{
-  <<initialize fragment node provider>>
-}
-```
-
-The constructor for the `FragmentNodeProvider` creates an instance of the
-`MarkdownIt` module, fully configured for our **literate programming** needs.
-Additionally a `DiagnosticCollection` is created so that it can be passed on to
-the `handleFragments` function that is utilized in the `FragmentNodeProvider`.
-
-``` ts : <<initialize fragment node provider>>=
-this.md = createMarkdownItParserForLiterate();
-this.diagnostics = vscode.languages.createDiagnosticCollection('literate-treeview');
-```
-
-This means we need two members to hold these instances.
-
-``` ts : <<fragment node provider members>>=
-private md : MarkdownIt;
-private diagnostics : vscode.DiagnosticCollection;
-```
-
-The API for `FragmentNodeProvider` gives as method to update the tree view
-
-``` ts : <<fragment node provider API>>=+
-refresh(): void {
-  <<refresh fragment node provider>>
-}
-```
-
-The current implementation simply fires the `onDidChangeTreeData` event but
-could do more work if needed. To that end there is a private member for emitting
-the event, and the actual event to which the event emitter is published.
-
-``` ts : <<fragment node provider members>>=+
-private _onDidChangeTreeData:
-  vscode.EventEmitter<
-    FragmentNode |
-    undefined |
-    void
-  > = new vscode.EventEmitter<FragmentNode | undefined | void>();
-readonly onDidChangeTreeData :
-  vscode.Event<
-    FragmentNode |
-    undefined |
-    void
-  > = this._onDidChangeTreeData.event;
-```
-
-With those two in place the `refresh` function can fire the event whenever
-called.
-
-``` ts : <<refresh fragment node provider>>=
-this._onDidChangeTreeData.fire();
-```
-
-The `TreeDataProvider` implementation provided by `FragmentNodeProvider` is
-completed by `getTreeItem` and `getChildren`. The first one is simple, it just
-returns the element that is passed to it, as there is no need to find out more
-information about this. Instead, elements have been already created by the
-`getChildren` function, where all `FragmentNode` instances are created with all
-the data necessary.
-
-``` ts : <<fragment node provider API>>=+
-getTreeItem(element : FragmentNode): vscode.TreeItem {
-  <<get fragment tree item>>
-}
-```
-
-As said, the `getTreeItem` implementation remains simple
-
-``` ts : <<get fragment tree item>>=
-return element;
-```
-
-On the other hand the `getChildren` function is more involved. Yet its job is
-simple: get all `FragmentNode`s that represent the direct children of the
-element given.
-
-``` ts : <<fragment node provider API>>=+
-async getChildren(element? : FragmentNode): Promise<FragmentNode[]>
-{
-  <<get direct children>>
-}
-```
-
-When the workspace has no workspace folders at all there will be no children to
-return, as there are no **literate** documents to begin with.
-
-``` ts : <<get direct children>>=
-if(!vscode.workspace.workspaceFolders ||
-  (
-    vscode.workspace.workspaceFolders &&
-    vscode.workspace.workspaceFolders.length < 1
-  )) {
-  vscode.window.showInformationMessage('No fragments in empty workspace');
-  return Promise.resolve([]);
-}
-```
-
-If we do have workspace folders, but no element is given to look for children we
-need to look at the all the fragments available in all documents across all
-workspace folders. If on the other hand an element is given then its children
-are retrieved.
-
-``` ts : <<get direct children>>=+
-if(!element)
-{
-  <<get children for workspace folders>>
-}
-else
-{
-  <<get children for element>>
-}
-```
-
-When no element is passed we want the root of all the branches, where each
-workspace folder is the root of its own branch.
-
-To this end the children are all essentially the workspace folder names. Since
-these are the work folders the fragments representing them have no `parentName`
-specified. As `folderName` we pass on the workspace folder name. This is a
-property all its children and the rest of its offspring inherit. The
-`folderName` is used to find the correct workspace folder to search for the
-given element and its offspring.
-
-``` ts : <<get children for workspace folders>>=
-let arr = new Array<FragmentNode>();
-for(const wsFolder of vscode.workspace.workspaceFolders)
-{
-    arr.push(
-    new FragmentNode(
-      wsFolder.name,
-      new vscode.MarkdownString('$(book) (workspace folder)', true),
-      'Workspace folder containing a literate project',
-      vscode.TreeItemCollapsibleState.Collapsed,
-      wsFolder.name,
-      undefined,
-      wsFolder,
-      undefined));
-}
-return Promise.resolve(arr);
-```
-
-Getting the children for a given element is a bit more involved. First we set
-up a constant `folderName` for ease of access. Then we also creat an array of
-`FragmentNode`s.
-
-``` ts : <<get children for element>>=
-const folderName : string = element.folderName;
-const fldr : vscode.WorkspaceFolder = element.workspaceFolder;
-let arr = new Array<FragmentNode>();
-```
-
-From the element we already learned the workspace folder for its project, so we
-can use that directly to parse the **literate** content. With the `fragments`
-map of the workspace folder in hand we can iterate over the keys in the
-`fragments` map.
-
-There are essentially two cases we need to check for. If the given element has
-no `parentName` set we know it is a fragment in the document level, so a
-fragment that was created. In contrast for a fragment there are child fragments,
-meaning that in the fragment code block other fragments were used. These are
-presented in the tree view as children to that fragment.
-
-``` ts : <<get children for element>>=+
-<<get fragment family for offspring search>>
-for(const fragmentName of fragments.keys() )
-{
-  if(!element.parentName) {
-    <<create fragment node for document level>>
-  }
-  else if (fragmentName === element.label) {
-    <<create fragment node for fragment parent>>
-  }
-}
-
-return Promise.resolve(arr);
-```
-
-### Getting all fragments
-
-To find the fragment information to build `FragmentNode`s from iterate over the
-**literate** files in the workspace folder that we determined we need to search.
-Then build the fragment map based on the tokens generated by the iteration pass.
-As a reminder the fragments map has the fragment name as key and the
-corresponding `FragmentInformation` as the value to that key.
-
-``` ts : <<get fragment family for offspring search>>=
-let envList: Array<GrabbedState> = new Array<GrabbedState>();
-await iterateLiterateFiles(fldr, undefined, envList, this.md);
-const fragments = await handleFragments(fldr, envList, this.diagnostics, false, undefined);
-```
-
-### TODO: build proper fragment hierarchy from fragments map
-
-Still to do. Right now essentially the map structure is shown, but that isn't
-very useful. What we really need is a hierarchical form with each fragment under
-its parent fragment so that the structure of the literate program can be seen.
-
-Another improvement we could make is to show Markdown outline of chapters, with
-fragment occurance under that shown.
-
-### Fragment used in other fragment
-
-When we have found the fragment the passed in element represents we can find the
-child fragment names, that is the fragment names used in this fragment. All
-matches against `FRAGMENT_USE_IN_CODE_RE` are found and for each case a
-corresponding `FragmentNode` is created to function as a child to our parent
-element.
-
-``` ts : <<create fragment node for fragment parent>>=
-let fragmentInfo = fragments.get(fragmentName) || undefined;
-if (fragmentInfo) {
-  const casesToReplace = [...fragmentInfo.code.matchAll(FRAGMENT_USE_IN_CODE_RE)];
-  for (let match of casesToReplace) {
-    if(!match || !match.groups)
-    {
-      continue;
-    }
-    let tag = match[0];
-    let ident = match.groups.ident;
-    let tagName = match.groups.tagName;
-    let root = match.groups.root;
-    let add = match.groups.add;
-    arr.push(
-      new FragmentNode(
-        tagName,
-                new vscode.MarkdownString(`$(symbol-file) ${fragmentInfo.literateFileName}`, true),
-        fragmentName,
-        vscode.TreeItemCollapsibleState.Collapsed,
-        folderName,
-        element.label,
-        element.workspaceFolder,
-        undefined
-      )
-    );
-  }
-}
-```
-
-### Fragment on document level
-
-When the workspace folder is given as the element, or rather the `parentName`
-of the given element is undefined, we have a fragment on document level. There
-are two types of fragments we want to discern beetween: top level fragments, or
-fragments that also tell us what file to create, and other fragments. A
-**literate** document can contain multiple top level fragments. But each top
-level fragment will generate only one source code file.
-
-``` ts : <<create fragment node for document level>>=
-let fragmentType : vscode.MarkdownString;
-let fragmentInfo = fragments.get(fragmentName) || undefined;
-if (fragmentInfo) {
-  if(fragmentName.indexOf(".*") >= 0)
-  {
-    fragmentType = new vscode.MarkdownString(
-              `$(globe): ${fragmentInfo.literateFileName}`,
-              true);
-  }
-  else
-  {
-    fragmentType = new vscode.MarkdownString(
-              `$(code): ${fragmentInfo.literateFileName}`,
-              true);
-  }
-    arr.push(
-    new FragmentNode(
-      fragmentName,
-      fragmentType,
-      fragmentInfo.literateFileName,
-      vscode.TreeItemCollapsibleState.Collapsed,
-      folderName,
-      element.label,
-      element.workspaceFolder,
-      undefined));
-}
-```
-
-### Fragment node for tree view
-
-A fragment node represents a **literate** project fragment in a Visual Studio
-Code tree view. The class `FragmentNode` extends the `vscode.TreeItem`. Apart
-from just showing basic information like the fragment name and the file it is
-defined in we use `FragmentNode` also to keep track of the workspace folder it
-is hosted in as well as the text document if there is one. Text documents are
-documents the workspace currently has opened. We need to take these into
-account so that we can directly use these as part of the **literate** document
-parsing.
-
-``` ts : <<fragment node>>=
-class FragmentNode extends vscode.TreeItem
-{
-  constructor (
-    <<fragment node readonly members>>
-  )
-  {
-    <<fragment node initialization>>
-  }
-}
-```
-
-For the visualization part we need a `label`, a `tooltip`, a `description` and a
-`collapsibleState`. These are the only pieces of information needed that show up
-in the tree view.
-
-``` ts : <<fragment node readonly members>>=
-public readonly label : string,
-public readonly tooltip : vscode.MarkdownString,
-public readonly description : string,
-public readonly collapsibleState : vscode.TreeItemCollapsibleState,
-```
-
-We further encode some more information in `FragmentNode` so that subsequent
-parsing can be done much more efficiently.
-
-``` ts : <<fragment node readonly members>>=+
-public readonly folderName: string,
-public readonly parentName : string | undefined,
-public readonly workspaceFolder : vscode.WorkspaceFolder,
-public readonly textDocument : vscode.TextDocument | undefined
-```
-
-Each node in the tree view represents a fragment. When the tree item is used to
-denote a workspace folder the theme icon for `'book'` is used. Actual fragments
-get the theme icon for `'code'`.
-
-``` ts : <<fragment node initialization>>=
-super(label, collapsibleState);
-this.tooltip = tooltip;
-this.description = description;
-this.iconPath = this.parentName ?
-          new vscode.ThemeIcon('code')
-          : new vscode.ThemeIcon('book');
-this.contextValue = 'literate_fragment';
-```
-
-### registering FragmentNodeProvider
-
-The `FragmentNodeProvide` needs to be registered with Visual Studio Code so it
-can work when literate files are found in a work space.
-
-``` ts : <<register fragment tree view>>=
-new FragmentExplorer(context);
-```
-
-## Code completion
-
-A simple implementation to provide code completion will help authors writing
-their literate programs. Having possible tag names suggested will help
-decreasing the cognitive load of remembering all code fragment names in a
-literate project. This project itself has well over 50 fragments, and having to
-remember them by name is not easy.
-
-Until there is a good **literate** file type integration with Visual Studio Code
-we'll be relying on the built-in **Markdown** functionality.
-
-``` ts : <<register completion item provider>>=
-const completionItemProvider =
-  vscode.languages.registerCompletionItemProvider('markdown', {
-    <<implement provide completion items>>
-}, '<');
-context.subscriptions.push(completionItemProvider);
-```
-
-### Providing completion items
-
-The completion item provider will generate a `CompletionItem` for each fragment
-we currently know of. Although the provider gets passed in the `TextDocument`
-for which it was triggered we will present fragments from the entire project.
-
-``` ts : <<implement provide completion items>>=
-async provideCompletionItems(
-  document : vscode.TextDocument,
-  ..._
-)
-{
-```
-
-After setting up the necessary variables with
-`<<setup variables for providing completion items>>` we figure out to which
-workspace folder the current `TextDocument`. If no workspace folder can be
-determined we return an empty array. This can happen with an unsaved new file,
-or when documents were opened that are not part of the workspace.
-
-``` ts : <<implement provide completion items>>=+
-  <<setup variables for providing completion items>>
-  <<get workspace for TextDocument>>
-```
-
-After the workspace folder has been determined we can gather all fragments in
-our project.
-
-``` ts : <<implement provide completion items>>=+
-  <<get fragments for completion items>>
-```
-
-Finally we generate the completion items into the array `completionItems` that
-we return when done.
-
-``` ts : <<implement provide completion items>>=+
-  <<for each fragment create a completion item>>
-  return completionItems;
-}
-```
-
-#### Setting up variables
-
-Completion items are going to be collected in an `Array<CompletionItem>`.
-Further,  creating completion items for code completion needs to parse the
-entire project, so we need an `Array<GrabbedState>`. Iterating and parsing
-through the project also needs a `DiagnosticCollection`, although we won't be
-using it any further. Lastly we create an instance of the *MarkdownIt* parser to
-give to `iterateLiterateFiles`.
-
-``` ts : <<setup variables for providing completion items>>=
-let completionItems : Array<vscode.CompletionItem> =
-    new Array<vscode.CompletionItem>();
-let envForCompletion : Array<GrabbedState> = new Array<GrabbedState>();
-    new Array<vscode.CompletionItem>();
-const diagnostics = vscode.languages.createDiagnosticCollection('literate-completionitems');
-const md : MarkdownIt = createMarkdownItParserForLiterate();
-```
-
-#### Workspace folder for TextDocument
-
-Determining the workspace folder for the given TextDocument is done by creating
-relative paths from each workspace folder to the document. If the path does not
-start with `..` we found the workspace folder where the document is from.
-
-If no workspace folders were found, or if the TextDocument did not have a
-workspace folder we essentially end up returning an empty array from the
-completion item provider.
-
-``` ts : <<get workspace for TextDocument>>=
-const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
-if(!workspaceFolder) { return []; }
-```
-
-#### Retrieving fragments of project
-
-Getting the fragments for our project means we `iterateLiterateFiles`with the
-`envForCompletion` given, along with the workspace folder and the *MarkdownIt*
-parser. Once we have iterated over all files, and thus `envForCompletion` now
-contains all literate documents tokenized we can pass those to `handleFragments`
-so we can end up with a map of all fragments. We pass in `false` to the function
-to ensure fragments aren't extrapolated: we want to show the fragments as they
-are in code completion.
-
-``` ts : <<get fragments for completion items>>=
-  await iterateLiterateFiles(workspaceFolder, undefined, envForCompletion, md);
-  let fragments = await handleFragments(workspaceFolder, envForCompletion, diagnostics, false, writeSourceFiles);
-```
-
-#### Creating the CompletionItems
-
-With all fragments in the map we iterate over all the keys. For each key we
-fetch the corresponding `FragmentInformation`. Now we can create the
-`CompletionItem` with the `fragmentName` as its content.
-
-Further the fragment code is set to be the detail of the completion item. This
-will provide a tooltip with the code fragment readable, so that it is easy to
-understand what fragment is currently highlighted in the completion list.
-
-Finally the set the completion item kind to `Reference` so that we get a nice
-icon in the completion list pop-up.
-
-``` ts : <<for each fragment create a completion item>>=
-  for(const fragmentName of fragments.keys())
-  {
-    const fragment : FragmentInformation | undefined = fragments.get(fragmentName);
-    if(!fragment) {
-      continue;
-    }
-    const fragmentCompletion = new vscode.CompletionItem(fragmentName);
-    fragmentCompletion.detail = fragment.code;
-    fragmentCompletion.kind = vscode.CompletionItemKind.Reference;
-    completionItems.push(fragmentCompletion);
-  }
-```
-
-## Hover elements
-
-In addition to code completion we can provide hover information. We want to see
-the implementation of fragments when hovering of fragment usages. That way code
-inspection can be easier done.
-
-We'll create `FragmentHoverProvider` which implements `HoverProvider`.
-
-``` ts : <<fragment hover provider>>=
-class FragmentHoverProvider implements vscode.HoverProvider {
-  <<hover provider method>>
-}
-```
-
-The `FragmentHoverProvider` implements `provideHover`. This will create the
-`Hover` item if under the current cursor position there is a fragment, including
-its opening and closing double chevrons.
-
-``` ts : <<hover provider method>>=
-public async provideHover(
-  document : vscode.TextDocument,
-  position : vscode.Position,
-  _: vscode.CancellationToken
-)
-{
-  <<get current line>>
-  <<find workspace folder for hover detection>>
-  <<create hover item for fragment>>
-  return null;
-}
-```
-
-We get the current line of text from the document. We are going to look only for
-tags that are on one line. In the future it would be nice to add support for
-cases where mentioning a fragment in explaining text is split over several lines
-due to word wrapping, but with the current implementation we'll look only at
-those that are on one line.
-
-``` ts : <<get current line>>=
-const currentLine = document.lineAt(position.line);
-```
-
-Next we need to know the the workspace folder for the given document so that we
-can query the correct project for the fragments. If no workspace folder was
-determined return `null`, as there is no literate project associated with the
-given document.
-
-``` ts : <<find workspace folder for hover detection>>=
-const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
-if(!workspaceFolder) { return null; }
-```
-
-Fragments are now available so we can see if we have a fragment under our
-cursor. If we do, and the fragment is not one that defines or appends to a
-fragment we know our cursor is over either fragment usage in a code fence or a
-fragment mention in explaining text. For this we can create a `Hover` with the
-code of the fragment as a `MarkdownString` in a code fence.
-
-If that is not the case our `provideHover` implementation will return `null`.
-
-``` ts : <<create hover item for fragment>>=
-const matchesOnLine = [...currentLine.text.matchAll(FRAGMENT_USE_IN_CODE_RE)];
-for(const match of matchesOnLine)
-{
-  if(!match || !match.groups) {
-    continue;
-  }
-  const foundIndex = currentLine.text.indexOf(match[0]);
-  if(foundIndex>-1) {
-    <<get fragments for hover detection>>
-    if(foundIndex <= position.character && position.character <= foundIndex + match[0].length && fragments.has(match.groups.tagName))
-    {
-      const startPosition = new vscode.Position(currentLine.lineNumber, foundIndex);
-      const endPosition = new vscode.Position(currentLine.lineNumber, foundIndex + match[0].length);
-      let range : vscode.Range = new vscode.Range(startPosition, endPosition);
-      let fragment = fragments.get(match.groups.tagName) || undefined;
-      if (fragment && !match.groups.root) {
-        return new vscode.Hover(
-          new vscode.MarkdownString(`~~~ ${fragment.lang}\n${fragment.code}\n~~~`, true),
-          range);
-      }
-    }
-  }
-}
-```
-
-With the workspace folder in hand we can iterate over all literate files in the
-workspace and get the fragments for the project. We don't want extrapolated
-fragments, we want to see them as they are with fragment usages intact.
-
-``` ts : <<get fragments for hover detection>>=
-const diagnostics = vscode.languages.createDiagnosticCollection('literate-completionitems');
-const md : MarkdownIt = createMarkdownItParserForLiterate();
-let envForCompletion : Array<GrabbedState> = new Array<GrabbedState>();
-    new Array<vscode.CompletionItem>();
-await iterateLiterateFiles(workspaceFolder, undefined, envForCompletion, md);
-let fragments = await handleFragments(workspaceFolder, envForCompletion, diagnostics, false, writeSourceFiles);
 ```
 
 ## Diagnostics
@@ -1518,6 +1190,7 @@ source file or source files as written in the **literate** program.
 <<render and collect state>>
 <<handle fragments>>
 <<write out source files>>
+<<fragment repository>>
 ```
 
 Utility function to determine the workspace folder for a TextDocument
@@ -1603,19 +1276,24 @@ interface WriteSourceCallback {
 ### Extension activation
 
 ``` ts : <<activate the extension>>=
-export function activate(context: vscode.ExtensionContext) {
+let theOneRepository : FragmentRepository;
+export async function activate(context: vscode.ExtensionContext) {
   const rootPath = (vscode.workspace.workspaceFolders && (vscode.workspace.workspaceFolders.length > 0))
     ? vscode.workspace.workspaceFolders[0].uri.fsPath : undefined;
 
   console.log('Ready to do some Literate Programming');
   const diagnostics = vscode.languages.createDiagnosticCollection('literate');
 
+  theOneRepository = new FragmentRepository(context);
+  await theOneRepository.processLiterateFiles(undefined);
+  context.subscriptions.push(theOneRepository);
+
   <<register literate.process>>
   <<register fragment tree view>>
   <<register completion item provider>>
 
   context.subscriptions.push(
-    vscode.languages.registerHoverProvider('markdown', new FragmentHoverProvider())
+    vscode.languages.registerHoverProvider('markdown', new FragmentHoverProvider(theOneRepository))
   );
 
   if (vscode.window.activeTextEditor) {
@@ -1628,11 +1306,6 @@ export function activate(context: vscode.ExtensionContext) {
   }));
 
   context.subscriptions.push(literateProcessDisposable);
-  context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(
-    _ => {
-      vscode.commands.executeCommand('literate.process');
-    }
-  ));
 
   return {
     extendMarkdownIt(md: any) {
