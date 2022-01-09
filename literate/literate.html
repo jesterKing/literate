@@ -913,7 +913,7 @@ in the document that do not create or modify a fragment. These we need to skip.<
 
 </div>
 </div><h3>Creating a new fragment</h3>
-<p>If the <code>root</code> group has captured a result, but the <code>add</code> group not we know we
+<p>If the <code>root</code> group has captured a result but not the <code>add</code> group we know we
 have a new fragment on our hand.</p>
 <p>If we already have in our <code>fragments</code> map a key with the same <code>name</code> as the
 fragment we are currently handling we add an error diagnostic message. We don't
@@ -927,39 +927,64 @@ code file eventually. A file defining fragment without a file name is an error.<
 created with the information found. The code for this fragment is the token
 content in <code>token.content</code>. Finally the new <code>FragmentInformation</code> instance is
 added to the <code>fragments</code> map.</p>
+<p>If a new fragment is going to be created, but it already exists in the fragment
+map we emit an error diagnostic. To ensure we emit the error diagnostic only
+once the fragment name is added to <code>overwriteAttempts</code>.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;create a new fragment&gt;&gt;=</div>
 <div class="code">
 <pre><code><span class="hljs-keyword">if</span> (root &amp;&amp; !add) {
-  <span class="hljs-keyword">if</span> (fragments.<span class="hljs-title function_">has</span>(name) &amp;&amp; !overwriteAttempts.<span class="hljs-title function_">includes</span>(name)) {
-    <span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Trying to overwrite existing fragment fragment <span class="hljs-subst">${name}</span>. <span class="hljs-subst">${env.literateFileName}</span><span class="hljs-subst">${linenumber}</span>`</span>;
-    <span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(token, msg);
-    <span class="hljs-title function_">updateDiagnostics</span>(env.<span class="hljs-property">literateUri</span>, diagnostics, diag);
-    overwriteAttempts.<span class="hljs-title function_">push</span>(name);
-  } <span class="hljs-keyword">else</span> {
-    <span class="hljs-keyword">if</span> (!fileName &amp;&amp; name.<span class="hljs-title function_">indexOf</span>(<span class="hljs-string">&quot;.*&quot;</span>) &gt; -<span class="hljs-number">1</span> &amp;&amp; !missingFilenames.<span class="hljs-title function_">includes</span>(name)) {
-      <span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Expected filename for star fragment <span class="hljs-subst">${name}</span>`</span>;
+  <span class="hljs-keyword">if</span> (fragments.<span class="hljs-title function_">has</span>(name)) {
+    <span class="hljs-keyword">if</span>(overwriteAttempts.<span class="hljs-title function_">includes</span>(name))
+    {
+      <span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Trying to overwrite existing fragment fragment <span class="hljs-subst">${name}</span>. <span class="hljs-subst">${env.literateFileName}</span><span class="hljs-subst">${linenumber}</span>`</span>;
       <span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(token, msg);
       <span class="hljs-title function_">updateDiagnostics</span>(env.<span class="hljs-property">literateUri</span>, diagnostics, diag);
-      missingFilenames.<span class="hljs-title function_">push</span>(name);
-    } <span class="hljs-keyword">else</span> {
-      <span class="hljs-keyword">let</span> code = token.<span class="hljs-property">content</span>;
-      <span class="hljs-keyword">let</span> <span class="hljs-attr">fragmentInfo</span>: <span class="hljs-title class_">FragmentInformation</span> = {
-        <span class="hljs-attr">lang</span>: lang,
-        <span class="hljs-attr">literateFileName</span>: env.<span class="hljs-property">literateFileName</span>,
-        <span class="hljs-attr">sourceFileName</span>: fileName,
-        <span class="hljs-attr">code</span>: code,
-        <span class="hljs-attr">tokens</span>: [token],
-        <span class="hljs-attr">env</span>: env,
-      };
-      fragments.<span class="hljs-title function_">set</span>(name, fragmentInfo);
+      overwriteAttempts.<span class="hljs-title function_">push</span>(name);
     }
+  }
+</code></pre>
+
+</div>
+</div><p>If it does not yet exist in the fragment map we can proceed. We need to check
+though if we have a top-level fragment. In that case we require a file name, so
+emit an error diagnostic when that is missing.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;create a new fragment&gt;&gt;=+</div>
+<div class="code">
+<pre><code>  <span class="hljs-keyword">else</span> {
+    <span class="hljs-keyword">if</span> (!fileName &amp;&amp; name.<span class="hljs-title function_">indexOf</span>(<span class="hljs-string">&quot;.*&quot;</span>) &gt; -<span class="hljs-number">1</span> ) {
+      <span class="hljs-keyword">if</span>(!missingFilenames.<span class="hljs-title function_">includes</span>(name)) {
+        <span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Expected filename for star fragment <span class="hljs-subst">${name}</span>`</span>;
+        <span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(token, msg);
+        <span class="hljs-title function_">updateDiagnostics</span>(env.<span class="hljs-property">literateUri</span>, diagnostics, diag);
+        missingFilenames.<span class="hljs-title function_">push</span>(name);
+      }
+    }
+</code></pre>
+
+</div>
+</div><p>We can now finally create the <code>FragmentInformation</code> instance and add it to our
+fragment map.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;create a new fragment&gt;&gt;=+</div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">let</span> code = token.<span class="hljs-property">content</span>;
+    <span class="hljs-keyword">let</span> <span class="hljs-attr">fragmentInfo</span>: <span class="hljs-title class_">FragmentInformation</span> = {
+      <span class="hljs-attr">lang</span>: lang,
+      <span class="hljs-attr">literateFileName</span>: env.<span class="hljs-property">literateFileName</span>,
+      <span class="hljs-attr">sourceFileName</span>: fileName,
+      <span class="hljs-attr">code</span>: code,
+      <span class="hljs-attr">tokens</span>: [token],
+      <span class="hljs-attr">env</span>: env,
+    };
+    fragments.<span class="hljs-title function_">set</span>(name, fragmentInfo);
   }
 }
 </code></pre>
 
 </div>
-</div><h3>Modifying an exiting fragment</h3>
+</div><h3>Modifying an existing fragment</h3>
 <p>If both the <code>root</code> and <code>add</code> groups have capture their results, an <code>=</code> and an
 <code>+</code> respectively we need to add code to an existing fragment.</p>
 <p>For this to work a new fragment needs to be always present before the modifying
@@ -1084,7 +1109,8 @@ fragments can be combined into source code.</p>
       }
       <span class="hljs-keyword">if</span> (!fragments.<span class="hljs-title function_">has</span>(match.<span class="hljs-property">groups</span>.<span class="hljs-property">tagName</span>) &amp;&amp; tagName !== <span class="hljs-string">&quot;(?&lt;tagName&gt;.+)&quot;</span> &amp;&amp; !fragmentNotFound.<span class="hljs-title function_">includes</span>(tagName)) {
         <span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Could not find fragment <span class="hljs-subst">${tag}</span> (<span class="hljs-subst">${tagName}</span>)`</span>;
-        <span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(fragmentInfo.<span class="hljs-property">tokens</span>[<span class="hljs-number">0</span>], msg);
+        <span class="hljs-keyword">let</span> range = <span class="hljs-title function_">fragmentUsageRange</span>(fragmentInfo.<span class="hljs-property">tokens</span>[<span class="hljs-number">0</span>], tagName);
+        <span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(fragmentInfo.<span class="hljs-property">tokens</span>[<span class="hljs-number">0</span>], msg, range);
         <span class="hljs-title function_">updateDiagnostics</span>(fragmentInfo.<span class="hljs-property">env</span>.<span class="hljs-property">literateUri</span>, diagnostics, diag);
         fragmentNotFound.<span class="hljs-title function_">push</span>(tagName);
       }
@@ -1190,6 +1216,10 @@ context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title
 
 </div>
 </div><h2>Diagnostics</h2>
+<p>In this chapter are a few methods that help creating and updating diagnostics.
+These diagnostics help the literate programmer determining if there are
+problems with the text and where.</p>
+<h3>Updating diagnostics</h3>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=</div>
 <div class="code">
@@ -1207,14 +1237,21 @@ context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title
     collection.<span class="hljs-title function_">clear</span>();
   }
 }
+</code></pre>
 
+</div>
+</div><h3>Creating an error diagnostic</h3>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=+</div>
+<div class="code">
+<pre><code>
 <span class="hljs-comment">/**
  * Create diagnostic for a given token with message.
  * <span class="hljs-doctag">@param</span> token Token that carries the faulty code fragment
  * <span class="hljs-doctag">@param</span> message Error message
  */</span>
-<span class="hljs-keyword">function</span> <span class="hljs-title function_">createErrorDiagnostic</span>(<span class="hljs-params">token: Token, message: <span class="hljs-built_in">string</span></span>) : vscode.<span class="hljs-property">Diagnostic</span> {
-  <span class="hljs-keyword">let</span> range = <span class="hljs-title function_">fragmentRange</span>(token);
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">createErrorDiagnostic</span>(<span class="hljs-params">token: Token, message: <span class="hljs-built_in">string</span>, range? : vscode.Range</span>) : vscode.<span class="hljs-property">Diagnostic</span> {
+  range = range ? range : <span class="hljs-title function_">fragmentRange</span>(token);
   <span class="hljs-keyword">let</span> <span class="hljs-attr">diagnostic</span>: vscode.<span class="hljs-property">Diagnostic</span> = {
     <span class="hljs-attr">severity</span>: vscode.<span class="hljs-property">DiagnosticSeverity</span>.<span class="hljs-property">Error</span>,
     <span class="hljs-attr">message</span>: message,
@@ -1223,8 +1260,14 @@ context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title
 
   <span class="hljs-keyword">return</span> diagnostic;
 }
+</code></pre>
 
-<span class="hljs-comment">/**
+</div>
+</div><h3>Line number of fragment start</h3>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=+</div>
+<div class="code">
+<pre><code><span class="hljs-comment">/**
  * Give the location of the line in the Markup document that contains the
  * tag declaration.
  * <span class="hljs-doctag">@param</span> token Token to extract code location from
@@ -1233,7 +1276,14 @@ context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title
   <span class="hljs-keyword">let</span> linenumber = token.<span class="hljs-property">map</span> ? (token.<span class="hljs-property">map</span>[<span class="hljs-number">0</span>]) : -<span class="hljs-number">1</span>;
   <span class="hljs-keyword">return</span> linenumber;
 }
+</code></pre>
 
+</div>
+</div><h3>Line number of fragment end</h3>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=+</div>
+<div class="code">
+<pre><code>
 <span class="hljs-comment">/**
  * Give the location of the last line in the Markup document that contains the
  * code fragment.
@@ -1243,9 +1293,14 @@ context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title
   <span class="hljs-keyword">let</span> linenumber = token.<span class="hljs-property">map</span> ? (token.<span class="hljs-property">map</span>[<span class="hljs-number">1</span>] ) : -<span class="hljs-number">1</span>;
   <span class="hljs-keyword">return</span> linenumber;
 }
+</code></pre>
 
-
-<span class="hljs-comment">/**
+</div>
+</div><h3>Range of whole fragment in text</h3>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=+</div>
+<div class="code">
+<pre><code><span class="hljs-comment">/**
  * Give range for the code fragment, including tag.
  * <span class="hljs-doctag">@param</span> token Token to create range for
  */</span>
@@ -1256,6 +1311,34 @@ context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title
   <span class="hljs-keyword">let</span> end = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Position</span>(<span class="hljs-title function_">locationOfFragmentEnd</span>(token), endTagName);
   <span class="hljs-keyword">let</span> <span class="hljs-attr">range</span>: vscode.<span class="hljs-property">Range</span> = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(start, end);
   <span class="hljs-keyword">return</span> range;
+}
+</code></pre>
+
+</div>
+</div><h3>Fragment usage range</h3>
+<p>This method gives a <code>Range</code> for the given tag name based on the passed in
+<code>Token</code>. The line number for the occurrance is computed, along with the begin
+and and positions within the line.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=+</div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">fragmentUsageRange</span>(<span class="hljs-params">token : Token, tagName : <span class="hljs-built_in">string</span></span>) : vscode.<span class="hljs-property">Range</span>
+{
+  <span class="hljs-keyword">let</span> startLineNumber = <span class="hljs-title function_">locationOfFragment</span>(token);
+  <span class="hljs-keyword">const</span> lines = token.<span class="hljs-property">content</span>.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;\n&#x27;</span>);
+  <span class="hljs-keyword">let</span> index : <span class="hljs-built_in">number</span> = <span class="hljs-number">0</span>;
+  <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> line <span class="hljs-keyword">of</span> lines)
+  {
+    startLineNumber++;
+    index = line.<span class="hljs-title function_">indexOf</span>(tagName);
+    <span class="hljs-keyword">if</span>(index &gt; -<span class="hljs-number">1</span>)
+    {
+      <span class="hljs-keyword">break</span>;
+    }
+  }
+  <span class="hljs-keyword">let</span> start = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Position</span>(startLineNumber, index - <span class="hljs-number">2</span>);
+  <span class="hljs-keyword">let</span> end = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Position</span>(startLineNumber, index + tagName.<span class="hljs-property">length</span> + <span class="hljs-number">2</span>);
+  <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(start, end);
 }
 </code></pre>
 

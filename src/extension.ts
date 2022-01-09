@@ -396,29 +396,34 @@ async function handleFragments(
             }
           }
           if (root && !add) {
-            if (fragments.has(name) && !overwriteAttempts.includes(name)) {
-              let msg = `Trying to overwrite existing fragment fragment ${name}. ${env.literateFileName}${linenumber}`;
-              const diag = createErrorDiagnostic(token, msg);
-              updateDiagnostics(env.literateUri, diagnostics, diag);
-              overwriteAttempts.push(name);
-            } else {
-              if (!fileName && name.indexOf(".*") > -1 && !missingFilenames.includes(name)) {
-                let msg = `Expected filename for star fragment ${name}`;
+            if (fragments.has(name)) {
+              if(overwriteAttempts.includes(name))
+              {
+                let msg = `Trying to overwrite existing fragment fragment ${name}. ${env.literateFileName}${linenumber}`;
                 const diag = createErrorDiagnostic(token, msg);
                 updateDiagnostics(env.literateUri, diagnostics, diag);
-                missingFilenames.push(name);
-              } else {
-                let code = token.content;
-                let fragmentInfo: FragmentInformation = {
-                  lang: lang,
-                  literateFileName: env.literateFileName,
-                  sourceFileName: fileName,
-                  code: code,
-                  tokens: [token],
-                  env: env,
-                };
-                fragments.set(name, fragmentInfo);
+                overwriteAttempts.push(name);
               }
+            }
+            else {
+              if (!fileName && name.indexOf(".*") > -1 ) {
+                if(!missingFilenames.includes(name)) {
+                  let msg = `Expected filename for star fragment ${name}`;
+                  const diag = createErrorDiagnostic(token, msg);
+                  updateDiagnostics(env.literateUri, diagnostics, diag);
+                  missingFilenames.push(name);
+                }
+              }
+              let code = token.content;
+              let fragmentInfo: FragmentInformation = {
+                lang: lang,
+                literateFileName: env.literateFileName,
+                sourceFileName: fileName,
+                code: code,
+                tokens: [token],
+                env: env,
+              };
+              fragments.set(name, fragmentInfo);
             }
           }
         }
@@ -466,7 +471,8 @@ async function handleFragments(
           }
           if (!fragments.has(match.groups.tagName) && tagName !== "(?<tagName>.+)" && !fragmentNotFound.includes(tagName)) {
             let msg = `Could not find fragment ${tag} (${tagName})`;
-            const diag = createErrorDiagnostic(fragmentInfo.tokens[0], msg);
+            let range = fragmentUsageRange(fragmentInfo.tokens[0], tagName);
+            const diag = createErrorDiagnostic(fragmentInfo.tokens[0], msg, range);
             updateDiagnostics(fragmentInfo.env.literateUri, diagnostics, diag);
             fragmentNotFound.push(tagName);
           }
@@ -943,8 +949,8 @@ function updateDiagnostics(
  * @param token Token that carries the faulty code fragment
  * @param message Error message
  */
-function createErrorDiagnostic(token: Token, message: string) : vscode.Diagnostic {
-  let range = fragmentRange(token);
+function createErrorDiagnostic(token: Token, message: string, range? : vscode.Range) : vscode.Diagnostic {
+  range = range ? range : fragmentRange(token);
   let diagnostic: vscode.Diagnostic = {
     severity: vscode.DiagnosticSeverity.Error,
     message: message,
@@ -953,7 +959,6 @@ function createErrorDiagnostic(token: Token, message: string) : vscode.Diagnosti
 
   return diagnostic;
 }
-
 /**
  * Give the location of the line in the Markup document that contains the
  * tag declaration.
@@ -973,8 +978,6 @@ function locationOfFragmentEnd(token: Token): number {
   let linenumber = token.map ? (token.map[1] ) : -1;
   return linenumber;
 }
-
-
 /**
  * Give range for the code fragment, including tag.
  * @param token Token to create range for
@@ -986,6 +989,24 @@ function fragmentRange(token: Token): vscode.Range {
   let end = new vscode.Position(locationOfFragmentEnd(token), endTagName);
   let range: vscode.Range = new vscode.Range(start, end);
   return range;
+}
+function fragmentUsageRange(token : Token, tagName : string) : vscode.Range
+{
+  let startLineNumber = locationOfFragment(token);
+  const lines = token.content.split('\n');
+  let index : number = 0;
+  for(const line of lines)
+  {
+    startLineNumber++;
+    index = line.indexOf(tagName);
+    if(index > -1)
+    {
+      break;
+    }
+  }
+  let start = new vscode.Position(startLineNumber, index - 2);
+  let end = new vscode.Position(startLineNumber, index + tagName.length + 2);
+  return new vscode.Range(start, end);
 }
 async function getLiterateFileUris(
   workspaceFolder : vscode.WorkspaceFolder
