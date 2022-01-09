@@ -338,25 +338,8 @@ async function iterateLiterateFiles(workspaceFolder : vscode.WorkspaceFolder,
                                     md : MarkdownIt)
 {
   const foundLiterateFiles = await getLiterateFileUris(workspaceFolder);
-  //const literateFilesInWorkspace : vscode.RelativePattern =
-  //          new vscode.RelativePattern(workspaceFolder, '**/*.literate');
-  //const foundLiterateFiles = await vscode.workspace
-  //          .findFiles(literateFilesInWorkspace)
-  //          .then(files => Promise.all(files.map(file => file)));
   try {
     for (let fl of foundLiterateFiles) {
-      /*const currentContent = (() =>
-        {
-          for(const textDocument of vscode.workspace.textDocuments) {
-            if(vscode.workspace.asRelativePath(fl) === vscode.workspace.asRelativePath(textDocument.uri)) {
-              return textDocument.getText();
-            }
-          }
-          return '';
-        }
-      )();*/
-      //const content = currentContent ? null : await vscode.workspace.fs.readFile(fl);
-      //const text = currentContent ? currentContent : new TextDecoder('utf-8').decode(content);
       const text = await getFileContent(fl);
       const fname = path.relative(workspaceFolder.uri.path, fl.path);
       const env: GrabbedState = { literateFileName: fname, literateUri: fl, gstate: new StateCore('', md, {}) };
@@ -726,7 +709,11 @@ export class FragmentRepository {
                                           grabbedStateList.list,
                                           this.md);
               this.diagnostics.clear();
-              fragments.map = await handleFragments(folder, grabbedStateList.list, this.diagnostics, false, undefined);
+              fragments.map = await handleFragments(folder,
+                                                    grabbedStateList.list,
+                                                    this.diagnostics,
+                                                    false,
+                                                    undefined);
               this.diagnostics.clear();
               await handleFragments(folder, grabbedStateList.list, this.diagnostics, true, writeSourceFiles);
             }

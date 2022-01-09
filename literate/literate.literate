@@ -423,7 +423,11 @@ be incomplete, or even just missing later on.
 
 ``` ts : <<hanle fragments for map>>=
 this.diagnostics.clear();
-fragments.map = await handleFragments(folder, grabbedStateList.list, this.diagnostics, false, undefined);
+fragments.map = await handleFragments(folder,
+                                      grabbedStateList.list,
+                                      this.diagnostics,
+                                      false,
+                                      undefined);
 ```
 
 The second step we'll call the fragment handler again, but this time we *do*
@@ -596,7 +600,6 @@ async function iterateLiterateFiles(workspaceFolder : vscode.WorkspaceFolder,
   <<find all literate files in workspace>>
   try {
     for (let fl of foundLiterateFiles) {
-      <<get text document content if available>>
       <<get text from literate document>>
       <<parse literate file>>
       <<write out rendered file if requested>>
@@ -613,42 +616,12 @@ folder passed into `iterateLiterateFiles`.
 
 ``` ts : <<find all literate files in workspace>>=
 const foundLiterateFiles = await getLiterateFileUris(workspaceFolder);
-//const literateFilesInWorkspace : vscode.RelativePattern =
-//          new vscode.RelativePattern(workspaceFolder, '**/*.literate');
-//const foundLiterateFiles = await vscode.workspace
-//          .findFiles(literateFilesInWorkspace)
-//          .then(files => Promise.all(files.map(file => file)));
 ```
 
-For each **literate** file in the workspace we'll get eventually the text
-content, but we do have to check if any of the files are opened in an editor.
-Especially for on-the-fly updating of the tree view, but also for fragment name
-completion and similar functionality we need to get the text from the
-`TextDocument` instead of the file on disk. If there is a `TextDocument` that
-corresponds to the **literate** file we are currently handling we read the text
-into `currentContent`, otherwise we set it to an empty string.
-
-``` ts : <<get text document content if available>>=
-/*const currentContent = (() =>
-  {
-    for(const textDocument of vscode.workspace.textDocuments) {
-      if(vscode.workspace.asRelativePath(fl) === vscode.workspace.asRelativePath(textDocument.uri)) {
-        return textDocument.getText();
-      }
-    }
-    return '';
-  }
-)();*/
-```
-
-If `currentContent` is an empty string we read the content from the file on
-disk, and decode it into `text`. If on the other hand we do have
-`currentContent`, we use that for our `text` instead. The `currentContent`
-wil be more up-to-date than what we have on disk.
+We get the content of our **literate** file using `getFileContent`. We do need
+to `await` for that so that we actually get the string and not a promise.
 
 ``` ts : <<get text from literate document>>=
-//const content = currentContent ? null : await vscode.workspace.fs.readFile(fl);
-//const text = currentContent ? currentContent : new TextDecoder('utf-8').decode(content);
 const text = await getFileContent(fl);
 ```
 

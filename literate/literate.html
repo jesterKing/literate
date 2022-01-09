@@ -1,9 +1,9 @@
 <html>
-          <head>
-            <link rel="stylesheet" type="text/css" href="./style.css">
-          </head>
-          <body>
-          <h1>Literate Programming</h1>
+  <head>
+    <link rel="stylesheet" type="text/css" href="./style.css">
+  </head>
+  <body>
+  <h1>Literate Programming</h1>
 <p><strong>Literate programming</strong> is a programming paradigm introduced by Donald Knuth. A
 program is written in a natural language with snippets of code interspersed.
 From this text usable source code is generated, along with well formatted
@@ -448,7 +448,11 @@ be incomplete, or even just missing later on.</p>
 <div class="fragmentname">&lt;&lt;hanle fragments for map&gt;&gt;=</div>
 <div class="code">
 <pre><code><span class="hljs-variable language_">this</span>.<span class="hljs-property">diagnostics</span>.<span class="hljs-title function_">clear</span>();
-fragments.<span class="hljs-property">map</span> = <span class="hljs-keyword">await</span> <span class="hljs-title function_">handleFragments</span>(folder, grabbedStateList.<span class="hljs-property">list</span>, <span class="hljs-variable language_">this</span>.<span class="hljs-property">diagnostics</span>, <span class="hljs-literal">false</span>, <span class="hljs-literal">undefined</span>);
+fragments.<span class="hljs-property">map</span> = <span class="hljs-keyword">await</span> <span class="hljs-title function_">handleFragments</span>(folder,
+                                      grabbedStateList.<span class="hljs-property">list</span>,
+                                      <span class="hljs-variable language_">this</span>.<span class="hljs-property">diagnostics</span>,
+                                      <span class="hljs-literal">false</span>,
+                                      <span class="hljs-literal">undefined</span>);
 </code></pre>
 
 </div>
@@ -622,7 +626,6 @@ list of <code>GrabbedState</code>s <code>envList</code>.</p>
   &lt;&lt;find all literate files <span class="hljs-keyword">in</span> workspace&gt;&gt;
   <span class="hljs-keyword">try</span> {
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> fl <span class="hljs-keyword">of</span> foundLiterateFiles) {
-      &lt;&lt;get text <span class="hljs-variable language_">document</span> content <span class="hljs-keyword">if</span> available&gt;&gt;
       &lt;&lt;get text <span class="hljs-keyword">from</span> literate <span class="hljs-variable language_">document</span>&gt;&gt;
       &lt;&lt;parse literate file&gt;&gt;
       &lt;&lt;write out rendered file <span class="hljs-keyword">if</span> requested&gt;&gt;
@@ -641,47 +644,15 @@ folder passed into <code>iterateLiterateFiles</code>.</p>
 <div class="fragmentname">&lt;&lt;find all literate files in workspace&gt;&gt;=</div>
 <div class="code">
 <pre><code><span class="hljs-keyword">const</span> foundLiterateFiles = <span class="hljs-keyword">await</span> <span class="hljs-title function_">getLiterateFileUris</span>(workspaceFolder);
-<span class="hljs-comment">//const literateFilesInWorkspace : vscode.RelativePattern =</span>
-<span class="hljs-comment">//          new vscode.RelativePattern(workspaceFolder, &#x27;**/*.literate&#x27;);</span>
-<span class="hljs-comment">//const foundLiterateFiles = await vscode.workspace</span>
-<span class="hljs-comment">//          .findFiles(literateFilesInWorkspace)</span>
-<span class="hljs-comment">//          .then(files =&gt; Promise.all(files.map(file =&gt; file)));</span>
 </code></pre>
 
 </div>
-</div><p>For each <strong>literate</strong> file in the workspace we'll get eventually the text
-content, but we do have to check if any of the files are opened in an editor.
-Especially for on-the-fly updating of the tree view, but also for fragment name
-completion and similar functionality we need to get the text from the
-<code>TextDocument</code> instead of the file on disk. If there is a <code>TextDocument</code> that
-corresponds to the <strong>literate</strong> file we are currently handling we read the text
-into <code>currentContent</code>, otherwise we set it to an empty string.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;get text document content if available&gt;&gt;=</div>
-<div class="code">
-<pre><code><span class="hljs-comment">/*const currentContent = (() =&gt;
-  {
-    for(const textDocument of vscode.workspace.textDocuments) {
-      if(vscode.workspace.asRelativePath(fl) === vscode.workspace.asRelativePath(textDocument.uri)) {
-        return textDocument.getText();
-      }
-    }
-    return &#x27;&#x27;;
-  }
-)();*/</span>
-</code></pre>
-
-</div>
-</div><p>If <code>currentContent</code> is an empty string we read the content from the file on
-disk, and decode it into <code>text</code>. If on the other hand we do have
-<code>currentContent</code>, we use that for our <code>text</code> instead. The <code>currentContent</code>
-wil be more up-to-date than what we have on disk.</p>
+</div><p>We get the content of our <strong>literate</strong> file using <code>getFileContent</code>. We do need
+to <code>await</code> for that so that we actually get the string and not a promise.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;get text from literate document&gt;&gt;=</div>
 <div class="code">
-<pre><code><span class="hljs-comment">//const content = currentContent ? null : await vscode.workspace.fs.readFile(fl);</span>
-<span class="hljs-comment">//const text = currentContent ? currentContent : new TextDecoder(&#x27;utf-8&#x27;).decode(content);</span>
-<span class="hljs-keyword">const</span> text = <span class="hljs-keyword">await</span> <span class="hljs-title function_">getFileContent</span>(fl);
+<pre><code><span class="hljs-keyword">const</span> text = <span class="hljs-keyword">await</span> <span class="hljs-title function_">getFileContent</span>(fl);
 </code></pre>
 
 </div>
@@ -1649,5 +1620,5 @@ programming</strong> paradigm.</p>
 <p>I invite you to install the <strong>Literate Programming</strong> extension for Visual Studio
 Code and start using it in your daily work.</p>
 
-          </body>
-        </html>
+  </body>
+</html>
