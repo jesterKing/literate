@@ -64,28 +64,15 @@ code of the fragment as a `MarkdownString` in a code fence.
 If that is not the case our `provideHover` implementation will return `null`.
 
 ``` ts : <<create hover item for fragment>>=
-const matchesOnLine = [...currentLine.text.matchAll(FRAGMENT_USE_IN_CODE_RE)];
-for(const match of matchesOnLine)
+let fragmentLocation = this.fragmentRepository.getFragmentTagLocation(document, currentLine, position);
+if(fragmentLocation.fragment && !fragmentLocation.root)
 {
-  if(!match || !match.groups) {
-    continue;
-  }
-  const foundIndex = currentLine.text.indexOf(match[0]);
-  if(foundIndex>-1) {
-    <<get fragments for hover detection>>
-    if(foundIndex <= position.character && position.character <= foundIndex + match[0].length && fragments.has(match.groups.tagName))
-    {
-      const startPosition = new vscode.Position(currentLine.lineNumber, foundIndex);
-      const endPosition = new vscode.Position(currentLine.lineNumber, foundIndex + match[0].length);
-      let range : vscode.Range = new vscode.Range(startPosition, endPosition);
-      let fragment = fragments.get(match.groups.tagName) || undefined;
-      if (fragment && !match.groups.root) {
-        return new vscode.Hover(
-          new vscode.MarkdownString(`~~~ ${fragment.lang}\n${fragment.code}\n~~~`, true),
-          range);
-      }
-    }
-  }
+  let fragment = fragmentLocation.fragment;
+  let range = fragmentLocation.range;
+  return new vscode.Hover(
+    new vscode.MarkdownString(`~~~ ${fragment.lang}\n${fragment.code}\n~~~`, true),
+    range
+    );
 }
 ```
 

@@ -261,28 +261,15 @@ export class FragmentHoverProvider implements vscode.HoverProvider {
     const currentLine = document.lineAt(position.line);
     const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
     if(!workspaceFolder) { return null; }
-    const matchesOnLine = [...currentLine.text.matchAll(FRAGMENT_USE_IN_CODE_RE)];
-    for(const match of matchesOnLine)
+    let fragmentLocation = this.fragmentRepository.getFragmentTagLocation(document, currentLine, position);
+    if(fragmentLocation.fragment && !fragmentLocation.root)
     {
-      if(!match || !match.groups) {
-        continue;
-      }
-      const foundIndex = currentLine.text.indexOf(match[0]);
-      if(foundIndex>-1) {
-        let fragments = this.fragmentRepository.getFragments(workspaceFolder).map;
-        if(foundIndex <= position.character && position.character <= foundIndex + match[0].length && fragments.has(match.groups.tagName))
-        {
-          const startPosition = new vscode.Position(currentLine.lineNumber, foundIndex);
-          const endPosition = new vscode.Position(currentLine.lineNumber, foundIndex + match[0].length);
-          let range : vscode.Range = new vscode.Range(startPosition, endPosition);
-          let fragment = fragments.get(match.groups.tagName) || undefined;
-          if (fragment && !match.groups.root) {
-            return new vscode.Hover(
-              new vscode.MarkdownString(`~~~ ${fragment.lang}\n${fragment.code}\n~~~`, true),
-              range);
-          }
-        }
-      }
+      let fragment = fragmentLocation.fragment;
+      let range = fragmentLocation.range;
+      return new vscode.Hover(
+        new vscode.MarkdownString(`~~~ ${fragment.lang}\n${fragment.code}\n~~~`, true),
+        range
+        );
     }
     return null;
   }
@@ -350,14 +337,15 @@ async function iterateLiterateFiles(workspaceFolder : vscode.WorkspaceFolder,
                                     envList : Array<GrabbedState>,
                                     md : MarkdownIt)
 {
-  const literateFilesInWorkspace : vscode.RelativePattern =
-            new vscode.RelativePattern(workspaceFolder, '**/*.literate');
-  const foundLiterateFiles = await vscode.workspace
-            .findFiles(literateFilesInWorkspace)
-            .then(files => Promise.all(files.map(file => file)));
+  const foundLiterateFiles = await getLiterateFileUris(workspaceFolder);
+  //const literateFilesInWorkspace : vscode.RelativePattern =
+  //          new vscode.RelativePattern(workspaceFolder, '**/*.literate');
+  //const foundLiterateFiles = await vscode.workspace
+  //          .findFiles(literateFilesInWorkspace)
+  //          .then(files => Promise.all(files.map(file => file)));
   try {
     for (let fl of foundLiterateFiles) {
-      const currentContent = (() =>
+      /*const currentContent = (() =>
         {
           for(const textDocument of vscode.workspace.textDocuments) {
             if(vscode.workspace.asRelativePath(fl) === vscode.workspace.asRelativePath(textDocument.uri)) {
@@ -366,9 +354,10 @@ async function iterateLiterateFiles(workspaceFolder : vscode.WorkspaceFolder,
           }
           return '';
         }
-      )();
-      const content = currentContent ? null : await vscode.workspace.fs.readFile(fl);
-      const text = currentContent ? currentContent : new TextDecoder('utf-8').decode(content);
+      )();*/
+      //const content = currentContent ? null : await vscode.workspace.fs.readFile(fl);
+      //const text = currentContent ? currentContent : new TextDecoder('utf-8').decode(content);
+      const text = await getFileContent(fl);
       const fname = path.relative(workspaceFolder.uri.path, fl.path);
       const env: GrabbedState = { literateFileName: fname, literateUri: fl, gstate: new StateCore('', md, {}) };
       envList.push(env);
@@ -582,6 +571,42 @@ class GrabbedStateList {
     }
   }
 };
+export class FragmentLocation
+{
+  readonly rangeExclusive : vscode.Range;
+  readonly valid : boolean;
+
+  constructor(
+    public readonly name : string,
+    public readonly uri: vscode.Uri,
+    public readonly range : vscode.Range,
+    public readonly fragment : FragmentInformation | undefined,
+    public readonly root : string | undefined,
+    public readonly add : string | undefined
+  )
+  {
+    this.valid = uri.fsPath.indexOf('not_valid_for_literate')===-1;
+    if(name.startsWith('<<')) {
+      this.rangeExclusive = new vscode.Range(
+        range.start.line, range.start.character + 2,
+        range.end.line, range.end.character - 2
+      );
+    }
+    else
+    {
+      this.rangeExclusive = range;
+    }
+  }
+}
+const unsetFragmentLocation =
+    new FragmentLocation(
+      '',
+      vscode.Uri.file('not_valid_for_literate'),
+      new vscode.Range(0,0,0,0),
+      undefined,
+      undefined,
+      undefined
+    );
 
 export class FragmentRepository {
   private md : MarkdownIt;
@@ -681,43 +706,25 @@ export class FragmentRepository {
         }
         )();
         if(workspaceFolders) {
-          const writeOutHtml : WriteRenderCallback =
-              (fname : string,
-               folderUri : vscode.Uri,
-               rendered : string) : Thenable<void> => {
-            const html =
-        `<html>
-          <head>
-            <link rel="stylesheet" type="text/css" href="./style.css">
-          </head>
-          <body>
-          ${rendered}
-          </body>
-        </html>`;
-            const encoded = Buffer.from(html, 'utf-8');
-            fname = fname.replace(".literate", ".html");
-            const fileUri = vscode.Uri.joinPath(folderUri, fname);
-            return Promise.resolve(vscode.workspace.fs.writeFile(fileUri, encoded));
-          };
           for(const folder of workspaceFolders)
           {
-            if(!this.fragmentsForWorkspaceFolders.has(folder.name))
-            {
-              this.fragmentsForWorkspaceFolders.set(folder.name, new FragmentMap());
-            }
-            if(!this.grabbedStateForWorkspaceFolders.has(folder.name))
-            {
-              this.grabbedStateForWorkspaceFolders.set(folder.name, new GrabbedStateList());
-            }
-            const fragments = this.fragmentsForWorkspaceFolders.get(folder.name);
-            const grabbedStateList = this.grabbedStateForWorkspaceFolders.get(folder.name);
+                if(!this.fragmentsForWorkspaceFolders.has(folder.name))
+                {
+                  this.fragmentsForWorkspaceFolders.set(folder.name, new FragmentMap());
+                }
+                if(!this.grabbedStateForWorkspaceFolders.has(folder.name))
+                {
+                  this.grabbedStateForWorkspaceFolders.set(folder.name, new GrabbedStateList());
+                }
+                const fragments = this.fragmentsForWorkspaceFolders.get(folder.name);
+                const grabbedStateList = this.grabbedStateForWorkspaceFolders.get(folder.name);
             if(fragments && grabbedStateList) {
               fragments.clear();
               grabbedStateList.clear();
               await iterateLiterateFiles(folder,
-                                         writeOutHtml, /*     writeHtml : WriteRenderCallback*/
-                                         grabbedStateList.list,
-                                         this.md);
+                                          writeOutHtml,
+                                          grabbedStateList.list,
+                                          this.md);
               this.diagnostics.clear();
               fragments.map = await handleFragments(folder, grabbedStateList.list, this.diagnostics, false, undefined);
               this.diagnostics.clear();
@@ -729,18 +736,54 @@ export class FragmentRepository {
 
   getFragments(workspaceFolder : vscode.WorkspaceFolder) : FragmentMap
   {
-    let fragmentMap : FragmentMap = new FragmentMap();
-    this.fragmentsForWorkspaceFolders.forEach(
-      (value, key, _) =>
+  let fragmentMap : FragmentMap = new FragmentMap();
+  this.fragmentsForWorkspaceFolders.forEach(
+    (value, key, _) =>
+    {
+      if(key===workspaceFolder.name)
       {
-        if(key===workspaceFolder.name)
-        {
-          fragmentMap = value;
+        fragmentMap = value;
         }
       }
     );
   
     return fragmentMap;
+  }
+
+  getFragmentTagLocation(
+    document : vscode.TextDocument,
+    currentLine : vscode.TextLine,
+    position : vscode.Position
+  ) : FragmentLocation
+  {
+    const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
+    const matchesOnLine = [...currentLine.text.matchAll(FRAGMENT_USE_IN_CODE_RE)];
+    for(const match of matchesOnLine)
+    {
+      if(!match || !match.groups) {
+        continue;
+      }
+      const OPENING = '<<';
+      const CLOSING = '>>';
+      const tagName = `${OPENING}${match.groups.tagName}${CLOSING}`;
+      const foundIndex = currentLine.text.indexOf(tagName);
+      if(foundIndex>-1) {
+        if(foundIndex <= position.character && position.character <= foundIndex + tagName.length)
+        {
+          const startPosition = new vscode.Position(currentLine.lineNumber, foundIndex);
+          const endPosition = new vscode.Position(currentLine.lineNumber, foundIndex + tagName.length);
+          let range : vscode.Range = new vscode.Range(startPosition, endPosition);
+          let fragment : FragmentInformation | undefined;
+          if(workspaceFolder) {
+            const fragments = theOneRepository.getFragments(workspaceFolder).map;
+            fragment = fragments.get(match.groups.tagName) || undefined;
+          }
+          return new FragmentLocation(match.groups.tagName, document.uri, range, fragment, match.groups.root, match.groups.add);
+        }
+      }
+    }
+  
+    return unsetFragmentLocation;
   }
 
   dispose() {
@@ -756,6 +799,64 @@ export class FragmentRepository {
     }
     this.grabbedStateForWorkspaceFolders.clear();
   }
+}
+export class LiterateRenameProvider implements vscode.RenameProvider
+{
+    constructor(public readonly repository : FragmentRepository) {}
+
+    public async provideRenameEdits(
+        document : vscode.TextDocument,
+        position : vscode.Position,
+        newName : string,
+        _ : vscode.CancellationToken
+    )
+    {
+        let workspaceEdit = new vscode.WorkspaceEdit();
+        const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
+        if(!workspaceFolder) { return workspaceEdit; }
+        let fragmentLocation = this.repository.getFragmentTagLocation(
+          document,
+          document.lineAt(position.line),
+          position
+        );
+        if(fragmentLocation.valid)
+        {
+            const foundLiterateFiles = await getLiterateFileUris(workspaceFolder);
+            try {
+                for (let fl of foundLiterateFiles) {
+                    const text = await getFileContent(fl);
+                    const lines = text.split("\n");
+                    let lineNumber = 0;
+                    for(const line of lines)
+                    {
+                        let fromIdx = 0;
+                        while(true)
+                        {
+                            let foundIdx = line.indexOf(fragmentLocation.name, fromIdx);
+                            if(foundIdx===-1)
+                            {
+                                break;
+                            }
+                            let foundRange = new vscode.Range(lineNumber, foundIdx, lineNumber, foundIdx + fragmentLocation.name.length);
+                            workspaceEdit.replace(
+                                fl,
+                                foundRange,
+                                newName
+                            );
+                            fromIdx += foundIdx + fragmentLocation.name.length;
+        
+                        }
+                        lineNumber++;
+                    }
+                }
+            } catch(error)
+            {
+                console.log(error);
+            }
+        }
+        
+        return workspaceEdit;
+    }
 }
 function determineWorkspaceFolder(document : vscode.TextDocument) : vscode.WorkspaceFolder | undefined
 {
@@ -775,22 +876,17 @@ function determineWorkspaceFolder(document : vscode.TextDocument) : vscode.Works
 }
 let theOneRepository : FragmentRepository;
 export async function activate(context: vscode.ExtensionContext) {
-  const rootPath = (vscode.workspace.workspaceFolders && (vscode.workspace.workspaceFolders.length > 0))
-    ? vscode.workspace.workspaceFolders[0].uri.fsPath : undefined;
-
-  console.log('Ready to do some Literate Programming');
-  const diagnostics = vscode.languages.createDiagnosticCollection('literate');
-
   theOneRepository = new FragmentRepository(context);
   await theOneRepository.processLiterateFiles(undefined);
   context.subscriptions.push(theOneRepository);
-
   let literateProcessDisposable = vscode.commands.registerCommand(
     'literate.process',
     async function () {
       theOneRepository.processLiterateFiles(undefined);
       return vscode.window.setStatusBarMessage("Literate Process completed", 5000);
   });
+  
+  context.subscriptions.push(literateProcessDisposable);
   new FragmentExplorer(context);
   const completionItemProvider =
     vscode.languages.registerCompletionItemProvider('markdown', {
@@ -825,16 +921,11 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.languages.registerHoverProvider('markdown', new FragmentHoverProvider(theOneRepository))
   );
 
-  if (vscode.window.activeTextEditor) {
-    updateDiagnostics(vscode.window.activeTextEditor.document.uri, diagnostics, undefined);
-  }
-  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor => {
-    if (editor) {
-      updateDiagnostics(editor.document.uri, diagnostics, undefined);
-    }
-  }));
+  context.subscriptions.push(
+    vscode.languages.registerRenameProvider('markdown', new LiterateRenameProvider(theOneRepository))
 
-  context.subscriptions.push(literateProcessDisposable);
+  );
+  console.log('Ready to do some Literate Programming');
 
   return {
     extendMarkdownIt(md: any) {
@@ -908,5 +999,53 @@ function fragmentRange(token: Token): vscode.Range {
   let end = new vscode.Position(locationOfFragmentEnd(token), endTagName);
   let range: vscode.Range = new vscode.Range(start, end);
   return range;
+}
+async function getLiterateFileUris(
+  workspaceFolder : vscode.WorkspaceFolder
+) : Promise<vscode.Uri[]>
+{
+  const literateFilesInWorkspace : vscode.RelativePattern =
+        new vscode.RelativePattern(workspaceFolder, '**/*.literate');
+  const foundLiterateFiles = await vscode.workspace
+        .findFiles(literateFilesInWorkspace)
+        .then(files => Promise.all(files.map(file => file)));
+  return foundLiterateFiles;
+}
+function writeOutHtml
+      (fname : string,
+       folderUri : vscode.Uri,
+       rendered : string) : Thenable<void>
+{
+  const html =
+`<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="./style.css">
+  </head>
+  <body>
+  ${rendered}
+  </body>
+</html>`;
+  const encoded = Buffer.from(html, 'utf-8');
+  fname = fname.replace(".literate", ".html");
+  const fileUri = vscode.Uri.joinPath(folderUri, fname);
+  return Promise.resolve(vscode.workspace.fs.writeFile(fileUri, encoded));
+};
+async function getFileContent(
+  file : vscode.Uri
+) : Promise<string>
+{
+  const currentContent = (() =>
+      {
+          for(const textDocument of vscode.workspace.textDocuments) {
+              if(vscode.workspace.asRelativePath(file) === vscode.workspace.asRelativePath(textDocument.uri)) {
+                  return textDocument.getText();
+              }
+          }
+          return '';
+      }
+  )();
+  const content = currentContent ? null : await vscode.workspace.fs.readFile(file);
+  const text = currentContent ? currentContent : new TextDecoder('utf-8').decode(content);
+  return text;
 }
 export function deactivate() {}

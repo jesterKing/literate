@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.5.0
+
+* Add rename capability for fragments
+* Parts have been deduplicated and centralized to make it even easier to add new
+  providers in the future
+
 ## 0.4.1
 
 * Overhauling literate file processing. There is now one class responsible for

@@ -75,28 +75,15 @@ code of the fragment as a <code>MarkdownString</code> in a code fence.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;create hover item for fragment&gt;&gt;=</div>
 <div class="code">
-<pre><code><span class="hljs-keyword">const</span> matchesOnLine = [...currentLine.<span class="hljs-property">text</span>.<span class="hljs-title function_">matchAll</span>(<span class="hljs-variable constant_">FRAGMENT_USE_IN_CODE_RE</span>)];
-<span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> match <span class="hljs-keyword">of</span> matchesOnLine)
+<pre><code><span class="hljs-keyword">let</span> fragmentLocation = <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentRepository</span>.<span class="hljs-title function_">getFragmentTagLocation</span>(<span class="hljs-variable language_">document</span>, currentLine, position);
+<span class="hljs-keyword">if</span>(fragmentLocation.<span class="hljs-property">fragment</span> &amp;&amp; !fragmentLocation.<span class="hljs-property">root</span>)
 {
-  <span class="hljs-keyword">if</span>(!match || !match.<span class="hljs-property">groups</span>) {
-    <span class="hljs-keyword">continue</span>;
-  }
-  <span class="hljs-keyword">const</span> foundIndex = currentLine.<span class="hljs-property">text</span>.<span class="hljs-title function_">indexOf</span>(match[<span class="hljs-number">0</span>]);
-  <span class="hljs-keyword">if</span>(foundIndex&gt;-<span class="hljs-number">1</span>) {
-    &lt;&lt;get fragments <span class="hljs-keyword">for</span> hover detection&gt;&gt;
-    <span class="hljs-keyword">if</span>(foundIndex &lt;= position.<span class="hljs-property">character</span> &amp;&amp; position.<span class="hljs-property">character</span> &lt;= foundIndex + match[<span class="hljs-number">0</span>].<span class="hljs-property">length</span> &amp;&amp; fragments.<span class="hljs-title function_">has</span>(match.<span class="hljs-property">groups</span>.<span class="hljs-property">tagName</span>))
-    {
-      <span class="hljs-keyword">const</span> startPosition = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Position</span>(currentLine.<span class="hljs-property">lineNumber</span>, foundIndex);
-      <span class="hljs-keyword">const</span> endPosition = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Position</span>(currentLine.<span class="hljs-property">lineNumber</span>, foundIndex + match[<span class="hljs-number">0</span>].<span class="hljs-property">length</span>);
-      <span class="hljs-keyword">let</span> range : vscode.<span class="hljs-property">Range</span> = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(startPosition, endPosition);
-      <span class="hljs-keyword">let</span> fragment = fragments.<span class="hljs-title function_">get</span>(match.<span class="hljs-property">groups</span>.<span class="hljs-property">tagName</span>) || <span class="hljs-literal">undefined</span>;
-      <span class="hljs-keyword">if</span> (fragment &amp;&amp; !match.<span class="hljs-property">groups</span>.<span class="hljs-property">root</span>) {
-        <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Hover</span>(
-          <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">MarkdownString</span>(<span class="hljs-string">`~~~ <span class="hljs-subst">${fragment.lang}</span>\n<span class="hljs-subst">${fragment.code}</span>\n~~~`</span>, <span class="hljs-literal">true</span>),
-          range);
-      }
-    }
-  }
+  <span class="hljs-keyword">let</span> fragment = fragmentLocation.<span class="hljs-property">fragment</span>;
+  <span class="hljs-keyword">let</span> range = fragmentLocation.<span class="hljs-property">range</span>;
+  <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Hover</span>(
+    <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">MarkdownString</span>(<span class="hljs-string">`~~~ <span class="hljs-subst">${fragment.lang}</span>\n<span class="hljs-subst">${fragment.code}</span>\n~~~`</span>, <span class="hljs-literal">true</span>),
+    range
+    );
 }
 </code></pre>
 

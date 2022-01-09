@@ -1,0 +1,139 @@
+# Renaming fragments
+
+We have a `RenameProvider` implementation to help with renaming fragments easily
+throughout a project.
+
+``` ts : <<rename provider class>>=
+export class LiterateRenameProvider implements vscode.RenameProvider
+{
+    constructor(public readonly repository : FragmentRepository) {}
+
+    <<fragment rename provider>>
+}
+```
+
+The provider needs to implement `provideRenameEdits`, which takes a document, a
+position and the new string to use for the fragment name. There is also a
+cancellation token, but we haven't used these yet. TBD: figure out how to use
+the cancellation tokens.
+
+We start by finding the token that is at the current position given. When the
+fragment has been confirmed we find all occurrences throughout the project in
+the workspace folder and create workspace edits to replace with the given
+`newName`.
+
+``` ts : <<fragment rename provider>>=
+public async provideRenameEdits(
+    document : vscode.TextDocument,
+    position : vscode.Position,
+    newName : string,
+    _ : vscode.CancellationToken
+)
+{
+    let workspaceEdit = new vscode.WorkspaceEdit();
+    <<get workspace for renames>>
+    <<find fragment to rename at position>>
+    <<create workspace edits for fragment in project>>
+}
+```
+
+We start by getting the workspace folder for the rename attempt in the given
+text document. If the workspace folder is not a **literate** project just return
+the `workspaceEdit` without creating any edits to it.
+
+``` ts : <<get workspace for renames>>=
+const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
+if(!workspaceFolder) { return workspaceEdit; }
+```
+
+Now that we have a workspace folder with a project in it we get the fragment
+location for the given position in the text document.
+
+``` ts : <<find fragment to rename at position>>=
+let fragmentLocation = this.repository.getFragmentTagLocation(
+  document,
+  document.lineAt(position.line),
+  position
+);
+```
+
+We can actually create good rename edits only when we have a proper fragment
+location. There is no use in trying when we're not on a fragment. If we do have
+a valid fragment location we get the uris for all **literate** files in the
+workspace folder.
+
+``` ts : <<create workspace edits for fragment in project>>=
+if(fragmentLocation.valid)
+{
+    const foundLiterateFiles = await getLiterateFileUris(workspaceFolder);
+```
+
+For each uri in the list we get the correct content as a string and plit that
+into lines if possible. We'll iterate over the lines, keeping a counter of the
+line number so that we can create the correct range when a hit has been found.
+
+``` ts : <<create workspace edits for fragment in project>>=+
+    try {
+        for (let fl of foundLiterateFiles) {
+            <<get text and split into lines>>
+            let lineNumber = 0;
+            for(const line of lines)
+            {
+                let fromIdx = 0;
+                while(true)
+                {
+                    <<find fragment on line>>
+                    <<create replace on workspace edit>>
+                    <<ensure correct start index for further searching>>
+
+                }
+                lineNumber++;
+            }
+        }
+    } catch(error)
+    {
+        console.log(error);
+    }
+}
+
+return workspaceEdit;
+```
+
+Get the file contet as string using `getFileContent`. The string is split on
+`\n`, so that we get the document lines.
+
+``` ts : <<get text and split into lines>>=
+const text = await getFileContent(fl);
+const lines = text.split("\n");
+```
+
+Since a line could contain multiple mentions of the fragment we do this in a
+loop until no more hits of the fragment name are found. When that happens we
+break the while loop in which we check for occurrences.
+
+``` ts : <<find fragment on line>>=
+let foundIdx = line.indexOf(fragmentLocation.name, fromIdx);
+if(foundIdx===-1)
+{
+    break;
+}
+```
+
+When a good hit was found we create a `replace` on the `workspaceEdit` with the
+file uri, the new range and the text to use for the replacement.
+
+``` ts : <<create replace on workspace edit>>=
+let foundRange = new vscode.Range(lineNumber, foundIdx, lineNumber, foundIdx + fragmentLocation.name.length);
+workspaceEdit.replace(
+    fl,
+    foundRange,
+    newName
+);
+```
+
+While we're still looping we need to bump the `fromIdx` to ensure we skip past
+the fragment usage or mention we just found on the line.
+
+``` ts : <<ensure correct start index for further searching>>=
+fromIdx += foundIdx + fragmentLocation.name.length;
+```

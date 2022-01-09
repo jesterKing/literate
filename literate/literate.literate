@@ -124,6 +124,7 @@ before defining the repository class.
 ``` ts : <<fragment repository>>=
 <<fragment map>>
 <<list of grabbed states>>
+<<fragment tag location>>
 
 export class FragmentRepository {
   <<fragment repository member variables>>
@@ -131,6 +132,8 @@ export class FragmentRepository {
   <<fragment generation method>>
 
   <<method to get fragments from repository>>
+
+  <<method to get fragment on line for position>>
 
   dispose() {
     for(let fragmentMap of this.fragmentsForWorkspaceFolders.values())
@@ -340,6 +343,9 @@ if("eol" in trigger) {
 } 
 ```
 
+When the property `eol` is not found in the objetc we were passed we can assume
+it is just a workspace so return that as the one element in the array we return.
+
 ``` ts : <<else just use passed in workspace>>=
 else
 {
@@ -347,28 +353,28 @@ else
 }
 ```
 
+With workspace folders available we can itherate over each folder and then
+handle **literate** files in that wrokspace folder.
+
 ``` ts : <<iterate over workspace folders and parse>>=
 if(workspaceFolders) {
-  const writeOutHtml : WriteRenderCallback =
-      (fname : string,
-       folderUri : vscode.Uri,
-       rendered : string) : Thenable<void> => {
-    const html =
-`<html>
-  <head>
-    <link rel="stylesheet" type="text/css" href="./style.css">
-  </head>
-  <body>
-  ${rendered}
-  </body>
-</html>`;
-    const encoded = Buffer.from(html, 'utf-8');
-    fname = fname.replace(".literate", ".html");
-    const fileUri = vscode.Uri.joinPath(folderUri, fname);
-    return Promise.resolve(vscode.workspace.fs.writeFile(fileUri, encoded));
-  };
   for(const folder of workspaceFolders)
   {
+    <<set up fragments and grabbedStateList>>
+    if(fragments && grabbedStateList) {
+      <<clear FragmentMap and GrabbedStateList>>
+      <<iterate over all files, write out html>>
+      <<hanle fragments for map>>
+      <<extrapolate fragments and save out>>
+    }
+  }
+}
+```
+
+First we ensure entries for our workspace exist in the maps for `FragmentMap`
+and `GrabbedStateList`.
+
+``` ts : <<set up fragments and grabbedStateList>>=
     if(!this.fragmentsForWorkspaceFolders.has(folder.name))
     {
       this.fragmentsForWorkspaceFolders.set(folder.name, new FragmentMap());
@@ -377,22 +383,59 @@ if(workspaceFolders) {
     {
       this.grabbedStateForWorkspaceFolders.set(folder.name, new GrabbedStateList());
     }
+```
+
+Next we can get the `FragmentMap` and `GrabbedStateList` for our workspace
+folder. These we'll fill up with the data of our **literate** project.
+
+``` ts : <<set up fragments and grabbedStateList>>=+
     const fragments = this.fragmentsForWorkspaceFolders.get(folder.name);
     const grabbedStateList = this.grabbedStateForWorkspaceFolders.get(folder.name);
-    if(fragments && grabbedStateList) {
-      fragments.clear();
-      grabbedStateList.clear();
-      await iterateLiterateFiles(folder,
-                                 writeOutHtml, /*     writeHtml : WriteRenderCallback*/
-                                 grabbedStateList.list,
-                                 this.md);
-      this.diagnostics.clear();
-      fragments.map = await handleFragments(folder, grabbedStateList.list, this.diagnostics, false, undefined);
-      this.diagnostics.clear();
-      await handleFragments(folder, grabbedStateList.list, this.diagnostics, true, writeSourceFiles);
-    }
-  }
-}
+```
+
+Each time we process a **literate** project we clear out the fragments and state
+so that we don't end up with stray elements.
+
+``` ts : <<clear FragmentMap and GrabbedStateList>>=
+fragments.clear();
+grabbedStateList.clear();
+```
+
+Our first pass is iterating over all the **literate** files in our folder,
+parsing them as we go. Each parsed file will be rendered as HTML and saved out
+to disk. The parser state with all the tokens will be set to
+`grabbedStateList.list`. We need to `await` on this `async` function, otherwise
+our state will be incomplete. The full state is needed for the next two steps.
+
+``` ts : <<iterate over all files, write out html>>=
+await iterateLiterateFiles(folder,
+                            writeOutHtml,
+                            grabbedStateList.list,
+                            this.md);
+```
+
+With the state complete, and our HTML files saved out, we are going to do two
+passes over the state. Lets do the first step here: we clear out the
+diagnostics, and then await on `handleFragments`. This function we call such
+that there is no extrapolation of fragments, nor source files are going to be
+saved. We `await` for the function to complete, otherwise our fragment map will
+be incomplete, or even just missing later on.
+
+``` ts : <<hanle fragments for map>>=
+this.diagnostics.clear();
+fragments.map = await handleFragments(folder, grabbedStateList.list, this.diagnostics, false, undefined);
+```
+
+The second step we'll call the fragment handler again, but this time we *do*
+want the fragments to be completely extrapolated, and the final source files
+written to disk. Before the call we again clear out the `DiagnosticCollection`
+so that we get the correct diagnostics in case of errors in **literate** files.
+
+Again we wait for the results, just to ensure it all completes before we go on.
+
+``` ts : <<extrapolate fragments and save out>>=
+this.diagnostics.clear();
+await handleFragments(folder, grabbedStateList.list, this.diagnostics, true, writeSourceFiles);
 ```
 
 #### Fetching fragments for workspace folder
@@ -406,19 +449,124 @@ the projects have been properly processed, though, this function returns the
 ``` ts : <<method to get fragments from repository>>=
 getFragments(workspaceFolder : vscode.WorkspaceFolder) : FragmentMap
 {
-  let fragmentMap : FragmentMap = new FragmentMap();
-  this.fragmentsForWorkspaceFolders.forEach(
-    (value, key, _) =>
+let fragmentMap : FragmentMap = new FragmentMap();
+this.fragmentsForWorkspaceFolders.forEach(
+  (value, key, _) =>
+  {
+    if(key===workspaceFolder.name)
     {
-      if(key===workspaceFolder.name)
-      {
-        fragmentMap = value;
+      fragmentMap = value;
       }
     }
   );
 
   return fragmentMap;
 }
+```
+
+#### Getting fragment on line for position
+
+This method checks to see if for the given text line and position a fragment
+usage or mention can be found.
+
+First we find matches on the current line against `FRAGMENT_USE_IN_CODE_RE`. In
+all matches we check which of them is at the given position. We do that by
+searching for the index of the match tag name, including the double chevron
+bracketing.
+
+The range for the `FragmentLocation` will be created from the found index and
+run the length of the tag name including the double enclosing chevrons. An
+attempt to find the corresponding fragment is made, but if no such fragment
+exists the `FragmentLocation` will be created with the fragment set to
+`undefined`. The `root` and `add` parts are also given to the fragment location,
+even if they were not matched. This information can be used elsewhere to
+determine what kind of fragment was found at the given position.
+
+``` ts : <<method to get fragment on line for position>>=
+getFragmentTagLocation(
+  document : vscode.TextDocument,
+  currentLine : vscode.TextLine,
+  position : vscode.Position
+) : FragmentLocation
+{
+  const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
+  const matchesOnLine = [...currentLine.text.matchAll(FRAGMENT_USE_IN_CODE_RE)];
+  for(const match of matchesOnLine)
+  {
+    if(!match || !match.groups) {
+      continue;
+    }
+    const OPENING = '<<';
+    const CLOSING = '>>';
+    const tagName = `${OPENING}${match.groups.tagName}${CLOSING}`;
+    const foundIndex = currentLine.text.indexOf(tagName);
+    if(foundIndex>-1) {
+      if(foundIndex <= position.character && position.character <= foundIndex + tagName.length)
+      {
+        const startPosition = new vscode.Position(currentLine.lineNumber, foundIndex);
+        const endPosition = new vscode.Position(currentLine.lineNumber, foundIndex + tagName.length);
+        let range : vscode.Range = new vscode.Range(startPosition, endPosition);
+        let fragment : FragmentInformation | undefined;
+        if(workspaceFolder) {
+          const fragments = theOneRepository.getFragments(workspaceFolder).map;
+          fragment = fragments.get(match.groups.tagName) || undefined;
+        }
+        return new FragmentLocation(match.groups.tagName, document.uri, range, fragment, match.groups.root, match.groups.add);
+      }
+    }
+  }
+
+  return unsetFragmentLocation;
+}
+```
+
+#### The FragmentLocation
+
+A fragment location encodes the occurrence of what could be a fragment that
+already exists or one that still needs to be defined. The class holds the name
+of the fragment, the range of this string in the resource specified by the uri,
+and whether a `FragmentInformation` was found or not.
+
+The properties `root` and `add` can be used to determine what type of fragment
+is at the given range.
+
+``` ts : <<fragment tag location>>=
+export class FragmentLocation
+{
+  readonly rangeExclusive : vscode.Range;
+  readonly valid : boolean;
+
+  constructor(
+    public readonly name : string,
+    public readonly uri: vscode.Uri,
+    public readonly range : vscode.Range,
+    public readonly fragment : FragmentInformation | undefined,
+    public readonly root : string | undefined,
+    public readonly add : string | undefined
+  )
+  {
+    this.valid = uri.fsPath.indexOf('not_valid_for_literate')===-1;
+    if(name.startsWith('<<')) {
+      this.rangeExclusive = new vscode.Range(
+        range.start.line, range.start.character + 2,
+        range.end.line, range.end.character - 2
+      );
+    }
+    else
+    {
+      this.rangeExclusive = range;
+    }
+  }
+}
+const unsetFragmentLocation =
+    new FragmentLocation(
+      '',
+      vscode.Uri.file('not_valid_for_literate'),
+      new vscode.Range(0,0,0,0),
+      undefined,
+      undefined,
+      undefined
+    );
 ```
 
 ## Iterating all literate files
@@ -464,11 +612,12 @@ fragments. We do that by using a `vscode.RelativePattern` using the workspace
 folder passed into `iterateLiterateFiles`.
 
 ``` ts : <<find all literate files in workspace>>=
-const literateFilesInWorkspace : vscode.RelativePattern =
-          new vscode.RelativePattern(workspaceFolder, '**/*.literate');
-const foundLiterateFiles = await vscode.workspace
-          .findFiles(literateFilesInWorkspace)
-          .then(files => Promise.all(files.map(file => file)));
+const foundLiterateFiles = await getLiterateFileUris(workspaceFolder);
+//const literateFilesInWorkspace : vscode.RelativePattern =
+//          new vscode.RelativePattern(workspaceFolder, '**/*.literate');
+//const foundLiterateFiles = await vscode.workspace
+//          .findFiles(literateFilesInWorkspace)
+//          .then(files => Promise.all(files.map(file => file)));
 ```
 
 For each **literate** file in the workspace we'll get eventually the text
@@ -480,7 +629,7 @@ corresponds to the **literate** file we are currently handling we read the text
 into `currentContent`, otherwise we set it to an empty string.
 
 ``` ts : <<get text document content if available>>=
-const currentContent = (() =>
+/*const currentContent = (() =>
   {
     for(const textDocument of vscode.workspace.textDocuments) {
       if(vscode.workspace.asRelativePath(fl) === vscode.workspace.asRelativePath(textDocument.uri)) {
@@ -489,7 +638,7 @@ const currentContent = (() =>
     }
     return '';
   }
-)();
+)();*/
 ```
 
 If `currentContent` is an empty string we read the content from the file on
@@ -498,8 +647,9 @@ disk, and decode it into `text`. If on the other hand we do have
 wil be more up-to-date than what we have on disk.
 
 ``` ts : <<get text from literate document>>=
-const content = currentContent ? null : await vscode.workspace.fs.readFile(fl);
-const text = currentContent ? currentContent : new TextDecoder('utf-8').decode(content);
+//const content = currentContent ? null : await vscode.workspace.fs.readFile(fl);
+//const text = currentContent ? currentContent : new TextDecoder('utf-8').decode(content);
+const text = await getFileContent(fl);
 ```
 
 With the `text` for our **literate** document ready we harvest the relative file
@@ -1036,6 +1186,8 @@ let literateProcessDisposable = vscode.commands.registerCommand(
     theOneRepository.processLiterateFiles(undefined);
     return vscode.window.setStatusBarMessage("Literate Process completed", 5000);
 });
+
+context.subscriptions.push(literateProcessDisposable);
 ```
 
 ## Diagnostics
@@ -1104,6 +1256,87 @@ function fragmentRange(token: Token): vscode.Range {
   let end = new vscode.Position(locationOfFragmentEnd(token), endTagName);
   let range: vscode.Range = new vscode.Range(start, end);
   return range;
+}
+```
+
+## Utility functions
+
+Function to get all literate files in a given workspace.
+
+``` ts : <<utility functions>>=
+async function getLiterateFileUris(
+  workspaceFolder : vscode.WorkspaceFolder
+) : Promise<vscode.Uri[]>
+{
+  const literateFilesInWorkspace : vscode.RelativePattern =
+        new vscode.RelativePattern(workspaceFolder, '**/*.literate');
+  const foundLiterateFiles = await vscode.workspace
+        .findFiles(literateFilesInWorkspace)
+        .then(files => Promise.all(files.map(file => file)));
+  return foundLiterateFiles;
+}
+```
+
+Function to write out the given `rendered` content out to a file. The `rendered`
+string will be set into a HTML body. The header will be configured so that the
+style sheet is referenced.
+
+``` ts : <<utility functions>>=+
+function writeOutHtml
+      (fname : string,
+       folderUri : vscode.Uri,
+       rendered : string) : Thenable<void>
+{
+  const html =
+`<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="./style.css">
+  </head>
+  <body>
+  ${rendered}
+  </body>
+</html>`;
+  const encoded = Buffer.from(html, 'utf-8');
+  fname = fname.replace(".literate", ".html");
+  const fileUri = vscode.Uri.joinPath(folderUri, fname);
+  return Promise.resolve(vscode.workspace.fs.writeFile(fileUri, encoded));
+};
+```
+
+For each **literate** file in the workspace we'll get eventually the text
+content, but we do have to check if any of the files are opened in an editor.
+Especially for on-the-fly updating of the tree view, but also for fragment name
+completion and similar functionality we need to get the text from the
+`TextDocument` instead of the file on disk. If there is a `TextDocument` that
+corresponds to the **literate** file we are currently handling we read the text
+into `currentContent`, otherwise we set it to an empty string.
+
+``` ts : <<utility functions>>=+
+async function getFileContent(
+  file : vscode.Uri
+) : Promise<string>
+{
+  const currentContent = (() =>
+      {
+          for(const textDocument of vscode.workspace.textDocuments) {
+              if(vscode.workspace.asRelativePath(file) === vscode.workspace.asRelativePath(textDocument.uri)) {
+                  return textDocument.getText();
+              }
+          }
+          return '';
+      }
+  )();
+```
+
+If `currentContent` is an empty string we read the content from the file on
+disk, and decode it into `text`. If on the other hand we do have
+`currentContent`, we use that for our `text` instead. The `currentContent`
+wil be more up-to-date than what we have on disk.
+
+``` ts : <<utility functions>>=+
+  const content = currentContent ? null : await vscode.workspace.fs.readFile(file);
+  const text = currentContent ? currentContent : new TextDecoder('utf-8').decode(content);
+  return text;
 }
 ```
 
@@ -1191,6 +1424,7 @@ source file or source files as written in the **literate** program.
 <<handle fragments>>
 <<write out source files>>
 <<fragment repository>>
+<<rename provider class>>
 ```
 
 Utility function to determine the workspace folder for a TextDocument
@@ -1225,6 +1459,7 @@ Code.
 
 ``` ts : <<literate.*>>=+
 <<diagnostic updating>>
+<<utility functions>>
 ```
 
 ``` ts : <<literate.*>>=+
@@ -1275,19 +1510,39 @@ interface WriteSourceCallback {
 
 ### Extension activation
 
+The extension activation sets up all our tools and data structures. The
+activation happens through the `activate` function. This takes a context to
+which we push all our disposables for proper cleanup when our extension gets
+decativate. Note that our `activate` implementation is also marked `async`,
+because we want to `await` where necessary.
+
 ``` ts : <<activate the extension>>=
 let theOneRepository : FragmentRepository;
 export async function activate(context: vscode.ExtensionContext) {
-  const rootPath = (vscode.workspace.workspaceFolders && (vscode.workspace.workspaceFolders.length > 0))
-    ? vscode.workspace.workspaceFolders[0].uri.fsPath : undefined;
+```
 
-  console.log('Ready to do some Literate Programming');
-  const diagnostics = vscode.languages.createDiagnosticCollection('literate');
+We start the activation by setting up the `FragmentRepository`. This is the hard
+of the processing of literate projects. We give it the `context` so that it can
+also push disposables to the `context.subscriptions` for proper cleanup.
 
+With the repository set up we will process the entire workspace for literate
+projects. We want to `await` here to ensure everything is ready, that is our
+repository can provide fragments when requested.
+
+With that done we place our repository in the `context.subscriptions`.
+
+``` ts : <<activate the extension>>=+
   theOneRepository = new FragmentRepository(context);
   await theOneRepository.processLiterateFiles(undefined);
   context.subscriptions.push(theOneRepository);
+```
 
+Now that the repository is up and running we can register all our commands,
+views and providers. Note that we currently use `markdown` to register to. In
+the future we would probably want to ensure that `.literate` becomes its own
+language ID to register agains.
+
+``` ts : <<activate the extension>>=+
   <<register literate.process>>
   <<register fragment tree view>>
   <<register completion item provider>>
@@ -1296,16 +1551,19 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.languages.registerHoverProvider('markdown', new FragmentHoverProvider(theOneRepository))
   );
 
-  if (vscode.window.activeTextEditor) {
-    updateDiagnostics(vscode.window.activeTextEditor.document.uri, diagnostics, undefined);
-  }
-  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor => {
-    if (editor) {
-      updateDiagnostics(editor.document.uri, diagnostics, undefined);
-    }
-  }));
+  context.subscriptions.push(
+    vscode.languages.registerRenameProvider('markdown', new LiterateRenameProvider(theOneRepository))
 
-  context.subscriptions.push(literateProcessDisposable);
+  );
+```
+
+From our extension activation we return an extension of the built-in
+*MarkdownIt* parser. This way we get a preview where the parser is configured
+the same way as our extension. This should result in previews that are close to
+what our HTML rendering does.
+
+``` ts : <<activate the extension>>=+
+  console.log('Ready to do some Literate Programming');
 
   return {
     extendMarkdownIt(md: any) {
