@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.6.1
+
+* Fix #16 - inadequate copy&paste resulted in double definitions not being
+  recognized.
+
 ## 0.6.0
 
 * Add `literate.create_fragment_for_tag` command. When the cursor is on a
