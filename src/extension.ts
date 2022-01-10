@@ -420,7 +420,7 @@ async function handleFragments(
           }
           if (root && !add) {
             if (fragments.has(name)) {
-              if(overwriteAttempts.includes(name))
+              if(!overwriteAttempts.includes(name))
               {
                 let msg = `Trying to overwrite existing fragment fragment ${name}. ${env.literateFileName}${linenumber}`;
                 const diag = createErrorDiagnostic(token, msg);
