@@ -1294,8 +1294,8 @@ context.subscriptions.push(literateProcessDisposable);
 ``` ts : <<register literate.create_fragment_for_tag>>=
 let literateCreateFragmentForTagDisposable = vscode.commands.registerCommand(
   'literate.create_fragment_for_tag',
-  async function () {
-    createFragmentForTag();
+  async function (range? : vscode.Range) {
+    createFragmentForTag(range);
   }
 );
 
@@ -1317,7 +1317,7 @@ pre-filled.
 First we ensure we have an active editor.
 
 ``` ts : <<create fragment for tag>>=
-function createFragmentForTag()
+function createFragmentForTag(range? : vscode.Range)
 {
   let activeEditor = vscode.window.activeTextEditor;
   if(activeEditor)
@@ -1325,11 +1325,12 @@ function createFragmentForTag()
 ```
 
 From the active editor we find the document. The editor also has the information
-about where our cursor currently is, under `active` property on `selection`.
+about where our cursor currently is, under `active` property on `selection`, but
+we use `range.start` if `range` was passed in.
 
 ``` ts : <<create fragment for tag>>=+
     const document = activeEditor.document;
-    const position = activeEditor.selection.active;
+    const position = range ? range.start : activeEditor.selection.active;
 ```
 
 For the document and position we determined we can get the fragment at that
@@ -1699,6 +1700,7 @@ source file or source files as written in the **literate** program.
 <<write out source files>>
 <<fragment repository>>
 <<rename provider class>>
+<<code action provider class>>
 ```
 
 Utility function to determine the workspace folder for a TextDocument
@@ -1830,7 +1832,10 @@ language ID to register agains.
 
   context.subscriptions.push(
     vscode.languages.registerRenameProvider('markdown', new LiterateRenameProvider(theOneRepository))
+  );
 
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionsProvider('markdown', new LiterateCodeActionProvider(theOneRepository))
   );
 ```
 

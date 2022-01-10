@@ -1,5 +1,15 @@
 # Change Log
 
+## 0.6.0
+
+* Add `literate.create_fragment_for_tag` command. When the cursor is on a
+  fragment use in either a code fence or in a paragraph the command creates a
+  new fragment definition after the block.
+* Add code action provider that emits code actions with
+  `literate.create_fragment_for_tag` so that these can be taken by doing quick
+  fixes.
+* Fix #14 - diagnostic message not precise enough for fragment not found.
+
 ## 0.5.0
 
 * Add rename capability for fragments

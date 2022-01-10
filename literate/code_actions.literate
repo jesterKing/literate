@@ -1,0 +1,69 @@
+# Code actions
+
+Code actions allow us to give potential actions on errors and warnings, making
+it a bit easier to create new parts and bits.
+
+## Provider class
+
+The action provider class takes a `FragmentRepository` in the constructor. This
+will be used to compute the fragment name for which we need to create an action.
+
+``` ts : <<code action provider class>>=
+export class LiterateCodeActionProvider implements vscode.CodeActionProvider
+{
+    constructor(public readonly repository : FragmentRepository) {}
+```
+
+The actual implementation of the provider is in `provideCodeActions`. It takes a
+document, range, context and cancellation token. The cancellation token and
+range we don't use.
+
+``` ts : <<code action provider class>>=+
+    public provideCodeActions(
+        document : vscode.TextDocument,
+        _: vscode.Range,
+        context : vscode.CodeActionContext,
+        __ : vscode.CancellationToken
+    ) : Thenable<vscode.CodeAction[]>
+    {
+```
+
+We start by initializing a new array of `CodeAction`, to which we will add any
+if we determine we can provide them.
+
+``` ts : <<code action provider class>>=+
+        let codeActions = new Array<vscode.CodeAction>();
+```
+
+Now loop over all the diagnostics received through the context. If we have one
+that starts with `"Could not find fragment"` we know we can create an action for
+defining the fragment.
+
+``` ts : <<code action provider class>>=+
+        for(const diag of context.diagnostics)
+        {
+            if(diag.message.indexOf("Could not find fragment")>-1)
+            {
+```
+
+Now create a new `CodeAction` and set it up to run the
+`literate.create_fragment_for_tag` command with the range specified by the
+diagnostics. We also get the fragment location so that we have access to its
+name.
+
+``` ts : <<code action provider class>>=+
+                let fragmentLocation = this.repository.getFragmentTagLocation(document, document.lineAt(diag.range.start), diag.range.start);
+                let action = new vscode.CodeAction(`Create fragment for ${OPENING}${fragmentLocation.name}${CLOSING}`, context.only ? context.only : vscode.CodeActionKind.Refactor);
+                action.command = {command: 'literate.create_fragment_for_tag', title: `Create fragment for ${OPENING}${fragmentLocation.name}${CLOSING}`, arguments : [diag.range]};
+                codeActions.push(action);
+            }
+        }
+```
+
+Finally return the code actions array.
+
+``` ts : <<code action provider class>>=+
+        return Promise.resolve(codeActions);
+    }
+}
+```

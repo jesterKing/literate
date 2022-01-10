@@ -1334,8 +1334,8 @@ context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title
 <div class="code">
 <pre><code><span class="hljs-keyword">let</span> literateCreateFragmentForTagDisposable = vscode.<span class="hljs-property">commands</span>.<span class="hljs-title function_">registerCommand</span>(
   <span class="hljs-string">&#x27;literate.create_fragment_for_tag&#x27;</span>,
-  <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) {
-    <span class="hljs-title function_">createFragmentForTag</span>();
+  <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> (<span class="hljs-params">range? : vscode.Range</span>) {
+    <span class="hljs-title function_">createFragmentForTag</span>(range);
   }
 );
 
@@ -1356,7 +1356,7 @@ pre-filled.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;create fragment for tag&gt;&gt;=</div>
 <div class="code">
-<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">createFragmentForTag</span>(<span class="hljs-params"></span>)
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">createFragmentForTag</span>(<span class="hljs-params">range? : vscode.Range</span>)
 {
   <span class="hljs-keyword">let</span> activeEditor = vscode.<span class="hljs-property">window</span>.<span class="hljs-property">activeTextEditor</span>;
   <span class="hljs-keyword">if</span>(activeEditor)
@@ -1365,12 +1365,13 @@ pre-filled.</p>
 
 </div>
 </div><p>From the active editor we find the document. The editor also has the information
-about where our cursor currently is, under <code>active</code> property on <code>selection</code>.</p>
+about where our cursor currently is, under <code>active</code> property on <code>selection</code>, but
+we use <code>range.start</code> if <code>range</code> was passed in.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;create fragment for tag&gt;&gt;=+</div>
 <div class="code">
 <pre><code>    <span class="hljs-keyword">const</span> <span class="hljs-variable language_">document</span> = activeEditor.<span class="hljs-property">document</span>;
-    <span class="hljs-keyword">const</span> position = activeEditor.<span class="hljs-property">selection</span>.<span class="hljs-property">active</span>;
+    <span class="hljs-keyword">const</span> position = range ? range.<span class="hljs-property">start</span> : activeEditor.<span class="hljs-property">selection</span>.<span class="hljs-property">active</span>;
 </code></pre>
 
 </div>
@@ -1773,6 +1774,7 @@ source file or source files as written in the <strong>literate</strong> program.
 &lt;&lt;write out source files&gt;&gt;
 &lt;&lt;fragment repository&gt;&gt;
 &lt;&lt;rename provider <span class="hljs-keyword">class</span>&gt;&gt;
+&lt;&lt;code action provider <span class="hljs-keyword">class</span>&gt;&gt;
 </code></pre>
 
 </div>
@@ -1921,7 +1923,10 @@ language ID to register agains.</p>
 
   context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(
     vscode.<span class="hljs-property">languages</span>.<span class="hljs-title function_">registerRenameProvider</span>(<span class="hljs-string">&#x27;markdown&#x27;</span>, <span class="hljs-keyword">new</span> <span class="hljs-title class_">LiterateRenameProvider</span>(theOneRepository))
+  );
 
+  context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(
+    vscode.<span class="hljs-property">languages</span>.<span class="hljs-title function_">registerCodeActionsProvider</span>(<span class="hljs-string">&#x27;markdown&#x27;</span>, <span class="hljs-keyword">new</span> <span class="hljs-title class_">LiterateCodeActionProvider</span>(theOneRepository))
   );
 </code></pre>
 

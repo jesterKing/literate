@@ -1,0 +1,87 @@
+<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="./style.css">
+  </head>
+  <body>
+  <h1>Code actions</h1>
+<p>Code actions allow us to give potential actions on errors and warnings, making
+it a bit easier to create new parts and bits.</p>
+<h2>Provider class</h2>
+<p>The action provider class takes a <code>FragmentRepository</code> in the constructor. This
+will be used to compute the fragment name for which we need to create an action.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;code action provider class&gt;&gt;=</div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">LiterateCodeActionProvider</span> <span class="hljs-keyword">implements</span> vscode.<span class="hljs-property">CodeActionProvider</span>
+{
+    <span class="hljs-title function_">constructor</span>(<span class="hljs-params"><span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> repository : FragmentRepository</span>) {}
+</code></pre>
+
+</div>
+</div><p>The actual implementation of the provider is in <code>provideCodeActions</code>. It takes a
+document, range, context and cancellation token. The cancellation token and
+range we don't use.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;code action provider class&gt;&gt;=+</div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">public</span> <span class="hljs-title function_">provideCodeActions</span>(
+        <span class="hljs-variable language_">document</span> : vscode.<span class="hljs-property">TextDocument</span>,
+        <span class="hljs-attr">_</span>: vscode.<span class="hljs-property">Range</span>,
+        context : vscode.<span class="hljs-property">CodeActionContext</span>,
+        __ : vscode.<span class="hljs-property">CancellationToken</span>
+    ) : <span class="hljs-title class_">Thenable</span>&lt;vscode.<span class="hljs-property">CodeAction</span>[]&gt;
+    {
+</code></pre>
+
+</div>
+</div><p>We start by initializing a new array of <code>CodeAction</code>, to which we will add any
+if we determine we can provide them.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;code action provider class&gt;&gt;=+</div>
+<div class="code">
+<pre><code>        <span class="hljs-keyword">let</span> codeActions = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;vscode.<span class="hljs-property">CodeAction</span>&gt;();
+</code></pre>
+
+</div>
+</div><p>Now loop over all the diagnostics received through the context. If we have one
+that starts with <code>&quot;Could not find fragment&quot;</code> we know we can create an action for
+defining the fragment.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;code action provider class&gt;&gt;=+</div>
+<div class="code">
+<pre><code>        <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> diag <span class="hljs-keyword">of</span> context.<span class="hljs-property">diagnostics</span>)
+        {
+            <span class="hljs-keyword">if</span>(diag.<span class="hljs-property">message</span>.<span class="hljs-title function_">indexOf</span>(<span class="hljs-string">&quot;Could not find fragment&quot;</span>)&gt;-<span class="hljs-number">1</span>)
+            {
+</code></pre>
+
+</div>
+</div><p>Now create a new <code>CodeAction</code> and set it up to run the
+<code>literate.create_fragment_for_tag</code> command with the range specified by the
+diagnostics. We also get the fragment location so that we have access to its
+name.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;code action provider class&gt;&gt;=+</div>
+<div class="code">
+<pre><code>                <span class="hljs-keyword">let</span> fragmentLocation = <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">getFragmentTagLocation</span>(<span class="hljs-variable language_">document</span>, <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">lineAt</span>(diag.<span class="hljs-property">range</span>.<span class="hljs-property">start</span>), diag.<span class="hljs-property">range</span>.<span class="hljs-property">start</span>);
+                <span class="hljs-keyword">let</span> action = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">CodeAction</span>(<span class="hljs-string">`Create fragment for <span class="hljs-subst">${OPENING}</span><span class="hljs-subst">${fragmentLocation.name}</span><span class="hljs-subst">${CLOSING}</span>`</span>, context.<span class="hljs-property">only</span> ? context.<span class="hljs-property">only</span> : vscode.<span class="hljs-property">CodeActionKind</span>.<span class="hljs-property">Refactor</span>);
+                action.<span class="hljs-property">command</span> = {<span class="hljs-attr">command</span>: <span class="hljs-string">&#x27;literate.create_fragment_for_tag&#x27;</span>, <span class="hljs-attr">title</span>: <span class="hljs-string">`Create fragment for <span class="hljs-subst">${OPENING}</span><span class="hljs-subst">${fragmentLocation.name}</span><span class="hljs-subst">${CLOSING}</span>`</span>, <span class="hljs-variable language_">arguments</span> : [diag.<span class="hljs-property">range</span>]};
+                codeActions.<span class="hljs-title function_">push</span>(action);
+            }
+        }
+</code></pre>
+
+</div>
+</div><p>Finally return the code actions array.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;code action provider class&gt;&gt;=+</div>
+<div class="code">
+<pre><code>        <span class="hljs-keyword">return</span> <span class="hljs-title class_">Promise</span>.<span class="hljs-title function_">resolve</span>(codeActions);
+    }
+}
+</code></pre>
+
+</div>
+</div>
+  </body>
+</html>

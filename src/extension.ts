@@ -936,6 +936,30 @@ export class LiterateRenameProvider implements vscode.RenameProvider
         return workspaceEdit;
     }
 }
+export class LiterateCodeActionProvider implements vscode.CodeActionProvider
+{
+    constructor(public readonly repository : FragmentRepository) {}
+    public provideCodeActions(
+        document : vscode.TextDocument,
+        _: vscode.Range,
+        context : vscode.CodeActionContext,
+        __ : vscode.CancellationToken
+    ) : Thenable<vscode.CodeAction[]>
+    {
+        let codeActions = new Array<vscode.CodeAction>();
+        for(const diag of context.diagnostics)
+        {
+            if(diag.message.indexOf("Could not find fragment")>-1)
+            {
+                let fragmentLocation = this.repository.getFragmentTagLocation(document, document.lineAt(diag.range.start), diag.range.start);
+                let action = new vscode.CodeAction(`Create fragment for ${OPENING}${fragmentLocation.name}${CLOSING}`, context.only ? context.only : vscode.CodeActionKind.Refactor);
+                action.command = {command: 'literate.create_fragment_for_tag', title: `Create fragment for ${OPENING}${fragmentLocation.name}${CLOSING}`, arguments : [diag.range]};
+                codeActions.push(action);
+            }
+        }
+        return Promise.resolve(codeActions);
+    }
+}
 function determineWorkspaceFolder(document : vscode.TextDocument) : vscode.WorkspaceFolder | undefined
 {
   if(!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0)
@@ -967,8 +991,8 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(literateProcessDisposable);
   let literateCreateFragmentForTagDisposable = vscode.commands.registerCommand(
     'literate.create_fragment_for_tag',
-    async function () {
-      createFragmentForTag();
+    async function (range? : vscode.Range) {
+      createFragmentForTag(range);
     }
   );
   
@@ -1009,7 +1033,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.languages.registerRenameProvider('markdown', new LiterateRenameProvider(theOneRepository))
+  );
 
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionsProvider('markdown', new LiterateCodeActionProvider(theOneRepository))
   );
   console.log('Ready to do some Literate Programming');
 
@@ -1149,13 +1176,13 @@ async function getFileContent(
   const text = currentContent ? currentContent : new TextDecoder('utf-8').decode(content);
   return text;
 }
-function createFragmentForTag()
+function createFragmentForTag(range? : vscode.Range)
 {
   let activeEditor = vscode.window.activeTextEditor;
   if(activeEditor)
   {
     const document = activeEditor.document;
-    const position = activeEditor.selection.active;
+    const position = range ? range.start : activeEditor.selection.active;
     const fragmentLocation = theOneRepository.getFragmentTagLocation(
       document,
       document.lineAt(position),
