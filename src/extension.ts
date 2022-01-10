@@ -39,7 +39,6 @@ interface GrabbedState {
   literateUri: vscode.Uri;
   gstate: StateCore;
 }
-
 const emptyState : GrabbedState =
 {
   literateFileName : '',
@@ -78,16 +77,12 @@ interface FragmentInformation {
 }
 interface TokenUsage
 {
-  previous : Token | undefined,
   token : Token | undefined,
-  next : Token | undefined
 }
 
 const emptyToken : TokenUsage =
 {
-  previous : undefined,
   token : undefined,
-  next : undefined
 };
 
 //let HTML_ENCODED_FRAGMENT_TAG_RE = /(&lt;&lt.*?&gt;&gt;)/g;
@@ -810,7 +805,6 @@ export class FragmentRepository {
       return emptyToken;
     }
     const state = this.getDocumentState(document);
-    let tokenIndex = 0;
     for(const token of state.gstate.tokens)
     {
       if(token.map) {
@@ -818,16 +812,12 @@ export class FragmentRepository {
         if(tokenRange.contains(range))
         {
           let tokenUsage : TokenUsage = {
-            previous : undefined,
             token : token,
-            next : undefined
           };
           return tokenUsage;
         }
       }
-      tokenIndex++;
     }
-  
     return emptyToken;
   }
   getWorkspaceState(workspaceFolder : vscode.WorkspaceFolder) : GrabbedStateList
@@ -856,7 +846,6 @@ export class FragmentRepository {
         if(document.uri.path === state.literateUri.path)
         {
           grabbedState = state;
-          console.log(state);
         }
       }
     }
@@ -997,6 +986,14 @@ export async function activate(context: vscode.ExtensionContext) {
   );
   
   context.subscriptions.push(literateCreateFragmentForTagDisposable);
+  let literateSplitFragmentDisposable = vscode.commands.registerCommand(
+    'literate.split_fragment',
+    async function (position? : vscode.Position) {
+      splitFragment(position);
+    }
+  );
+  
+  context.subscriptions.push(literateSplitFragmentDisposable);
   new FragmentExplorer(context);
   const completionItemProvider =
     vscode.languages.registerCompletionItemProvider('markdown', {
@@ -1208,6 +1205,34 @@ function createFragmentForTag(range? : vscode.Range)
         newFragment
         );
       vscode.workspace.applyEdit(workspaceEdit);
+    }
+  }
+}
+function splitFragment(position_? : vscode.Position)
+{
+  let activeEditor = vscode.window.activeTextEditor;
+  if(activeEditor)
+  {
+    const document = activeEditor.document;
+    const position = position_ ? position_ : activeEditor.selection.active;
+    const tokenUsage = theOneRepository.getTokenAtPosition(
+      document,
+      new vscode.Range(position, position));
+    if(tokenUsage.token && tokenUsage.token.type === 'fence')
+    {
+      let match = tokenUsage.token.info.match(FRAGMENT_RE);
+      if(match && match.groups)
+      {
+        let langId = match.groups.lang;
+        let textToInsert = `${FENCE}\n\n${FENCE} ${langId} : ${OPENING}${match.groups.tagName}${CLOSING}=+\n`;
+        let workspaceEdit = new vscode.WorkspaceEdit();
+        workspaceEdit.insert(
+          document.uri,
+          new vscode.Position(position.line+1, 0),
+          textToInsert 
+          );
+        vscode.workspace.applyEdit(workspaceEdit);
+      }
     }
   }
 }

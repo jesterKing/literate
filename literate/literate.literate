@@ -576,9 +576,9 @@ const unsetFragmentLocation =
 
 #### Get fragment usage token
 
-This method takes a fragment name and returns the Markdown token it is contained
-in. It further needs the range of the fragment name, which can be used to see if
-the token range contains the fragment usage.
+This method takes a text document and a range, based on which the token
+containing the range is returned. If no token is found, or the workspace folder
+is not available the `emptyToken` constant is returned.
 
 ``` ts : <<method to get token at position>>=
 getTokenAtPosition(
@@ -586,49 +586,75 @@ getTokenAtPosition(
   range : vscode.Range
 ) : TokenUsage
 {
+```
+
+Determine the workspace folder for the given text document. As mentioned above,
+is no workspace folder is found the `emptyToken` is returned.
+
+```  ts  : <<method to get token at position>>=+
   const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
   if(!workspaceFolder)
   {
     return emptyToken;
   }
+```
+
+Next we can retrieve the state for the document.
+
+```   ts   : <<method to get token at position>>=+
   const state = this.getDocumentState(document);
-  let tokenIndex = 0;
+```
+
+We can iterate over all the tokens in the grabbed state of the document. We're
+only interested in tokens that have a valid `map` property, since we need to
+check the range asked for.
+
+```    ts    : <<method to get token at position>>=+
   for(const token of state.gstate.tokens)
   {
     if(token.map) {
+```
+
+If the range given is contained within the token map we create a new TokenUsage
+and return that. This concludes the search for the token containing the range we
+are interested in.
+
+```     ts     : <<method to get token at position>>=+
       const tokenRange = new vscode.Range(token.map[0], 0, token.map[1], 1024);
       if(tokenRange.contains(range))
       {
         let tokenUsage : TokenUsage = {
-          previous : undefined,
           token : token,
-          next : undefined
         };
         return tokenUsage;
       }
     }
-    tokenIndex++;
   }
+```
 
+If no hit was found return the `emptyToken`.
+
+```      ts      : <<method to get token at position>>=+
   return emptyToken;
 }
 ```
 
+The `TokenUsage` interface helps determining whether we have a token or not.
+TBD: we can probably get rid of this interface and just use a `Token` directly.
+
 ``` ts : <<token usage interface>>=
 interface TokenUsage
 {
-  previous : Token | undefined,
   token : Token | undefined,
-  next : Token | undefined
 }
 
 const emptyToken : TokenUsage =
 {
-  previous : undefined,
   token : undefined,
-  next : undefined
 };
 ```
+
+#### Get list of grabbed states for a workspace
 
 ``` ts : <<method to get state for workspace>>=
 getWorkspaceState(workspaceFolder : vscode.WorkspaceFolder) : GrabbedStateList
@@ -648,6 +674,8 @@ getWorkspaceState(workspaceFolder : vscode.WorkspaceFolder) : GrabbedStateList
 }
 ```
 
+#### Get the grabbed state of a document
+
 ``` ts : <<method to get state for document>>=
 getDocumentState(document: vscode.TextDocument) : GrabbedState
 {
@@ -660,7 +688,6 @@ getDocumentState(document: vscode.TextDocument) : GrabbedState
       if(document.uri.path === state.literateUri.path)
       {
         grabbedState = state;
-        console.log(state);
       }
     }
   }
@@ -770,7 +797,12 @@ interface GrabbedState {
   literateUri: vscode.Uri;
   gstate: StateCore;
 }
+```
 
+We define a `GrabbedState` that is not valid, the `emptyState`. This allows us
+to always return an object instead of `undefined` in select cases.
+
+```  ts  : <<grabbed state type>>=+
 const emptyState : GrabbedState =
 {
   literateFileName : '',
@@ -1412,6 +1444,84 @@ at the position we ran the command at.
 }
 ```
 
+## Register the literate.split_fragment command
+
+Registering the `literate.split_fragment` command, setting it up so that it
+could take a `vscode.Position` parameter, which helps in programmatically firing
+the command for a certain pre-computed location.
+
+``` ts : <<register literate.split_fragment>>=
+let literateSplitFragmentDisposable = vscode.commands.registerCommand(
+  'literate.split_fragment',
+  async function (position? : vscode.Position) {
+    splitFragment(position);
+  }
+);
+
+context.subscriptions.push(literateSplitFragmentDisposable);
+```
+
+### literate.split_fragment implementation
+
+The `literate.split_fragment` will split the current fragment below the line
+where the cursor is. If no active text editor was found nothing will happen.
+With one in hand though we can either use the position given to the method, or
+otherwise use the cursor location in the document.
+
+```ts : <<split fragment>>=
+function splitFragment(position_? : vscode.Position)
+{
+  let activeEditor = vscode.window.activeTextEditor;
+  if(activeEditor)
+  {
+    const document = activeEditor.document;
+    const position = position_ ? position_ : activeEditor.selection.active;
+```
+
+With the document and position we can find the `Token` at that location.
+Continue only if it is a fence.
+
+``` ts  : <<split fragment>>=+
+    const tokenUsage = theOneRepository.getTokenAtPosition(
+      document,
+      new vscode.Range(position, position));
+    if(tokenUsage.token && tokenUsage.token.type === 'fence')
+    {
+```
+
+Next we match the info line, we want to ensure we have actually a fragment here.
+
+```  ts   : <<split fragment>>=+
+      let match = tokenUsage.token.info.match(FRAGMENT_RE);
+      if(match && match.groups)
+      {
+```
+
+From the matched info line we take the language identifier and the fragment tag
+name. We can create the text that will split the current fragment.
+
+```   ts    : <<split fragment>>=+
+        let langId = match.groups.lang;
+        let textToInsert = `${FENCE}\n\n${FENCE} ${langId} : ${OPENING}${match.groups.tagName}${CLOSING}=+\n`;
+```
+
+Finally we can create the workspace edit, make the insert on the next line from
+the cursor, and apply the edit.
+
+```    ts     : <<split fragment>>=+
+        let workspaceEdit = new vscode.WorkspaceEdit();
+        workspaceEdit.insert(
+          document.uri,
+          new vscode.Position(position.line+1, 0),
+          textToInsert 
+          );
+        vscode.workspace.applyEdit(workspaceEdit);
+      }
+    }
+  }
+}
+```
+
 ## Diagnostics
 
 In this chapter are a few methods that help creating and updating diagnostics.
@@ -1737,6 +1847,7 @@ Code.
 <<diagnostic updating>>
 <<utility functions>>
 <<create fragment for tag>>
+<<split fragment>>
 ```
 
 ``` ts : <<literate.*>>=+
@@ -1823,6 +1934,7 @@ language ID to register agains.
 ``` ts : <<activate the extension>>=+
   <<register literate.process>>
   <<register literate.create_fragment_for_tag>>
+  <<register literate.split_fragment>>
   <<register fragment tree view>>
   <<register completion item provider>>
 

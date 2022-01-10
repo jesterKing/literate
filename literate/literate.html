@@ -602,9 +602,9 @@ is at the given range.</p>
 
 </div>
 </div><h4>Get fragment usage token</h4>
-<p>This method takes a fragment name and returns the Markdown token it is contained
-in. It further needs the range of the fragment name, which can be used to see if
-the token range contains the fragment usage.</p>
+<p>This method takes a text document and a range, based on which the token
+containing the range is returned. If no token is found, or the workspace folder
+is not available the <code>emptyToken</code> constant is returned.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;method to get token at position&gt;&gt;=</div>
 <div class="code">
@@ -613,55 +613,89 @@ the token range contains the fragment usage.</p>
   range : vscode.<span class="hljs-property">Range</span>
 ) : <span class="hljs-title class_">TokenUsage</span>
 {
-  <span class="hljs-keyword">const</span> workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span> | <span class="hljs-literal">undefined</span> = <span class="hljs-title function_">determineWorkspaceFolder</span>(<span class="hljs-variable language_">document</span>);
+</code></pre>
+
+</div>
+</div><p>Determine the workspace folder for the given text document. As mentioned above,
+is no workspace folder is found the <code>emptyToken</code> is returned.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;method to get token at position&gt;&gt;=+</div>
+<div class="code">
+<pre><code>  <span class="hljs-keyword">const</span> workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span> | <span class="hljs-literal">undefined</span> = <span class="hljs-title function_">determineWorkspaceFolder</span>(<span class="hljs-variable language_">document</span>);
   <span class="hljs-keyword">if</span>(!workspaceFolder)
   {
     <span class="hljs-keyword">return</span> emptyToken;
   }
-  <span class="hljs-keyword">const</span> state = <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">getDocumentState</span>(<span class="hljs-variable language_">document</span>);
-  <span class="hljs-keyword">let</span> tokenIndex = <span class="hljs-number">0</span>;
-  <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> state.<span class="hljs-property">gstate</span>.<span class="hljs-property">tokens</span>)
+</code></pre>
+
+</div>
+</div><p>Next we can retrieve the state for the document.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;method to get token at position&gt;&gt;=+</div>
+<div class="code">
+<pre><code>  <span class="hljs-keyword">const</span> state = <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">getDocumentState</span>(<span class="hljs-variable language_">document</span>);
+</code></pre>
+
+</div>
+</div><p>We can iterate over all the tokens in the grabbed state of the document. We're
+only interested in tokens that have a valid <code>map</code> property, since we need to
+check the range asked for.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;method to get token at position&gt;&gt;=+</div>
+<div class="code">
+<pre><code>  <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> state.<span class="hljs-property">gstate</span>.<span class="hljs-property">tokens</span>)
   {
     <span class="hljs-keyword">if</span>(token.<span class="hljs-property">map</span>) {
-      <span class="hljs-keyword">const</span> tokenRange = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(token.<span class="hljs-property">map</span>[<span class="hljs-number">0</span>], <span class="hljs-number">0</span>, token.<span class="hljs-property">map</span>[<span class="hljs-number">1</span>], <span class="hljs-number">1024</span>);
+</code></pre>
+
+</div>
+</div><p>If the range given is contained within the token map we create a new TokenUsage
+and return that. This concludes the search for the token containing the range we
+are interested in.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;method to get token at position&gt;&gt;=+</div>
+<div class="code">
+<pre><code>      <span class="hljs-keyword">const</span> tokenRange = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(token.<span class="hljs-property">map</span>[<span class="hljs-number">0</span>], <span class="hljs-number">0</span>, token.<span class="hljs-property">map</span>[<span class="hljs-number">1</span>], <span class="hljs-number">1024</span>);
       <span class="hljs-keyword">if</span>(tokenRange.<span class="hljs-title function_">contains</span>(range))
       {
         <span class="hljs-keyword">let</span> tokenUsage : <span class="hljs-title class_">TokenUsage</span> = {
-          previous : <span class="hljs-literal">undefined</span>,
           token : token,
-          next : <span class="hljs-literal">undefined</span>
         };
         <span class="hljs-keyword">return</span> tokenUsage;
       }
     }
-    tokenIndex++;
   }
+</code></pre>
 
-  <span class="hljs-keyword">return</span> emptyToken;
+</div>
+</div><p>If no hit was found return the <code>emptyToken</code>.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;method to get token at position&gt;&gt;=+</div>
+<div class="code">
+<pre><code>  <span class="hljs-keyword">return</span> emptyToken;
 }
 </code></pre>
 
 </div>
-</div><div class="codefragment">
+</div><p>The <code>TokenUsage</code> interface helps determining whether we have a token or not.
+TBD: we can probably get rid of this interface and just use a <code>Token</code> directly.</p>
+<div class="codefragment">
 <div class="fragmentname">&lt;&lt;token usage interface&gt;&gt;=</div>
 <div class="code">
 <pre><code><span class="hljs-keyword">interface</span> <span class="hljs-title class_">TokenUsage</span>
 {
-  previous : <span class="hljs-title class_">Token</span> | <span class="hljs-literal">undefined</span>,
   token : <span class="hljs-title class_">Token</span> | <span class="hljs-literal">undefined</span>,
-  next : <span class="hljs-title class_">Token</span> | <span class="hljs-literal">undefined</span>
 }
 
 <span class="hljs-keyword">const</span> emptyToken : <span class="hljs-title class_">TokenUsage</span> =
 {
-  previous : <span class="hljs-literal">undefined</span>,
   token : <span class="hljs-literal">undefined</span>,
-  next : <span class="hljs-literal">undefined</span>
 };
 </code></pre>
 
 </div>
-</div><div class="codefragment">
+</div><h4>Get list of grabbed states for a workspace</h4>
+<div class="codefragment">
 <div class="fragmentname">&lt;&lt;method to get state for workspace&gt;&gt;=</div>
 <div class="code">
 <pre><code><span class="hljs-title function_">getWorkspaceState</span>(workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span>) : <span class="hljs-title class_">GrabbedStateList</span>
@@ -682,7 +716,8 @@ the token range contains the fragment usage.</p>
 </code></pre>
 
 </div>
-</div><div class="codefragment">
+</div><h4>Get the grabbed state of a document</h4>
+<div class="codefragment">
 <div class="fragmentname">&lt;&lt;method to get state for document&gt;&gt;=</div>
 <div class="code">
 <pre><code><span class="hljs-title function_">getDocumentState</span>(<span class="hljs-attr">document</span>: vscode.<span class="hljs-property">TextDocument</span>) : <span class="hljs-title class_">GrabbedState</span>
@@ -696,7 +731,6 @@ the token range contains the fragment usage.</p>
       <span class="hljs-keyword">if</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span> === state.<span class="hljs-property">literateUri</span>.<span class="hljs-property">path</span>)
       {
         grabbedState = state;
-        <span class="hljs-variable language_">console</span>.<span class="hljs-title function_">log</span>(state);
       }
     }
   }
@@ -814,8 +848,15 @@ parsing result.</p>
   <span class="hljs-attr">literateUri</span>: vscode.<span class="hljs-property">Uri</span>;
   <span class="hljs-attr">gstate</span>: <span class="hljs-title class_">StateCore</span>;
 }
+</code></pre>
 
-<span class="hljs-keyword">const</span> emptyState : <span class="hljs-title class_">GrabbedState</span> =
+</div>
+</div><p>We define a <code>GrabbedState</code> that is not valid, the <code>emptyState</code>. This allows us
+to always return an object instead of <code>undefined</code> in select cases.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;grabbed state type&gt;&gt;=+</div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> emptyState : <span class="hljs-title class_">GrabbedState</span> =
 {
   literateFileName : <span class="hljs-string">&#x27;&#x27;</span>,
   literateUri : vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">file</span>(<span class="hljs-string">&#x27;not_valid_for_literate&#x27;</span>),
@@ -1463,6 +1504,94 @@ at the position we ran the command at.</p>
 </code></pre>
 
 </div>
+</div><h2>Register the literate.split_fragment command</h2>
+<p>Registering the <code>literate.split_fragment</code> command, setting it up so that it
+could take a <code>vscode.Position</code> parameter, which helps in programmatically firing
+the command for a certain pre-computed location.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;register literate.split_fragment&gt;&gt;=</div>
+<div class="code">
+<pre><code><span class="hljs-keyword">let</span> literateSplitFragmentDisposable = vscode.<span class="hljs-property">commands</span>.<span class="hljs-title function_">registerCommand</span>(
+  <span class="hljs-string">&#x27;literate.split_fragment&#x27;</span>,
+  <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> (<span class="hljs-params">position? : vscode.Position</span>) {
+    <span class="hljs-title function_">splitFragment</span>(position);
+  }
+);
+
+context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(literateSplitFragmentDisposable);
+</code></pre>
+
+</div>
+</div><h3>literate.split_fragment implementation</h3>
+<p>The <code>literate.split_fragment</code> will split the current fragment below the line
+where the cursor is. If no active text editor was found nothing will happen.
+With one in hand though we can either use the position given to the method, or
+otherwise use the cursor location in the document.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;split fragment&gt;&gt;=</div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">splitFragment</span>(<span class="hljs-params">position_? : vscode.Position</span>)
+{
+  <span class="hljs-keyword">let</span> activeEditor = vscode.<span class="hljs-property">window</span>.<span class="hljs-property">activeTextEditor</span>;
+  <span class="hljs-keyword">if</span>(activeEditor)
+  {
+    <span class="hljs-keyword">const</span> <span class="hljs-variable language_">document</span> = activeEditor.<span class="hljs-property">document</span>;
+    <span class="hljs-keyword">const</span> position = position_ ? position_ : activeEditor.<span class="hljs-property">selection</span>.<span class="hljs-property">active</span>;
+</code></pre>
+
+</div>
+</div><p>With the document and position we can find the <code>Token</code> at that location.
+Continue only if it is a fence.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;split fragment&gt;&gt;=+</div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">const</span> tokenUsage = theOneRepository.<span class="hljs-title function_">getTokenAtPosition</span>(
+      <span class="hljs-variable language_">document</span>,
+      <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(position, position));
+    <span class="hljs-keyword">if</span>(tokenUsage.<span class="hljs-property">token</span> &amp;&amp; tokenUsage.<span class="hljs-property">token</span>.<span class="hljs-property">type</span> === <span class="hljs-string">&#x27;fence&#x27;</span>)
+    {
+</code></pre>
+
+</div>
+</div><p>Next we match the info line, we want to ensure we have actually a fragment here.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;split fragment&gt;&gt;=+</div>
+<div class="code">
+<pre><code>      <span class="hljs-keyword">let</span> match = tokenUsage.<span class="hljs-property">token</span>.<span class="hljs-property">info</span>.<span class="hljs-title function_">match</span>(<span class="hljs-variable constant_">FRAGMENT_RE</span>);
+      <span class="hljs-keyword">if</span>(match &amp;&amp; match.<span class="hljs-property">groups</span>)
+      {
+</code></pre>
+
+</div>
+</div><p>From the matched info line we take the language identifier and the fragment tag
+name. We can create the text that will split the current fragment.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;split fragment&gt;&gt;=+</div>
+<div class="code">
+<pre><code>        <span class="hljs-keyword">let</span> langId = match.<span class="hljs-property">groups</span>.<span class="hljs-property">lang</span>;
+        <span class="hljs-keyword">let</span> textToInsert = <span class="hljs-string">`<span class="hljs-subst">${FENCE}</span>\n\n<span class="hljs-subst">${FENCE}</span> <span class="hljs-subst">${langId}</span> : <span class="hljs-subst">${OPENING}</span><span class="hljs-subst">${match.groups.tagName}</span><span class="hljs-subst">${CLOSING}</span>=+\n`</span>;
+</code></pre>
+
+</div>
+</div><p>Finally we can create the workspace edit, make the insert on the next line from
+the cursor, and apply the edit.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;split fragment&gt;&gt;=+</div>
+<div class="code">
+<pre><code>        <span class="hljs-keyword">let</span> workspaceEdit = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">WorkspaceEdit</span>();
+        workspaceEdit.<span class="hljs-title function_">insert</span>(
+          <span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>,
+          <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Position</span>(position.<span class="hljs-property">line</span>+<span class="hljs-number">1</span>, <span class="hljs-number">0</span>),
+          textToInsert 
+          );
+        vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title function_">applyEdit</span>(workspaceEdit);
+      }
+    }
+  }
+}
+</code></pre>
+
+</div>
 </div><h2>Diagnostics</h2>
 <p>In this chapter are a few methods that help creating and updating diagnostics.
 These diagnostics help the literate programmer determining if there are
@@ -1818,6 +1947,7 @@ Code.</p>
 <pre><code>&lt;&lt;diagnostic updating&gt;&gt;
 &lt;&lt;utility functions&gt;&gt;
 &lt;&lt;create fragment <span class="hljs-keyword">for</span> tag&gt;&gt;
+&lt;&lt;split fragment&gt;&gt;
 </code></pre>
 
 </div>
@@ -1914,6 +2044,7 @@ language ID to register agains.</p>
 <div class="code">
 <pre><code>  &lt;&lt;register literate.<span class="hljs-property">process</span>&gt;&gt;
   &lt;&lt;register literate.<span class="hljs-property">create_fragment_for_tag</span>&gt;&gt;
+  &lt;&lt;register literate.<span class="hljs-property">split_fragment</span>&gt;&gt;
   &lt;&lt;register fragment tree view&gt;&gt;
   &lt;&lt;register completion item provider&gt;&gt;
 
