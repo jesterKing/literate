@@ -134,6 +134,9 @@ export class FragmentRepository {
   <<method to get fragments from repository>>
 
   <<method to get fragment on line for position>>
+  <<method to get token at position>>
+  <<method to get state for workspace>>
+  <<method to get state for document>>
 
   dispose() {
     for(let fragmentMap of this.fragmentsForWorkspaceFolders.values())
@@ -457,7 +460,7 @@ let fragmentMap : FragmentMap = new FragmentMap();
 this.fragmentsForWorkspaceFolders.forEach(
   (value, key, _) =>
   {
-    if(key===workspaceFolder.name)
+    if(key === workspaceFolder.name)
     {
       fragmentMap = value;
       }
@@ -500,8 +503,6 @@ getFragmentTagLocation(
     if(!match || !match.groups) {
       continue;
     }
-    const OPENING = '<<';
-    const CLOSING = '>>';
     const tagName = `${OPENING}${match.groups.tagName}${CLOSING}`;
     const foundIndex = currentLine.text.indexOf(tagName);
     if(foundIndex>-1) {
@@ -524,7 +525,7 @@ getFragmentTagLocation(
 }
 ```
 
-#### The FragmentLocation
+##### The FragmentLocation
 
 A fragment location encodes the occurrence of what could be a fragment that
 already exists or one that still needs to be defined. The class holds the name
@@ -550,7 +551,7 @@ export class FragmentLocation
   )
   {
     this.valid = uri.fsPath.indexOf('not_valid_for_literate')===-1;
-    if(name.startsWith('<<')) {
+    if(name.startsWith(OPENING)) {
       this.rangeExclusive = new vscode.Range(
         range.start.line, range.start.character + 2,
         range.end.line, range.end.character - 2
@@ -571,6 +572,101 @@ const unsetFragmentLocation =
       undefined,
       undefined
     );
+```
+
+#### Get fragment usage token
+
+This method takes a fragment name and returns the Markdown token it is contained
+in. It further needs the range of the fragment name, which can be used to see if
+the token range contains the fragment usage.
+
+``` ts : <<method to get token at position>>=
+getTokenAtPosition(
+  document : vscode.TextDocument,
+  range : vscode.Range
+) : TokenUsage
+{
+  const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
+  if(!workspaceFolder)
+  {
+    return emptyToken;
+  }
+  const state = this.getDocumentState(document);
+  let tokenIndex = 0;
+  for(const token of state.gstate.tokens)
+  {
+    if(token.map) {
+      const tokenRange = new vscode.Range(token.map[0], 0, token.map[1], 1024);
+      if(tokenRange.contains(range))
+      {
+        let tokenUsage : TokenUsage = {
+          previous : undefined,
+          token : token,
+          next : undefined
+        };
+        return tokenUsage;
+      }
+    }
+    tokenIndex++;
+  }
+
+  return emptyToken;
+}
+```
+
+``` ts : <<token usage interface>>=
+interface TokenUsage
+{
+  previous : Token | undefined,
+  token : Token | undefined,
+  next : Token | undefined
+}
+
+const emptyToken : TokenUsage =
+{
+  previous : undefined,
+  token : undefined,
+  next : undefined
+};
+```
+
+``` ts : <<method to get state for workspace>>=
+getWorkspaceState(workspaceFolder : vscode.WorkspaceFolder) : GrabbedStateList
+{
+  let grabbedState : GrabbedStateList = new GrabbedStateList();
+  this.grabbedStateForWorkspaceFolders.forEach(
+    (value, key, _) =>
+    {
+      if(key === workspaceFolder.name)
+      {
+        grabbedState = value;
+        }
+      }
+    );
+
+  return grabbedState;
+}
+```
+
+``` ts : <<method to get state for document>>=
+getDocumentState(document: vscode.TextDocument) : GrabbedState
+{
+  let grabbedState : GrabbedState = emptyState;
+  const ws = determineWorkspaceFolder(document);
+  if(ws) {
+    const workspaceState = this.getWorkspaceState(ws);
+    for(const state of workspaceState.list)
+    {
+      if(document.uri.path === state.literateUri.path)
+      {
+        grabbedState = state;
+        console.log(state);
+      }
+    }
+  }
+
+  return grabbedState;
+}
 ```
 
 ## Iterating all literate files
@@ -674,6 +770,13 @@ interface GrabbedState {
   literateUri: vscode.Uri;
   gstate: StateCore;
 }
+
+const emptyState : GrabbedState =
+{
+  literateFileName : '',
+  literateUri : vscode.Uri.file('not_valid_for_literate'),
+  gstate: new StateCore('', createMarkdownItParserForLiterate(), '')
+};
 ```
 
 ## Preparing MarkdownIt
@@ -745,7 +848,7 @@ of fragments in code we use `FRAGMENT_USE_IN_CODE_RE`.
 
 ``` ts : <<fragment regular expressions>>=
 //let HTML_ENCODED_FRAGMENT_TAG_RE = /(&lt;&lt.*?&gt;&gt;)/g;
-let FRAGMENT_USE_IN_CODE_RE =
+const FRAGMENT_USE_IN_CODE_RE =
   /(?<indent>[ \t]*)<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?/g;
 ```
 
@@ -773,7 +876,7 @@ block. The actual fragment tag is placed as first option right after the colon
 following the language specifier.
 
 ``` ts : <<fragment regular expressions>>=+
-let FRAGMENT_RE =
+const FRAGMENT_RE =
   /(?<lang>.*):.*<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*)/;
 ```
 
@@ -1186,6 +1289,128 @@ let literateProcessDisposable = vscode.commands.registerCommand(
 context.subscriptions.push(literateProcessDisposable);
 ```
 
+## Register the literate.create_fragment_for_tag command
+
+``` ts : <<register literate.create_fragment_for_tag>>=
+let literateCreateFragmentForTagDisposable = vscode.commands.registerCommand(
+  'literate.create_fragment_for_tag',
+  async function () {
+    createFragmentForTag();
+  }
+);
+
+context.subscriptions.push(literateCreateFragmentForTagDisposable);
+```
+
+### literate.create_fragment_for_tag implementation
+
+The `literate.create_fragment_for_tag` will do as its name suggests. When the
+position in the document is on a tag then the command will add a code fence to
+the document.
+
+If the tag at the position is fragment usage in a fragment then the code fence
+will be created after the current fragment using the same language as specified
+in the current fragment. If the tag is a fragment mention then instead the
+current fragment map is checked for what the most used language is and that is
+pre-filled.
+
+First we ensure we have an active editor.
+
+``` ts : <<create fragment for tag>>=
+function createFragmentForTag()
+{
+  let activeEditor = vscode.window.activeTextEditor;
+  if(activeEditor)
+  {
+```
+
+From the active editor we find the document. The editor also has the information
+about where our cursor currently is, under `active` property on `selection`.
+
+``` ts : <<create fragment for tag>>=+
+    const document = activeEditor.document;
+    const position = activeEditor.selection.active;
+```
+
+For the document and position we determined we can get the fragment at that
+location. We retrieve that from the repository so that we can get the range for
+the fragment use.
+
+``` ts : <<create fragment for tag>>=+
+    const fragmentLocation = theOneRepository.getFragmentTagLocation(
+      document,
+      document.lineAt(position),
+      position);
+```
+
+With the range of the fragment use in hand we can find the **Markdown** token
+where this range is contained for the document we're in.
+
+``` ts : <<create fragment for tag>>=+
+    const tokenUsage = theOneRepository.getTokenAtPosition(
+      document,
+      fragmentLocation.range);
+```
+
+The token needs to be valid to be able to use it for determining the insert. The
+`map` property on `Token` will tell us the begin and end lines. We want to add
+our new fragment definition after this token. We'll access the `map` when we are
+ready to do an `insert` on the `WorkspaceEdit`.
+
+We initialize a temporary language id to `LANGID`.
+
+``` ts : <<create fragment for tag>>=+
+    if(tokenUsage.token && tokenUsage.token.map)
+    {
+      let workspaceEdit = new vscode.WorkspaceEdit();
+      let langId : string = 'LANGID';
+```
+
+If we have a `fence` `Token` we try matching the `info` property of the token
+with `FRAGMENT_RE`. This gives us the language id used for that fence. We'll be
+using the same language id for the new code fragment.
+
+``` ts : <<create fragment for tag>>=+
+      if(tokenUsage.token.type === 'fence' && tokenUsage.token.map)
+      {
+        let match = tokenUsage.token.info.match(FRAGMENT_RE);
+        if(match && match.groups) {
+          langId = match.groups.lang;
+        }
+      }
+```
+
+We can now create the new fragment string with the language id and the fragment
+tag name we want to create the fragment for.
+
+Newlines at the begin and end of the string ensure the fragment won't be created
+without the necessary empty lines.
+
+``` ts : <<create fragment for tag>>=+
+      let newFragment = `\n${FENCE} ${langId} : ${OPENING}${fragmentLocation.name}${CLOSING}=\n${FENCE}\n`;
+```
+
+Now that we have the new fragment text ready we can call `insert` on our
+workspace edit. The position is created with the second element of the
+`token.map` as the line number, and 0 to have the insert happen at the beginning
+of the line.
+
+Finally we apply the workspace edit to our workspace. This will give us the new
+fragment right after the paragraph or code fence with the fragment name we found
+at the position we ran the command at.
+
+``` ts : <<create fragment for tag>>=+
+      workspaceEdit.insert(
+        document.uri,
+        new vscode.Position(tokenUsage.token.map[1], 0),
+        newFragment
+        );
+      vscode.workspace.applyEdit(workspaceEdit);
+    }
+  }
+}
+```
+
 ## Diagnostics
 
 In this chapter are a few methods that help creating and updating diagnostics.
@@ -1415,6 +1640,9 @@ best tackle it, so for now it is here.
 
 ``` ts : <<literate.*>>=+
 let oldFence : Renderer.RenderRule | undefined;
+const FENCE = '```';
+const OPENING = '<<';
+const CLOSING = '>>';
 ```
 
 With that out of the way we introduce the interfaces we use in the Literate
@@ -1506,6 +1734,7 @@ Code.
 ``` ts : <<literate.*>>=+
 <<diagnostic updating>>
 <<utility functions>>
+<<create fragment for tag>>
 ```
 
 ``` ts : <<literate.*>>=+
@@ -1552,6 +1781,7 @@ interface WriteSourceCallback {
 
 <<grabbed state type>>
 <<fragment information type>>
+<<token usage interface>>
 ```
 
 ### Extension activation
@@ -1590,6 +1820,7 @@ language ID to register agains.
 
 ``` ts : <<activate the extension>>=+
   <<register literate.process>>
+  <<register literate.create_fragment_for_tag>>
   <<register fragment tree view>>
   <<register completion item provider>>
 

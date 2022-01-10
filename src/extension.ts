@@ -17,6 +17,9 @@ const hljs = require('highlight.js');
 
 import { grabberPlugin } from './grabber';
 let oldFence : Renderer.RenderRule | undefined;
+const FENCE = '```';
+const OPENING = '<<';
+const CLOSING = '>>';
 interface WriteRenderCallback {
   (
     fname : string,
@@ -36,6 +39,13 @@ interface GrabbedState {
   literateUri: vscode.Uri;
   gstate: StateCore;
 }
+
+const emptyState : GrabbedState =
+{
+  literateFileName : '',
+  literateUri : vscode.Uri.file('not_valid_for_literate'),
+  gstate: new StateCore('', createMarkdownItParserForLiterate(), '')
+};
 /**
  * Interface denoting a fragment and related information
  */
@@ -66,11 +76,24 @@ interface FragmentInformation {
    */
   env: GrabbedState;
 }
+interface TokenUsage
+{
+  previous : Token | undefined,
+  token : Token | undefined,
+  next : Token | undefined
+}
+
+const emptyToken : TokenUsage =
+{
+  previous : undefined,
+  token : undefined,
+  next : undefined
+};
 
 //let HTML_ENCODED_FRAGMENT_TAG_RE = /(&lt;&lt.*?&gt;&gt;)/g;
-let FRAGMENT_USE_IN_CODE_RE =
+const FRAGMENT_USE_IN_CODE_RE =
   /(?<indent>[ \t]*)<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?/g;
-let FRAGMENT_RE =
+const FRAGMENT_RE =
   /(?<lang>.*):.*<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*)/;
 
 class FragmentNode extends vscode.TreeItem
@@ -575,7 +598,7 @@ export class FragmentLocation
   )
   {
     this.valid = uri.fsPath.indexOf('not_valid_for_literate')===-1;
-    if(name.startsWith('<<')) {
+    if(name.startsWith(OPENING)) {
       this.rangeExclusive = new vscode.Range(
         range.start.line, range.start.character + 2,
         range.end.line, range.end.character - 2
@@ -733,7 +756,7 @@ export class FragmentRepository {
   this.fragmentsForWorkspaceFolders.forEach(
     (value, key, _) =>
     {
-      if(key===workspaceFolder.name)
+      if(key === workspaceFolder.name)
       {
         fragmentMap = value;
         }
@@ -756,8 +779,6 @@ export class FragmentRepository {
       if(!match || !match.groups) {
         continue;
       }
-      const OPENING = '<<';
-      const CLOSING = '>>';
       const tagName = `${OPENING}${match.groups.tagName}${CLOSING}`;
       const foundIndex = currentLine.text.indexOf(tagName);
       if(foundIndex>-1) {
@@ -777,6 +798,70 @@ export class FragmentRepository {
     }
   
     return unsetFragmentLocation;
+  }
+  getTokenAtPosition(
+    document : vscode.TextDocument,
+    range : vscode.Range
+  ) : TokenUsage
+  {
+    const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
+    if(!workspaceFolder)
+    {
+      return emptyToken;
+    }
+    const state = this.getDocumentState(document);
+    let tokenIndex = 0;
+    for(const token of state.gstate.tokens)
+    {
+      if(token.map) {
+        const tokenRange = new vscode.Range(token.map[0], 0, token.map[1], 1024);
+        if(tokenRange.contains(range))
+        {
+          let tokenUsage : TokenUsage = {
+            previous : undefined,
+            token : token,
+            next : undefined
+          };
+          return tokenUsage;
+        }
+      }
+      tokenIndex++;
+    }
+  
+    return emptyToken;
+  }
+  getWorkspaceState(workspaceFolder : vscode.WorkspaceFolder) : GrabbedStateList
+  {
+    let grabbedState : GrabbedStateList = new GrabbedStateList();
+    this.grabbedStateForWorkspaceFolders.forEach(
+      (value, key, _) =>
+      {
+        if(key === workspaceFolder.name)
+        {
+          grabbedState = value;
+          }
+        }
+      );
+  
+    return grabbedState;
+  }
+  getDocumentState(document: vscode.TextDocument) : GrabbedState
+  {
+    let grabbedState : GrabbedState = emptyState;
+    const ws = determineWorkspaceFolder(document);
+    if(ws) {
+      const workspaceState = this.getWorkspaceState(ws);
+      for(const state of workspaceState.list)
+      {
+        if(document.uri.path === state.literateUri.path)
+        {
+          grabbedState = state;
+          console.log(state);
+        }
+      }
+    }
+  
+    return grabbedState;
   }
 
   dispose() {
@@ -880,6 +965,14 @@ export async function activate(context: vscode.ExtensionContext) {
   });
   
   context.subscriptions.push(literateProcessDisposable);
+  let literateCreateFragmentForTagDisposable = vscode.commands.registerCommand(
+    'literate.create_fragment_for_tag',
+    async function () {
+      createFragmentForTag();
+    }
+  );
+  
+  context.subscriptions.push(literateCreateFragmentForTagDisposable);
   new FragmentExplorer(context);
   const completionItemProvider =
     vscode.languages.registerCompletionItemProvider('markdown', {
@@ -1055,5 +1148,40 @@ async function getFileContent(
   const content = currentContent ? null : await vscode.workspace.fs.readFile(file);
   const text = currentContent ? currentContent : new TextDecoder('utf-8').decode(content);
   return text;
+}
+function createFragmentForTag()
+{
+  let activeEditor = vscode.window.activeTextEditor;
+  if(activeEditor)
+  {
+    const document = activeEditor.document;
+    const position = activeEditor.selection.active;
+    const fragmentLocation = theOneRepository.getFragmentTagLocation(
+      document,
+      document.lineAt(position),
+      position);
+    const tokenUsage = theOneRepository.getTokenAtPosition(
+      document,
+      fragmentLocation.range);
+    if(tokenUsage.token && tokenUsage.token.map)
+    {
+      let workspaceEdit = new vscode.WorkspaceEdit();
+      let langId : string = 'LANGID';
+      if(tokenUsage.token.type === 'fence' && tokenUsage.token.map)
+      {
+        let match = tokenUsage.token.info.match(FRAGMENT_RE);
+        if(match && match.groups) {
+          langId = match.groups.lang;
+        }
+      }
+      let newFragment = `\n${FENCE} ${langId} : ${OPENING}${fragmentLocation.name}${CLOSING}=\n${FENCE}\n`;
+      workspaceEdit.insert(
+        document.uri,
+        new vscode.Position(tokenUsage.token.map[1], 0),
+        newFragment
+        );
+      vscode.workspace.applyEdit(workspaceEdit);
+    }
+  }
 }
 export function deactivate() {}
