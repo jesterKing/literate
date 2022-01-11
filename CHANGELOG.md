@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.7.0
+
+* Add `literate.split_fragment` command. Splits the fragment the cursor
+  currently is in on the next line. Resolves #17.
+* Add browse capability for the literate fragment explorer.
+
 ## 0.6.1
 
 * Fix #16 - inadequate copy&paste resulted in double definitions not being
