@@ -101,7 +101,7 @@ class FragmentNode extends vscode.TreeItem
     public readonly folderName: string,
     public readonly parentName : string | undefined,
     public readonly workspaceFolder : vscode.WorkspaceFolder,
-    public readonly textDocument : vscode.TextDocument | undefined
+    public readonly fragmentInformation : FragmentInformation | undefined
   )
   {
     super(label, collapsibleState);
@@ -111,6 +111,27 @@ class FragmentNode extends vscode.TreeItem
               new vscode.ThemeIcon('code')
               : new vscode.ThemeIcon('book');
     this.contextValue = 'literate_fragment';
+    if(this.fragmentInformation
+      && this.fragmentInformation.tokens[0]
+      && this.fragmentInformation.tokens[0].map)
+    {
+      const range = new vscode.Range(
+        this.fragmentInformation.tokens[0].map[0], 0,
+        this.fragmentInformation.tokens[0].map[0], 0
+        );
+      this.command = {
+        command: 'vscode.open',
+        title: 'Browse to fragment',
+        tooltip: 'Browse to fragment',
+        arguments: [
+          this.fragmentInformation.env.literateUri,
+          {
+            selection: range,
+            preserveFocus: false
+          }
+        ]
+      };
+    }
   }
 }
 
@@ -195,7 +216,7 @@ export class FragmentNodeProvider implements vscode.TreeDataProvider<FragmentNod
                 folderName,
                 element.label,
                 element.workspaceFolder,
-                undefined));
+                fragmentInfo));
           }
         }
         else if (fragmentName === element.label) {
@@ -221,7 +242,7 @@ export class FragmentNodeProvider implements vscode.TreeDataProvider<FragmentNod
                   folderName,
                   element.label,
                   element.workspaceFolder,
-                  undefined
+                  fragmentInfo
                 )
               );
             }

@@ -288,7 +288,7 @@ element.</p>
         folderName,
         element.<span class="hljs-property">label</span>,
         element.<span class="hljs-property">workspaceFolder</span>,
-        <span class="hljs-literal">undefined</span>
+        fragmentInfo
       )
     );
   }
@@ -330,7 +330,7 @@ level fragment will generate only one source code file.</p>
       folderName,
       element.<span class="hljs-property">label</span>,
       element.<span class="hljs-property">workspaceFolder</span>,
-      <span class="hljs-literal">undefined</span>));
+      fragmentInfo));
 }
 </code></pre>
 
@@ -380,7 +380,7 @@ parsing can be done much more efficiently.</p>
 <pre><code><span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> <span class="hljs-attr">folderName</span>: <span class="hljs-built_in">string</span>,
 <span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> parentName : <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>,
 <span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span>,
-<span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> textDocument : vscode.<span class="hljs-property">TextDocument</span> | <span class="hljs-literal">undefined</span>
+<span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> fragmentInformation : <span class="hljs-title class_">FragmentInformation</span> | <span class="hljs-literal">undefined</span>
 </code></pre>
 
 </div>
@@ -397,6 +397,58 @@ get the theme icon for <code>'code'</code>.</p>
           <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">ThemeIcon</span>(<span class="hljs-string">&#x27;code&#x27;</span>)
           : <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">ThemeIcon</span>(<span class="hljs-string">&#x27;book&#x27;</span>);
 <span class="hljs-variable language_">this</span>.<span class="hljs-property">contextValue</span> = <span class="hljs-string">&#x27;literate_fragment&#x27;</span>;
+</code></pre>
+
+</div>
+</div><p>If we have a <code>fragmentInformation</code> and its first token has a valid map we can
+setup the <code>vscode.open</code> command with a <code>TextDocumentShowOptions</code> that allows us
+to browse to fragments by just clicking on them in the tree view.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;fragment node initialization&gt;&gt;=+</div>
+<div class="code">
+<pre><code><span class="hljs-keyword">if</span>(<span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentInformation</span>
+  &amp;&amp; <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentInformation</span>.<span class="hljs-property">tokens</span>[<span class="hljs-number">0</span>]
+  &amp;&amp; <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentInformation</span>.<span class="hljs-property">tokens</span>[<span class="hljs-number">0</span>].<span class="hljs-property">map</span>)
+{
+</code></pre>
+
+</div>
+</div><p>For the new location in the target document we'll use the first line of the
+fragment map. Setting the <code>start</code> as well as the <code>end</code> to the same will result
+in essentially just the cursor being placed at that location.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;fragment node initialization&gt;&gt;=+</div>
+<div class="code">
+<pre><code>  <span class="hljs-keyword">const</span> range = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(
+    <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentInformation</span>.<span class="hljs-property">tokens</span>[<span class="hljs-number">0</span>].<span class="hljs-property">map</span>[<span class="hljs-number">0</span>], <span class="hljs-number">0</span>,
+    <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentInformation</span>.<span class="hljs-property">tokens</span>[<span class="hljs-number">0</span>].<span class="hljs-property">map</span>[<span class="hljs-number">0</span>], <span class="hljs-number">0</span>
+    );
+</code></pre>
+
+</div>
+</div><p>Now set up the <code>vscode.open</code> command. We give it as parameters the uri of the
+document containing the fragment and the range we just set up. The uri is
+accessed through the <code>literateUri</code> in the <code>GrabbedState</code> assigned to the
+fragment information.</p>
+<p>The range is set to the <code>selection</code> property for the <code>TextDocumentShowOptions</code>,
+and <code>preserveFocus</code> is set to <code>false</code> to ensure the focus is moved to the text
+document we just browsed to.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;fragment node initialization&gt;&gt;=+</div>
+<div class="code">
+<pre><code>  <span class="hljs-variable language_">this</span>.<span class="hljs-property">command</span> = {
+    <span class="hljs-attr">command</span>: <span class="hljs-string">&#x27;vscode.open&#x27;</span>,
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;Browse to fragment&#x27;</span>,
+    <span class="hljs-attr">tooltip</span>: <span class="hljs-string">&#x27;Browse to fragment&#x27;</span>,
+    <span class="hljs-attr">arguments</span>: [
+      <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentInformation</span>.<span class="hljs-property">env</span>.<span class="hljs-property">literateUri</span>,
+      {
+        <span class="hljs-attr">selection</span>: range,
+        <span class="hljs-attr">preserveFocus</span>: <span class="hljs-literal">false</span>
+      }
+    ]
+  };
+}
 </code></pre>
 
 </div>

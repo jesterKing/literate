@@ -264,7 +264,7 @@ if (fragmentInfo) {
         folderName,
         element.label,
         element.workspaceFolder,
-        undefined
+        fragmentInfo
       )
     );
   }
@@ -305,7 +305,7 @@ if (fragmentInfo) {
       folderName,
       element.label,
       element.workspaceFolder,
-      undefined));
+      fragmentInfo));
 }
 ```
 
@@ -350,7 +350,7 @@ parsing can be done much more efficiently.
 public readonly folderName: string,
 public readonly parentName : string | undefined,
 public readonly workspaceFolder : vscode.WorkspaceFolder,
-public readonly textDocument : vscode.TextDocument | undefined
+public readonly fragmentInformation : FragmentInformation | undefined
 ```
 
 Each node in the tree view represents a fragment. When the tree item is used to
@@ -365,6 +365,53 @@ this.iconPath = this.parentName ?
           new vscode.ThemeIcon('code')
           : new vscode.ThemeIcon('book');
 this.contextValue = 'literate_fragment';
+```
+
+If we have a `fragmentInformation` and its first token has a valid map we can
+setup the `vscode.open` command with a `TextDocumentShowOptions` that allows us
+to browse to fragments by just clicking on them in the tree view.
+
+```ts : <<fragment node initialization>>=+
+if(this.fragmentInformation
+  && this.fragmentInformation.tokens[0]
+  && this.fragmentInformation.tokens[0].map)
+{
+```
+
+For the new location in the target document we'll use the first line of the
+fragment map. Setting the `start` as well as the `end` to the same will result
+in essentially just the cursor being placed at that location.
+
+``` ts  : <<fragment node initialization>>=+
+  const range = new vscode.Range(
+    this.fragmentInformation.tokens[0].map[0], 0,
+    this.fragmentInformation.tokens[0].map[0], 0
+    );
+```
+
+Now set up the `vscode.open` command. We give it as parameters the uri of the
+document containing the fragment and the range we just set up. The uri is
+accessed through the `literateUri` in the `GrabbedState` assigned to the
+fragment information.
+
+The range is set to the `selection` property for the `TextDocumentShowOptions`,
+and `preserveFocus` is set to `false` to ensure the focus is moved to the text
+document we just browsed to.
+
+```  ts   : <<fragment node initialization>>=+
+  this.command = {
+    command: 'vscode.open',
+    title: 'Browse to fragment',
+    tooltip: 'Browse to fragment',
+    arguments: [
+      this.fragmentInformation.env.literateUri,
+      {
+        selection: range,
+        preserveFocus: false
+      }
+    ]
+  };
+}
 ```
 
 ## registering FragmentNodeProvider
