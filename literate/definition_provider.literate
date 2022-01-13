@@ -1,0 +1,68 @@
+# Definition provider
+
+The definition provider will allow users to see and browse to the definition
+from where they are used.
+
+The definition provider is a class that implements `vscode.DefinitionProvider`.
+The provider method will return a `vscode.Location` when the definition is
+found.
+
+``` ts : <<definition provider class>>=
+export class LiterateDefinitionProvider implements vscode.DefinitionProvider
+{
+    <<definiton provider construction>>
+    <<definiton provider implementation>>
+}
+```
+
+The constructor for `LiterateDefinitionProvider` takes a `FragmentRepository` to
+access the tools necessary to find the correct fragment definition. We'll do
+this as a parameter property.
+
+```  ts  : <<definiton provider construction>>=
+constructor(
+    private readonly repository : FragmentRepository
+) {}
+```
+
+The provider method takes a text document and a position. The cancellation token
+is unused.
+
+```  ts  : <<definiton provider implementation>>=
+public provideDefinition
+    (
+        document : vscode.TextDocument,
+        position : vscode.Position,
+        _ : vscode.CancellationToken
+    )
+{
+    const fragmentLocation = this.repository.getFragmentTagLocation(
+        document,
+        document.lineAt(position),
+        position
+    );
+    if(fragmentLocation && fragmentLocation.fragment)
+    {
+        let map = fragmentLocation.fragment.tokens[0].map;
+        if(map) {
+            let definitionPosition = new vscode.Position(map[0], 0);
+            return new vscode.Location(
+                fragmentLocation.fragment.env.literateUri,
+                definitionPosition
+            );
+        }
+    }
+    return null;
+}
+```
+
+## Registering the definition provider
+
+``` ts : <<register definiton provider>>=
+context.subscriptions.push(
+    vscode.languages.registerDefinitionProvider(
+        'markdown',
+        new LiterateDefinitionProvider(theOneRepository)
+    )
+)
+```

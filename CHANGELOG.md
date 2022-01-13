@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.8.0
+
+* Add definition provider, which allows to quickly navigate to where the
+  definition of a fragment is
+
 ## 0.7.0
 
 * Add `literate.split_fragment` command. Splits the fragment the cursor

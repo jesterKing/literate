@@ -1,0 +1,83 @@
+<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="./style.css">
+  </head>
+  <body>
+  <h1>Definition provider</h1>
+<p>The definition provider will allow users to see and browse to the definition
+from where they are used.</p>
+<p>The definition provider is a class that implements <code>vscode.DefinitionProvider</code>.
+The provider method will return a <code>vscode.Location</code> when the definition is
+found.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;definition provider class&gt;&gt;=</div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">LiterateDefinitionProvider</span> <span class="hljs-keyword">implements</span> vscode.<span class="hljs-property">DefinitionProvider</span>
+{
+    &lt;&lt;definiton provider construction&gt;&gt;
+    &lt;&lt;definiton provider implementation&gt;&gt;
+}
+</code></pre>
+
+</div>
+</div><p>The constructor for <code>LiterateDefinitionProvider</code> takes a <code>FragmentRepository</code> to
+access the tools necessary to find the correct fragment definition. We'll do
+this as a parameter property.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;definiton provider construction&gt;&gt;=</div>
+<div class="code">
+<pre><code><span class="hljs-title function_">constructor</span>(<span class="hljs-params">
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">readonly</span> repository : FragmentRepository
+</span>) {}
+</code></pre>
+
+</div>
+</div><p>The provider method takes a text document and a position. The cancellation token
+is unused.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;definiton provider implementation&gt;&gt;=</div>
+<div class="code">
+<pre><code><span class="hljs-keyword">public</span> provideDefinition
+    (
+        <span class="hljs-variable language_">document</span> : vscode.<span class="hljs-property">TextDocument</span>,
+        position : vscode.<span class="hljs-property">Position</span>,
+        _ : vscode.<span class="hljs-property">CancellationToken</span>
+    )
+{
+    <span class="hljs-keyword">const</span> fragmentLocation = <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">getFragmentTagLocation</span>(
+        <span class="hljs-variable language_">document</span>,
+        <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">lineAt</span>(position),
+        position
+    );
+    <span class="hljs-keyword">if</span>(fragmentLocation &amp;&amp; fragmentLocation.<span class="hljs-property">fragment</span>)
+    {
+        <span class="hljs-keyword">let</span> map = fragmentLocation.<span class="hljs-property">fragment</span>.<span class="hljs-property">tokens</span>[<span class="hljs-number">0</span>].<span class="hljs-property">map</span>;
+        <span class="hljs-keyword">if</span>(map) {
+            <span class="hljs-keyword">let</span> definitionPosition = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Position</span>(map[<span class="hljs-number">0</span>], <span class="hljs-number">0</span>);
+            <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Location</span>(
+                fragmentLocation.<span class="hljs-property">fragment</span>.<span class="hljs-property">env</span>.<span class="hljs-property">literateUri</span>,
+                definitionPosition
+            );
+        }
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>;
+}
+</code></pre>
+
+</div>
+</div><h2>Registering the definition provider</h2>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;register definiton provider&gt;&gt;=</div>
+<div class="code">
+<pre><code>context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(
+    vscode.<span class="hljs-property">languages</span>.<span class="hljs-title function_">registerDefinitionProvider</span>(
+        <span class="hljs-string">&#x27;markdown&#x27;</span>,
+        <span class="hljs-keyword">new</span> <span class="hljs-title class_">LiterateDefinitionProvider</span>(theOneRepository)
+    )
+)
+</code></pre>
+
+</div>
+</div>
+  </body>
+</html>

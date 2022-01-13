@@ -360,10 +360,10 @@ function createMarkdownItParserForLiterate() : MarkdownIt
             }
             return '<pre title="' + attrs + '">' + md.utils.escapeHtml(str) + '</pre>';
           }
-      
+
         })
         .use(grabberPlugin);
-      
+
       oldFence = md.renderer.rules.fence;
       md.renderer.rules.fence = renderCodeFence;
   return md;
@@ -562,7 +562,7 @@ async function writeSourceFiles(workspaceFolder : vscode.WorkspaceFolder,
 }
 class FragmentMap {
   map : Map<string, FragmentInformation>;
-  
+
   constructor()
   {
     this.map = new Map<string, FragmentInformation>();
@@ -590,7 +590,7 @@ class GrabbedStateList {
   {
     this.list = new Array<GrabbedState>();
   }
-  
+
   dispose()
   {
     while(this.list.length>0)
@@ -707,7 +707,7 @@ export class FragmentRepository {
               {
                 return [ws];
               }
-            } 
+            }
             else
             {
               return [trigger];
@@ -970,6 +970,37 @@ export class LiterateCodeActionProvider implements vscode.CodeActionProvider
         return Promise.resolve(codeActions);
     }
 }
+export class LiterateDefinitionProvider implements vscode.DefinitionProvider
+{
+    constructor(
+        private readonly repository : FragmentRepository
+    ) {}
+    public provideDefinition
+        (
+            document : vscode.TextDocument,
+            position : vscode.Position,
+            _ : vscode.CancellationToken
+        )
+    {
+        const fragmentLocation = this.repository.getFragmentTagLocation(
+            document,
+            document.lineAt(position),
+            position
+        );
+        if(fragmentLocation && fragmentLocation.fragment)
+        {
+            let map = fragmentLocation.fragment.tokens[0].map;
+            if(map) {
+                let definitionPosition = new vscode.Position(map[0], 0);
+                return new vscode.Location(
+                    fragmentLocation.fragment.env.literateUri,
+                    definitionPosition
+                );
+            }
+        }
+        return null;
+    }
+}
 function determineWorkspaceFolder(document : vscode.TextDocument) : vscode.WorkspaceFolder | undefined
 {
   if(!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0)
@@ -1044,6 +1075,12 @@ export async function activate(context: vscode.ExtensionContext) {
       }
   }, '<');
   context.subscriptions.push(completionItemProvider);
+  context.subscriptions.push(
+      vscode.languages.registerDefinitionProvider(
+          'markdown',
+          new LiterateDefinitionProvider(theOneRepository)
+      )
+  )
 
   context.subscriptions.push(
     vscode.languages.registerHoverProvider('markdown', new FragmentHoverProvider(theOneRepository))
@@ -1250,7 +1287,7 @@ function splitFragment(position_? : vscode.Position)
         workspaceEdit.insert(
           document.uri,
           new vscode.Position(position.line+1, 0),
-          textToInsert 
+          textToInsert
           );
         vscode.workspace.applyEdit(workspaceEdit);
       }
