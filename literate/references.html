@@ -1,0 +1,82 @@
+<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="./style.css">
+  </head>
+  <body>
+  <h1>References to symbols</h1>
+<p>Navigating the <strong>literate</strong> program is made easier also by being able to see
+where fragments are used. We can give that capability by implementing
+<code>vscode.ReferenceProvider</code>.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;reference provider class&gt;&gt;=</div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">LiterateReferenceProvider</span> <span class="hljs-keyword">implements</span> vscode.<span class="hljs-property">ReferenceProvider</span>
+{
+    &lt;&lt;constructor <span class="hljs-keyword">for</span> reference provider&gt;&gt;
+    &lt;&lt;imlement reference provider&gt;&gt;
+}
+</code></pre>
+
+</div>
+</div><p>The reference provider gets constructed by passing a <code>FragmentRepository</code> to its
+constructor. This is defined as a parameter property.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;constructor for reference provider&gt;&gt;=</div>
+<div class="code">
+<pre><code><span class="hljs-title function_">constructor</span>(<span class="hljs-params">
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">readonly</span> repository : FragmentRepository
+</span>) {}
+</code></pre>
+
+</div>
+</div><p>The actual implementation of the provider takes a document, a position and an
+option whether to include the declaration in the list of references or not. The
+cancellation token remains unused for now.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;imlement reference provider&gt;&gt;=</div>
+<div class="code">
+<pre><code><span class="hljs-keyword">public</span> <span class="hljs-keyword">async</span> <span class="hljs-title function_">provideReferences</span>(<span class="hljs-params">
+    <span class="hljs-variable language_">document</span> : vscode.TextDocument,
+    position : vscode.Position,
+    __: { includeDeclaration : <span class="hljs-built_in">boolean</span>},
+    _ : vscode.CancellationToken
+</span>)
+{
+    <span class="hljs-keyword">const</span> fragmentLocation = <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">getFragmentTagLocation</span>(
+        <span class="hljs-variable language_">document</span>,
+        <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">lineAt</span>(position),
+        position
+    );
+
+    <span class="hljs-keyword">const</span> workspaceFolder = <span class="hljs-title function_">determineWorkspaceFolder</span>(<span class="hljs-variable language_">document</span>);
+
+    <span class="hljs-keyword">if</span>(workspaceFolder)
+    {
+        <span class="hljs-keyword">return</span> <span class="hljs-keyword">await</span> <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">getReferenceLocations</span>(
+            workspaceFolder,
+            fragmentLocation.<span class="hljs-property">name</span>
+        );
+    }
+
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>;
+
+}
+</code></pre>
+
+</div>
+</div><h2>Registering the reference provider</h2>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;register reference provider&gt;&gt;=</div>
+<div class="code">
+<pre><code>context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(
+    vscode.<span class="hljs-property">languages</span>.<span class="hljs-title function_">registerReferenceProvider</span>(
+        <span class="hljs-string">&#x27;markdown&#x27;</span>,
+        <span class="hljs-keyword">new</span> <span class="hljs-title class_">LiterateReferenceProvider</span>(theOneRepository)
+    )
+)
+</code></pre>
+
+</div>
+</div>
+  </body>
+</html>

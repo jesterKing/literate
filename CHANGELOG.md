@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.9.0
+
+* Add reference provider, which allows to see where fragments are mentioned or
+  used. This further improves the navigability of **literate** projects
+
 ## 0.8.0
 
 * Add definition provider, which allows to quickly navigate to where the

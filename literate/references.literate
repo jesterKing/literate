@@ -1,0 +1,66 @@
+# References to symbols
+
+Navigating the **literate** program is made easier also by being able to see
+where fragments are used. We can give that capability by implementing
+`vscode.ReferenceProvider`.
+
+``` ts : <<reference provider class>>=
+export class LiterateReferenceProvider implements vscode.ReferenceProvider
+{
+    <<constructor for reference provider>>
+    <<imlement reference provider>>
+}
+```
+
+The reference provider gets constructed by passing a `FragmentRepository` to its
+constructor. This is defined as a parameter property.
+
+```  ts  : <<constructor for reference provider>>=
+constructor(
+    private readonly repository : FragmentRepository
+) {}
+```
+
+The actual implementation of the provider takes a document, a position and an
+option whether to include the declaration in the list of references or not. The
+cancellation token remains unused for now.
+
+```  ts  : <<imlement reference provider>>=
+public async provideReferences(
+    document : vscode.TextDocument,
+    position : vscode.Position,
+    __: { includeDeclaration : boolean},
+    _ : vscode.CancellationToken
+)
+{
+    const fragmentLocation = this.repository.getFragmentTagLocation(
+        document,
+        document.lineAt(position),
+        position
+    );
+
+    const workspaceFolder = determineWorkspaceFolder(document);
+
+    if(workspaceFolder)
+    {
+        return await this.repository.getReferenceLocations(
+            workspaceFolder,
+            fragmentLocation.name
+        );
+    }
+
+    return null;
+
+}
+```
+
+## Registering the reference provider
+
+``` ts : <<register reference provider>>=
+context.subscriptions.push(
+    vscode.languages.registerReferenceProvider(
+        'markdown',
+        new LiterateReferenceProvider(theOneRepository)
+    )
+)
+```

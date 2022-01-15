@@ -132,6 +132,7 @@ before defining the repository class.</p>
   &lt;&lt;method to get token at position&gt;&gt;
   &lt;&lt;method to get state <span class="hljs-keyword">for</span> workspace&gt;&gt;
   &lt;&lt;method to get state <span class="hljs-keyword">for</span> <span class="hljs-variable language_">document</span>&gt;&gt;
+  &lt;&lt;method to get all reference locations&gt;&gt;
 
   <span class="hljs-title function_">dispose</span>(<span class="hljs-params"></span>) {
     <span class="hljs-keyword">for</span>(<span class="hljs-keyword">let</span> fragmentMap <span class="hljs-keyword">of</span> <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentsForWorkspaceFolders</span>.<span class="hljs-title function_">values</span>())
@@ -736,6 +737,130 @@ TBD: we can probably get rid of this interface and just use a <code>Token</code>
   }
 
   <span class="hljs-keyword">return</span> grabbedState;
+}
+</code></pre>
+
+</div>
+</div><h4>Get all reference locations</h4>
+<p>Finding all references for a fragment, that is fragment usage or fragment
+mention in a <strong>literate</strong> project will go over all tokens of a workspace. For
+each reference a <code>vscode.Location</code> is returned.</p>
+<p>The <code>getReferenceLocations</code> method takes a workspace folder and a fragment name,
+and will return an array of <code>vscode.Location</code>.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;method to get all reference locations&gt;&gt;=</div>
+<div class="code">
+<pre><code><span class="hljs-title function_">getReferenceLocations</span>(
+  workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span>,
+  fragmentName : <span class="hljs-built_in">string</span>
+) : vscode.<span class="hljs-property">Location</span>[]
+{
+</code></pre>
+
+</div>
+</div><p>We start with an empty list of locations, which we will fill for each reference
+hit we determine in the given <strong>literate</strong> project. For the workspace folder we
+get the latest grabbed state.</p>
+<p>We then will proceed to iterate through all grabbed states. Remember that each
+grabbed state corresponds to a <strong>literate</strong> document. From that grabbed state we
+will iterate over each token, and we'll be interested only in the tokens that
+have a valid <code>map</code> property.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;method to get all reference locations&gt;&gt;=+</div>
+<div class="code">
+<pre><code>  <span class="hljs-keyword">const</span> fragmentTag = <span class="hljs-variable constant_">OPENING</span>+fragmentName+<span class="hljs-variable constant_">CLOSING</span>;
+  <span class="hljs-keyword">let</span> locations = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;vscode.<span class="hljs-property">Location</span>&gt;();
+  <span class="hljs-keyword">let</span> grabbedStateList = <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">getWorkspaceState</span>(workspaceFolder).<span class="hljs-property">list</span>;
+
+  <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> grabbedState <span class="hljs-keyword">of</span> grabbedStateList)
+  {
+    <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> grabbedState.<span class="hljs-property">gstate</span>.<span class="hljs-property">tokens</span>)
+    {
+      <span class="hljs-keyword">if</span>(token.<span class="hljs-property">map</span>)
+      {
+</code></pre>
+
+</div>
+</div><p>When we have a token that could contain a reference we'll see if there is any
+occurrence of the fragment tag, otherwise the content has no reference.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;method to get all reference locations&gt;&gt;=+</div>
+<div class="code">
+<pre><code>        <span class="hljs-keyword">if</span>(token.<span class="hljs-property">content</span>.<span class="hljs-title function_">indexOf</span>(fragmentTag) &gt; -<span class="hljs-number">1</span>)
+        {
+</code></pre>
+
+</div>
+</div><p>With a hit in the entire content of the token we need to figure out each
+reference, which we do by splitting the token content into lines if there are
+any new line characters, then for each line look at each hit.</p>
+<p>If our token is a <code>fence</code> we initialize <code>idx</code> to 1, otherwise to 0.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;method to get all reference locations&gt;&gt;=+</div>
+<div class="code">
+<pre><code>          <span class="hljs-keyword">const</span> lines = token.<span class="hljs-property">content</span>.<span class="hljs-title function_">split</span>(<span class="hljs-string">&quot;\n&quot;</span>);
+          <span class="hljs-keyword">let</span> idx = token.<span class="hljs-property">type</span> == <span class="hljs-string">&#x27;fence&#x27;</span> ? <span class="hljs-number">1</span> : <span class="hljs-number">0</span>;
+          <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> line <span class="hljs-keyword">of</span> lines) {
+            <span class="hljs-keyword">let</span> offset = line.<span class="hljs-title function_">indexOf</span>(fragmentTag);
+            <span class="hljs-keyword">while</span>(offset&gt;-<span class="hljs-number">1</span>) {
+</code></pre>
+
+</div>
+</div><p>When offset is larger than -1 we know we have a hit, so we can create a new
+range using the <code>token.map[0]</code> and the <code>idx</code>. The range will include the entire
+fragment tag, with the opening and closing double chevrons.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;method to get all reference locations&gt;&gt;=+</div>
+<div class="code">
+<pre><code>              <span class="hljs-keyword">let</span> range = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(
+                token.<span class="hljs-property">map</span>[<span class="hljs-number">0</span>] + idx,
+                offset,
+                token.<span class="hljs-property">map</span>[<span class="hljs-number">0</span>] + idx,
+                offset + fragmentTag.<span class="hljs-property">length</span>
+              );
+</code></pre>
+
+</div>
+</div><p>The location then is created with the uri of the <strong>literate</strong> file that contains
+this token, and the rnge we just set up.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;method to get all reference locations&gt;&gt;=+</div>
+<div class="code">
+<pre><code>              <span class="hljs-keyword">let</span> location = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Location</span>(grabbedState.<span class="hljs-property">literateUri</span>, range);
+              locations.<span class="hljs-title function_">push</span>(location);
+</code></pre>
+
+</div>
+</div><p>We chech for the next occurrance of the fragment tag by looking enough
+characters past the current offset. That way we'll ensure we get to all the
+references if there are multiple on one line.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;method to get all reference locations&gt;&gt;=+</div>
+<div class="code">
+<pre><code>              offset = line.<span class="hljs-title function_">indexOf</span>(fragmentTag, offset + <span class="hljs-number">5</span>);
+            }
+</code></pre>
+
+</div>
+</div><p>Update <code>idx</code> for each pass while going through the lines array.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;method to get all reference locations&gt;&gt;=+</div>
+<div class="code">
+<pre><code>            idx++;
+          }
+        }
+      }
+    }
+  }
+</code></pre>
+
+</div>
+</div><p>Return the <code>locations</code> array. If there were hits the <code>locations</code> array will have
+entries, if there were no hits the array will be empty.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;method to get all reference locations&gt;&gt;=+</div>
+<div class="code">
+<pre><code>  <span class="hljs-keyword">return</span> locations;
 }
 </code></pre>
 
@@ -1905,6 +2030,7 @@ source file or source files as written in the <strong>literate</strong> program.
 &lt;&lt;rename provider <span class="hljs-keyword">class</span>&gt;&gt;
 &lt;&lt;code action provider <span class="hljs-keyword">class</span>&gt;&gt;
 &lt;&lt;definition provider <span class="hljs-keyword">class</span>&gt;&gt;
+&lt;&lt;reference provider <span class="hljs-keyword">class</span>&gt;&gt;
 </code></pre>
 
 </div>
@@ -2049,6 +2175,7 @@ language ID to register agains.</p>
   &lt;&lt;register fragment tree view&gt;&gt;
   &lt;&lt;register completion item provider&gt;&gt;
   &lt;&lt;register definiton provider&gt;&gt;
+  &lt;&lt;register reference provider&gt;&gt;
 
   context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(
     vscode.<span class="hljs-property">languages</span>.<span class="hljs-title function_">registerHoverProvider</span>(<span class="hljs-string">&#x27;markdown&#x27;</span>, <span class="hljs-keyword">new</span> <span class="hljs-title class_">FragmentHoverProvider</span>(theOneRepository))

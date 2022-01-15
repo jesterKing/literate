@@ -137,6 +137,7 @@ export class FragmentRepository {
   <<method to get token at position>>
   <<method to get state for workspace>>
   <<method to get state for document>>
+  <<method to get all reference locations>>
 
   dispose() {
     for(let fragmentMap of this.fragmentsForWorkspaceFolders.values())
@@ -693,6 +694,116 @@ getDocumentState(document: vscode.TextDocument) : GrabbedState
   }
 
   return grabbedState;
+}
+```
+
+#### Get all reference locations
+
+Finding all references for a fragment, that is fragment usage or fragment
+mention in a **literate** project will go over all tokens of a workspace. For
+each reference a `vscode.Location` is returned.
+
+The `getReferenceLocations` method takes a workspace folder and a fragment name,
+and will return an array of `vscode.Location`.
+
+``` ts : <<method to get all reference locations>>=
+getReferenceLocations(
+  workspaceFolder : vscode.WorkspaceFolder,
+  fragmentName : string
+) : vscode.Location[]
+{
+```
+
+We start with an empty list of locations, which we will fill for each reference
+hit we determine in the given **literate** project. For the workspace folder we
+get the latest grabbed state.
+
+We then will proceed to iterate through all grabbed states. Remember that each
+grabbed state corresponds to a **literate** document. From that grabbed state we
+will iterate over each token, and we'll be interested only in the tokens that
+have a valid `map` property.
+
+``` ts : <<method to get all reference locations>>=+
+  const fragmentTag = OPENING+fragmentName+CLOSING;
+  let locations = new Array<vscode.Location>();
+  let grabbedStateList = this.getWorkspaceState(workspaceFolder).list;
+
+  for(const grabbedState of grabbedStateList)
+  {
+    for(const token of grabbedState.gstate.tokens)
+    {
+      if(token.map)
+      {
+```
+
+When we have a token that could contain a reference we'll see if there is any
+occurrence of the fragment tag, otherwise the content has no reference.
+
+``` ts : <<method to get all reference locations>>=+
+        if(token.content.indexOf(fragmentTag) > -1)
+        {
+```
+
+With a hit in the entire content of the token we need to figure out each
+reference, which we do by splitting the token content into lines if there are
+any new line characters, then for each line look at each hit.
+
+If our token is a `fence` we initialize `idx` to 1, otherwise to 0.
+
+``` ts : <<method to get all reference locations>>=+
+          const lines = token.content.split("\n");
+          let idx = token.type == 'fence' ? 1 : 0;
+          for(const line of lines) {
+            let offset = line.indexOf(fragmentTag);
+            while(offset>-1) {
+```
+
+When offset is larger than -1 we know we have a hit, so we can create a new
+range using the `token.map[0]` and the `idx`. The range will include the entire
+fragment tag, with the opening and closing double chevrons.
+
+``` ts : <<method to get all reference locations>>=+
+              let range = new vscode.Range(
+                token.map[0] + idx,
+                offset,
+                token.map[0] + idx,
+                offset + fragmentTag.length
+              );
+```
+
+The location then is created with the uri of the **literate** file that contains
+this token, and the rnge we just set up.
+
+``` ts : <<method to get all reference locations>>=+
+              let location = new vscode.Location(grabbedState.literateUri, range);
+              locations.push(location);
+```
+
+We chech for the next occurrance of the fragment tag by looking enough
+characters past the current offset. That way we'll ensure we get to all the
+references if there are multiple on one line.
+
+``` ts : <<method to get all reference locations>>=+
+              offset = line.indexOf(fragmentTag, offset + 5);
+            }
+```
+
+Update `idx` for each pass while going through the lines array.
+
+``` ts : <<method to get all reference locations>>=+
+            idx++;
+          }
+        }
+      }
+    }
+  }
+```
+
+Return the `locations` array. If there were hits the `locations` array will have
+entries, if there were no hits the array will be empty.
+
+``` ts : <<method to get all reference locations>>=+
+  return locations;
 }
 ```
 
@@ -1812,6 +1923,7 @@ source file or source files as written in the **literate** program.
 <<rename provider class>>
 <<code action provider class>>
 <<definition provider class>>
+<<reference provider class>>
 ```
 
 Utility function to determine the workspace folder for a TextDocument
@@ -1939,6 +2051,7 @@ language ID to register agains.
   <<register fragment tree view>>
   <<register completion item provider>>
   <<register definiton provider>>
+  <<register reference provider>>
 
   context.subscriptions.push(
     vscode.languages.registerHoverProvider('markdown', new FragmentHoverProvider(theOneRepository))

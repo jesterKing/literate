@@ -873,6 +873,46 @@ export class FragmentRepository {
   
     return grabbedState;
   }
+  getReferenceLocations(
+    workspaceFolder : vscode.WorkspaceFolder,
+    fragmentName : string
+  ) : vscode.Location[]
+  {
+    const fragmentTag = OPENING+fragmentName+CLOSING;
+    let locations = new Array<vscode.Location>();
+    let grabbedStateList = this.getWorkspaceState(workspaceFolder).list;
+  
+    for(const grabbedState of grabbedStateList)
+    {
+      for(const token of grabbedState.gstate.tokens)
+      {
+        if(token.map)
+        {
+          if(token.content.indexOf(fragmentTag) > -1)
+          {
+            const lines = token.content.split("\n");
+            let idx = token.type == 'fence' ? 1 : 0;
+            for(const line of lines) {
+              let offset = line.indexOf(fragmentTag);
+              while(offset>-1) {
+                let range = new vscode.Range(
+                  token.map[0] + idx,
+                  offset,
+                  token.map[0] + idx,
+                  offset + fragmentTag.length
+                );
+                let location = new vscode.Location(grabbedState.literateUri, range);
+                locations.push(location);
+                offset = line.indexOf(fragmentTag, offset + 5);
+              }
+              idx++;
+            }
+          }
+        }
+      }
+    }
+    return locations;
+  }
 
   dispose() {
     for(let fragmentMap of this.fragmentsForWorkspaceFolders.values())
@@ -1001,6 +1041,38 @@ export class LiterateDefinitionProvider implements vscode.DefinitionProvider
         return null;
     }
 }
+export class LiterateReferenceProvider implements vscode.ReferenceProvider
+{
+    constructor(
+        private readonly repository : FragmentRepository
+    ) {}
+    public async provideReferences(
+        document : vscode.TextDocument,
+        position : vscode.Position,
+        __: { includeDeclaration : boolean},
+        _ : vscode.CancellationToken
+    )
+    {
+        const fragmentLocation = this.repository.getFragmentTagLocation(
+            document,
+            document.lineAt(position),
+            position
+        );
+    
+        const workspaceFolder = determineWorkspaceFolder(document);
+    
+        if(workspaceFolder)
+        {
+            return await this.repository.getReferenceLocations(
+                workspaceFolder,
+                fragmentLocation.name
+            );
+        }
+    
+        return null;
+    
+    }
+}
 function determineWorkspaceFolder(document : vscode.TextDocument) : vscode.WorkspaceFolder | undefined
 {
   if(!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0)
@@ -1079,6 +1151,12 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.languages.registerDefinitionProvider(
           'markdown',
           new LiterateDefinitionProvider(theOneRepository)
+      )
+  )
+  context.subscriptions.push(
+      vscode.languages.registerReferenceProvider(
+          'markdown',
+          new LiterateReferenceProvider(theOneRepository)
       )
   )
 
