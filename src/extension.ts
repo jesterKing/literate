@@ -1267,9 +1267,55 @@ async function getLiterateFileUris(
 {
   const literateFilesInWorkspace : vscode.RelativePattern =
         new vscode.RelativePattern(workspaceFolder, '**/*.literate');
-  const foundLiterateFiles = await vscode.workspace
+  const _foundLiterateFiles = await vscode.workspace
         .findFiles(literateFilesInWorkspace)
         .then(files => Promise.all(files.map(file => file)));
+  let foundLiterateFiles = new Array<vscode.Uri>();
+  const index = _foundLiterateFiles.find(uri => uri.path.endsWith('index.literate'));
+  if(!index)
+  {
+    return _foundLiterateFiles;
+  }
+  const md = createMarkdownItParserForLiterate();
+  const text = await getFileContent(index);
+  const env: GrabbedState = { literateFileName: 'index.literate', literateUri: index, gstate: new StateCore('', md, {}) };
+  const _ = md.render(text, env);
+  let links = new Array<string>();
+  let bulletListOpen = false;
+  let idx = 0;
+  for(let token of env.gstate.tokens)
+  {
+    if(token.type==='bullet_list_open')
+    {
+      bulletListOpen = true;
+    }
+    if(token.type==='bullet_list_close')
+    {
+      bulletListOpen = false;
+    }
+    if(bulletListOpen && token.type=='list_item_open')
+    {
+      let inline = env.gstate.tokens[idx+2];
+      if(inline.children && inline.children[0].attrs)
+      {
+        try {
+          const currentUri = inline.children[0].attrs[0][1];
+          let path = currentUri.replace("html", "literate");
+          const foundUri = _foundLiterateFiles.find(uri => uri.path.endsWith(path));
+          if(foundUri)
+          {
+            foundLiterateFiles.push(foundUri);
+          }
+        } catch(_) {}
+      }
+    }
+    idx++;
+  }
+  const finalCheck = foundLiterateFiles.find(uri => uri.path.endsWith('index.literate'));
+  if(!finalCheck)
+  {
+    foundLiterateFiles.splice(0, 0, index);
+  }
   return foundLiterateFiles;
 }
 function writeOutHtml

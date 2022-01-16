@@ -1754,7 +1754,12 @@ function fragmentUsageRange(token : Token, tagName : string) : vscode.Range
 
 ## Utility functions
 
-Function to get all literate files in a given workspace.
+### Retrieving literate file uri list
+
+Function to get all literate files in a given workspace. We need to ensure that
+we give the uris in the correct order. The order will be defined by an
+`index.literate` if it exists. Otherwise use the order in which they are found
+by `findFiles`.
 
 ``` ts : <<utility functions>>=
 async function getLiterateFileUris(
@@ -1763,12 +1768,94 @@ async function getLiterateFileUris(
 {
   const literateFilesInWorkspace : vscode.RelativePattern =
         new vscode.RelativePattern(workspaceFolder, '**/*.literate');
-  const foundLiterateFiles = await vscode.workspace
+  const _foundLiterateFiles = await vscode.workspace
         .findFiles(literateFilesInWorkspace)
         .then(files => Promise.all(files.map(file => file)));
+  let foundLiterateFiles = new Array<vscode.Uri>();
+  <<see if an index.literate exists>>
+  <<search index for html links>>
+  <<sort uris based on html link order>>
   return foundLiterateFiles;
 }
 ```
+
+TBD: create instead a markup that allows us to express the literate file order
+in whichever file we want.
+
+```  ts  : <<see if an index.literate exists>>=
+const index = _foundLiterateFiles.find(uri => uri.path.endsWith('index.literate'));
+if(!index)
+{
+  return _foundLiterateFiles;
+}
+```
+
+We now parse the index file to get the state with markdown tokens. We don't need
+the rendered HTML of the index document, so we discard that.
+
+```  ts  : <<search index for html links>>=
+const md = createMarkdownItParserForLiterate();
+const text = await getFileContent(index);
+const env: GrabbedState = { literateFileName: 'index.literate', literateUri: index, gstate: new StateCore('', md, {}) };
+const _ = md.render(text, env);
+```
+
+We create a new list of strings to which we will add the file uris in the order
+is found in the parsed tokens. We do that by looking for `bullet_open_list` and
+`bullet_close_list`. We assume that inside these lists there will be items that
+contain links. Once we've encountered an `bullet_open_item` we start looking for
+`list_item_open`. When the token is found we get the inline token that is two
+tokens away from the `list_item_open` token. We make sure that it has child
+tokens, and that the first child token has a valid `attrs` property. Here we
+find the uri to the HTML version of a **literate** file.
+
+TBD add support for ordered list.
+
+```  ts  : <<sort uris based on html link order>>=
+let links = new Array<string>();
+let bulletListOpen = false;
+let idx = 0;
+for(let token of env.gstate.tokens)
+{
+  if(token.type==='bullet_list_open')
+  {
+    bulletListOpen = true;
+  }
+  if(token.type==='bullet_list_close')
+  {
+    bulletListOpen = false;
+  }
+  if(bulletListOpen && token.type=='list_item_open')
+  {
+    let inline = env.gstate.tokens[idx+2];
+    if(inline.children && inline.children[0].attrs)
+    {
+      try {
+        const currentUri = inline.children[0].attrs[0][1];
+        let path = currentUri.replace("html", "literate");
+        const foundUri = _foundLiterateFiles.find(uri => uri.path.endsWith(path));
+        if(foundUri)
+        {
+          foundLiterateFiles.push(foundUri);
+        }
+      } catch(_) {}
+    }
+  }
+  idx++;
+}
+```
+
+Finally ensure that the index file also exists in the list to return.
+
+```   ts   : <<sort uris based on html link order>>=+
+const finalCheck = foundLiterateFiles.find(uri => uri.path.endsWith('index.literate'));
+if(!finalCheck)
+{
+  foundLiterateFiles.splice(0, 0, index);
+}
+```
+
+### Write out HTML
 
 Function to write out the given `rendered` content out to a file. The `rendered`
 string will be set into a HTML body. The header will be configured so that the
@@ -1795,6 +1882,8 @@ function writeOutHtml
   return Promise.resolve(vscode.workspace.fs.writeFile(fileUri, encoded));
 };
 ```
+
+### Get file content for uri
 
 For each **literate** file in the workspace we'll get eventually the text
 content, but we do have to check if any of the files are opened in an editor.
