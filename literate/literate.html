@@ -12,31 +12,57 @@ human-readable document.</p>
 <a href="https://pbr-book.org">PBR Book</a>.</p>
 <p>This extension provides a set of tools that help the programmer writing literate
 programs. Through automation the process of writing literate programs should be
-as painless as possible. The programming writes his literate programs using
+as painless as possible. The programmer writes his literate programs using
 Markdown. When a literate programmer needs a snippet they can add a code fence.
 In this extension snippets are called code fragments.</p>
 <p>The approach for this extension is based on Markdown documents, as noted
 earlier. The Markdown specification is only slightly adapted to make supporting
 <strong>literate programming</strong> easy. The code fragments are expressed in code fences
-as per the Markdown specification, either with surrounding tripple backticks or
-tripple tildes. Along with the programming language identifier the opening line
-has been extended to contain the fragment name and type as essentially options
-to the code fence. This opening line thus will look like
+as per the Markdown specification, either with surrounding triple backticks or
+triple tildes. Along with the programming language identifier the opening line
+has been extended to contain the fragment name and type essentially as options
+to the code fence. The opening line thus will look like
 <code>py : &lt;&lt;fragment name&gt;&gt;</code> to create a new fragment, or like
 <code>py : &lt;&lt;fragment name&gt;&gt;=+</code> to amend an existing fragment.</p>
+<h2>Forward referencing code fragments</h2>
+<p>Sometimes it is necessary to give a high-level overview of a construct and
+later explain the pieces in more detail. This can be done by <em>forward
+referencing</em> the code fragments as shown in this example.</p>
+<pre title="">``` py : &lt;&lt;my class overview&gt;&gt;=
+class MyClass:
+  &lt;&lt;ctor&gt;&gt;
+  &lt;&lt;methods&gt;&gt;
+```
+</pre>
+<p>Then somewhere later you can formulate what <code>&lt;&lt;methods&gt;&gt;</code> means:</p>
+<pre title="">``` py : &lt;&lt;methods&gt;&gt;=
+  def foo(self):
+    pass
+```
+</pre>
+<p>And then even later you can define the constructor <code>&lt;&lt;ctor&gt;&gt;</code>:</p>
+<pre title="">``` py : &lt;&lt;ctor&gt;&gt;=
+  def __init__(self):
+    pass
+```
+</pre>
+<p>Note, that the order in which you <em>forward reference</em> the code
+fragments <code>&lt;&lt;ctor&gt;&gt;</code> and <code>&lt;&lt;methods&gt;&gt;</code> doesn't have to be the
+same order in which you define them later.</p>
+<h2>From fragment to source code</h2>
 <p>To create actual source files a fragment creation line needs to be used with a
 slightly extended form of the creation tag mentioned above. The name has to be
-postixed with the string <code>.*</code> betueen the chevrons. Furthermore a file
-name needs to be specied after the equal sign. This is essentially a relative
-path that is going to be appended each workspace folder as the root. A top level
+suffixed with the string <code>.*</code> between the chevrons. Furthermore a file
+name needs to be specified after the equal sign. This is essentially a relative
+path that is going to be appended to each workspace folder as the root. A top-level
 fragment looks like <code>py : &lt;&lt;top-level fragment.*&gt;&gt; ./src/source.py</code>. The
 name of this fragment is <code>top-level fragment</code>, and once it has been fully
-extrapolated will be written to a file in the workspace folder under <code>src</code> as
+extrapolated will it be written to a file in the workspace folder under <code>src</code> as
 the file <code>source.py</code>.</p>
 <p>The <strong>Literate Programming</strong> extension allows the program author to write
 multiple projects in the same Visual Studio Code workspace. Each workspace
 folder is the root for its own literate project. Within each project there can
-be one or more <strong>literate</strong> files. These files have the extension <code>.literate</code>.
+be one or more <strong>literate</strong> files. These files carry the extension <code>.literate</code>.
 One literate file can contain zero or more code fragments. A literate file can
 also contain more than one top level fragment. In other words an author can
 create multiple source files within just one <strong>literate</strong> document.</p>

@@ -10,34 +10,72 @@ The most important influence for this **literate programming** extension is the
 
 This extension provides a set of tools that help the programmer writing literate
 programs. Through automation the process of writing literate programs should be
-as painless as possible. The programming writes his literate programs using
+as painless as possible. The programmer writes his literate programs using
 Markdown. When a literate programmer needs a snippet they can add a code fence.
 In this extension snippets are called code fragments.
 
 The approach for this extension is based on Markdown documents, as noted
 earlier. The Markdown specification is only slightly adapted to make supporting
 **literate programming** easy. The code fragments are expressed in code fences
-as per the Markdown specification, either with surrounding tripple backticks or
-tripple tildes. Along with the programming language identifier the opening line
-has been extended to contain the fragment name and type as essentially options
-to the code fence. This opening line thus will look like
+as per the Markdown specification, either with surrounding triple backticks or
+triple tildes. Along with the programming language identifier the opening line
+has been extended to contain the fragment name and type essentially as options
+to the code fence. The opening line thus will look like
 `py : <<fragment name>>` to create a new fragment, or like
 `py : <<fragment name>>=+` to amend an existing fragment.
 
+## Forward referencing code fragments
+
+Sometimes it is necessary to give a high-level overview of a construct and
+later explain the pieces in more detail. This can be done by *forward
+referencing* the code fragments as shown in this example.
+
+`````
+``` py : <<my class overview>>=
+class MyClass:
+  <<ctor>>
+  <<methods>>
+```
+`````
+
+Then somewhere later you can formulate what `<<methods>>` means:
+
+`````
+``` py : <<methods>>=
+  def foo(self):
+    pass
+```
+`````
+
+And then even later you can define the constructor `<<ctor>>`:
+
+`````
+``` py : <<ctor>>=
+  def __init__(self):
+    pass
+```
+`````
+
+Note, that the order in which you *forward reference* the code
+fragments `<<ctor>>` and `<<methods>>` doesn't have to be the
+same order in which you define them later.
+
+## From fragment to source code
+
 To create actual source files a fragment creation line needs to be used with a
 slightly extended form of the creation tag mentioned above. The name has to be
-postixed with the string `.*` betueen the chevrons. Furthermore a file
-name needs to be specied after the equal sign. This is essentially a relative
-path that is going to be appended each workspace folder as the root. A top level
+suffixed with the string `.*` between the chevrons. Furthermore a file
+name needs to be specified after the equal sign. This is essentially a relative
+path that is going to be appended to each workspace folder as the root. A top-level
 fragment looks like `py : <<top-level fragment.*>> ./src/source.py`. The
 name of this fragment is `top-level fragment`, and once it has been fully
-extrapolated will be written to a file in the workspace folder under `src` as
+extrapolated will it be written to a file in the workspace folder under `src` as
 the file `source.py`.
 
 The **Literate Programming** extension allows the program author to write
 multiple projects in the same Visual Studio Code workspace. Each workspace
 folder is the root for its own literate project. Within each project there can
-be one or more **literate** files. These files have the extension `.literate`.
+be one or more **literate** files. These files carry the extension `.literate`.
 One literate file can contain zero or more code fragments. A literate file can
 also contain more than one top level fragment. In other words an author can
 create multiple source files within just one **literate** document.
