@@ -552,9 +552,9 @@ async function writeSourceFiles(workspaceFolder : vscode.WorkspaceFolder,
     if (name.indexOf(".*") >= 0) {
       let fragmentInfo = fragments.get(name) || undefined;
       if (fragmentInfo) {
-        const lf2crlf = /[^\r]\n/g
+        const lf2crlf = /([^\r])\n/g
         let fileName = fragmentInfo.sourceFileName.trim();
-        const fixed = fragmentInfo.code.replaceAll(lf2crlf, '\r\n');
+        const fixed = fragmentInfo.code.replaceAll(lf2crlf, '$1\r\n');
         const encoded = Buffer.from(fixed, 'utf-8');
         const fileUri = vscode.Uri.joinPath(folderUri, fileName);
         await vscode.workspace.fs.writeFile(fileUri, encoded);
@@ -1325,7 +1325,7 @@ function writeOutHtml
        folderUri : vscode.Uri,
        rendered : string) : Thenable<void>
 {
-  const lf2crlf = /[^\r]\n/g
+  const lf2crlf = /([^\r])\n/g
   const html =
 `<html>
   <head>
@@ -1334,7 +1334,7 @@ function writeOutHtml
   <body>
   ${rendered}
   </body>
-</html>`.replaceAll(lf2crlf, '\r\n');
+</html>`.replaceAll(lf2crlf, '$1\r\n');
   const encoded = Buffer.from(html, 'utf-8');
   fname = fname.replace(".literate", ".html");
   const fileUri = vscode.Uri.joinPath(folderUri, fname);
