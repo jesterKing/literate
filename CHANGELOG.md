@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.10.0
+
+* Write out CRLF instead of LF
+
 ## 0.9.0
 
 * Add reference provider, which allows to see where fragments are mentioned or
