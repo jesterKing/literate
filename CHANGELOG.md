@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.10.1
+
+* Fix error with LF to CRLF replacement
+
 ## 0.10.0
 
 * Write out CRLF instead of LF
