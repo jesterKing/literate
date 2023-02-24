@@ -1,6 +1,6 @@
-# literate README
+# **Literate Programming** for Visual Studio Code.
 
-**Literate Programming** for Visual Studio Code.
+<a href="https://marketplace.visualstudio.com/items?itemName=jesterking.literate"><img src="https://vsmarketplacebadges.dev/version/jesterking.literate.svg?style=for-the-badge&colorA=252526&colorB=43A047&label=Get%20from%20the%20marketplace" alt="Get from the marketplace: version "></a>
 
 This extension is inspired by the work done by [Physically Based Rendering: From
 Theory To Implementation](http://www.pbr-book.org) by Matt Pharr, Wenzel Jakob,
@@ -45,6 +45,11 @@ indentation to denote scope.
 
 The command `Literate: Process` (`literate.process`) will process all
 `.literate` documents found in the (first) workspace folder.
+
+## Example and documentation
+
+The HTML documentation generated from this repository `.literate` files can be
+found here : https://jesterking.github.io/literate/
 
 ## Credits
 
