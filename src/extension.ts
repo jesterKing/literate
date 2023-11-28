@@ -552,7 +552,7 @@ async function writeSourceFiles(workspaceFolder : vscode.WorkspaceFolder,
     if (name.indexOf(".*") >= 0) {
       let fragmentInfo = fragments.get(name) || undefined;
       if (fragmentInfo) {
-        const lf2crlf = /([^\r])\n/g
+        const lf2crlf = /([^\r])\n/g;
         let fileName = fragmentInfo.sourceFileName.trim();
         const fixed = fragmentInfo.code.replaceAll(lf2crlf, '$1\r\n');
         const encoded = Buffer.from(fixed, 'utf-8');
@@ -679,21 +679,6 @@ export class FragmentRepository {
         }
       )
     );
-    context.subscriptions.push(
-      vscode.workspace.onDidChangeWorkspaceFolders(
-        async (e : vscode.WorkspaceFoldersChangeEvent) =>
-        {
-          for(const addedWorkspaceFolder of e.added) {
-            await this.processLiterateFiles(addedWorkspaceFolder);
-          }
-          for(const removedWorkspaceFolder of e.removed)
-          {
-            this.fragmentsForWorkspaceFolders.delete(removedWorkspaceFolder.name);
-            this.grabbedStateForWorkspaceFolders.delete(removedWorkspaceFolder.name);
-          }
-        }
-      )
-    );
   }
   async processLiterateFiles(
     trigger :
@@ -752,9 +737,9 @@ export class FragmentRepository {
               fragments.clear();
               grabbedStateList.clear();
               await iterateLiterateFiles(folder,
-                                          writeOutHtml,
-                                          grabbedStateList.list,
-                                          this.md);
+                                         writeOutHtml,
+                                         grabbedStateList.list,
+                                         this.md);
               this.diagnostics.clear();
               fragments.map = await handleFragments(folder,
                                                     grabbedStateList.list,
@@ -762,7 +747,11 @@ export class FragmentRepository {
                                                     false,
                                                     undefined);
               this.diagnostics.clear();
-              await handleFragments(folder, grabbedStateList.list, this.diagnostics, true, writeSourceFiles);
+              await handleFragments(folder,
+                                    grabbedStateList.list,
+                                    this.diagnostics,
+                                    true,
+                                    writeSourceFiles);
             }
           }
         }
@@ -893,7 +882,7 @@ export class FragmentRepository {
           if(token.content.indexOf(fragmentTag) > -1)
           {
             const lines = token.content.split("\n");
-            let idx = token.type == 'fence' ? 1 : 0;
+            let idx = token.type === 'fence' ? 1 : 0;
             for(const line of lines) {
               let offset = line.indexOf(fragmentTag);
               while(offset>-1) {
@@ -1154,13 +1143,13 @@ export async function activate(context: vscode.ExtensionContext) {
           'markdown',
           new LiterateDefinitionProvider(theOneRepository)
       )
-  )
+  );
   context.subscriptions.push(
       vscode.languages.registerReferenceProvider(
           'markdown',
           new LiterateReferenceProvider(theOneRepository)
       )
-  )
+  );
 
   context.subscriptions.push(
     vscode.languages.registerHoverProvider('markdown', new FragmentHoverProvider(theOneRepository))
@@ -1295,7 +1284,7 @@ async function getLiterateFileUris(
     {
       bulletListOpen = false;
     }
-    if(bulletListOpen && token.type=='list_item_open')
+    if(bulletListOpen && token.type==='list_item_open')
     {
       let inline = env.gstate.tokens[idx+2];
       if(inline.children && inline.children[0].attrs)
@@ -1325,7 +1314,7 @@ function writeOutHtml
        folderUri : vscode.Uri,
        rendered : string) : Thenable<void>
 {
-  const lf2crlf = /([^\r])\n/g
+  const lf2crlf = /([^\r])\n/g;
   const html =
 `<html>
   <head>
