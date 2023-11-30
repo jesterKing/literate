@@ -90,7 +90,7 @@ const FRAGMENT_USE_IN_CODE_RE =
   /(?<indent>[ \t]*)<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?/g;
 const FRAGMENT_RE =
   /(?<lang>.*):.*<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*)/;
-const FRAGMENT_HTML_CLEANUP_RE= /(&lt;&lt.+?)(<span.class="hljs-.+?">)(.+?)(<\/span>)(.*?&gt;&gt)/g;
+const FRAGMENT_HTML_CLEANUP_RE= /(<span.class="hljs-.+?">)(.*?)(<\/span>)/g;
 const FRAGMENT_HTML_RE= /(&lt;&lt;.+?&gt;&gt;)/g;
 
 class FragmentNode extends vscode.TreeItem
@@ -317,17 +317,16 @@ export class FragmentHoverProvider implements vscode.HoverProvider {
 }
 
 function protectFragmentTags(rendered : string) {
-
-  rendered = rendered.replaceAll(
-    FRAGMENT_HTML_CLEANUP_RE,
-    "$1$3$5"
-  );
-  rendered = rendered.replaceAll(
-    FRAGMENT_HTML_RE,
-    "<span class=\"literate-tag-name\">$1</span>"
-  );
-
-  return rendered;
+  function cleanHighlights(match : string, _: number, __: string)
+  {
+    let internal = match.replaceAll(FRAGMENT_HTML_CLEANUP_RE, "$2");
+    return `<span class="literate-tag-name">${internal}</span>`
+  }
+  return rendered
+    .replaceAll(
+      FRAGMENT_HTML_RE,
+      cleanHighlights
+    );
 }
 
 function renderCodeFence(tokens : Token[],

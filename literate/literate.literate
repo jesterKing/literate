@@ -1449,29 +1449,30 @@ class of our own, `literate-name-tag` to handle special styling for tags in code
 fences.
 
 ``` ts : <<fragment regular expressions>>=+
-const FRAGMENT_HTML_CLEANUP_RE= /(&lt;&lt.+?)(<span.class="hljs-.+?">)(.+?)(<\/span>)(.*?&gt;&gt)/g;
+const FRAGMENT_HTML_CLEANUP_RE= /(<span.class="hljs-.+?">)(.*?)(<\/span>)/g;
 const FRAGMENT_HTML_RE= /(&lt;&lt;.+?&gt;&gt;)/g;
 ```
 
 Since these regular expressions are used with `replaceAll` they need to be
 marked global with `g`.
 
-After that it becomes a simple use of `replaceAll` on `rendered` with first
-`FRAGMENT_HTML_CLEANUP_RE`, followed by a `replaceAll` using `FRAGMENT_HTML_RE`:
+To make sure the highlights are properly cleaned we introduce an inline function
+`cleanHighlights` that takes care of all the highlights by using a `replaceAll`
+on the match passed on to `cleanHighlights`. The result is used to wrap inside
+the `span` with the `literate-name-tag` class.
 
 ```ts : <<fragment tag protector>>=
 function protectFragmentTags(rendered : string) {
-
-  rendered = rendered.replaceAll(
-    FRAGMENT_HTML_CLEANUP_RE,
-    "$1$3$5"
-  );
-  rendered = rendered.replaceAll(
-    FRAGMENT_HTML_RE,
-    "<span class=\"literate-tag-name\">$1</span>"
-  );
-
-  return rendered;
+  function cleanHighlights(match : string, _: number, __: string)
+  {
+    let internal = match.replaceAll(FRAGMENT_HTML_CLEANUP_RE, "$2");
+    return `<span class="literate-tag-name">${internal}</span>`
+  }
+  return rendered
+    .replaceAll(
+      FRAGMENT_HTML_RE,
+      cleanHighlights
+    );
 }
 ```
 
