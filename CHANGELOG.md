@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.11.0
+
+* Add styling for fragment names in code fences. Remove hljs highlighting tags
+  from fragment names and wrap fragment name in span with CSS class
+  literate-tag-name. Based on proposal #23 by Konrad Kleine
+* Workspace settings and README tweaked after feedback from several users.
+  README had PR #24 by Nicolas Lelong merged
+* Added minimal CONTRIBUTING.md
+
 ## 0.10.1
 
 * Fix error with LF to CRLF replacement
