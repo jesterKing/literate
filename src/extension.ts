@@ -90,6 +90,8 @@ const FRAGMENT_USE_IN_CODE_RE =
   /(?<indent>[ \t]*)<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?/g;
 const FRAGMENT_RE =
   /(?<lang>.*):.*<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*)/;
+const FRAGMENT_HTML_CLEANUP_RE= /(&lt;&lt.+?)(<span.class="hljs-.+?">)(.+?)(<\/span>)(.*?&gt;&gt)/g;
+const FRAGMENT_HTML_RE= /(&lt;&lt;.+?&gt;&gt;)/g;
 
 class FragmentNode extends vscode.TreeItem
 {
@@ -313,6 +315,21 @@ export class FragmentHoverProvider implements vscode.HoverProvider {
     return null;
   }
 }
+
+function protectFragmentTags(rendered : string) {
+
+  rendered = rendered.replaceAll(
+    FRAGMENT_HTML_CLEANUP_RE,
+    "$1$3$5"
+  );
+  rendered = rendered.replaceAll(
+    FRAGMENT_HTML_RE,
+    "<span class=\"literate-tag-name\">$1</span>"
+  );
+
+  return rendered;
+}
+
 function renderCodeFence(tokens : Token[],
              idx : number,
              options : MarkdownIt.Options,
@@ -334,6 +351,7 @@ function renderCodeFence(tokens : Token[],
         if (name) {
           root = root || '';
           add = add || '';
+          rendered = protectFragmentTags(rendered);
           rendered =
 `<div class="codefragment">
 <div class="fragmentname">&lt;&lt;${name}&gt;&gt;${root}${add}</div>
