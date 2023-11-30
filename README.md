@@ -26,7 +26,7 @@ fence has been extended to include fragment identifiers and their related
 settings.
 
 Code fragments can be created by adding `<<some identifying string>>=` to the
-info line of a code fence.
+info line of a code fence, separated by a colon `:` after the language identifier.
 
 Adding to existing fragments is done through `<<some identifying string>>=+`.
 
@@ -49,7 +49,8 @@ The command `Literate: Process` (`literate.process`) will process all
 ## Example and documentation
 
 The HTML documentation generated from this repository `.literate` files can be
-found here : https://jesterking.github.io/literate/
+found here : https://jesterking.github.io/literate/ . Here creation of code fragments
+is explained in more detail.
 
 ## Credits
 
