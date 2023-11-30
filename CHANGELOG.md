@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.11.1
+
+* Fix for bug #27. Only the first highlight was being handled in a fragment name
+  tag. Now all highlights are cleaned up.
+
 ## 0.11.0
 
 * Add styling for fragment names in code fences. Remove hljs highlighting tags
