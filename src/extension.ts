@@ -350,10 +350,11 @@ function renderCodeFence(tokens : Token[],
         if (name) {
           root = root || '';
           add = add || '';
+          fileName = fileName || '';
           rendered = protectFragmentTags(rendered);
           rendered =
 `<div class="codefragment">
-<div class="fragmentname">&lt;&lt;${name}&gt;&gt;${root}${add}</div>
+<div class="fragmentname">&lt;&lt;${name}&gt;&gt;${root}${add} ${fileName}</div>
 <div class="code">
 ${rendered}
 </div>
