@@ -320,7 +320,7 @@ function protectFragmentTags(rendered : string) {
   function cleanHighlights(match : string, _: number, __: string)
   {
     let internal = match.replaceAll(FRAGMENT_HTML_CLEANUP_RE, "$2");
-    return `<span class="literate-tag-name">${internal}</span>`
+    return `<span class="literate-tag-name">${internal}</span>`;
   }
   return rendered
     .replaceAll(
