@@ -3,6 +3,8 @@
 * Ensure `yarn` is installed: `npm install -g yarn`
 * Ensure `typescript` compiler is installed: `npm install -g typescript`
 * Ensure dependencies are installed: `yarn`
+* Change code in the `.literate` files
+* Rebuild with the `VSCode` command `Literate: Process` (`literate.process`)
 * Check linting: `yarn pretest`
 * Compile code: `yarn esbuild`
 
