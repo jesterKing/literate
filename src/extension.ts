@@ -89,7 +89,7 @@ const emptyToken : TokenUsage =
 const FRAGMENT_USE_IN_CODE_RE =
   /(?<indent>[ \t]*)<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?/g;
 const FRAGMENT_RE =
-  /(?<lang>.*):.*<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*)/;
+  /(?<lang>[^:]*)(?<colon>:)?.*<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*)/;
 const FRAGMENT_HTML_CLEANUP_RE= /(<span.class="hljs-.+?">)(.*?)(<\/span>)/g;
 const FRAGMENT_HTML_RE= /(&lt;&lt;.+?&gt;&gt;)/g;
 
@@ -429,10 +429,17 @@ async function handleFragments(
         const match = token.info.match(FRAGMENT_RE);
         if (match && match.groups) {
           let lang = match.groups.lang.trim();
+          let colon = match.groups.colon;
           let name = match.groups.tagName;
           let root = match.groups.root;
           let add = match.groups.add;
           let fileName = match.groups.fileName;
+          if(lang && !match.groups.colon) {
+            let msg = `Missing colon for fragment: ${name}. ${env.literateFileName}${linenumber}`;
+            const diag = createErrorDiagnostic(token, msg);
+            updateDiagnostics(env.literateUri, diagnostics, diag);
+          }
+          
           if (root && add) {
             if (fragments.has(name)) {
               let fragmentInfo = fragments.get(name) || undefined;

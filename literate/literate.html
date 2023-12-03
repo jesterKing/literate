@@ -1099,7 +1099,7 @@ following the language specifier.</p>
 <div class="fragmentname">&lt;&lt;fragment regular expressions&gt;&gt;=+</div>
 <div class="code">
 <pre><code><span class="hljs-keyword">const</span> <span class="hljs-variable constant_">FRAGMENT_RE</span> =
-  <span class="hljs-regexp">/(?&lt;lang&gt;.*):.*<span class="literate-tag-name">&lt;&lt;(?&lt;tagName&gt;.+)&gt;&gt;</span>(?&lt;root&gt;=)?(?&lt;add&gt;\+)?\s*(?&lt;fileName&gt;.*)/</span>;
+  <span class="hljs-regexp">/(?&lt;lang&gt;[^:]*)(?&lt;colon&gt;:)?.*<span class="literate-tag-name">&lt;&lt;(?&lt;tagName&gt;.+)&gt;&gt;</span>(?&lt;root&gt;=)?(?&lt;add&gt;\+)?\s*(?&lt;fileName&gt;.*)/</span>;
 </code></pre>
 
 </div>
@@ -1107,6 +1107,7 @@ following the language specifier.</p>
 with a few additions. Most notably there is the group catching the language
 specifier, and the group to catch the filename, called <code>lang</code> and <code>fileName</code>
 respectively.</p>
+<p>Also the colon is separated out into a group. That will allow for checking if a tag declaration is properly formed. When the colon is missing it is possible to detect this and emit a diagnostic accordingly.</p>
 <p>So to create a new tag the info line for the code fence could look like
 <code>py : &lt;&lt;a fragment name&gt;&gt;=</code>.</p>
 <p>To add to a fragment a <code>+</code> is added, so it could look like
@@ -1191,7 +1192,9 @@ function as the key, and an instance of <code>FragmentInformation</code> will be
 </div>
 </div><p>Each <code>fence</code> token we find we need to check. There may be of course code fences
 in the document that do not create or modify a fragment. These we need to skip.</p>
-<p>Since we are handling code fences we use <code>FRAGMENT_RE</code> to match <code>token.info</code>.</p>
+<p>Since we are handling code fences we use <code>FRAGMENT_RE</code> to match <code>token.info</code>. A
+fragment is malformed if the colon is missing, so we need to
+<code>&lt;&lt;emit diagnostic when colon is missing&gt;&gt;</code>.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;handle fence tokens&gt;&gt;=</div>
 <div class="code">
@@ -1200,15 +1203,32 @@ in the document that do not create or modify a fragment. These we need to skip.<
   <span class="hljs-keyword">const</span> match = token.<span class="hljs-property">info</span>.<span class="hljs-title function_">match</span>(<span class="hljs-variable constant_">FRAGMENT_RE</span>);
   <span class="hljs-keyword">if</span> (match &amp;&amp; match.<span class="hljs-property">groups</span>) {
     <span class="hljs-keyword">let</span> lang = match.<span class="hljs-property">groups</span>.<span class="hljs-property">lang</span>.<span class="hljs-title function_">trim</span>();
+    <span class="hljs-keyword">let</span> colon = match.<span class="hljs-property">groups</span>.<span class="hljs-property">colon</span>;
     <span class="hljs-keyword">let</span> name = match.<span class="hljs-property">groups</span>.<span class="hljs-property">tagName</span>;
     <span class="hljs-keyword">let</span> root = match.<span class="hljs-property">groups</span>.<span class="hljs-property">root</span>;
     <span class="hljs-keyword">let</span> add = match.<span class="hljs-property">groups</span>.<span class="hljs-property">add</span>;
     <span class="hljs-keyword">let</span> fileName = match.<span class="hljs-property">groups</span>.<span class="hljs-property">fileName</span>;
+    <span class="literate-tag-name">&lt;&lt;emit diagnostic when colon is missing&gt;&gt;</span>
     <span class="literate-tag-name">&lt;&lt;add to existing fragment&gt;&gt;</span>
     <span class="literate-tag-name">&lt;&lt;create a new fragment&gt;&gt;</span>
   }
 }
 </code></pre>
+
+</div>
+</div><h3>Error diagnostic when fragment malformed</h3>
+<p>The diagnostic emitted has a message telling the colon is missing, along with
+the line number and the literate file this happened in.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;emit diagnostic when colon is missing&gt;&gt;=</div>
+<div class="code">
+<pre title="<<emit diagnostic when colon is missing>>=">if(lang &amp;&amp; !match.groups.colon) {
+  let msg = `Missing colon for fragment: ${name}. ${env.literateFileName}${linenumber}`;
+  const diag = createErrorDiagnostic(token, msg);
+  updateDiagnostics(env.literateUri, diagnostics, diag);
+}
+
+</pre>
 
 </div>
 </div><h3>Creating a new fragment</h3>

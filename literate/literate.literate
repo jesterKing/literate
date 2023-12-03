@@ -1045,13 +1045,15 @@ following the language specifier.
 
 ``` ts : <<fragment regular expressions>>=+
 const FRAGMENT_RE =
-  /(?<lang>.*):.*<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*)/;
+  /(?<lang>[^:]*)(?<colon>:)?.*<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*)/;
 ```
 
 Most of the groups correspond to the ones defined by `FRAGMENT_USE_IN_CODE_RE`
 with a few additions. Most notably there is the group catching the language
 specifier, and the group to catch the filename, called `lang` and `fileName`
 respectively.
+
+Also the colon is separated out into a group. That will allow for checking if a tag declaration is properly formed. When the colon is missing it is possible to detect this and emit a diagnostic accordingly.
 
 So to create a new tag the info line for the code fence could look like
 `py : <<a fragment name>>=`.
@@ -1135,7 +1137,9 @@ for (let env of envList) {
 Each `fence` token we find we need to check. There may be of course code fences
 in the document that do not create or modify a fragment. These we need to skip.
 
-Since we are handling code fences we use `FRAGMENT_RE` to match `token.info`.
+Since we are handling code fences we use `FRAGMENT_RE` to match `token.info`. A
+fragment is malformed if the colon is missing, so we need to
+`<<emit diagnostic when colon is missing>>`.
 
 ```ts : <<handle fence tokens>>=
 if (token.type === 'fence') {
@@ -1143,14 +1147,30 @@ if (token.type === 'fence') {
   const match = token.info.match(FRAGMENT_RE);
   if (match && match.groups) {
     let lang = match.groups.lang.trim();
+    let colon = match.groups.colon;
     let name = match.groups.tagName;
     let root = match.groups.root;
     let add = match.groups.add;
     let fileName = match.groups.fileName;
+    <<emit diagnostic when colon is missing>>
     <<add to existing fragment>>
     <<create a new fragment>>
   }
 }
+```
+
+### Error diagnostic when fragment malformed
+
+The diagnostic emitted has a message telling the colon is missing, along with
+the line number and the literate file this happened in.
+
+```ts: <<emit diagnostic when colon is missing>>=
+if(lang && !match.groups.colon) {
+  let msg = `Missing colon for fragment: ${name}. ${env.literateFileName}${linenumber}`;
+  const diag = createErrorDiagnostic(token, msg);
+  updateDiagnostics(env.literateUri, diagnostics, diag);
+}
+
 ```
 
 ### Creating a new fragment
