@@ -1423,8 +1423,9 @@ function splitFragment(position_? : vscode.Position)
       let match = tokenUsage.token.info.match(FRAGMENT_RE);
       if(match && match.groups)
       {
-        let langId = match.groups.lang;
-        let textToInsert = `${FENCE}\n\n${FENCE} ${langId} : ${OPENING}${match.groups.tagName}${CLOSING}=+\n`;
+        let langId = match.groups.lang.trim();
+        let tagName = match.groups.tagName.trim();
+        let textToInsert = `${FENCE}\n\n${FENCE}${langId} : ${OPENING}${tagName}${CLOSING}=+\n`;
         let workspaceEdit = new vscode.WorkspaceEdit();
         workspaceEdit.insert(
           document.uri,
