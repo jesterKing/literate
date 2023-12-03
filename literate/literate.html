@@ -1811,6 +1811,8 @@ the cursor, and apply the edit.</p>
 These diagnostics help the literate programmer determining if there are
 problems with the text and where.</p>
 <h3>Updating diagnostics</h3>
+<h1></h1>
+<p>Diagnostic messages are instances of <code>vscode.Diagnostic</code>. To show them in the Problems panel in VSCode we add the <code>diagnostics</code> collection, which typically is passed into the <code>updateDiagnostics</code>.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=</div>
 <div class="code">
@@ -1828,15 +1830,17 @@ problems with the text and where.</p>
     collection.<span class="hljs-title function_">clear</span>();
   }
 }
+
 </code></pre>
 
 </div>
 </div><h3>Creating an error diagnostic</h3>
+<p>Instances of <code>vscode.Diagnostic</code> can be created with <code>createErrorDiagnostic</code>. This takes a <code>markdownIt</code> <code>token</code>, a <code>message</code> and a <code>range</code>. If the passed in range isn't a proper range the range is harvested from the passed in <code>token</code>.</p>
+<p>For now all messages are considered errors.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=+</div>
 <div class="code">
-<pre><code>
-<span class="hljs-comment">/**
+<pre><code><span class="hljs-comment">/**
  * Create diagnostic for a given token with message.
  * <span class="hljs-doctag">@param</span> token Token that carries the faulty code fragment
  * <span class="hljs-doctag">@param</span> message Error message
@@ -1851,6 +1855,7 @@ problems with the text and where.</p>
 
   <span class="hljs-keyword">return</span> diagnostic;
 }
+
 </code></pre>
 
 </div>
@@ -1867,16 +1872,18 @@ problems with the text and where.</p>
   <span class="hljs-keyword">let</span> linenumber = token.<span class="hljs-property">map</span> ? (token.<span class="hljs-property">map</span>[<span class="hljs-number">0</span>]) : -<span class="hljs-number">1</span>;
   <span class="hljs-keyword">return</span> linenumber;
 }
+
 </code></pre>
 
 </div>
 </div><h3>Line number of fragment end</h3>
+<p><code>locationOfFragmentEnd</code> is used to get the last line of the given token in the
+<strong>literate</strong> document. This is typically used for code fences in this extension.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=+</div>
 <div class="code">
-<pre><code>
-<span class="hljs-comment">/**
- * Give the location of the last line in the Markup document that contains the
+<pre><code><span class="hljs-comment">/**
+ * Give the location of the last line in the literate document that contains the
  * code fragment.
  * <span class="hljs-doctag">@param</span> token Token to extract code location from
  */</span>
@@ -1884,10 +1891,13 @@ problems with the text and where.</p>
   <span class="hljs-keyword">let</span> linenumber = token.<span class="hljs-property">map</span> ? (token.<span class="hljs-property">map</span>[<span class="hljs-number">1</span>] ) : -<span class="hljs-number">1</span>;
   <span class="hljs-keyword">return</span> linenumber;
 }
+
 </code></pre>
 
 </div>
 </div><h3>Range of whole fragment in text</h3>
+<p><code>fragmentRange</code> is a method to construct a <code>vscode.Range</code> for a given token that
+is a code fragment.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=+</div>
 <div class="code">
@@ -2248,20 +2258,16 @@ Code.</p>
 <div class="fragmentname">&lt;&lt;literate.*&gt;&gt;=+</div>
 <div class="code">
 <pre><code><span class="literate-tag-name">&lt;&lt;activate the extension&gt;&gt;</span>
-</code></pre>
-
-</div>
-</div><div class="codefragment">
-<div class="fragmentname">&lt;&lt;literate.*&gt;&gt;=+</div>
-<div class="code">
-<pre><code><span class="literate-tag-name">&lt;&lt;diagnostic updating&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;diagnostic updating&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;utility functions&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;create fragment for tag&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;split fragment&gt;&gt;</span>
 </code></pre>
 
 </div>
-</div><div class="codefragment">
+</div><p>There is nothing currently needed for deactivation of the extension, so there is
+just an empty-bodied implementation for it.</p>
+<div class="codefragment">
 <div class="fragmentname">&lt;&lt;literate.*&gt;&gt;=+</div>
 <div class="code">
 <pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">deactivate</span>(<span class="hljs-params"></span>) {}

@@ -1227,6 +1227,7 @@ function createErrorDiagnostic(token: Token, message: string, range? : vscode.Ra
 
   return diagnostic;
 }
+
 /**
  * Give the location of the line in the Markup document that contains the
  * tag declaration.
@@ -1238,7 +1239,7 @@ function locationOfFragment(token: Token): number {
 }
 
 /**
- * Give the location of the last line in the Markup document that contains the
+ * Give the location of the last line in the literate document that contains the
  * code fragment.
  * @param token Token to extract code location from
  */
@@ -1246,6 +1247,7 @@ function locationOfFragmentEnd(token: Token): number {
   let linenumber = token.map ? (token.map[1] ) : -1;
   return linenumber;
 }
+
 /**
  * Give range for the code fragment, including tag.
  * @param token Token to create range for

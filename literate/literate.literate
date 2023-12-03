@@ -1689,7 +1689,7 @@ function splitFragment(position_? : vscode.Position)
 With the document and position we can find the `Token` at that location.
 Continue only if it is a fence.
 
-``` ts  : <<split fragment>>=+
+```ts : <<split fragment>>=+
     const tokenUsage = theOneRepository.getTokenAtPosition(
       document,
       new vscode.Range(position, position));
@@ -1699,7 +1699,7 @@ Continue only if it is a fence.
 
 Next we match the info line, we want to ensure we have actually a fragment here.
 
-```  ts   : <<split fragment>>=+
+```ts : <<split fragment>>=+
       let match = tokenUsage.token.info.match(FRAGMENT_RE);
       if(match && match.groups)
       {
@@ -1708,7 +1708,7 @@ Next we match the info line, we want to ensure we have actually a fragment here.
 From the matched info line we take the language identifier and the fragment tag
 name. We can create the text that will split the current fragment.
 
-```   ts    : <<split fragment>>=+
+```ts : <<split fragment>>=+
         let langId = match.groups.lang;
         let textToInsert = `${FENCE}\n\n${FENCE} ${langId} : ${OPENING}${match.groups.tagName}${CLOSING}=+\n`;
 ```
@@ -1716,7 +1716,7 @@ name. We can create the text that will split the current fragment.
 Finally we can create the workspace edit, make the insert on the next line from
 the cursor, and apply the edit.
 
-```    ts     : <<split fragment>>=+
+```ts : <<split fragment>>=+
         let workspaceEdit = new vscode.WorkspaceEdit();
         workspaceEdit.insert(
           document.uri,
@@ -1737,8 +1737,10 @@ These diagnostics help the literate programmer determining if there are
 problems with the text and where.
 
 ### Updating diagnostics
+#
+Diagnostic messages are instances of `vscode.Diagnostic`. To show them in the Problems panel in VSCode we add the `diagnostics` collection, which typically is passed into the `updateDiagnostics`.
 
-``` ts : <<diagnostic updating>>=
+```ts : <<diagnostic updating>>=
 function updateDiagnostics(
   uri: vscode.Uri,
   collection: vscode.DiagnosticCollection,
@@ -1753,12 +1755,16 @@ function updateDiagnostics(
     collection.clear();
   }
 }
+
 ```
 
 ### Creating an error diagnostic
 
-``` ts : <<diagnostic updating>>=+
+Instances of `vscode.Diagnostic` can be created with `createErrorDiagnostic`. This takes a `markdownIt` `token`, a `message` and a `range`. If the passed in range isn't a proper range the range is harvested from the passed in `token`.
 
+For now all messages are considered errors.
+
+```ts : <<diagnostic updating>>=+
 /**
  * Create diagnostic for a given token with message.
  * @param token Token that carries the faulty code fragment
@@ -1774,11 +1780,12 @@ function createErrorDiagnostic(token: Token, message: string, range? : vscode.Ra
 
   return diagnostic;
 }
+
 ```
 
 ### Line number of fragment start
 
-``` ts : <<diagnostic updating>>=+
+```ts : <<diagnostic updating>>=+
 /**
  * Give the location of the line in the Markup document that contains the
  * tag declaration.
@@ -1788,14 +1795,17 @@ function locationOfFragment(token: Token): number {
   let linenumber = token.map ? (token.map[0]) : -1;
   return linenumber;
 }
+
 ```
 
 ### Line number of fragment end
 
-``` ts : <<diagnostic updating>>=+
+`locationOfFragmentEnd` is used to get the last line of the given token in the
+**literate** document. This is typically used for code fences in this extension.
 
+``` ts : <<diagnostic updating>>=+
 /**
- * Give the location of the last line in the Markup document that contains the
+ * Give the location of the last line in the literate document that contains the
  * code fragment.
  * @param token Token to extract code location from
  */
@@ -1803,9 +1813,13 @@ function locationOfFragmentEnd(token: Token): number {
   let linenumber = token.map ? (token.map[1] ) : -1;
   return linenumber;
 }
+
 ```
 
 ### Range of whole fragment in text
+
+`fragmentRange` is a method to construct a `vscode.Range` for a given token that
+is a code fragment.
 
 ``` ts : <<diagnostic updating>>=+
 /**
@@ -2141,14 +2155,14 @@ Code.
 
 ``` ts : <<literate.*>>=+
 <<activate the extension>>
-```
-
-``` ts : <<literate.*>>=+
 <<diagnostic updating>>
 <<utility functions>>
 <<create fragment for tag>>
 <<split fragment>>
 ```
+
+There is nothing currently needed for deactivation of the extension, so there is
+just an empty-bodied implementation for it.
 
 ``` ts : <<literate.*>>=+
 export function deactivate() {}
