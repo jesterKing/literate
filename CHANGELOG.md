@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.12.0
+
+* Emit error diagnostic when colon is missing from fragments (#31)
+
 ## 0.11.1
 
 * Fix for bug #27. Only the first highlight was being handled in a fragment name
