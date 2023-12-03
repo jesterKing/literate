@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.12.1
+
+* Fix Split Fragment adding unnecessary space around language identifiers (#32)
+
+
 ## 0.12.0
 
 * Emit error diagnostic when colon is missing from fragments (#31)
