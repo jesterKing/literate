@@ -1,5 +1,15 @@
 # Change Log
 
+## 0.13.0
+
+* Breaking change: Handle filenames on starred fragments better (#34)
+  * Starred code fragments need to be changed to end in whitespace plus dollar
+    sign to process properly with version 0.13.0 or later of this extension
+  * Introduce diagnostics telling about missing filename
+* Make EOL handling platform dependant instead of always forcing CRLF
+  * Only on Windows `core.autocrlf true` should be set, on other platforms it
+    should be set to `core.autocrlf false`
+
 ## 0.12.1
 
 * Fix Split Fragment adding unnecessary space around language identifiers (#32)

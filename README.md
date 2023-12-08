@@ -32,9 +32,12 @@ Adding to existing fragments is done through `<<some identifying string>>=+`.
 
 A top-level code fragment has a `.*` at the end of the identifying string:
 `<<some identifying string.*>>=`. The top-level fragment should include a file
-name: `<<some top level.*>>= ./CodeFile.cs`. The file name is relative to the
-workspace folder. It can contain subfolders, which will be automatically created
-during code generation .
+name followed by whitespace and ending in a dollar sign:
+
+`<<some top level.*>>=./CodeFile.cs $`.
+
+The file name is relative to the workspace folder. It can contain subfolders,
+which will be automatically created during code generation .
 
 Code fragments can reference other code fragments in code by using the code
 fragment tag `<<some identifying string>>`.
