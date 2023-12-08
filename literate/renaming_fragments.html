@@ -7,7 +7,7 @@
 <p>We have a <code>RenameProvider</code> implementation to help with renaming fragments easily
 throughout a project.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;rename provider class&gt;&gt;=</div>
+<div class="fragmentname">&lt;&lt;rename provider class&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">LiterateRenameProvider</span> <span class="hljs-keyword">implements</span> vscode.<span class="hljs-property">RenameProvider</span>
 {
@@ -27,7 +27,7 @@ fragment has been confirmed we find all occurrences throughout the project in
 the workspace folder and create workspace edits to replace with the given
 <code>newName</code>.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;fragment rename provider&gt;&gt;=</div>
+<div class="fragmentname">&lt;&lt;fragment rename provider&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">public</span> <span class="hljs-keyword">async</span> <span class="hljs-title function_">provideRenameEdits</span>(<span class="hljs-params">
     <span class="hljs-variable language_">document</span> : vscode.TextDocument,
@@ -48,7 +48,7 @@ the workspace folder and create workspace edits to replace with the given
 text document. If the workspace folder is not a <strong>literate</strong> project just return
 the <code>workspaceEdit</code> without creating any edits to it.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;get workspace for renames&gt;&gt;=</div>
+<div class="fragmentname">&lt;&lt;get workspace for renames&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">const</span> workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span> | <span class="hljs-literal">undefined</span> = <span class="hljs-title function_">determineWorkspaceFolder</span>(<span class="hljs-variable language_">document</span>);
 <span class="hljs-keyword">if</span>(!workspaceFolder) { <span class="hljs-keyword">return</span> workspaceEdit; }
@@ -58,7 +58,7 @@ the <code>workspaceEdit</code> without creating any edits to it.</p>
 </div><p>Now that we have a workspace folder with a project in it we get the fragment
 location for the given position in the text document.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;find fragment to rename at position&gt;&gt;=</div>
+<div class="fragmentname">&lt;&lt;find fragment to rename at position&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">let</span> fragmentLocation = <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">getFragmentTagLocation</span>(
   <span class="hljs-variable language_">document</span>,
@@ -73,7 +73,7 @@ location. There is no use in trying when we're not on a fragment. If we do have
 a valid fragment location we get the uris for all <strong>literate</strong> files in the
 workspace folder.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;create workspace edits for fragment in project&gt;&gt;=</div>
+<div class="fragmentname">&lt;&lt;create workspace edits for fragment in project&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">if</span>(fragmentLocation.<span class="hljs-property">valid</span>)
 {
@@ -85,7 +85,7 @@ workspace folder.</p>
 into lines if possible. We'll iterate over the lines, keeping a counter of the
 line number so that we can create the correct range when a hit has been found.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;create workspace edits for fragment in project&gt;&gt;=+</div>
+<div class="fragmentname">&lt;&lt;create workspace edits for fragment in project&gt;&gt;=+ </div>
 <div class="code">
 <pre><code>    <span class="hljs-keyword">try</span> {
         <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> fl <span class="hljs-keyword">of</span> foundLiterateFiles) {
@@ -117,7 +117,7 @@ line number so that we can create the correct range when a hit has been found.</
 </div><p>Get the file contet as string using <code>getFileContent</code>. The string is split on
 <code>\n</code>, so that we get the document lines.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;get text and split into lines&gt;&gt;=</div>
+<div class="fragmentname">&lt;&lt;get text and split into lines&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">const</span> text = <span class="hljs-keyword">await</span> <span class="hljs-title function_">getFileContent</span>(fl);
 <span class="hljs-keyword">const</span> lines = text.<span class="hljs-title function_">split</span>(<span class="hljs-string">&quot;\n&quot;</span>);
@@ -128,7 +128,7 @@ line number so that we can create the correct range when a hit has been found.</
 loop until no more hits of the fragment name are found. When that happens we
 break the while loop in which we check for occurrences.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;find fragment on line&gt;&gt;=</div>
+<div class="fragmentname">&lt;&lt;find fragment on line&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">let</span> foundIdx = line.<span class="hljs-title function_">indexOf</span>(fragmentLocation.<span class="hljs-property">name</span>, fromIdx);
 <span class="hljs-keyword">if</span>(foundIdx===-<span class="hljs-number">1</span>)
@@ -141,7 +141,7 @@ break the while loop in which we check for occurrences.</p>
 </div><p>When a good hit was found we create a <code>replace</code> on the <code>workspaceEdit</code> with the
 file uri, the new range and the text to use for the replacement.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;create replace on workspace edit&gt;&gt;=</div>
+<div class="fragmentname">&lt;&lt;create replace on workspace edit&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">let</span> foundRange = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(lineNumber, foundIdx, lineNumber, foundIdx + fragmentLocation.<span class="hljs-property">name</span>.<span class="hljs-property">length</span>);
 workspaceEdit.<span class="hljs-title function_">replace</span>(
@@ -155,7 +155,7 @@ workspaceEdit.<span class="hljs-title function_">replace</span>(
 </div><p>While we're still looping we need to bump the <code>fromIdx</code> to ensure we skip past
 the fragment usage or mention we just found on the line.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;ensure correct start index for further searching&gt;&gt;=</div>
+<div class="fragmentname">&lt;&lt;ensure correct start index for further searching&gt;&gt;= </div>
 <div class="code">
 <pre><code>fromIdx += foundIdx + fragmentLocation.<span class="hljs-property">name</span>.<span class="hljs-property">length</span>;
 </code></pre>

@@ -252,7 +252,7 @@ export class FragmentNodeProvider implements vscode.TreeDataProvider<FragmentNod
           }
         }
       }
-
+      
       return Promise.resolve(arr);
     }
   }
@@ -441,7 +441,7 @@ async function handleFragments(
             const diag = createErrorDiagnostic(token, msg);
             updateDiagnostics(env.literateUri, diagnostics, diag);
           }
-
+          
           if (root && add) {
             if (fragments.has(name)) {
               let fragmentInfo = fragments.get(name) || undefined;
@@ -519,7 +519,7 @@ async function handleFragments(
         if (!fragmentInfo) {
           continue;
         }
-
+    
         const casesToReplace = [...fragmentInfo.code.matchAll(FRAGMENT_USE_IN_CODE_RE)];
         for (let match of casesToReplace) {
           if(!match || !match.groups) {
@@ -555,7 +555,7 @@ async function handleFragments(
             let lines = code.split("\n").slice(0, -1);
             let indentedLines = lines.flatMap(function (e, _) {
               return indent + e;
-
+    
             });
             let newcode = indentedLines.join("\n");
             fragmentReplaced = true;
@@ -698,7 +698,7 @@ export class FragmentRepository {
     this.grabbedStateForWorkspaceFolders = new Map<string, GrabbedStateList>();
     this.diagnostics = vscode.languages.createDiagnosticCollection('literate');
     context.subscriptions.push(this.diagnostics);
-
+  
     context.subscriptions.push(
       vscode.workspace.onDidChangeTextDocument(
         async (e : vscode.TextDocumentChangeEvent) =>
@@ -815,7 +815,7 @@ export class FragmentRepository {
         }
       }
     );
-
+  
     return fragmentMap;
   }
 
@@ -849,7 +849,7 @@ export class FragmentRepository {
         }
       }
     }
-
+  
     return unsetFragmentLocation;
   }
   getTokenAtPosition(
@@ -890,7 +890,7 @@ export class FragmentRepository {
           }
         }
       );
-
+  
     return grabbedState;
   }
   getDocumentState(document: vscode.TextDocument) : GrabbedState
@@ -907,7 +907,7 @@ export class FragmentRepository {
         }
       }
     }
-
+  
     return grabbedState;
   }
   getReferenceLocations(
@@ -918,7 +918,7 @@ export class FragmentRepository {
     const fragmentTag = OPENING+fragmentName+CLOSING;
     let locations = new Array<vscode.Location>();
     let grabbedStateList = this.getWorkspaceState(workspaceFolder).list;
-
+  
     for(const grabbedState of grabbedStateList)
     {
       for(const token of grabbedState.gstate.tokens)
@@ -1009,7 +1009,7 @@ export class LiterateRenameProvider implements vscode.RenameProvider
                                 newName
                             );
                             fromIdx += foundIdx + fragmentLocation.name.length;
-
+        
                         }
                         lineNumber++;
                     }
@@ -1019,7 +1019,7 @@ export class LiterateRenameProvider implements vscode.RenameProvider
                 console.log(error);
             }
         }
-
+        
         return workspaceEdit;
     }
 }
@@ -1095,9 +1095,9 @@ export class LiterateReferenceProvider implements vscode.ReferenceProvider
             document.lineAt(position),
             position
         );
-
+    
         const workspaceFolder = determineWorkspaceFolder(document);
-
+    
         if(workspaceFolder)
         {
             return await this.repository.getReferenceLocations(
@@ -1105,9 +1105,9 @@ export class LiterateReferenceProvider implements vscode.ReferenceProvider
                 fragmentLocation.name
             );
         }
-
+    
         return null;
-
+    
     }
 }
 function determineWorkspaceFolder(document : vscode.TextDocument) : vscode.WorkspaceFolder | undefined
@@ -1137,7 +1137,7 @@ export async function activate(context: vscode.ExtensionContext) {
       theOneRepository.processLiterateFiles(undefined);
       return vscode.window.setStatusBarMessage("Literate Process completed", 5000);
   });
-
+  
   context.subscriptions.push(literateProcessDisposable);
   let literateCreateFragmentForTagDisposable = vscode.commands.registerCommand(
     'literate.create_fragment_for_tag',
@@ -1145,7 +1145,7 @@ export async function activate(context: vscode.ExtensionContext) {
       createFragmentForTag(range);
     }
   );
-
+  
   context.subscriptions.push(literateCreateFragmentForTagDisposable);
   let literateSplitFragmentDisposable = vscode.commands.registerCommand(
     'literate.split_fragment',
@@ -1153,7 +1153,7 @@ export async function activate(context: vscode.ExtensionContext) {
       splitFragment(position);
     }
   );
-
+  
   context.subscriptions.push(literateSplitFragmentDisposable);
   new FragmentExplorer(context);
   const completionItemProvider =

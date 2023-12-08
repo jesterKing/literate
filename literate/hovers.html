@@ -9,7 +9,7 @@ the implementation of fragments when hovering of fragment usages. That way code
 inspection can be easier done.</p>
 <p>We'll create <code>FragmentHoverProvider</code> which implements <code>HoverProvider</code>.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;fragment hover provider&gt;&gt;=</div>
+<div class="fragmentname">&lt;&lt;fragment hover provider&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">FragmentHoverProvider</span> <span class="hljs-keyword">implements</span> vscode.<span class="hljs-property">HoverProvider</span> {
   <span class="hljs-keyword">readonly</span> fragmentRepository : <span class="hljs-title class_">FragmentRepository</span>;
@@ -26,7 +26,7 @@ inspection can be easier done.</p>
 <code>Hover</code> item if under the current cursor position there is a fragment, including
 its opening and closing double chevrons.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;hover provider method&gt;&gt;=</div>
+<div class="fragmentname">&lt;&lt;hover provider method&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">public</span> <span class="hljs-keyword">async</span> <span class="hljs-title function_">provideHover</span>(<span class="hljs-params">
   <span class="hljs-variable language_">document</span> : vscode.TextDocument,
@@ -48,7 +48,7 @@ cases where mentioning a fragment in explaining text is split over several lines
 due to word wrapping, but with the current implementation we'll look only at
 those that are on one line.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;get current line&gt;&gt;=</div>
+<div class="fragmentname">&lt;&lt;get current line&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">const</span> currentLine = <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">lineAt</span>(position.<span class="hljs-property">line</span>);
 </code></pre>
@@ -59,7 +59,7 @@ can query the correct project for the fragments. If no workspace folder was
 determined return <code>null</code>, as there is no literate project associated with the
 given document.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;find workspace folder for hover detection&gt;&gt;=</div>
+<div class="fragmentname">&lt;&lt;find workspace folder for hover detection&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">const</span> workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span> | <span class="hljs-literal">undefined</span> = <span class="hljs-title function_">determineWorkspaceFolder</span>(<span class="hljs-variable language_">document</span>);
 <span class="hljs-keyword">if</span>(!workspaceFolder) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
@@ -73,7 +73,7 @@ fragment mention in explaining text. For this we can create a <code>Hover</code>
 code of the fragment as a <code>MarkdownString</code> in a code fence.</p>
 <p>If that is not the case our <code>provideHover</code> implementation will return <code>null</code>.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;create hover item for fragment&gt;&gt;=</div>
+<div class="fragmentname">&lt;&lt;create hover item for fragment&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">let</span> fragmentLocation = <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentRepository</span>.<span class="hljs-title function_">getFragmentTagLocation</span>(<span class="hljs-variable language_">document</span>, currentLine, position);
 <span class="hljs-keyword">if</span>(fragmentLocation.<span class="hljs-property">fragment</span> &amp;&amp; !fragmentLocation.<span class="hljs-property">root</span>)
@@ -91,7 +91,7 @@ code of the fragment as a <code>MarkdownString</code> in a code fence.</p>
 </div><p>With the workspace folder in hand we can ask the <code>FragmentRepository</code> for the
 fragment map that has been generated for the workspace folder.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;get fragments for hover detection&gt;&gt;=</div>
+<div class="fragmentname">&lt;&lt;get fragments for hover detection&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">let</span> fragments = <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentRepository</span>.<span class="hljs-title function_">getFragments</span>(workspaceFolder).<span class="hljs-property">map</span>;
 </code></pre>
