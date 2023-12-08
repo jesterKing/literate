@@ -4,6 +4,7 @@ import { TextDecoder } from 'util';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');
 import Token = require('markdown-it/lib/token');
@@ -89,7 +90,7 @@ const emptyToken : TokenUsage =
 const FRAGMENT_USE_IN_CODE_RE =
   /(?<indent>[ \t]*)<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?/g;
 const FRAGMENT_RE =
-  /(?<lang>[^:]*)(?<colon>:)?.*<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*)/;
+  /(?<lang>[^:]*)(?<colon>:)?.*<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*\s+\$)?/;
 const FRAGMENT_HTML_CLEANUP_RE= /(<span.class="hljs-.+?">)(.*?)(<\/span>)/g;
 const FRAGMENT_HTML_RE= /(&lt;&lt;.+?&gt;&gt;)/g;
 
@@ -251,7 +252,7 @@ export class FragmentNodeProvider implements vscode.TreeDataProvider<FragmentNod
           }
         }
       }
-      
+
       return Promise.resolve(arr);
     }
   }
@@ -440,7 +441,7 @@ async function handleFragments(
             const diag = createErrorDiagnostic(token, msg);
             updateDiagnostics(env.literateUri, diagnostics, diag);
           }
-          
+
           if (root && add) {
             if (fragments.has(name)) {
               let fragmentInfo = fragments.get(name) || undefined;
@@ -478,6 +479,14 @@ async function handleFragments(
                   missingFilenames.push(name);
                 }
               }
+              if(fileName && name.indexOf(".*")===-1) {
+                  let msg = `Unexpected filename for non-star fragment ${name}`;
+                  const diag = createErrorDiagnostic(token, msg);
+                  updateDiagnostics(env.literateUri, diagnostics, diag);
+              }
+              if(fileName) {
+                fileName = fileName.replace(/\s+\$/, "");
+              }
               let code = token.content;
               let fragmentInfo: FragmentInformation = {
                 lang: lang,
@@ -510,7 +519,7 @@ async function handleFragments(
         if (!fragmentInfo) {
           continue;
         }
-    
+
         const casesToReplace = [...fragmentInfo.code.matchAll(FRAGMENT_USE_IN_CODE_RE)];
         for (let match of casesToReplace) {
           if(!match || !match.groups) {
@@ -546,7 +555,7 @@ async function handleFragments(
             let lines = code.split("\n").slice(0, -1);
             let indentedLines = lines.flatMap(function (e, _) {
               return indent + e;
-    
+
             });
             let newcode = indentedLines.join("\n");
             fragmentReplaced = true;
@@ -574,15 +583,27 @@ async function writeSourceFiles(workspaceFolder : vscode.WorkspaceFolder,
   const folderUri = workspaceFolder.uri;
   /* now write out the source files. */
   for(const name of fragments.keys()) {
-    if (name.indexOf(".*") >= 0) {
+    if (name.endsWith(".*")) {
       let fragmentInfo = fragments.get(name) || undefined;
-      if (fragmentInfo) {
-        const lf2crlf = /([^\r])\n/g;
-        let fileName = fragmentInfo.sourceFileName.trim();
-        const fixed = fragmentInfo.code.replaceAll(lf2crlf, '$1\r\n');
+      if (fragmentInfo && fragmentInfo.sourceFileName) {
+        let fixed = '';
+        if(os.platform()==='win32')
+        {
+          const lf2crlf = /([^\r])\n/g;
+          fixed = fragmentInfo.code.replaceAll(lf2crlf, '$1\r\n');
+        } else {
+          const crlf2lf = /\r\n/g;
+          fixed = fragmentInfo.code.replaceAll(crlf2lf, '\n');
+        }
         const encoded = Buffer.from(fixed, 'utf-8');
+        let fileName = fragmentInfo.sourceFileName.trim();
         const fileUri = vscode.Uri.joinPath(folderUri, fileName);
-        await vscode.workspace.fs.writeFile(fileUri, encoded);
+        try {
+          await vscode.workspace.fs.writeFile(fileUri, encoded);
+        } catch(writeError)
+        {
+          console.log(writeError);
+        }
       }
     }
   }
@@ -677,7 +698,7 @@ export class FragmentRepository {
     this.grabbedStateForWorkspaceFolders = new Map<string, GrabbedStateList>();
     this.diagnostics = vscode.languages.createDiagnosticCollection('literate');
     context.subscriptions.push(this.diagnostics);
-  
+
     context.subscriptions.push(
       vscode.workspace.onDidChangeTextDocument(
         async (e : vscode.TextDocumentChangeEvent) =>
@@ -794,7 +815,7 @@ export class FragmentRepository {
         }
       }
     );
-  
+
     return fragmentMap;
   }
 
@@ -828,7 +849,7 @@ export class FragmentRepository {
         }
       }
     }
-  
+
     return unsetFragmentLocation;
   }
   getTokenAtPosition(
@@ -869,7 +890,7 @@ export class FragmentRepository {
           }
         }
       );
-  
+
     return grabbedState;
   }
   getDocumentState(document: vscode.TextDocument) : GrabbedState
@@ -886,7 +907,7 @@ export class FragmentRepository {
         }
       }
     }
-  
+
     return grabbedState;
   }
   getReferenceLocations(
@@ -897,7 +918,7 @@ export class FragmentRepository {
     const fragmentTag = OPENING+fragmentName+CLOSING;
     let locations = new Array<vscode.Location>();
     let grabbedStateList = this.getWorkspaceState(workspaceFolder).list;
-  
+
     for(const grabbedState of grabbedStateList)
     {
       for(const token of grabbedState.gstate.tokens)
@@ -988,7 +1009,7 @@ export class LiterateRenameProvider implements vscode.RenameProvider
                                 newName
                             );
                             fromIdx += foundIdx + fragmentLocation.name.length;
-        
+
                         }
                         lineNumber++;
                     }
@@ -998,7 +1019,7 @@ export class LiterateRenameProvider implements vscode.RenameProvider
                 console.log(error);
             }
         }
-        
+
         return workspaceEdit;
     }
 }
@@ -1074,9 +1095,9 @@ export class LiterateReferenceProvider implements vscode.ReferenceProvider
             document.lineAt(position),
             position
         );
-    
+
         const workspaceFolder = determineWorkspaceFolder(document);
-    
+
         if(workspaceFolder)
         {
             return await this.repository.getReferenceLocations(
@@ -1084,9 +1105,9 @@ export class LiterateReferenceProvider implements vscode.ReferenceProvider
                 fragmentLocation.name
             );
         }
-    
+
         return null;
-    
+
     }
 }
 function determineWorkspaceFolder(document : vscode.TextDocument) : vscode.WorkspaceFolder | undefined
@@ -1116,7 +1137,7 @@ export async function activate(context: vscode.ExtensionContext) {
       theOneRepository.processLiterateFiles(undefined);
       return vscode.window.setStatusBarMessage("Literate Process completed", 5000);
   });
-  
+
   context.subscriptions.push(literateProcessDisposable);
   let literateCreateFragmentForTagDisposable = vscode.commands.registerCommand(
     'literate.create_fragment_for_tag',
@@ -1124,7 +1145,7 @@ export async function activate(context: vscode.ExtensionContext) {
       createFragmentForTag(range);
     }
   );
-  
+
   context.subscriptions.push(literateCreateFragmentForTagDisposable);
   let literateSplitFragmentDisposable = vscode.commands.registerCommand(
     'literate.split_fragment',
@@ -1132,7 +1153,7 @@ export async function activate(context: vscode.ExtensionContext) {
       splitFragment(position);
     }
   );
-  
+
   context.subscriptions.push(literateSplitFragmentDisposable);
   new FragmentExplorer(context);
   const completionItemProvider =
@@ -1341,8 +1362,7 @@ function writeOutHtml
        folderUri : vscode.Uri,
        rendered : string) : Thenable<void>
 {
-  const lf2crlf = /([^\r])\n/g;
-  const html =
+  let html =
 `<html>
   <head>
     <link rel="stylesheet" type="text/css" href="./style.css">
@@ -1350,7 +1370,15 @@ function writeOutHtml
   <body>
   ${rendered}
   </body>
-</html>`.replaceAll(lf2crlf, '$1\r\n');
+</html>`;
+
+  if(os.platform()==='win32'){
+    const lf2crlf = /([^\r])\n/g;
+    html = html.replaceAll(lf2crlf, '$1\r\n');
+  } else {
+    const crlf2lf = /\r\n/g;
+    html = html.replaceAll(crlf2lf, '\n');
+  }
   const encoded = Buffer.from(html, 'utf-8');
   fname = fname.replace(".literate", ".html");
   const fileUri = vscode.Uri.joinPath(folderUri, fname);
