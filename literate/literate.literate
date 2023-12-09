@@ -2057,6 +2057,10 @@ for(let token of env.gstate.tokens)
           htmlTemplateFile = _foundHtmlTemplateFile[0];
         }
       }
+      else if(line.startsWith("authors")) {
+        let parts = line.split("=");
+        authors = parts[1];
+      }
     }
   }
 }
@@ -2072,11 +2076,17 @@ hard-coded piece of HTML template.
 For the template to work it needs to have the string `[CONTENT]` where the
 rendered Markdown HTML is going to be substituted.
 
+If `authors` contains a string that is not empty one ore more Open Graph
+protocol tags will be used to replace the `[AUTHORS]` tag if it exists. If
+`authors` is empty `[AUTHORS]` will be replaced with that. If the `authors`
+string contains semi-colons it will be split on those, and for each author are
+there will be an `article:author` tag added.
+
 Regarding the file endings we do the same as for source files. On Windows we
 replace single LF instances with CRLF and vice versa on non-Windows machines
 replace CRLF instances with LF.
 
-``` ts : <<utility functions>>=+
+```ts : <<utility functions>>=+
 async function writeOutHtml
       (fname : string,
        folderUri : vscode.Uri,
@@ -2091,7 +2101,10 @@ async function writeOutHtml
       _html =
 `<html>
 <head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
   <link rel="stylesheet" type="text/css" href="./style.css">
+  [AUTHORS]
 </head>
 <body>
 [CONTENT]
@@ -2101,7 +2114,16 @@ async function writeOutHtml
     return _html;
   };
   html = await getContent();
-  html = html.replace("[CONTENT]", rendered);
+
+  let authorlist = authors.split(";");
+  let meta_authors = '';
+  for(let author of authorlist) {
+    meta_authors += `<meta name="author" content="${author}">`;
+  }
+
+  html = html
+    .replace("[CONTENT]", rendered)
+    .replace("[AUTHORS]", meta_authors);
 
   if(os.platform()==='win32'){
     const lf2crlf = /([^\r])\n/g;
@@ -2182,6 +2204,10 @@ First of all we import all the functionality and modules we are going to need.
 After the imports we introduce the `oldFence` where we will keep a hold of the
 fence rule from the default *MarkdownIt* parser. I was not entirely sure how to
 best tackle it, so for now it is here.
+
+Here we also find `htmlTemplateFile` and `authors`, variables that can be set in
+a **literate** program through a code fence in `index.literate` with the token
+info containing the string `SETTINGS`.
 
 ```ts : <<literate.*>>=+
 let oldFence : Renderer.RenderRule | undefined;

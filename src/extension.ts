@@ -1378,6 +1378,10 @@ async function getLiterateFileUris(
             htmlTemplateFile = _foundHtmlTemplateFile[0];
           }
         }
+        else if(line.startsWith("authors")) {
+          let parts = line.split("=");
+          authors = parts[1];
+        }
       }
     }
   }
@@ -1397,7 +1401,10 @@ async function writeOutHtml
       _html =
 `<html>
 <head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
   <link rel="stylesheet" type="text/css" href="./style.css">
+  [AUTHORS]
 </head>
 <body>
 [CONTENT]
@@ -1407,7 +1414,16 @@ async function writeOutHtml
     return _html;
   };
   html = await getContent();
-  html = html.replace("[CONTENT]", rendered);
+
+  let authorlist = authors.split(";");
+  let meta_authors = '';
+  for(let author of authorlist) {
+    meta_authors += `<meta name="author" content="${author}">`;
+  }
+
+  html = html
+    .replace("[CONTENT]", rendered)
+    .replace("[AUTHORS]", meta_authors);
 
   if(os.platform()==='win32'){
     const lf2crlf = /([^\r])\n/g;

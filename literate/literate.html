@@ -2139,6 +2139,10 @@ URI to <code>htmlTemplateFile</code>.</p>
           htmlTemplateFile = _foundHtmlTemplateFile[<span class="hljs-number">0</span>];
         }
       }
+      <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(line.<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&quot;authors&quot;</span>)) {
+        <span class="hljs-keyword">let</span> parts = line.<span class="hljs-title function_">split</span>(<span class="hljs-string">&quot;=&quot;</span>);
+        authors = parts[<span class="hljs-number">1</span>];
+      }
     }
   }
 }
@@ -2152,6 +2156,11 @@ file at the URI specified by <code>htmlTemplateFile</code> if it is set, otherwi
 hard-coded piece of HTML template.</p>
 <p>For the template to work it needs to have the string <code>[CONTENT]</code> where the
 rendered Markdown HTML is going to be substituted.</p>
+<p>If <code>authors</code> contains a string that is not empty one ore more Open Graph
+protocol tags will be used to replace the <code>[AUTHORS]</code> tag if it exists. If
+<code>authors</code> is empty <code>[AUTHORS]</code> will be replaced with that. If the <code>authors</code>
+string contains semi-colons it will be split on those, and for each author are
+there will be an <code>article:author</code> tag added.</p>
 <p>Regarding the file endings we do the same as for source files. On Windows we
 replace single LF instances with CRLF and vice versa on non-Windows machines
 replace CRLF instances with LF.</p>
@@ -2172,7 +2181,10 @@ replace CRLF instances with LF.</p>
       _html =
 <span class="hljs-string">`&lt;html&gt;
 &lt;head&gt;
+  &lt;meta name=&quot;description&quot; content=&quot;A Literate Program written with the Literate Programming vscode extension by Nathan &#x27;jesterKing&#x27; Letwory and contributors&quot; /&gt;
+  &lt;meta property=&quot;og:description&quot; content=&quot;A Literate Program written with the Literate Programming vscode extension by Nathan &#x27;jesterKing&#x27; Letwory and contributors&quot; /&gt;
   &lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;./style.css&quot;&gt;
+  [AUTHORS]
 &lt;/head&gt;
 &lt;body&gt;
 [CONTENT]
@@ -2182,7 +2194,16 @@ replace CRLF instances with LF.</p>
     <span class="hljs-keyword">return</span> _html;
   };
   html = <span class="hljs-keyword">await</span> <span class="hljs-title function_">getContent</span>();
-  html = html.<span class="hljs-title function_">replace</span>(<span class="hljs-string">&quot;[CONTENT]&quot;</span>, rendered);
+
+  <span class="hljs-keyword">let</span> authorlist = authors.<span class="hljs-title function_">split</span>(<span class="hljs-string">&quot;;&quot;</span>);
+  <span class="hljs-keyword">let</span> meta_authors = <span class="hljs-string">&#x27;&#x27;</span>;
+  <span class="hljs-keyword">for</span>(<span class="hljs-keyword">let</span> author <span class="hljs-keyword">of</span> authorlist) {
+    meta_authors += <span class="hljs-string">`&lt;meta name=&quot;author&quot; content=&quot;<span class="hljs-subst">${author}</span>&quot;&gt;`</span>;
+  }
+
+  html = html
+    .<span class="hljs-title function_">replace</span>(<span class="hljs-string">&quot;[CONTENT]&quot;</span>, rendered)
+    .<span class="hljs-title function_">replace</span>(<span class="hljs-string">&quot;[AUTHORS]&quot;</span>, meta_authors);
 
   <span class="hljs-keyword">if</span>(os.<span class="hljs-title function_">platform</span>()===<span class="hljs-string">&#x27;win32&#x27;</span>){
     <span class="hljs-keyword">const</span> lf2crlf = <span class="hljs-regexp">/([^\r])\n/g</span>;
@@ -2266,6 +2287,9 @@ bits and pieces that are required for the proper functioning of the tools.</p>
 </div><p>After the imports we introduce the <code>oldFence</code> where we will keep a hold of the
 fence rule from the default <em>MarkdownIt</em> parser. I was not entirely sure how to
 best tackle it, so for now it is here.</p>
+<p>Here we also find <code>htmlTemplateFile</code> and <code>authors</code>, variables that can be set in
+a <strong>literate</strong> program through a code fence in <code>index.literate</code> with the token
+info containing the string <code>SETTINGS</code>.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;literate.*&gt;&gt;=+ </div>
 <div class="code">
