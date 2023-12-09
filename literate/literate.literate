@@ -606,7 +606,7 @@ This method takes a text document and a range, based on which the token
 containing the range is returned. If no token is found, or the workspace folder
 is not available the `emptyToken` constant is returned.
 
-``` ts : <<method to get token at position>>=
+```ts : <<method to get token at position>>=
 getTokenAtPosition(
   document : vscode.TextDocument,
   range : vscode.Range
@@ -617,7 +617,7 @@ getTokenAtPosition(
 Determine the workspace folder for the given text document. As mentioned above,
 is no workspace folder is found the `emptyToken` is returned.
 
-```  ts  : <<method to get token at position>>=+
+```ts : <<method to get token at position>>=+
   const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
   if(!workspaceFolder)
   {
@@ -627,7 +627,7 @@ is no workspace folder is found the `emptyToken` is returned.
 
 Next we can retrieve the state for the document.
 
-```   ts   : <<method to get token at position>>=+
+```ts : <<method to get token at position>>=+
   const state = this.getDocumentState(document);
 ```
 
@@ -660,7 +660,7 @@ are interested in.
 
 If no hit was found return the `emptyToken`.
 
-```      ts      : <<method to get token at position>>=+
+```ts : <<method to get token at position>>=+
   return emptyToken;
 }
 ```
@@ -1469,7 +1469,7 @@ function renderCodeFence(tokens : Token[],
              env : any,
              slf : Renderer) {
   let rendered = '';
-  if (oldFence) {
+  if (oldFence && tokens[idx].info.indexOf("SETTINGS")<0) {
     rendered = oldFence(tokens, idx, options, env, slf);
 
     let token = tokens[idx];
@@ -1485,6 +1485,7 @@ function renderCodeFence(tokens : Token[],
           root = root || '';
           add = add || '';
           fileName = fileName || '';
+          fileName = fileName.trim();
           rendered = protectFragmentTags(rendered);
           rendered =
 `<div class="codefragment">
@@ -1936,12 +1937,15 @@ async function getLiterateFileUris(
   <<see if an index.literate exists>>
   <<search index for html links>>
   <<sort uris based on html link order>>
+  <<get SETTINGS from index.literate>>
   return foundLiterateFiles;
 }
 ```
 
 TBD: create instead a markup that allows us to express the literate file order
 in whichever file we want.
+
+If we don't find an `index.literate` file return the found literate files as is.
 
 ```  ts  : <<see if an index.literate exists>>=
 const index = _foundLiterateFiles.find(uri => uri.path.endsWith('index.literate'));
@@ -2016,6 +2020,33 @@ if(!finalCheck)
 }
 ```
 
+### Get project settings
+
+```ts : <<get SETTINGS from index.literate>>=
+for(let token of env.gstate.tokens)
+{
+  if(token.type==='fence' && token.tag==='code' && token.info.indexOf("SETTINGS")>=0)
+  {
+    const lines = token.content.split("\n");
+    for(let line of lines) {
+      line = line.trim();
+      if(line.startsWith("template")) {
+        let parts = line.split("=");
+        const templateFileInWorkspace : vscode.RelativePattern =
+        new vscode.RelativePattern(workspaceFolder, parts[1]);
+        const _foundHtmlTemplateFile = await vscode.workspace
+          .findFiles(templateFileInWorkspace)
+          .then(files => Promise.all(files.map(file => file)));
+        console.log(_foundHtmlTemplateFile);
+        if(_foundHtmlTemplateFile.length===1) {
+          htmlTemplateFile = _foundHtmlTemplateFile[0];
+        }
+      }
+    }
+  }
+}
+```
+
 ### Write out HTML
 
 Function to write out the given `rendered` content out to a file. The `rendered`
@@ -2027,20 +2058,31 @@ replace single LF instances with CRLF and vice versa on non-Windows machines
 replace CRLF instances with LF.
 
 ``` ts : <<utility functions>>=+
-function writeOutHtml
+async function writeOutHtml
       (fname : string,
        folderUri : vscode.Uri,
-       rendered : string) : Thenable<void>
+       rendered : string) : Promise<void>
 {
-  let html =
+  let html = '';
+  const getContent = async () => {
+    let _html = '';
+    if(htmlTemplateFile) {
+      _html = await getFileContent(htmlTemplateFile);
+    } else {
+      _html =
 `<html>
-  <head>
-    <link rel="stylesheet" type="text/css" href="./style.css">
-  </head>
-  <body>
-  ${rendered}
-  </body>
+<head>
+  <link rel="stylesheet" type="text/css" href="./style.css">
+</head>
+<body>
+[CONTENT]
+</body>
 </html>`;
+    }
+    return _html;
+  };
+  html = await getContent();
+  html = html.replace("[CONTENT]", rendered);
 
   if(os.platform()==='win32'){
     const lf2crlf = /([^\r])\n/g;
@@ -2122,17 +2164,20 @@ After the imports we introduce the `oldFence` where we will keep a hold of the
 fence rule from the default *MarkdownIt* parser. I was not entirely sure how to
 best tackle it, so for now it is here.
 
-``` ts : <<literate.*>>=+
+```ts : <<literate.*>>=+
 let oldFence : Renderer.RenderRule | undefined;
 const FENCE = '```';
 const OPENING = '<<';
 const CLOSING = '>>';
+
+let htmlTemplateFile : vscode.Uri | undefined = undefined;
+let authors = '';
 ```
 
 With that out of the way we introduce the interfaces we use in the Literate
 Programming extension.
 
-``` ts : <<literate.*>>=+
+```ts : <<literate.*>>=+
 <<introduce interfaces>>
 
 ```
@@ -2143,7 +2188,7 @@ when a literate project is open. We need a representation for a node in the tree
 view, a data provider for the tree view and then the actual tree view explorer
 itself.
 
-``` ts : <<literate.*>>=+
+```ts : <<literate.*>>=+
 <<fragment regular expressions>>
 
 <<fragment node>>
@@ -2259,7 +2304,7 @@ interface WriteRenderCallback {
     fname : string,
     folderUri : vscode.Uri,
     content : string
-  ) : Thenable<void>
+  ) : Promise<void>
 };
 interface WriteSourceCallback {
   (

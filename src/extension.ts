@@ -21,12 +21,15 @@ let oldFence : Renderer.RenderRule | undefined;
 const FENCE = '```';
 const OPENING = '<<';
 const CLOSING = '>>';
+
+let htmlTemplateFile : vscode.Uri | undefined = undefined;
+let authors = '';
 interface WriteRenderCallback {
   (
     fname : string,
     folderUri : vscode.Uri,
     content : string
-  ) : Thenable<void>
+  ) : Promise<void>
 };
 interface WriteSourceCallback {
   (
@@ -336,7 +339,7 @@ function renderCodeFence(tokens : Token[],
              env : any,
              slf : Renderer) {
   let rendered = '';
-  if (oldFence) {
+  if (oldFence && tokens[idx].info.indexOf("SETTINGS")<0) {
     rendered = oldFence(tokens, idx, options, env, slf);
 
     let token = tokens[idx];
@@ -352,6 +355,7 @@ function renderCodeFence(tokens : Token[],
           root = root || '';
           add = add || '';
           fileName = fileName || '';
+          fileName = fileName.trim();
           rendered = protectFragmentTags(rendered);
           rendered =
 `<div class="codefragment">
@@ -1355,22 +1359,55 @@ async function getLiterateFileUris(
   {
     foundLiterateFiles.splice(0, 0, index);
   }
+  for(let token of env.gstate.tokens)
+  {
+    if(token.type==='fence' && token.tag==='code' && token.info.indexOf("SETTINGS")>=0)
+    {
+      const lines = token.content.split("\n");
+      for(let line of lines) {
+        line = line.trim();
+        if(line.startsWith("template")) {
+          let parts = line.split("=");
+          const templateFileInWorkspace : vscode.RelativePattern =
+          new vscode.RelativePattern(workspaceFolder, parts[1]);
+          const _foundHtmlTemplateFile = await vscode.workspace
+            .findFiles(templateFileInWorkspace)
+            .then(files => Promise.all(files.map(file => file)));
+          console.log(_foundHtmlTemplateFile);
+          if(_foundHtmlTemplateFile.length===1) {
+            htmlTemplateFile = _foundHtmlTemplateFile[0];
+          }
+        }
+      }
+    }
+  }
   return foundLiterateFiles;
 }
-function writeOutHtml
+async function writeOutHtml
       (fname : string,
        folderUri : vscode.Uri,
-       rendered : string) : Thenable<void>
+       rendered : string) : Promise<void>
 {
-  let html =
+  let html = '';
+  const getContent = async () => {
+    let _html = '';
+    if(htmlTemplateFile) {
+      _html = await getFileContent(htmlTemplateFile);
+    } else {
+      _html =
 `<html>
-  <head>
-    <link rel="stylesheet" type="text/css" href="./style.css">
-  </head>
-  <body>
-  ${rendered}
-  </body>
+<head>
+  <link rel="stylesheet" type="text/css" href="./style.css">
+</head>
+<body>
+[CONTENT]
+</body>
 </html>`;
+    }
+    return _html;
+  };
+  html = await getContent();
+  html = html.replace("[CONTENT]", rendered);
 
   if(os.platform()==='win32'){
     const lf2crlf = /([^\r])\n/g;

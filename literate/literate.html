@@ -1522,7 +1522,7 @@ If we have a match we prepare the <code>HTML</code> code to essentially wrap aro
              env : <span class="hljs-built_in">any</span>,
              slf : Renderer</span>) {
   <span class="hljs-keyword">let</span> rendered = <span class="hljs-string">&#x27;&#x27;</span>;
-  <span class="hljs-keyword">if</span> (oldFence) {
+  <span class="hljs-keyword">if</span> (oldFence &amp;&amp; tokens[idx].<span class="hljs-property">info</span>.<span class="hljs-title function_">indexOf</span>(<span class="hljs-string">&quot;SETTINGS&quot;</span>)&lt;<span class="hljs-number">0</span>) {
     rendered = <span class="hljs-title function_">oldFence</span>(tokens, idx, options, env, slf);
 
     <span class="hljs-keyword">let</span> token = tokens[idx];
@@ -1538,6 +1538,7 @@ If we have a match we prepare the <code>HTML</code> code to essentially wrap aro
           root = root || <span class="hljs-string">&#x27;&#x27;</span>;
           add = add || <span class="hljs-string">&#x27;&#x27;</span>;
           fileName = fileName || <span class="hljs-string">&#x27;&#x27;</span>;
+          fileName = fileName.<span class="hljs-title function_">trim</span>();
           rendered = <span class="hljs-title function_">protectFragmentTags</span>(rendered);
           rendered =
 <span class="hljs-string">`&lt;div class=&quot;codefragment&quot;&gt;
@@ -2013,6 +2014,7 @@ by <code>findFiles</code>.</p>
   <span class="literate-tag-name">&lt;&lt;see if an index.literate exists&gt;&gt;</span>
   <span class="literate-tag-name">&lt;&lt;search index for html links&gt;&gt;</span>
   <span class="literate-tag-name">&lt;&lt;sort uris based on html link order&gt;&gt;</span>
+  <span class="literate-tag-name">&lt;&lt;get SETTINGS from index.literate&gt;&gt;</span>
   <span class="hljs-keyword">return</span> foundLiterateFiles;
 }
 </code></pre>
@@ -2020,6 +2022,7 @@ by <code>findFiles</code>.</p>
 </div>
 </div><p>TBD: create instead a markup that allows us to express the literate file order
 in whichever file we want.</p>
+<p>If we don't find an <code>index.literate</code> file return the found literate files as is.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;see if an index.literate exists&gt;&gt;= </div>
 <div class="code">
@@ -2101,6 +2104,35 @@ find the uri to the HTML version of a <strong>literate</strong> file.</p>
 </code></pre>
 
 </div>
+</div><h3>Get project settings</h3>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;get SETTINGS from index.literate&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span>(<span class="hljs-keyword">let</span> token <span class="hljs-keyword">of</span> env.<span class="hljs-property">gstate</span>.<span class="hljs-property">tokens</span>)
+{
+  <span class="hljs-keyword">if</span>(token.<span class="hljs-property">type</span>===<span class="hljs-string">&#x27;fence&#x27;</span> &amp;&amp; token.<span class="hljs-property">tag</span>===<span class="hljs-string">&#x27;code&#x27;</span> &amp;&amp; token.<span class="hljs-property">info</span>.<span class="hljs-title function_">indexOf</span>(<span class="hljs-string">&quot;SETTINGS&quot;</span>)&gt;=<span class="hljs-number">0</span>)
+  {
+    <span class="hljs-keyword">const</span> lines = token.<span class="hljs-property">content</span>.<span class="hljs-title function_">split</span>(<span class="hljs-string">&quot;\n&quot;</span>);
+    <span class="hljs-keyword">for</span>(<span class="hljs-keyword">let</span> line <span class="hljs-keyword">of</span> lines) {
+      line = line.<span class="hljs-title function_">trim</span>();
+      <span class="hljs-keyword">if</span>(line.<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&quot;template&quot;</span>)) {
+        <span class="hljs-keyword">let</span> parts = line.<span class="hljs-title function_">split</span>(<span class="hljs-string">&quot;=&quot;</span>);
+        <span class="hljs-keyword">const</span> templateFileInWorkspace : vscode.<span class="hljs-property">RelativePattern</span> =
+        <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">RelativePattern</span>(workspaceFolder, parts[<span class="hljs-number">1</span>]);
+        <span class="hljs-keyword">const</span> _foundHtmlTemplateFile = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>
+          .<span class="hljs-title function_">findFiles</span>(templateFileInWorkspace)
+          .<span class="hljs-title function_">then</span>(<span class="hljs-function"><span class="hljs-params">files</span> =&gt;</span> <span class="hljs-title class_">Promise</span>.<span class="hljs-title function_">all</span>(files.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">file</span> =&gt;</span> file)));
+        <span class="hljs-variable language_">console</span>.<span class="hljs-title function_">log</span>(_foundHtmlTemplateFile);
+        <span class="hljs-keyword">if</span>(_foundHtmlTemplateFile.<span class="hljs-property">length</span>===<span class="hljs-number">1</span>) {
+          htmlTemplateFile = _foundHtmlTemplateFile[<span class="hljs-number">0</span>];
+        }
+      }
+    }
+  }
+}
+</code></pre>
+
+</div>
 </div><h3>Write out HTML</h3>
 <p>Function to write out the given <code>rendered</code> content out to a file. The <code>rendered</code>
 string will be set into a HTML body. The header will be configured so that the
@@ -2111,20 +2143,31 @@ replace CRLF instances with LF.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;utility functions&gt;&gt;=+ </div>
 <div class="code">
-<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">writeOutHtml</span>
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">writeOutHtml</span>
       (fname : <span class="hljs-built_in">string</span>,
        folderUri : vscode.<span class="hljs-property">Uri</span>,
-       rendered : <span class="hljs-built_in">string</span>) : <span class="hljs-title class_">Thenable</span>&lt;<span class="hljs-built_in">void</span>&gt;
+       rendered : <span class="hljs-built_in">string</span>) : <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt;
 {
-  <span class="hljs-keyword">let</span> html =
+  <span class="hljs-keyword">let</span> html = <span class="hljs-string">&#x27;&#x27;</span>;
+  <span class="hljs-keyword">const</span> <span class="hljs-title function_">getContent</span> = <span class="hljs-keyword">async</span> (<span class="hljs-params"></span>) =&gt; {
+    <span class="hljs-keyword">let</span> _html = <span class="hljs-string">&#x27;&#x27;</span>;
+    <span class="hljs-keyword">if</span>(htmlTemplateFile) {
+      _html = <span class="hljs-keyword">await</span> <span class="hljs-title function_">getFileContent</span>(htmlTemplateFile);
+    } <span class="hljs-keyword">else</span> {
+      _html =
 <span class="hljs-string">`&lt;html&gt;
-  &lt;head&gt;
-    &lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;./style.css&quot;&gt;
-  &lt;/head&gt;
-  &lt;body&gt;
-  <span class="hljs-subst">${rendered}</span>
-  &lt;/body&gt;
+&lt;head&gt;
+  &lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;./style.css&quot;&gt;
+&lt;/head&gt;
+&lt;body&gt;
+[CONTENT]
+&lt;/body&gt;
 &lt;/html&gt;`</span>;
+    }
+    <span class="hljs-keyword">return</span> _html;
+  };
+  html = <span class="hljs-keyword">await</span> <span class="hljs-title function_">getContent</span>();
+  html = html.<span class="hljs-title function_">replace</span>(<span class="hljs-string">&quot;[CONTENT]&quot;</span>, rendered);
 
   <span class="hljs-keyword">if</span>(os.<span class="hljs-title function_">platform</span>()===<span class="hljs-string">&#x27;win32&#x27;</span>){
     <span class="hljs-keyword">const</span> lf2crlf = <span class="hljs-regexp">/([^\r])\n/g</span>;
@@ -2215,6 +2258,9 @@ best tackle it, so for now it is here.</p>
 <span class="hljs-keyword">const</span> <span class="hljs-variable constant_">FENCE</span> = <span class="hljs-string">&#x27;```&#x27;</span>;
 <span class="hljs-keyword">const</span> <span class="hljs-variable constant_">OPENING</span> = <span class="hljs-string">&#x27;&lt;&lt;&#x27;</span>;
 <span class="hljs-keyword">const</span> <span class="hljs-variable constant_">CLOSING</span> = <span class="hljs-string">&#x27;&gt;&gt;&#x27;</span>;
+
+<span class="hljs-keyword">let</span> htmlTemplateFile : vscode.<span class="hljs-property">Uri</span> | <span class="hljs-literal">undefined</span> = <span class="hljs-literal">undefined</span>;
+<span class="hljs-keyword">let</span> authors = <span class="hljs-string">&#x27;&#x27;</span>;
 </code></pre>
 
 </div>
@@ -2364,7 +2410,7 @@ just an empty-bodied implementation for it.</p>
     fname : <span class="hljs-built_in">string</span>,
     folderUri : vscode.<span class="hljs-property">Uri</span>,
     content : <span class="hljs-built_in">string</span>
-  ) : <span class="hljs-title class_">Thenable</span>&lt;<span class="hljs-built_in">void</span>&gt;
+  ) : <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt;
 };
 <span class="hljs-keyword">interface</span> <span class="hljs-title class_">WriteSourceCallback</span> {
   (
