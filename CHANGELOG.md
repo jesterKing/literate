@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.14.1
+
+* Quick adaptations for support of v0.14.0 features, no functional changes.
+
 ## 0.14.0
 
 * Add template support
