@@ -67,6 +67,10 @@ interface FragmentInformation {
    */
   sourceFileName: string;
   /**
+   * Uri to source template filename.
+   */
+  templateFileName: vscode.Uri | undefined;
+  /**
    * The code fragment.
    */
   code: string;
@@ -93,7 +97,7 @@ const emptyToken : TokenUsage =
 const FRAGMENT_USE_IN_CODE_RE =
   /(?<indent>[ \t]*)<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?/g;
 const FRAGMENT_RE =
-  /(?<lang>[^:]*)(?<colon>:)?.*<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*\s+\$)?/;
+  /(?<lang>[^:]*)(?<colon>:)?.*<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*\s+\$)?(?<extraSettings>\s+.*)?/;
 const FRAGMENT_HTML_CLEANUP_RE= /(<span.class="hljs-.+?">)(.*?)(<\/span>)/g;
 const FRAGMENT_HTML_RE= /(&lt;&lt;.+?&gt;&gt;)/g;
 
@@ -440,6 +444,7 @@ async function handleFragments(
           let root = match.groups.root;
           let add = match.groups.add;
           let fileName = match.groups.fileName;
+          let extraSettings = match.groups.extraSettings;
           if(lang && !match.groups.colon) {
             let msg = `Missing colon for fragment: ${name}. ${env.literateFileName}${linenumber}`;
             const diag = createErrorDiagnostic(token, msg);
@@ -491,11 +496,32 @@ async function handleFragments(
               if(fileName) {
                 fileName = fileName.replace(/\s+\$/, "");
               }
+              let sourceTemplateUri : vscode.Uri | undefined = undefined;
+              if(extraSettings) {
+                let settings = extraSettings.split(";");
+                for(let setting of settings)
+                {
+                  setting = setting.trim();
+                  if(setting.startsWith("template"))
+                  {
+                    let settingParts = setting.split("=");
+                    const sourceTemplateFilePattern : vscode.RelativePattern = new vscode.RelativePattern(workspaceFolder, settingParts[1]);
+                    const _foundSourceTemplateFile = await vscode.workspace
+                      .findFiles(sourceTemplateFilePattern)
+                      .then(files => Promise.all(files.map(file => file)));
+                    if(_foundSourceTemplateFile.length===1)
+                    {
+                      sourceTemplateUri = _foundSourceTemplateFile[0];
+                    }
+                  }
+                }
+              }
               let code = token.content;
               let fragmentInfo: FragmentInformation = {
                 lang: lang,
                 literateFileName: env.literateFileName,
                 sourceFileName: fileName,
+                templateFileName: sourceTemplateUri,
                 code: code,
                 tokens: [token],
                 env: env,
@@ -590,14 +616,19 @@ async function writeSourceFiles(workspaceFolder : vscode.WorkspaceFolder,
     if (name.endsWith(".*")) {
       let fragmentInfo = fragments.get(name) || undefined;
       if (fragmentInfo && fragmentInfo.sourceFileName) {
+        let sourceTemplate = '[CODE]';
+        if(fragmentInfo.templateFileName) {
+          sourceTemplate = await getFileContent(fragmentInfo.templateFileName);
+        }
+        let code = sourceTemplate.replace("[CODE]", fragmentInfo.code);
         let fixed = '';
         if(os.platform()==='win32')
         {
           const lf2crlf = /([^\r])\n/g;
-          fixed = fragmentInfo.code.replaceAll(lf2crlf, '$1\r\n');
+          fixed = code.replaceAll(lf2crlf, '$1\r\n');
         } else {
           const crlf2lf = /\r\n/g;
-          fixed = fragmentInfo.code.replaceAll(crlf2lf, '\n');
+          fixed = code.replaceAll(crlf2lf, '\n');
         }
         const encoded = Buffer.from(fixed, 'utf-8');
         let fileName = fragmentInfo.sourceFileName.trim();
@@ -1416,14 +1447,14 @@ async function writeOutHtml
   html = await getContent();
 
   let authorlist = authors.split(";");
-  let meta_authors = '';
+  let metaAuthors = '';
   for(let author of authorlist) {
-    meta_authors += `<meta name="author" content="${author}">`;
+    metaAuthors += `<meta name="author" content="${author}">`;
   }
 
   html = html
     .replace("[CONTENT]", rendered)
-    .replace("[AUTHORS]", meta_authors);
+    .replace("[AUTHORS]", metaAuthors);
 
   if(os.platform()==='win32'){
     const lf2crlf = /([^\r])\n/g;

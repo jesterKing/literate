@@ -1045,13 +1045,15 @@ following the language specifier.
 
 ``` ts : <<fragment regular expressions>>=+
 const FRAGMENT_RE =
-  /(?<lang>[^:]*)(?<colon>:)?.*<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*\s+\$)?/;
+  /(?<lang>[^:]*)(?<colon>:)?.*<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*\s+\$)?(?<extraSettings>\s+.*)?/;
 ```
 
 Most of the groups correspond to the ones defined by `FRAGMENT_USE_IN_CODE_RE`
 with a few additions. Most notably there is the group catching the language
-specifier, and the group to catch the filename, called `lang` and `fileName`
-respectively.
+specifier, the group to catch the filename and the group to catch extra
+settings, called `lang`, `fileName` and `extraSettings` respectively.
+
+The filename group has to end in whitespace and a dollar sign.
 
 Also the colon is separated out into a group. That will allow for checking if a
 tag declaration is properly formed. When the colon is missing it is possible to
@@ -1132,6 +1134,7 @@ if (token.type === 'fence') {
     let root = match.groups.root;
     let add = match.groups.add;
     let fileName = match.groups.fileName;
+    let extraSettings = match.groups.extraSettings;
     <<emit diagnostic when colon is missing>>
     <<add to existing fragment>>
     <<create a new fragment>>
@@ -1195,7 +1198,7 @@ though if we have a top-level fragment. In that case we require a file name, so
 emit an error diagnostic when that is missing.
 
 
-``` ts : <<create a new fragment>>=+
+```ts : <<create a new fragment>>=+
   else {
     if (!fileName && name.indexOf(".*") > -1 ) {
       if(!missingFilenames.includes(name)) {
@@ -1228,15 +1231,44 @@ expression for this contains whitespace and a dollar sign.
     }
 ```
 
+Check the `extraSettings` group if a template is specified. Find the
+`vscode.Uri` for the file specified. Use that if it exists, otherwise keep
+`sourceTemplateUri` at `undefined`.
+
+```ts : <<create a new fragment>>=+
+    let sourceTemplateUri : vscode.Uri | undefined = undefined;
+    if(extraSettings) {
+      let settings = extraSettings.split(";");
+      for(let setting of settings)
+      {
+        setting = setting.trim();
+        if(setting.startsWith("template"))
+        {
+          let settingParts = setting.split("=");
+          const sourceTemplateFilePattern : vscode.RelativePattern = new vscode.RelativePattern(workspaceFolder, settingParts[1]);
+          const _foundSourceTemplateFile = await vscode.workspace
+            .findFiles(sourceTemplateFilePattern)
+            .then(files => Promise.all(files.map(file => file)));
+          if(_foundSourceTemplateFile.length===1)
+          {
+            sourceTemplateUri = _foundSourceTemplateFile[0];
+          }
+        }
+      }
+    }
+```
+
+
 We can now finally create the `FragmentInformation` instance and add it to our
 fragment map.
 
-``` ts : <<create a new fragment>>=+
+```ts : <<create a new fragment>>=+
     let code = token.content;
     let fragmentInfo: FragmentInformation = {
       lang: lang,
       literateFileName: env.literateFileName,
       sourceFileName: fileName,
+      templateFileName: sourceTemplateUri,
       code: code,
       tokens: [token],
       env: env,
@@ -1316,6 +1348,10 @@ interface FragmentInformation {
    */
   sourceFileName: string;
   /**
+   * Uri to source template filename.
+   */
+  templateFileName: vscode.Uri | undefined;
+  /**
    * The code fragment.
    */
   code: string;
@@ -1337,6 +1373,11 @@ For each key that ends with the `.*` string we check if a fragment exists, and
 if for that fragment a source filename is recorded. If that is the case write
 out the file with the code content of the fragment.
 
+If a `vscode.Uri` is defined for `templateFileName` read the file contents and
+use that instead of the default one that says just `[CODE]`. This means that for
+a template to work properly it needs to contain the string `[CODE]`, since that
+will be replaced with the code generated for this file.
+
 For newline handling we'll replace all single LF occurances with CRLF when the
 underlying operating system is Windows. Otherwise do the reverse: replace CRLF
 with a single LF.
@@ -1351,14 +1392,19 @@ async function writeSourceFiles(workspaceFolder : vscode.WorkspaceFolder,
     if (name.endsWith(".*")) {
       let fragmentInfo = fragments.get(name) || undefined;
       if (fragmentInfo && fragmentInfo.sourceFileName) {
+        let sourceTemplate = '[CODE]';
+        if(fragmentInfo.templateFileName) {
+          sourceTemplate = await getFileContent(fragmentInfo.templateFileName);
+        }
+        let code = sourceTemplate.replace("[CODE]", fragmentInfo.code);
         let fixed = '';
         if(os.platform()==='win32')
         {
           const lf2crlf = /([^\r])\n/g;
-          fixed = fragmentInfo.code.replaceAll(lf2crlf, '$1\r\n');
+          fixed = code.replaceAll(lf2crlf, '$1\r\n');
         } else {
           const crlf2lf = /\r\n/g;
-          fixed = fragmentInfo.code.replaceAll(crlf2lf, '\n');
+          fixed = code.replaceAll(crlf2lf, '\n');
         }
         const encoded = Buffer.from(fixed, 'utf-8');
         let fileName = fragmentInfo.sourceFileName.trim();
@@ -2116,14 +2162,14 @@ async function writeOutHtml
   html = await getContent();
 
   let authorlist = authors.split(";");
-  let meta_authors = '';
+  let metaAuthors = '';
   for(let author of authorlist) {
-    meta_authors += `<meta name="author" content="${author}">`;
+    metaAuthors += `<meta name="author" content="${author}">`;
   }
 
   html = html
     .replace("[CONTENT]", rendered)
-    .replace("[AUTHORS]", meta_authors);
+    .replace("[AUTHORS]", metaAuthors);
 
   if(os.platform()==='win32'){
     const lf2crlf = /([^\r])\n/g;

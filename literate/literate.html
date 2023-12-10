@@ -1099,14 +1099,15 @@ following the language specifier.</p>
 <div class="fragmentname">&lt;&lt;fragment regular expressions&gt;&gt;=+ </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">const</span> <span class="hljs-variable constant_">FRAGMENT_RE</span> =
-  <span class="hljs-regexp">/(?&lt;lang&gt;[^:]*)(?&lt;colon&gt;:)?.*<span class="literate-tag-name">&lt;&lt;(?&lt;tagName&gt;.+)&gt;&gt;</span>(?&lt;root&gt;=)?(?&lt;add&gt;\+)?\s*(?&lt;fileName&gt;.*\s+\$)?/</span>;
+  <span class="hljs-regexp">/(?&lt;lang&gt;[^:]*)(?&lt;colon&gt;:)?.*<span class="literate-tag-name">&lt;&lt;(?&lt;tagName&gt;.+)&gt;&gt;</span>(?&lt;root&gt;=)?(?&lt;add&gt;\+)?\s*(?&lt;fileName&gt;.*\s+\$)?(?&lt;extraSettings&gt;\s+.*)?/</span>;
 </code></pre>
 
 </div>
 </div><p>Most of the groups correspond to the ones defined by <code>FRAGMENT_USE_IN_CODE_RE</code>
 with a few additions. Most notably there is the group catching the language
-specifier, and the group to catch the filename, called <code>lang</code> and <code>fileName</code>
-respectively.</p>
+specifier, the group to catch the filename and the group to catch extra
+settings, called <code>lang</code>, <code>fileName</code> and <code>extraSettings</code> respectively.</p>
+<p>The filename group has to end in whitespace and a dollar sign.</p>
 <p>Also the colon is separated out into a group. That will allow for checking if a
 tag declaration is properly formed. When the colon is missing it is possible to
 detect this and emit a diagnostic accordingly.</p>
@@ -1185,6 +1186,7 @@ fragment is malformed if the colon is missing, so we need to
     <span class="hljs-keyword">let</span> root = match.<span class="hljs-property">groups</span>.<span class="hljs-property">root</span>;
     <span class="hljs-keyword">let</span> add = match.<span class="hljs-property">groups</span>.<span class="hljs-property">add</span>;
     <span class="hljs-keyword">let</span> fileName = match.<span class="hljs-property">groups</span>.<span class="hljs-property">fileName</span>;
+    <span class="hljs-keyword">let</span> extraSettings = match.<span class="hljs-property">groups</span>.<span class="hljs-property">extraSettings</span>;
     <span class="literate-tag-name">&lt;&lt;emit diagnostic when colon is missing&gt;&gt;</span>
     <span class="literate-tag-name">&lt;&lt;add to existing fragment&gt;&gt;</span>
     <span class="literate-tag-name">&lt;&lt;create a new fragment&gt;&gt;</span>
@@ -1284,6 +1286,35 @@ expression for this contains whitespace and a dollar sign.</p>
 </code></pre>
 
 </div>
+</div><p>Check the <code>extraSettings</code> group if a template is specified. Find the
+<code>vscode.Uri</code> for the file specified. Use that if it exists, otherwise keep
+<code>sourceTemplateUri</code> at <code>undefined</code>.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;create a new fragment&gt;&gt;=+ </div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">let</span> sourceTemplateUri : vscode.<span class="hljs-property">Uri</span> | <span class="hljs-literal">undefined</span> = <span class="hljs-literal">undefined</span>;
+    <span class="hljs-keyword">if</span>(extraSettings) {
+      <span class="hljs-keyword">let</span> settings = extraSettings.<span class="hljs-title function_">split</span>(<span class="hljs-string">&quot;;&quot;</span>);
+      <span class="hljs-keyword">for</span>(<span class="hljs-keyword">let</span> setting <span class="hljs-keyword">of</span> settings)
+      {
+        setting = setting.<span class="hljs-title function_">trim</span>();
+        <span class="hljs-keyword">if</span>(setting.<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&quot;template&quot;</span>))
+        {
+          <span class="hljs-keyword">let</span> settingParts = setting.<span class="hljs-title function_">split</span>(<span class="hljs-string">&quot;=&quot;</span>);
+          <span class="hljs-keyword">const</span> sourceTemplateFilePattern : vscode.<span class="hljs-property">RelativePattern</span> = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">RelativePattern</span>(workspaceFolder, settingParts[<span class="hljs-number">1</span>]);
+          <span class="hljs-keyword">const</span> _foundSourceTemplateFile = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>
+            .<span class="hljs-title function_">findFiles</span>(sourceTemplateFilePattern)
+            .<span class="hljs-title function_">then</span>(<span class="hljs-function"><span class="hljs-params">files</span> =&gt;</span> <span class="hljs-title class_">Promise</span>.<span class="hljs-title function_">all</span>(files.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">file</span> =&gt;</span> file)));
+          <span class="hljs-keyword">if</span>(_foundSourceTemplateFile.<span class="hljs-property">length</span>===<span class="hljs-number">1</span>)
+          {
+            sourceTemplateUri = _foundSourceTemplateFile[<span class="hljs-number">0</span>];
+          }
+        }
+      }
+    }
+</code></pre>
+
+</div>
 </div><p>We can now finally create the <code>FragmentInformation</code> instance and add it to our
 fragment map.</p>
 <div class="codefragment">
@@ -1294,6 +1325,7 @@ fragment map.</p>
       <span class="hljs-attr">lang</span>: lang,
       <span class="hljs-attr">literateFileName</span>: env.<span class="hljs-property">literateFileName</span>,
       <span class="hljs-attr">sourceFileName</span>: fileName,
+      <span class="hljs-attr">templateFileName</span>: sourceTemplateUri,
       <span class="hljs-attr">code</span>: code,
       <span class="hljs-attr">tokens</span>: [token],
       <span class="hljs-attr">env</span>: env,
@@ -1370,6 +1402,10 @@ module.</p>
    */</span>
   <span class="hljs-attr">sourceFileName</span>: <span class="hljs-built_in">string</span>;
   <span class="hljs-comment">/**
+   * Uri to source template filename.
+   */</span>
+  <span class="hljs-attr">templateFileName</span>: vscode.<span class="hljs-property">Uri</span> | <span class="hljs-literal">undefined</span>;
+  <span class="hljs-comment">/**
    * The code fragment.
    */</span>
   <span class="hljs-attr">code</span>: <span class="hljs-built_in">string</span>;
@@ -1390,6 +1426,10 @@ module.</p>
 For each key that ends with the <code>.*</code> string we check if a fragment exists, and
 if for that fragment a source filename is recorded. If that is the case write
 out the file with the code content of the fragment.</p>
+<p>If a <code>vscode.Uri</code> is defined for <code>templateFileName</code> read the file contents and
+use that instead of the default one that says just <code>[CODE]</code>. This means that for
+a template to work properly it needs to contain the string <code>[CODE]</code>, since that
+will be replaced with the code generated for this file.</p>
 <p>For newline handling we'll replace all single LF occurances with CRLF when the
 underlying operating system is Windows. Otherwise do the reverse: replace CRLF
 with a single LF.</p>
@@ -1405,14 +1445,19 @@ with a single LF.</p>
     <span class="hljs-keyword">if</span> (name.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&quot;.*&quot;</span>)) {
       <span class="hljs-keyword">let</span> fragmentInfo = fragments.<span class="hljs-title function_">get</span>(name) || <span class="hljs-literal">undefined</span>;
       <span class="hljs-keyword">if</span> (fragmentInfo &amp;&amp; fragmentInfo.<span class="hljs-property">sourceFileName</span>) {
+        <span class="hljs-keyword">let</span> sourceTemplate = <span class="hljs-string">&#x27;[CODE]&#x27;</span>;
+        <span class="hljs-keyword">if</span>(fragmentInfo.<span class="hljs-property">templateFileName</span>) {
+          sourceTemplate = <span class="hljs-keyword">await</span> <span class="hljs-title function_">getFileContent</span>(fragmentInfo.<span class="hljs-property">templateFileName</span>);
+        }
+        <span class="hljs-keyword">let</span> code = sourceTemplate.<span class="hljs-title function_">replace</span>(<span class="hljs-string">&quot;[CODE]&quot;</span>, fragmentInfo.<span class="hljs-property">code</span>);
         <span class="hljs-keyword">let</span> fixed = <span class="hljs-string">&#x27;&#x27;</span>;
         <span class="hljs-keyword">if</span>(os.<span class="hljs-title function_">platform</span>()===<span class="hljs-string">&#x27;win32&#x27;</span>)
         {
           <span class="hljs-keyword">const</span> lf2crlf = <span class="hljs-regexp">/([^\r])\n/g</span>;
-          fixed = fragmentInfo.<span class="hljs-property">code</span>.<span class="hljs-title function_">replaceAll</span>(lf2crlf, <span class="hljs-string">&#x27;$1\r\n&#x27;</span>);
+          fixed = code.<span class="hljs-title function_">replaceAll</span>(lf2crlf, <span class="hljs-string">&#x27;$1\r\n&#x27;</span>);
         } <span class="hljs-keyword">else</span> {
           <span class="hljs-keyword">const</span> crlf2lf = <span class="hljs-regexp">/\r\n/g</span>;
-          fixed = fragmentInfo.<span class="hljs-property">code</span>.<span class="hljs-title function_">replaceAll</span>(crlf2lf, <span class="hljs-string">&#x27;\n&#x27;</span>);
+          fixed = code.<span class="hljs-title function_">replaceAll</span>(crlf2lf, <span class="hljs-string">&#x27;\n&#x27;</span>);
         }
         <span class="hljs-keyword">const</span> encoded = <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(fixed, <span class="hljs-string">&#x27;utf-8&#x27;</span>);
         <span class="hljs-keyword">let</span> fileName = fragmentInfo.<span class="hljs-property">sourceFileName</span>.<span class="hljs-title function_">trim</span>();
@@ -2196,14 +2241,14 @@ replace CRLF instances with LF.</p>
   html = <span class="hljs-keyword">await</span> <span class="hljs-title function_">getContent</span>();
 
   <span class="hljs-keyword">let</span> authorlist = authors.<span class="hljs-title function_">split</span>(<span class="hljs-string">&quot;;&quot;</span>);
-  <span class="hljs-keyword">let</span> meta_authors = <span class="hljs-string">&#x27;&#x27;</span>;
+  <span class="hljs-keyword">let</span> metaAuthors = <span class="hljs-string">&#x27;&#x27;</span>;
   <span class="hljs-keyword">for</span>(<span class="hljs-keyword">let</span> author <span class="hljs-keyword">of</span> authorlist) {
-    meta_authors += <span class="hljs-string">`&lt;meta name=&quot;author&quot; content=&quot;<span class="hljs-subst">${author}</span>&quot;&gt;`</span>;
+    metaAuthors += <span class="hljs-string">`&lt;meta name=&quot;author&quot; content=&quot;<span class="hljs-subst">${author}</span>&quot;&gt;`</span>;
   }
 
   html = html
     .<span class="hljs-title function_">replace</span>(<span class="hljs-string">&quot;[CONTENT]&quot;</span>, rendered)
-    .<span class="hljs-title function_">replace</span>(<span class="hljs-string">&quot;[AUTHORS]&quot;</span>, meta_authors);
+    .<span class="hljs-title function_">replace</span>(<span class="hljs-string">&quot;[AUTHORS]&quot;</span>, metaAuthors);
 
   <span class="hljs-keyword">if</span>(os.<span class="hljs-title function_">platform</span>()===<span class="hljs-string">&#x27;win32&#x27;</span>){
     <span class="hljs-keyword">const</span> lf2crlf = <span class="hljs-regexp">/([^\r])\n/g</span>;
