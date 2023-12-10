@@ -1,5 +1,18 @@
 # Change Log
 
+## 0.14.0
+
+* Add template support
+  * HTML template file can be specified in code fence with info containing
+    string `SETTINGS`. This code fence needs to be placed in `index.literate`. A
+    default HTML template is baked into the extension. This can be overridden by
+    specifying your own (#36 #6)
+  * source template file can be specified on starred fragments after the dollar
+    sign. Use `template=filename`
+  * `SETTINGS` fence accepts now two keys: `template` and `authors`. The first
+    takes a filename. The mentioned file has to exist for it to be actually
+    used. `authors` can hold one or more author names separated by semi-colons
+
 ## 0.13.0
 
 * Breaking change: Handle filenames on starred fragments better (#34)

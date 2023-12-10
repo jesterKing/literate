@@ -25,6 +25,17 @@ specification is followed through the use of the markdown-it library. The code
 fence has been extended to include fragment identifiers and their related
 settings.
 
+If an `index.literate` exists the order in the given list referencing literate
+HTML files will be used to determine the order for processing `.literate` files.
+
+The `index.literate` can contain a fence with `SETTINGS` on its info line. This
+fence will be hidden from HTML, but hosts settings for controlling some aspects
+of processing. Key=value pairs are given each on their own line. Currently two
+keys are recognized: `template` and `authors`. The `template` should point to an
+existing file containing an HTML template. The string `[CONTENT]` will be
+replaced with the rendered HTML from the literate document. The string
+`[AUTHORS]` will be replaced with `<meta />` tags for author information.
+
 Code fragments can be created by adding `<<some identifying string>>=` to the
 info line of a code fence, separated by a colon `:` after the language identifier.
 
@@ -38,6 +49,11 @@ name followed by whitespace and ending in a dollar sign:
 
 The file name is relative to the workspace folder. It can contain subfolders,
 which will be automatically created during code generation .
+
+After the file name you can specify extra settings, currently just
+`template=filename`, where `filename` points to a file with a source template.
+The string `[CODE]` in the source template will be replaced with the generated
+source code.
 
 Code fragments can reference other code fragments in code by using the code
 fragment tag `<<some identifying string>>`.
