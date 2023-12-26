@@ -2214,6 +2214,9 @@ replace CRLF instances with LF.</p>
 &lt;/head&gt;
 &lt;body&gt;
 [CONTENT]
+&lt;script type=&quot;module&quot;&gt;
+  import mermaid from &#x27;https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs&#x27;;
+&lt;/script&gt;
 &lt;/body&gt;
 &lt;/html&gt;`</span>;
     }
@@ -2238,30 +2241,6 @@ replace CRLF instances with LF.</p>
     <span class="hljs-keyword">const</span> crlf2lf = <span class="hljs-regexp">/\r\n/g</span>;
     html = html.<span class="hljs-title function_">replaceAll</span>(crlf2lf, <span class="hljs-string">&#x27;\n&#x27;</span>);
   }
-
-    <span class="hljs-keyword">const</span> <span class="hljs-variable constant_">MERMAID_RE</span> = <span class="hljs-regexp">/(&lt;pre class=&quot;mermaid&quot;&gt;\n)(.*?)(\n&lt;\/pre&gt;)/gm</span>s;
-    <span class="hljs-keyword">const</span> mermaids = [...html.<span class="hljs-title function_">matchAll</span>(<span class="hljs-variable constant_">MERMAID_RE</span>)];
-    <span class="hljs-keyword">const</span> mermaidSvgs : <span class="hljs-built_in">string</span>[] = [];
-    <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> mm <span class="hljs-keyword">of</span> mermaids) {
-      <span class="hljs-keyword">try</span> {
-        <span class="hljs-keyword">const</span> source = mm[<span class="hljs-number">2</span>];
-        mermaid.<span class="hljs-property">mermaidAPI</span>.<span class="hljs-title function_">reset</span>();
-        <span class="hljs-keyword">await</span> mermaid.<span class="hljs-title function_">parse</span>(source);
-        <span class="hljs-keyword">const</span> { svg } = <span class="hljs-keyword">await</span> mermaid.<span class="hljs-title function_">render</span>(<span class="hljs-string">&#x27;mermaid&#x27;</span>, source);
-        mermaidSvgs.<span class="hljs-title function_">push</span>(svg);
-      } <span class="hljs-keyword">catch</span>(domerror) {
-        <span class="hljs-variable language_">console</span>.<span class="hljs-title function_">log</span>(domerror);
-        mermaidSvgs.<span class="hljs-title function_">push</span>(<span class="hljs-string">`<span class="hljs-subst">${domerror}</span>`</span>);
-      }
-    }
-
-    <span class="hljs-keyword">let</span> mermaidCount = <span class="hljs-number">0</span>;
-    <span class="hljs-keyword">function</span> <span class="hljs-title function_">svgReplacer</span>(<span class="hljs-params">_ : <span class="hljs-built_in">string</span>, __ : <span class="hljs-built_in">string</span>, ___ : <span class="hljs-built_in">string</span>, ____ : <span class="hljs-built_in">string</span>, _____: <span class="hljs-built_in">string</span>, ______: <span class="hljs-built_in">string</span></span>)
-    {
-      <span class="hljs-keyword">return</span> <span class="hljs-string">`&lt;div class=&quot;mermaid&quot;&gt;<span class="hljs-subst">${mermaidSvgs[mermaidCount++]}</span>&lt;/div&gt;`</span>;
-    }
-    html = html.<span class="hljs-title function_">replaceAll</span>(<span class="hljs-variable constant_">MERMAID_RE</span>, svgReplacer);
-
 
   <span class="hljs-keyword">const</span> encoded = <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(html, <span class="hljs-string">&#x27;utf-8&#x27;</span>);
   fname = fname.<span class="hljs-title function_">replace</span>(<span class="hljs-string">&quot;.literate&quot;</span>, <span class="hljs-string">&quot;.html&quot;</span>);
@@ -2476,8 +2455,6 @@ just an empty-bodied implementation for it.</p>
 <span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> path <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;path&#x27;</span>;
 <span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> os <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;os&#x27;</span>;
 
-<span class="hljs-keyword">import</span> mermaid <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;mermaid&#x27;</span>;
-
 <span class="hljs-keyword">import</span> <span class="hljs-title class_">StateCore</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/rules_core/state_core&#x27;</span>);
 <span class="hljs-keyword">import</span> <span class="hljs-title class_">Token</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/token&#x27;</span>);
 <span class="hljs-keyword">import</span> <span class="hljs-title class_">MarkdownIt</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;markdown-it&quot;</span>);
@@ -2487,12 +2464,6 @@ just an empty-bodied implementation for it.</p>
 <span class="hljs-comment">// this way. Not sure why import fails. It would be great to find</span>
 <span class="hljs-comment">// out the reason.</span>
 <span class="hljs-keyword">const</span> hljs = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;highlight.js&#x27;</span>);
-
-mermaid.<span class="hljs-title function_">initialize</span>(
-  {
-    <span class="hljs-attr">startOnLoad</span>: <span class="hljs-literal">false</span>
-  }
-);
 
 <span class="hljs-keyword">import</span> { grabberPlugin } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./grabber&#x27;</span>;
 </code></pre>

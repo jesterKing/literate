@@ -15,8 +15,6 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
 
-import mermaid from 'mermaid';
-
 import StateCore = require('markdown-it/lib/rules_core/state_core');
 import Token = require('markdown-it/lib/token');
 import MarkdownIt = require("markdown-it");
@@ -26,12 +24,6 @@ import Renderer = require('markdown-it/lib/renderer');
 // this way. Not sure why import fails. It would be great to find
 // out the reason.
 const hljs = require('highlight.js');
-
-mermaid.initialize(
-  {
-    startOnLoad: false
-  }
-);
 
 import { grabberPlugin } from './grabber';
 let oldFence : Renderer.RenderRule | undefined;
@@ -1464,6 +1456,9 @@ async function writeOutHtml
 </head>
 <body>
 [CONTENT]
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+</script>
 </body>
 </html>`;
     }
@@ -1488,30 +1483,6 @@ async function writeOutHtml
     const crlf2lf = /\r\n/g;
     html = html.replaceAll(crlf2lf, '\n');
   }
-
-    const MERMAID_RE = /(<pre class="mermaid">\n)(.*?)(\n<\/pre>)/gms;
-    const mermaids = [...html.matchAll(MERMAID_RE)];
-    const mermaidSvgs : string[] = [];
-    for(const mm of mermaids) {
-      try {
-        const source = mm[2];
-        mermaid.mermaidAPI.reset();
-        await mermaid.parse(source);
-        const { svg } = await mermaid.render('mermaid', source);
-        mermaidSvgs.push(svg);
-      } catch(domerror) {
-        console.log(domerror);
-        mermaidSvgs.push(`${domerror}`);
-      }
-    }
-
-    let mermaidCount = 0;
-    function svgReplacer(_ : string, __ : string, ___ : string, ____ : string, _____: string, ______: string)
-    {
-      return `<div class="mermaid">${mermaidSvgs[mermaidCount++]}</div>`;
-    }
-    html = html.replaceAll(MERMAID_RE, svgReplacer);
-
 
   const encoded = Buffer.from(html, 'utf-8');
   fname = fname.replace(".literate", ".html");
