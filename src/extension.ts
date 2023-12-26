@@ -15,6 +15,8 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
 
+import mermaid from 'mermaid';
+
 import StateCore = require('markdown-it/lib/rules_core/state_core');
 import Token = require('markdown-it/lib/token');
 import MarkdownIt = require("markdown-it");
@@ -24,6 +26,12 @@ import Renderer = require('markdown-it/lib/renderer');
 // this way. Not sure why import fails. It would be great to find
 // out the reason.
 const hljs = require('highlight.js');
+
+mermaid.initialize(
+  {
+    startOnLoad: false
+  }
+);
 
 import { grabberPlugin } from './grabber';
 let oldFence : Renderer.RenderRule | undefined;
@@ -379,6 +387,13 @@ ${rendered}
 </div>`;
         }
       }
+      else if(token.info.endsWith("mermaid")) {
+        rendered =
+`<pre class="mermaid">
+${token.content}
+</pre>`;
+      }
+
     }
   }
 
@@ -1439,7 +1454,8 @@ async function writeOutHtml
       _html = await getFileContent(htmlTemplateFile);
     } else {
       _html =
-`<html>
+`<!DOCTYPE html>
+<html>
 <head>
   <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
   <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
@@ -1472,6 +1488,31 @@ async function writeOutHtml
     const crlf2lf = /\r\n/g;
     html = html.replaceAll(crlf2lf, '\n');
   }
+
+    const MERMAID_RE = /(<pre class="mermaid">\n)(.*?)(\n<\/pre>)/gms;
+    const mermaids = [...html.matchAll(MERMAID_RE)];
+    const mermaidSvgs : string[] = [];
+    for(const mm of mermaids) {
+      try {
+        const source = mm[2];
+        mermaid.mermaidAPI.reset();
+        await mermaid.parse(source);
+        const { svg } = await mermaid.render('mermaid', source);
+        mermaidSvgs.push(svg);
+      } catch(domerror) {
+        console.log(domerror);
+        mermaidSvgs.push(`${domerror}`);
+      }
+    }
+
+    let mermaidCount = 0;
+    function svgReplacer(m : string, p1 : string, p2 : string, p3 : string, offset : string, str : string)
+    {
+      return `<div class="mermaid">${mermaidSvgs[mermaidCount++]}</div>`;
+    }
+    html = html.replaceAll(MERMAID_RE, svgReplacer);
+
+
   const encoded = Buffer.from(html, 'utf-8');
   fname = fname.replace(".literate", ".html");
   const fileUri = vscode.Uri.joinPath(folderUri, fname);
