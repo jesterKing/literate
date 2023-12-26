@@ -1506,7 +1506,7 @@ async function writeOutHtml
     }
 
     let mermaidCount = 0;
-    function svgReplacer(m : string, p1 : string, p2 : string, p3 : string, offset : string, str : string)
+    function svgReplacer(_ : string, __ : string, ___ : string, ____ : string, _____: string, ______: string)
     {
       return `<div class="mermaid">${mermaidSvgs[mermaidCount++]}</div>`;
     }
