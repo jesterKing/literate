@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.14.4
+
+* Hide code comments from generated HTML (#38)
+
 ## 0.14.3
 
 * Fix default HTML template by including proper doctype.
