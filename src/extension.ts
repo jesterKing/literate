@@ -109,6 +109,7 @@ const FRAGMENT_RE =
   /(?<lang>[^:]*)(?<colon>:)?.*<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*\s+\$)?(?<extraSettings>\s+.*)?/;
 const FRAGMENT_HTML_CLEANUP_RE= /(<span.class="hljs-.+?">)(.*?)(<\/span>)/g;
 const FRAGMENT_HTML_RE= /(&lt;&lt;.+?&gt;&gt;)/g;
+const CODECOMMENT_HTML_RE= /<span class="hljs-comment">.*?<\/span>/gs;
 
 class FragmentNode extends vscode.TreeItem
 {
@@ -333,7 +334,7 @@ export class FragmentHoverProvider implements vscode.HoverProvider {
   }
 }
 
-function protectFragmentTags(rendered : string) {
+function protectFragmentTags(rendered : string) : string {
   function cleanHighlights(match : string, _: number, __: string)
   {
     let internal = match.replaceAll(FRAGMENT_HTML_CLEANUP_RE, "$2");
@@ -344,6 +345,10 @@ function protectFragmentTags(rendered : string) {
       FRAGMENT_HTML_RE,
       cleanHighlights
     );
+}
+function removeCodeComments(rendered : string) : string {
+  rendered = rendered.replaceAll(CODECOMMENT_HTML_RE, "");
+  return rendered;
 }
 
 function renderCodeFence(tokens : Token[],
@@ -370,6 +375,7 @@ function renderCodeFence(tokens : Token[],
           fileName = fileName || '';
           fileName = fileName.trim();
           rendered = protectFragmentTags(rendered);
+          rendered = removeCodeComments(rendered);
           rendered =
 `<div class="codefragment">
 <div class="fragmentname">&lt;&lt;${name}&gt;&gt;${root}${add} ${fileName}</div>
