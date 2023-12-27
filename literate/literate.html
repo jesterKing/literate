@@ -1565,6 +1565,10 @@ want.</p>
 denotes a configuration block as can be specified in <code>index.literate</code>. And the
 configuration block is not intended to be visible in either resulting code nor
 resulting HTML output.</p>
+<p>If the fence has its <code>token.info</code> end with the string <code>mermaid</code> (all
+lower-case), and is not a valid fragment fence then the <code>token.content</code> is
+wrapped in <code>&lt;pre class=&quot;mermaid&quot;&gt;</code> and <code>&lt;/pre&gt;</code>. This allows the HTML template
+module import of <code>mermaid.js</code> to render diagrams expressed in these tags.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;renderCodeFence rule&gt;&gt;= </div>
 <div class="code">
@@ -1603,6 +1607,12 @@ resulting HTML output.</p>
 &lt;/div&gt;
 &lt;/div&gt;`</span>;
         }
+      }
+      <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(token.<span class="hljs-property">info</span>.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;mermaid&#x27;</span>)) {
+        rendered =
+<span class="hljs-string">`&lt;pre class=&quot;mermaid&quot;&gt;
+<span class="hljs-subst">${token.content}</span>
+&lt;/pre&gt;`</span>;
       }
     }
   }
@@ -2172,6 +2182,8 @@ file at the URI specified by <code>htmlTemplateFile</code> if it is set, otherwi
 hard-coded piece of HTML template.</p>
 <p>For the template to work it needs to have the string <code>[CONTENT]</code> where the
 rendered Markdown HTML is going to be substituted.</p>
+<p>The default HTML template imports <code>mermaid.js</code> as a module, so that it can work
+on any <code>pre</code> tag that has the CSS class <code>mermaid</code> set.</p>
 <p>If <code>authors</code> contains a string that is not empty one ore more Open Graph
 protocol tags will be used to replace the <code>[AUTHORS]</code> tag if it exists. If
 <code>authors</code> is empty <code>[AUTHORS]</code> will be replaced with that. If the <code>authors</code>
@@ -2204,6 +2216,9 @@ replace CRLF instances with LF.</p>
 &lt;/head&gt;
 &lt;body&gt;
 [CONTENT]
+&lt;script type=&quot;module&quot;&gt;
+  import mermaid from &#x27;https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs&#x27;;
+&lt;/script&gt;
 &lt;/body&gt;
 &lt;/html&gt;`</span>;
     }

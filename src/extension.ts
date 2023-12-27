@@ -379,6 +379,12 @@ ${rendered}
 </div>`;
         }
       }
+      else if(token.info.endsWith('mermaid')) {
+        rendered =
+`<pre class="mermaid">
+${token.content}
+</pre>`;
+      }
     }
   }
 
@@ -1448,6 +1454,9 @@ async function writeOutHtml
 </head>
 <body>
 [CONTENT]
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+</script>
 </body>
 </html>`;
     }
