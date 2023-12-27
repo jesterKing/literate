@@ -1074,7 +1074,7 @@ of fragments in code we use <code>FRAGMENT_USE_IN_CODE_RE</code>.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;fragment regular expressions&gt;&gt;= </div>
 <div class="code">
-<pre><code><span class="hljs-comment">//let HTML_ENCODED_FRAGMENT_TAG_RE = /(&amp;lt;&amp;lt.*?&amp;gt;&amp;gt;)/g;</span>
+<pre><code>
 <span class="hljs-keyword">const</span> <span class="hljs-variable constant_">FRAGMENT_USE_IN_CODE_RE</span> =
   <span class="hljs-regexp">/(?&lt;indent&gt;[ \t]*)<span class="literate-tag-name">&lt;&lt;(?&lt;tagName&gt;.+)&gt;&gt;</span>(?&lt;root&gt;=)?(?&lt;add&gt;\+)?/g</span>;
 </code></pre>
@@ -1388,38 +1388,21 @@ module.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;fragment information type&gt;&gt;= </div>
 <div class="code">
-<pre><code><span class="hljs-comment">/**
- * Interface denoting a fragment and related information
- */</span>
+<pre><code>
 <span class="hljs-keyword">interface</span> <span class="hljs-title class_">FragmentInformation</span> {
-  <span class="hljs-comment">/**
-   * Programming language identifier for fragment.
-   */</span>
+  
   <span class="hljs-attr">lang</span>: <span class="hljs-built_in">string</span>;
-  <span class="hljs-comment">/**
-   * Filename of literate file.
-   */</span>
+  
   <span class="hljs-attr">literateFileName</span>: <span class="hljs-built_in">string</span>;
-  <span class="hljs-comment">/**
-   * Filename of target source file. This is set when the fragment
-   * is a top fragment.
-   */</span>
+  
   <span class="hljs-attr">sourceFileName</span>: <span class="hljs-built_in">string</span>;
-  <span class="hljs-comment">/**
-   * Uri to source template filename.
-   */</span>
+  
   <span class="hljs-attr">templateFileName</span>: vscode.<span class="hljs-property">Uri</span> | <span class="hljs-literal">undefined</span>;
-  <span class="hljs-comment">/**
-   * The code fragment.
-   */</span>
+  
   <span class="hljs-attr">code</span>: <span class="hljs-built_in">string</span>;
-  <span class="hljs-comment">/**
-   * List of tokens that make up the entire code fragment.
-   */</span>
+  
   <span class="hljs-attr">tokens</span>: <span class="hljs-title class_">Token</span>[];
-  <span class="hljs-comment">/**
-   * The GrabbedState related to this fragment.
-   */</span>
+  
   <span class="hljs-attr">env</span>: <span class="hljs-title class_">GrabbedState</span>;
 }
 </code></pre>
@@ -1444,7 +1427,7 @@ with a single LF.</p>
                 fragments : <span class="hljs-built_in">Map</span>&lt;<span class="hljs-built_in">string</span>, FragmentInformation&gt;</span>)
 {
   <span class="hljs-keyword">const</span> folderUri = workspaceFolder.<span class="hljs-property">uri</span>;
-  <span class="hljs-comment">/* now write out the source files. */</span>
+  
   <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> name <span class="hljs-keyword">of</span> fragments.<span class="hljs-title function_">keys</span>()) {
     <span class="hljs-keyword">if</span> (name.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&quot;.*&quot;</span>)) {
       <span class="hljs-keyword">let</span> fragmentInfo = fragments.<span class="hljs-title function_">get</span>(name) || <span class="hljs-literal">undefined</span>;
@@ -1485,7 +1468,7 @@ fragments can be combined into source code.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;extrapolate fragments&gt;&gt;= </div>
 <div class="code">
-<pre><code><span class="hljs-comment">// for now do several passes</span>
+<pre><code>
 <span class="hljs-keyword">let</span> <span class="hljs-attr">pass</span>: <span class="hljs-built_in">number</span> = <span class="hljs-number">0</span>;
 <span class="hljs-keyword">const</span> rootIncorrect = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;<span class="hljs-built_in">string</span>&gt;();
 <span class="hljs-keyword">const</span> addIncorrect = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;<span class="hljs-built_in">string</span>&gt;();
@@ -1986,9 +1969,7 @@ problems with the text and where.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=+ </div>
 <div class="code">
-<pre><code><span class="hljs-comment">/**
- * Create diagnostic for a given token with message.
- * <span class="hljs-doctag">@param</span> token Token that carries the faulty code fragment
+<pre><code> token Token that carries the faulty code fragment
  * <span class="hljs-doctag">@param</span> message Error message
  */</span>
 <span class="hljs-keyword">function</span> <span class="hljs-title function_">createErrorDiagnostic</span>(<span class="hljs-params">token: Token, message: <span class="hljs-built_in">string</span>, range? : vscode.Range</span>) : vscode.<span class="hljs-property">Diagnostic</span> {
@@ -2009,10 +1990,7 @@ problems with the text and where.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=+ </div>
 <div class="code">
-<pre><code><span class="hljs-comment">/**
- * Give the location of the line in the Markup document that contains the
- * tag declaration.
- * <span class="hljs-doctag">@param</span> token Token to extract code location from
+<pre><code> token Token to extract code location from
  */</span>
 <span class="hljs-keyword">function</span> <span class="hljs-title function_">locationOfFragment</span>(<span class="hljs-params">token: Token</span>): <span class="hljs-built_in">number</span> {
   <span class="hljs-keyword">let</span> linenumber = token.<span class="hljs-property">map</span> ? (token.<span class="hljs-property">map</span>[<span class="hljs-number">0</span>]) : -<span class="hljs-number">1</span>;
@@ -2028,10 +2006,7 @@ problems with the text and where.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=+ </div>
 <div class="code">
-<pre><code><span class="hljs-comment">/**
- * Give the location of the last line in the literate document that contains the
- * code fragment.
- * <span class="hljs-doctag">@param</span> token Token to extract code location from
+<pre><code> token Token to extract code location from
  */</span>
 <span class="hljs-keyword">function</span> <span class="hljs-title function_">locationOfFragmentEnd</span>(<span class="hljs-params">token: Token</span>): <span class="hljs-built_in">number</span> {
   <span class="hljs-keyword">let</span> linenumber = token.<span class="hljs-property">map</span> ? (token.<span class="hljs-property">map</span>[<span class="hljs-number">1</span>] ) : -<span class="hljs-number">1</span>;
@@ -2047,9 +2022,7 @@ is a code fragment.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=+ </div>
 <div class="code">
-<pre><code><span class="hljs-comment">/**
- * Give range for the code fragment, including tag.
- * <span class="hljs-doctag">@param</span> token Token to create range for
+<pre><code> token Token to create range for
  */</span>
 <span class="hljs-keyword">function</span> <span class="hljs-title function_">fragmentRange</span>(<span class="hljs-params">token: Token</span>): vscode.<span class="hljs-property">Range</span> {
   <span class="hljs-keyword">let</span> startTagName = token.<span class="hljs-property">info</span>.<span class="hljs-title function_">indexOf</span>(<span class="hljs-string">&quot;&lt;&lt;&quot;</span>) + <span class="hljs-number">2</span>;
@@ -2343,7 +2316,7 @@ bits and pieces that are required for the proper functioning of the tools.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;literate.*&gt;&gt;= ./src/extension.ts $</div>
 <div class="code">
-<pre><code><span class="hljs-comment">/* Literate Programming by Nathan &#x27;jesterKing&#x27; Letwory */</span>
+<pre><code>
 
 <span class="literate-tag-name">&lt;&lt;import necessary modules for literate&gt;&gt;</span>
 </code></pre>
@@ -2495,9 +2468,9 @@ just an empty-bodied implementation for it.</p>
 <span class="hljs-keyword">import</span> <span class="hljs-title class_">MarkdownIt</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;markdown-it&quot;</span>);
 <span class="hljs-keyword">import</span> <span class="hljs-title class_">Renderer</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/renderer&#x27;</span>);
 
-<span class="hljs-comment">// `import` here fails so instead we require the highlight module</span>
-<span class="hljs-comment">// this way. Not sure why import fails. It would be great to find</span>
-<span class="hljs-comment">// out the reason.</span>
+
+
+
 <span class="hljs-keyword">const</span> hljs = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;highlight.js&#x27;</span>);
 
 <span class="hljs-keyword">import</span> { grabberPlugin } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./grabber&#x27;</span>;
