@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.14.2
+
+* Add simple mermaid.js support by the way of wrapping code from fences that
+  express mermaid diagrams in `pre` tags with the class `mermaid`. (#9)
+* Update (dev) dependencies
+
 ## 0.14.1
 
 * Quick adaptations for support of v0.14.0 features, no functional changes.
