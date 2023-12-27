@@ -1445,7 +1445,8 @@ async function writeOutHtml
       _html = await getFileContent(htmlTemplateFile);
     } else {
       _html =
-`<html>
+`<!DOCTYPE html>
+<html>
 <head>
   <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
   <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />

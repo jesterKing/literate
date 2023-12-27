@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.14.3
+
+* Fix default HTML template by including proper doctype.
+
 ## 0.14.2
 
 * Add simple mermaid.js support by the way of wrapping code from fences that
