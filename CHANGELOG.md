@@ -2,7 +2,7 @@
 
 ## 0.14.4
 
-* Hide code comments from generated HTML (#38)
+* Hide code comments from generated HTML ( #38 )
 
 ## 0.14.3
 
@@ -11,7 +11,7 @@
 ## 0.14.2
 
 * Add simple mermaid.js support by the way of wrapping code from fences that
-  express mermaid diagrams in `pre` tags with the class `mermaid`. (#9)
+  express mermaid diagrams in `pre` tags with the class `mermaid`. ( #9 )
 * Update (dev) dependencies
 
 ## 0.14.1
@@ -33,7 +33,7 @@
 
 ## 0.13.0
 
-* Breaking change: Handle filenames on starred fragments better (#34)
+* Breaking change: Handle filenames on starred fragments better ( #34 )
   * Starred code fragments need to be changed to end in whitespace plus dollar
     sign to process properly with version 0.13.0 or later of this extension
   * Introduce diagnostics telling about missing filename
@@ -43,12 +43,12 @@
 
 ## 0.12.1
 
-* Fix Split Fragment adding unnecessary space around language identifiers (#32)
+* Fix Split Fragment adding unnecessary space around language identifiers ( #32 )
 
 
 ## 0.12.0
 
-* Emit error diagnostic when colon is missing from fragments (#31)
+* Emit error diagnostic when colon is missing from fragments ( #31 )
 
 ## 0.11.1
 
