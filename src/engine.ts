@@ -318,18 +318,15 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
             fragments.set(header.name, { header, parts: [part], location });
         }
     }
-    const replaceReferences = (part: Part, replace: (name: string, modifier: string | undefined, at: Location, prefix: string) => string): string => {
-        let result = '', cursor = 0;
+    function* references(part: Part) {
         for (const tag of scanFragmentTags(part.content)) {
             const before = part.content.slice(0, tag.start);
             const prefix = before.slice(before.lastIndexOf('\n') + 1);
             const line = before.split('\n').length - 1;
             const at = { path: part.location.path, line: part.location.line + line, column: prefix.length + part.columns[line] };
-            result += part.content.slice(cursor, tag.start) + replace(tag.name, tag.modifier, at, prefix);
-            cursor = tag.end + (tag.modifier?.length || 0);
+            yield { ...tag, at, prefix };
         }
-        return result + part.content.slice(cursor);
-    };
+    }
     inspection.templates = Array.from(referencedTemplates).sort();
     for (const { header, parts } of fragments.values()) {
         const entry: FragmentInspection = {
@@ -345,33 +342,70 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
             if (template) { entry.template = template; }
         }
         for (const part of parts) {
-            replaceReferences(part, (name, _modifier, at) => {
+            for (const { name, at } of references(part)) {
                 entry.references.push({ name, ...at });
-                return '';
-            });
+            }
         }
         inspection.fragments.push(entry);
     }
-    const expanded = new Map<string, string>();
-    const visiting: string[] = [];
-    const expand = (name: string, location: Location): string => {
-        if (expanded.has(name)) { return expanded.get(name)!; }
-        const fragment = fragments.get(name);
-        if (!fragment) { report(location, `Missing fragment: ${name}`); return ''; }
-        if (visiting.includes(name)) { report(location, `Fragment cycle: ${visiting.concat(name).join(' -> ')}`); return ''; }
-        visiting.push(name);
-        const content = fragment.parts.map(part => replaceReferences(part, (reference, modifier, at, prefix) => {
-            if (modifier) { report(at, `Invalid definition operator on reference: ${reference}`); }
-            const replacement = expand(reference, at).replace(/\n$/, '');
-            const indent = /^[ \t]*$/.test(prefix) ? prefix : (/[ \t]*$/.exec(prefix)?.[0] || '');
-            return replacement.replace(/\n/g, () => '\n' + indent);
-        })).join('');
-        visiting.pop();
-        expanded.set(name, content);
+    type Reference = ReturnType<typeof references> extends Generator<infer T> ? T : never;
+    function* expandParts(parts: Part[]): Generator<Reference, string, string> {
+        let content = '';
+        for (const part of parts) {
+            let cursor = 0;
+            for (const reference of references(part)) {
+                content += part.content.slice(cursor, reference.start);
+                const replacement = (yield reference).replace(/\n$/, '');
+                const indent = /[ \t]*$/.exec(reference.prefix)?.[0] || '';
+                content += replacement.replace(/\n/g, () => '\n' + indent);
+                cursor = reference.end + (reference.modifier?.length || 0);
+            }
+            content += part.content.slice(cursor);
+        }
         return content;
+    }
+    const expanded = new Map<string, string>();
+    const active = new Set<string>();
+    type ExpansionFrame = {
+        name: string;
+        expansion: Generator<Reference, string, string>;
+        step: IteratorResult<Reference, string>;
     };
-
-    for (const fragment of fragments.values()) { expand(fragment.header.name, fragment.location); }
+    const frames: ExpansionFrame[] = [];
+    const push = (name: string) => {
+        const expansion = expandParts(fragments.get(name)!.parts);
+        active.add(name);
+        frames.push({ name, expansion, step: expansion.next() });
+    };
+    for (const fragment of fragments.values()) {
+        if (expanded.has(fragment.header.name)) { continue; }
+        push(fragment.header.name);
+        while (frames.length) {
+            const frame = frames[frames.length - 1];
+            if (frame.step.done) {
+                const content = frame.step.value;
+                expanded.set(frame.name, content);
+                active.delete(frame.name);
+                frames.pop();
+                const parent = frames[frames.length - 1];
+                if (parent) { parent.step = parent.expansion.next(content); }
+                continue;
+            }
+            const { name, modifier, at } = frame.step.value;
+            if (modifier) { report(at, `Invalid definition operator on reference: ${name}`); }
+            if (expanded.has(name)) {
+                frame.step = frame.expansion.next(expanded.get(name)!);
+            } else if (!fragments.has(name)) {
+                report(at, `Missing fragment: ${name}`);
+                frame.step = frame.expansion.next('');
+            } else if (active.has(name)) {
+                report(at, `Fragment cycle: ${frames.map(value => value.name).concat(name).join(' -> ')}`);
+                frame.step = frame.expansion.next('');
+            } else {
+                push(name);
+            }
+        }
+    }
     if (diagnostics.length) { return { files: [], diagnostics, inspection }; }
     for (const fragment of fragments.values()) {
         if (!fragment.header.output) { continue; }

@@ -84,6 +84,53 @@ test('repeated and inline references expand every occurrence without losing surr
     'W/W\nprefix A\n B suffix\nW\n');
 });
 
+test('5000 nested fragments preserve indentation, escapes, appends, and cached reuse', () => {
+    const depth = 5000;
+    const parts = [root('  <<part0>>\n\t<<part0>>')];
+    for (let index = 0; index < depth; index++) {
+        parts.push(fence('text: <<part' + index + '>>=', index + 1 < depth
+            ? '<<part' + (index + 1) + '>>' : 'first\n\\<<literal>>\n\nlast $&'));
+    }
+    parts.push(fence('text: <<part' + (depth - 1) + '>>=+', 'appended'));
+    const lines = ['first', '<<literal>>', '', 'last $&', 'appended'];
+    assert.equal(output(parts.join('')), lines.map(line => '  ' + line + '\n').join('')
+        + lines.map(line => '\t' + line + '\n').join(''));
+});
+
+test('a cycle in 5000 unused nested fragments reports its full path without overflowing', () => {
+    const depth = 5000;
+    const parts = [root('valid')];
+    const names = Array.from({ length: depth }, (_, index) => 'part' + index);
+    for (let index = 0; index < depth; index++) {
+        parts.push(fence('text: <<' + names[index] + '>>=', '<<' + names[index + 1 < depth ? index + 1 : 2500] + '>>'));
+    }
+    const result = generateProject([document(parts.join(''))]);
+    assert.deepEqual(result.files, []);
+    assert.deepEqual(result.diagnostics, [{
+        path: 'index.literate', line: depth * 3 + 1, column: 0,
+        message: 'Fragment cycle: ' + names.concat('part2500').join(' -> '),
+    }]);
+});
+
+test('depth-first diagnostics retain reference positions and cache invalid dependencies', () => {
+    const text = root('<<a>>\n<<a>>')
+        + fence('text: <<a>>=', '<<b>>=\n<<missing>>')
+        + fence('text: <<b>>=', '<<a>>\n<<nested missing>>')
+        + fence('text: <<a>>=+', '<<b>>=+\n<<absent>>')
+        + fence('text: <<unused>>=', '<<unused>>');
+    const result = generateProject([document(text)]);
+    assert.deepEqual(result.files, []);
+    assert.deepEqual(result.diagnostics, [
+        { line: 5, message: 'Invalid definition operator on reference: b' },
+        { line: 9, message: 'Fragment cycle: main.* -> a -> b -> a' },
+        { line: 10, message: 'Missing fragment: nested missing' },
+        { line: 6, message: 'Missing fragment: missing' },
+        { line: 13, message: 'Invalid definition operator on reference: b' },
+        { line: 14, message: 'Missing fragment: absent' },
+        { line: 17, message: 'Fragment cycle: unused -> unused' },
+    ].map(diagnostic => ({ path: 'index.literate', column: 0, ...diagnostic })));
+});
+
 test('empty fragments, empty top-level files, and append-to-empty fragments are supported', () => {
     assert.equal(output(root('')), '');
     assert.equal(output(root('before<<empty>>after\n<<joined>>')

@@ -585,7 +585,8 @@ escaped, including those inside regular expressions and strings; only the
 assembly references are unescaped. Escapes survive dependency expansion and
 are removed at final emission. Replacement results are never rescanned, so a
 literal tag introduced by a referenced fragment cannot become a dependency.</p>
-<p>Callbacks also preserve dollar signs and other replacement metacharacters.
+<p>Literal concatenation and replacement callbacks preserve dollar signs and other
+replacement metacharacters.
 Repeated inline references expand independently. Preceding whitespace is
 carried onto continuation lines. Fence bodies retain their Markdown-normalized
 trailing newline, while insertion removes exactly one trailing newline from a
@@ -600,18 +601,15 @@ controls indentation when inserting multiline dependencies.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;engine dependency expansion and validation barrier&gt;&gt;= </div>
 <div class="code">
-<pre><code>    <span class="hljs-keyword">const</span> replaceReferences = (<span class="hljs-attr">part</span>: <span class="hljs-title class_">Part</span>, <span class="hljs-attr">replace</span>: <span class="hljs-function">(<span class="hljs-params">name: <span class="hljs-built_in">string</span>, modifier: <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>, at: Location, prefix: <span class="hljs-built_in">string</span></span>) =&gt;</span> <span class="hljs-built_in">string</span>): <span class="hljs-function"><span class="hljs-params">string</span> =&gt;</span> {
-        <span class="hljs-keyword">let</span> result = <span class="hljs-string">&#x27;&#x27;</span>, cursor = <span class="hljs-number">0</span>;
+<pre><code>    <span class="hljs-keyword">function</span>* <span class="hljs-title function_">references</span>(<span class="hljs-params">part: Part</span>) {
         <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> tag <span class="hljs-keyword">of</span> <span class="hljs-title function_">scanFragmentTags</span>(part.<span class="hljs-property">content</span>)) {
             <span class="hljs-keyword">const</span> before = part.<span class="hljs-property">content</span>.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, tag.<span class="hljs-property">start</span>);
             <span class="hljs-keyword">const</span> prefix = before.<span class="hljs-title function_">slice</span>(before.<span class="hljs-title function_">lastIndexOf</span>(<span class="hljs-string">&#x27;\n&#x27;</span>) + <span class="hljs-number">1</span>);
             <span class="hljs-keyword">const</span> line = before.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;\n&#x27;</span>).<span class="hljs-property">length</span> - <span class="hljs-number">1</span>;
             <span class="hljs-keyword">const</span> at = { <span class="hljs-attr">path</span>: part.<span class="hljs-property">location</span>.<span class="hljs-property">path</span>, <span class="hljs-attr">line</span>: part.<span class="hljs-property">location</span>.<span class="hljs-property">line</span> + line, <span class="hljs-attr">column</span>: prefix.<span class="hljs-property">length</span> + part.<span class="hljs-property">columns</span>[line] };
-            result += part.<span class="hljs-property">content</span>.<span class="hljs-title function_">slice</span>(cursor, tag.<span class="hljs-property">start</span>) + <span class="hljs-title function_">replace</span>(tag.<span class="hljs-property">name</span>, tag.<span class="hljs-property">modifier</span>, at, prefix);
-            cursor = tag.<span class="hljs-property">end</span> + (tag.<span class="hljs-property">modifier</span>?.<span class="hljs-property">length</span> || <span class="hljs-number">0</span>);
+            <span class="hljs-keyword">yield</span> { ...tag, at, prefix };
         }
-        <span class="hljs-keyword">return</span> result + part.<span class="hljs-property">content</span>.<span class="hljs-title function_">slice</span>(cursor);
-    };
+    }
 </code></pre>
 
 </div>
@@ -637,42 +635,98 @@ references; rejected duplicate definitions and orphan appends do not.</p>
             <span class="hljs-keyword">if</span> (template) { entry.<span class="hljs-property">template</span> = template; }
         }
         <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> part <span class="hljs-keyword">of</span> parts) {
-            <span class="hljs-title function_">replaceReferences</span>(part, <span class="hljs-function">(<span class="hljs-params">name, _modifier, at</span>) =&gt;</span> {
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> { name, at } <span class="hljs-keyword">of</span> <span class="hljs-title function_">references</span>(part)) {
                 entry.<span class="hljs-property">references</span>.<span class="hljs-title function_">push</span>({ name, ...at });
-                <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;&#x27;</span>;
-            });
+            }
         }
         inspection.<span class="hljs-property">fragments</span>.<span class="hljs-title function_">push</span>(entry);
     }
 </code></pre>
 
 </div>
-</div><p>Expansion consumes the same occurrences with a different callback, reporting
-invalid reference operators and recursively resolving dependencies. Inspection
-therefore survives missing references and cycles without requiring valid output.</p>
+</div><p>Expansion consumes the same occurrences, but suspends each fragment's generator
+at a dependency instead of calling expansion recursively. The explicit frame
+stack preserves depth-first encounter order without consuming the JavaScript
+call stack. An active-name set detects back edges in constant time; the frames
+retain the full path for cycle diagnostics. Completed fragments are cached even
+when validation reports errors, just as they are for successful expansions.
+Inspection therefore survives missing references and cycles without requiring
+valid output.</p>
+<p>Each suspended generator owns its part cursor and output text. Resuming it with
+a child's expansion applies indentation and removes one trailing newline, without
+rescanning inserted text. Appended parts are visited only after earlier parts
+finish, preserving diagnostic ordering as well as output ordering.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine dependency expansion and validation barrier&gt;&gt;=+ </div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">type</span> <span class="hljs-title class_">Reference</span> = <span class="hljs-title class_">ReturnType</span>&lt;<span class="hljs-keyword">typeof</span> references&gt; <span class="hljs-keyword">extends</span> <span class="hljs-title class_">Generator</span>&lt;infer T&gt; ? T : <span class="hljs-built_in">never</span>;
+    <span class="hljs-keyword">function</span>* <span class="hljs-title function_">expandParts</span>(<span class="hljs-attr">parts</span>: <span class="hljs-title class_">Part</span>[]): <span class="hljs-title class_">Generator</span>&lt;<span class="hljs-title class_">Reference</span>, <span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; {
+        <span class="hljs-keyword">let</span> content = <span class="hljs-string">&#x27;&#x27;</span>;
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> part <span class="hljs-keyword">of</span> parts) {
+            <span class="hljs-keyword">let</span> cursor = <span class="hljs-number">0</span>;
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> reference <span class="hljs-keyword">of</span> <span class="hljs-title function_">references</span>(part)) {
+                content += part.<span class="hljs-property">content</span>.<span class="hljs-title function_">slice</span>(cursor, reference.<span class="hljs-property">start</span>);
+                <span class="hljs-keyword">const</span> replacement = (<span class="hljs-keyword">yield</span> reference).<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\n$/</span>, <span class="hljs-string">&#x27;&#x27;</span>);
+                <span class="hljs-keyword">const</span> indent = <span class="hljs-regexp">/[ \t]*$/</span>.<span class="hljs-title function_">exec</span>(reference.<span class="hljs-property">prefix</span>)?.[<span class="hljs-number">0</span>] || <span class="hljs-string">&#x27;&#x27;</span>;
+                content += replacement.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\n/g</span>, <span class="hljs-function">() =&gt;</span> <span class="hljs-string">&#x27;\n&#x27;</span> + indent);
+                cursor = reference.<span class="hljs-property">end</span> + (reference.<span class="hljs-property">modifier</span>?.<span class="hljs-property">length</span> || <span class="hljs-number">0</span>);
+            }
+            content += part.<span class="hljs-property">content</span>.<span class="hljs-title function_">slice</span>(cursor);
+        }
+        <span class="hljs-keyword">return</span> content;
+    }
+</code></pre>
+
+</div>
+</div><p>The driver resumes only the top frame. A dependency either supplies a cached
+value, reports a missing name or active-path cycle and supplies empty text, or
+pushes a new frame. Popping a completed frame resumes its parent exactly once,
+so invalid operators are reported once per occurrence, not once per resume.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;engine dependency expansion and validation barrier&gt;&gt;=+ </div>
 <div class="code">
 <pre><code>    <span class="hljs-keyword">const</span> expanded = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;();
-    <span class="hljs-keyword">const</span> <span class="hljs-attr">visiting</span>: <span class="hljs-built_in">string</span>[] = [];
-    <span class="hljs-keyword">const</span> expand = (<span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>, <span class="hljs-attr">location</span>: <span class="hljs-title class_">Location</span>): <span class="hljs-function"><span class="hljs-params">string</span> =&gt;</span> {
-        <span class="hljs-keyword">if</span> (expanded.<span class="hljs-title function_">has</span>(name)) { <span class="hljs-keyword">return</span> expanded.<span class="hljs-title function_">get</span>(name)!; }
-        <span class="hljs-keyword">const</span> fragment = fragments.<span class="hljs-title function_">get</span>(name);
-        <span class="hljs-keyword">if</span> (!fragment) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Missing fragment: <span class="hljs-subst">${name}</span>`</span>); <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;&#x27;</span>; }
-        <span class="hljs-keyword">if</span> (visiting.<span class="hljs-title function_">includes</span>(name)) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Fragment cycle: <span class="hljs-subst">${visiting.concat(name).join(<span class="hljs-string">&#x27; -&gt; &#x27;</span>)}</span>`</span>); <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;&#x27;</span>; }
-        visiting.<span class="hljs-title function_">push</span>(name);
-        <span class="hljs-keyword">const</span> content = fragment.<span class="hljs-property">parts</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> <span class="hljs-title function_">replaceReferences</span>(part, <span class="hljs-function">(<span class="hljs-params">reference, modifier, at, prefix</span>) =&gt;</span> {
-            <span class="hljs-keyword">if</span> (modifier) { <span class="hljs-title function_">report</span>(at, <span class="hljs-string">`Invalid definition operator on reference: <span class="hljs-subst">${reference}</span>`</span>); }
-            <span class="hljs-keyword">const</span> replacement = <span class="hljs-title function_">expand</span>(reference, at).<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\n$/</span>, <span class="hljs-string">&#x27;&#x27;</span>);
-            <span class="hljs-keyword">const</span> indent = <span class="hljs-regexp">/^[ \t]*$/</span>.<span class="hljs-title function_">test</span>(prefix) ? prefix : (<span class="hljs-regexp">/[ \t]*$/</span>.<span class="hljs-title function_">exec</span>(prefix)?.[<span class="hljs-number">0</span>] || <span class="hljs-string">&#x27;&#x27;</span>);
-            <span class="hljs-keyword">return</span> replacement.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\n/g</span>, <span class="hljs-function">() =&gt;</span> <span class="hljs-string">&#x27;\n&#x27;</span> + indent);
-        })).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;&#x27;</span>);
-        visiting.<span class="hljs-title function_">pop</span>();
-        expanded.<span class="hljs-title function_">set</span>(name, content);
-        <span class="hljs-keyword">return</span> content;
+    <span class="hljs-keyword">const</span> active = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
+    <span class="hljs-keyword">type</span> <span class="hljs-title class_">ExpansionFrame</span> = {
+        <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>;
+        <span class="hljs-attr">expansion</span>: <span class="hljs-title class_">Generator</span>&lt;<span class="hljs-title class_">Reference</span>, <span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;;
+        <span class="hljs-attr">step</span>: <span class="hljs-title class_">IteratorResult</span>&lt;<span class="hljs-title class_">Reference</span>, <span class="hljs-built_in">string</span>&gt;;
     };
-
-    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> fragment <span class="hljs-keyword">of</span> fragments.<span class="hljs-title function_">values</span>()) { <span class="hljs-title function_">expand</span>(fragment.<span class="hljs-property">header</span>.<span class="hljs-property">name</span>, fragment.<span class="hljs-property">location</span>); }
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">frames</span>: <span class="hljs-title class_">ExpansionFrame</span>[] = [];
+    <span class="hljs-keyword">const</span> <span class="hljs-title function_">push</span> = (<span class="hljs-params">name: <span class="hljs-built_in">string</span></span>) =&gt; {
+        <span class="hljs-keyword">const</span> expansion = <span class="hljs-title function_">expandParts</span>(fragments.<span class="hljs-title function_">get</span>(name)!.<span class="hljs-property">parts</span>);
+        active.<span class="hljs-title function_">add</span>(name);
+        frames.<span class="hljs-title function_">push</span>({ name, expansion, <span class="hljs-attr">step</span>: expansion.<span class="hljs-title function_">next</span>() });
+    };
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> fragment <span class="hljs-keyword">of</span> fragments.<span class="hljs-title function_">values</span>()) {
+        <span class="hljs-keyword">if</span> (expanded.<span class="hljs-title function_">has</span>(fragment.<span class="hljs-property">header</span>.<span class="hljs-property">name</span>)) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-title function_">push</span>(fragment.<span class="hljs-property">header</span>.<span class="hljs-property">name</span>);
+        <span class="hljs-keyword">while</span> (frames.<span class="hljs-property">length</span>) {
+            <span class="hljs-keyword">const</span> frame = frames[frames.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>];
+            <span class="hljs-keyword">if</span> (frame.<span class="hljs-property">step</span>.<span class="hljs-property">done</span>) {
+                <span class="hljs-keyword">const</span> content = frame.<span class="hljs-property">step</span>.<span class="hljs-property">value</span>;
+                expanded.<span class="hljs-title function_">set</span>(frame.<span class="hljs-property">name</span>, content);
+                active.<span class="hljs-title function_">delete</span>(frame.<span class="hljs-property">name</span>);
+                frames.<span class="hljs-title function_">pop</span>();
+                <span class="hljs-keyword">const</span> parent = frames[frames.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>];
+                <span class="hljs-keyword">if</span> (parent) { parent.<span class="hljs-property">step</span> = parent.<span class="hljs-property">expansion</span>.<span class="hljs-title function_">next</span>(content); }
+                <span class="hljs-keyword">continue</span>;
+            }
+            <span class="hljs-keyword">const</span> { name, modifier, at } = frame.<span class="hljs-property">step</span>.<span class="hljs-property">value</span>;
+            <span class="hljs-keyword">if</span> (modifier) { <span class="hljs-title function_">report</span>(at, <span class="hljs-string">`Invalid definition operator on reference: <span class="hljs-subst">${name}</span>`</span>); }
+            <span class="hljs-keyword">if</span> (expanded.<span class="hljs-title function_">has</span>(name)) {
+                frame.<span class="hljs-property">step</span> = frame.<span class="hljs-property">expansion</span>.<span class="hljs-title function_">next</span>(expanded.<span class="hljs-title function_">get</span>(name)!);
+            } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (!fragments.<span class="hljs-title function_">has</span>(name)) {
+                <span class="hljs-title function_">report</span>(at, <span class="hljs-string">`Missing fragment: <span class="hljs-subst">${name}</span>`</span>);
+                frame.<span class="hljs-property">step</span> = frame.<span class="hljs-property">expansion</span>.<span class="hljs-title function_">next</span>(<span class="hljs-string">&#x27;&#x27;</span>);
+            } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (active.<span class="hljs-title function_">has</span>(name)) {
+                <span class="hljs-title function_">report</span>(at, <span class="hljs-string">`Fragment cycle: <span class="hljs-subst">${frames.map(value =&gt; value.name).concat(name).join(<span class="hljs-string">&#x27; -&gt; &#x27;</span>)}</span>`</span>);
+                frame.<span class="hljs-property">step</span> = frame.<span class="hljs-property">expansion</span>.<span class="hljs-title function_">next</span>(<span class="hljs-string">&#x27;&#x27;</span>);
+            } <span class="hljs-keyword">else</span> {
+                <span class="hljs-title function_">push</span>(name);
+            }
+        }
+    }
     <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">files</span>: [], diagnostics, inspection }; }
 </code></pre>
 
