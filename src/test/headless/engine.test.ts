@@ -38,6 +38,31 @@ function rejected(documents: SourceDocument[], message: RegExp, templates: Recor
 
 const root = (content: string) => fence('text: <<main.*>>= result.txt $', content);
 
+test('LF, CRLF, CR and mixed inputs generate identical source, HTML and inspection', () => {
+    const docs = [
+        document(fence('SETTINGS', 'template=page.template\nauthors=Example')
+            + '# Example\n\n' + fence('text: <<main.*>>= result.txt $ template=source.template',
+                'begin\n  <<part>>\nend')),
+        document(fence('text: <<part>>=', 'first\nsecond'), 'part.literate'),
+    ];
+    const templates = {
+        'source.template': 'before\n[CODE]after\n',
+        'page.template': '<html>\n[AUTHORS]\n[CONTENT]\n</html>\n',
+    };
+    const expected = generateProject(docs, templates);
+    assert.deepEqual(expected.diagnostics, []);
+    for (const endings of [['\n'], ['\r\n'], ['\r'], ['\n', '\r\n', '\r']]) {
+        const convert = (text: string) => {
+            let index = 0;
+            return text.replace(/\n/g, () => endings[index++ % endings.length]);
+        };
+        const actual = generateProject(docs.map(doc => ({ ...doc, text: convert(doc.text) })),
+            Object.fromEntries(Object.entries(templates).map(([path, text]) => [path, convert(text)])));
+        assert.deepEqual(actual, expected, JSON.stringify(endings));
+        assert.ok(actual.files.every(file => !file.content.includes('\r')));
+    }
+});
+
 test('replacement sequences remain literal through fragment and source-template substitution', () => {
     const literal = "$& $$ $` $' $1 $99 \\path [CODE] [CONTENT] [AUTHORS]";
     const text = fence('text: <<main.*>>= result.txt $ template=source.template', '<<value>>\n<<value>>')
