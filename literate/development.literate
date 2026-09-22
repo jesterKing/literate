@@ -135,10 +135,24 @@ edits currently require `Literate: Process`. Do not run CLI generation concurren
 with editor generation against the same project or leave unsaved literate buffers
 open while checking disk-based results.
 
-Validation precedes output writes, but writing several files is not a filesystem
-transaction. An I/O failure can leave earlier writes in place. Resolve the error
-and generate again. The CLI rejects symlink targets and skips symlink inputs;
-the VS Code adapter uses the workspace filesystem provider instead.
+Both adapters preflight every output in a project before any output directory
+creation or writes. The CLI uses `lstat`; VS Code uses `workspace.fs.stat` and,
+when a component appears missing, its parent's `readDirectory` entries to detect
+dangling links. Below the trusted workspace root, symbolic-link leaves and
+ancestors, non-directory parents, and non-file targets (including unknown types)
+are rejected. VS Code checks all outputs before reading their contents, including
+outputs that would otherwise be unchanged. Read-only editor refreshes do not
+preflight or write outputs. Permission errors propagate rather than being treated
+as missing files. Remote workspaces use their filesystem provider, not Node's
+local filesystem.
+
+This safety depends on the provider reporting symbolic links in file types;
+VS Code has no portable no-follow write API. Concurrent filesystem changes can
+race preflight (TOCTOU), and writing several files is not a filesystem
+transaction. A known unsafe output blocks all writes for that project, but a
+later I/O failure can leave earlier writes in place. Resolve the error and
+generate again. The CLI also skips symlink inputs; output preflight does not
+establish an equivalent input policy for the VS Code provider.
 
 ## Testing the editor
 

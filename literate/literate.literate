@@ -418,26 +418,105 @@ processLiterateFiles(
       }
       fragments.map = handleFragments(states.list, result.inspection.fragments);
       if (!writeFiles || result.diagnostics.length) { continue; }
-      for (const file of result.files) {
-        const uri = vscode.Uri.joinPath(workspaceFolder.uri, file.path);
-        const content = Buffer.from(file.content, 'utf-8');
-        try {
-          const previous = await vscode.workspace.fs.readFile(uri);
-          if (content.equals(Buffer.from(previous))) { continue; }
-        } catch (error) {
-          if (!(error instanceof vscode.FileSystemError) || error.code !== 'FileNotFound') {
-            throw error;
-          }
-        }
-        await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(uri, '..'));
-        await vscode.workspace.fs.writeFile(uri, content);
-      }
+      const outputs = await this.preflightOutputs(workspaceFolder.uri, result.files);
+      await this.writeChangedOutputs(outputs);
     }
   });
   this.processingQueue = operation.catch(error => {
     void vscode.window.showErrorMessage(`Literate processing failed: ${String(error)}`);
   });
   return operation;
+}
+```
+
+#### Preflighting output paths
+
+Before reading any output contents, preflight every source and HTML output in
+this project. The shared `safeRelativePath` policy keeps paths beneath the trusted
+workspace root; only components below that boundary are inspected. Filesystem
+access stays in `workspace.fs`, including for remote workspace URIs.
+
+Check the symbolic-link bit before checking the exact expected type: providers
+can combine `SymbolicLink` with `File` or `Directory`. Unknown and special types
+are not safe substitutes. A missing component ends the walk, since descendants
+cannot exist beneath it. However, `stat` may follow a dangling link and report
+`FileNotFound`. In that case inspect the already-checked parent's directory
+entries before treating the component as absent. Other errors must propagate.
+
+``` ts : <<fragment generation method>>=+
+private async preflightOutputs(
+  root: vscode.Uri, files: readonly { path: string; content: string }[]
+): Promise<{ uri: vscode.Uri; content: string }[]> {
+  const outputs: { uri: vscode.Uri; content: string }[] = [];
+  for (const file of files) {
+    const relative = safeRelativePath(file.path);
+    if (!relative) { throw new Error(`Unsafe output path: ${file.path}`); }
+    const parts = relative.split('/');
+    let parent = root;
+    for (let index = 0; index < parts.length; index++) {
+      const uri = vscode.Uri.joinPath(parent, parts[index]);
+      const type = await this.outputEntryType(parent, uri, parts[index]);
+      if (type === undefined) { break; }
+      if (type & vscode.FileType.SymbolicLink) {
+        throw new Error(`Unsafe output path (symbolic link): ${uri.toString()}`);
+      }
+      const expected = index === parts.length - 1 ? vscode.FileType.File : vscode.FileType.Directory;
+      if (type !== expected) {
+        throw new Error(`Unsafe output path (expected ${expected === vscode.FileType.File ? 'file' : 'directory'}): ${uri.toString()}`);
+      }
+      parent = uri;
+    }
+    outputs.push({ uri: vscode.Uri.joinPath(root, relative), content: file.content });
+  }
+  return outputs;
+}
+```
+
+The entry lookup distinguishes an absent path from a dangling link. Only a
+`FileNotFound` response permits the directory-entry fallback; permission and
+provider failures must stop generation rather than authorize a write.
+
+``` ts : <<fragment generation method>>=+
+private async outputEntryType(parent: vscode.Uri, uri: vscode.Uri, name: string): Promise<vscode.FileType | undefined> {
+  try {
+    return (await vscode.workspace.fs.stat(uri)).type;
+  } catch (error) {
+    if (!(error instanceof vscode.FileSystemError) || error.code !== 'FileNotFound') {
+      throw error;
+    }
+  }
+  const entries = await vscode.workspace.fs.readDirectory(parent);
+  return entries.find(([entry]) => entry === name)?.[1];
+}
+```
+
+These checks depend on the provider reporting links through `stat` or directory
+entries. VS Code has no portable no-follow open/write API: concurrent filesystem
+changes can race the checks (TOCTOU). Preflight is not a security sandbox or a
+multi-file transaction. It prevents a known unsafe later output from allowing
+earlier writes, but an I/O failure during writing can still leave partial output.
+Read-only navigation refreshes bypass both output preflight and output writes.
+
+#### Writing changed outputs
+
+Only after the entire project's preflight succeeds do we compare disk bytes and
+write changed files. Open output buffers are not used for this comparison.
+
+``` ts : <<fragment generation method>>=+
+private async writeChangedOutputs(outputs: readonly { uri: vscode.Uri; content: string }[]): Promise<void> {
+  for (const output of outputs) {
+    const content = Buffer.from(output.content, 'utf-8');
+    try {
+      const previous = await vscode.workspace.fs.readFile(output.uri);
+      if (content.equals(Buffer.from(previous))) { continue; }
+    } catch (error) {
+      if (!(error instanceof vscode.FileSystemError) || error.code !== 'FileNotFound') {
+        throw error;
+      }
+    }
+    await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(output.uri, '..'));
+    await vscode.workspace.fs.writeFile(output.uri, content);
+  }
 }
 ```
 
@@ -1460,7 +1539,7 @@ export function deactivate() {}
 import { TextDecoder } from 'util';
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { discoveryExcludedDirectories, generateProject, orderSourceDocuments, templateReferences, scanFragmentTags, SourceDocument, FragmentInspection } from './engine';
+import { discoveryExcludedDirectories, generateProject, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, SourceDocument, FragmentInspection } from './engine';
 import { collectFragmentOccurrences, planFragmentRename, FragmentOccurrence } from './symbols';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');

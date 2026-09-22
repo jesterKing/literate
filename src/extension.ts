@@ -13,7 +13,7 @@
 import { TextDecoder } from 'util';
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { discoveryExcludedDirectories, generateProject, orderSourceDocuments, templateReferences, scanFragmentTags, SourceDocument, FragmentInspection } from './engine';
+import { discoveryExcludedDirectories, generateProject, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, SourceDocument, FragmentInspection } from './engine';
 import { collectFragmentOccurrences, planFragmentRename, FragmentOccurrence } from './symbols';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');
@@ -626,26 +626,66 @@ export class FragmentRepository {
         }
         fragments.map = handleFragments(states.list, result.inspection.fragments);
         if (!writeFiles || result.diagnostics.length) { continue; }
-        for (const file of result.files) {
-          const uri = vscode.Uri.joinPath(workspaceFolder.uri, file.path);
-          const content = Buffer.from(file.content, 'utf-8');
-          try {
-            const previous = await vscode.workspace.fs.readFile(uri);
-            if (content.equals(Buffer.from(previous))) { continue; }
-          } catch (error) {
-            if (!(error instanceof vscode.FileSystemError) || error.code !== 'FileNotFound') {
-              throw error;
-            }
-          }
-          await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(uri, '..'));
-          await vscode.workspace.fs.writeFile(uri, content);
-        }
+        const outputs = await this.preflightOutputs(workspaceFolder.uri, result.files);
+        await this.writeChangedOutputs(outputs);
       }
     });
     this.processingQueue = operation.catch(error => {
       void vscode.window.showErrorMessage(`Literate processing failed: ${String(error)}`);
     });
     return operation;
+  }
+  private async preflightOutputs(
+    root: vscode.Uri, files: readonly { path: string; content: string }[]
+  ): Promise<{ uri: vscode.Uri; content: string }[]> {
+    const outputs: { uri: vscode.Uri; content: string }[] = [];
+    for (const file of files) {
+      const relative = safeRelativePath(file.path);
+      if (!relative) { throw new Error(`Unsafe output path: ${file.path}`); }
+      const parts = relative.split('/');
+      let parent = root;
+      for (let index = 0; index < parts.length; index++) {
+        const uri = vscode.Uri.joinPath(parent, parts[index]);
+        const type = await this.outputEntryType(parent, uri, parts[index]);
+        if (type === undefined) { break; }
+        if (type & vscode.FileType.SymbolicLink) {
+          throw new Error(`Unsafe output path (symbolic link): ${uri.toString()}`);
+        }
+        const expected = index === parts.length - 1 ? vscode.FileType.File : vscode.FileType.Directory;
+        if (type !== expected) {
+          throw new Error(`Unsafe output path (expected ${expected === vscode.FileType.File ? 'file' : 'directory'}): ${uri.toString()}`);
+        }
+        parent = uri;
+      }
+      outputs.push({ uri: vscode.Uri.joinPath(root, relative), content: file.content });
+    }
+    return outputs;
+  }
+  private async outputEntryType(parent: vscode.Uri, uri: vscode.Uri, name: string): Promise<vscode.FileType | undefined> {
+    try {
+      return (await vscode.workspace.fs.stat(uri)).type;
+    } catch (error) {
+      if (!(error instanceof vscode.FileSystemError) || error.code !== 'FileNotFound') {
+        throw error;
+      }
+    }
+    const entries = await vscode.workspace.fs.readDirectory(parent);
+    return entries.find(([entry]) => entry === name)?.[1];
+  }
+  private async writeChangedOutputs(outputs: readonly { uri: vscode.Uri; content: string }[]): Promise<void> {
+    for (const output of outputs) {
+      const content = Buffer.from(output.content, 'utf-8');
+      try {
+        const previous = await vscode.workspace.fs.readFile(output.uri);
+        if (content.equals(Buffer.from(previous))) { continue; }
+      } catch (error) {
+        if (!(error instanceof vscode.FileSystemError) || error.code !== 'FileNotFound') {
+          throw error;
+        }
+      }
+      await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(output.uri, '..'));
+      await vscode.workspace.fs.writeFile(output.uri, content);
+    }
   }
 
   getFragments(workspaceFolder : vscode.WorkspaceFolder) : FragmentMap

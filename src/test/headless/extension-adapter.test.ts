@@ -112,6 +112,108 @@ test('adapter skips unchanged files and rewrites only changed disk output', { ti
     assert.equal(f.disk.get(f.uri('generated/main.txt'))?.toString(), 'hello\n');
 });
 
+for (const unsafe of [
+    { name: 'linked leaf', target: 'generated/main.txt', type: 1 | 64 },
+    { name: 'linked ancestor', target: 'generated', type: 2 | 64 },
+    { name: 'bare link', target: 'generated/main.txt', type: 64 },
+    { name: 'dangling leaf', target: 'generated/main.txt', type: 64, dangling: true },
+    { name: 'dangling ancestor', target: 'generated', type: 2 | 64, dangling: true },
+    { name: 'file parent', target: 'generated', type: 1 },
+    { name: 'unknown parent', target: 'generated', type: 0 },
+    { name: 'directory output', target: 'generated/main.txt', type: 2 },
+    { name: 'unknown output', target: 'generated/main.txt', type: 0 },
+    { name: 'special output', target: 'generated/main.txt', type: 128 },
+    { name: 'combined non-link output', target: 'generated/main.txt', type: 1 | 2 },
+    { name: 'late unsafe HTML output', target: 'index.html', type: 2 | 64 }
+]) {
+    test(`output preflight rejects ${unsafe.name} before any output reads or writes`, { timeout: 5000 }, async () => {
+        const f = fixture();
+        const text = root('hello');
+        f.put('index.literate', text);
+        const files = expected([{ path: 'index.literate', text }]);
+        for (const file of files) { f.put(file.path, file.content); }
+        f.types.set(f.uri(unsafe.target), unsafe.type);
+        if (unsafe.dangling) { f.statErrors.set(f.uri(unsafe.target), 'FileNotFound'); }
+        const before = new Map(f.disk);
+        await assert.rejects(f.process(true), /Unsafe output path/);
+        assert.deepEqual(f.writes, []);
+        assert.deepEqual(f.directories, []);
+        assert.deepEqual(f.disk, before);
+        for (const file of files) {
+            assert.ok(!f.reads.includes(f.uri(file.path)), `preflight must precede reading ${file.path}`);
+        }
+        assert.ok(!f.stats.includes(f.folder.uri.toString()), 'workspace root is the trusted boundary');
+        if (unsafe.dangling) {
+            const parent = f.mock.Uri.joinPath(f.mock.Uri.parse(f.uri(unsafe.target)), '..').toString();
+            assert.ok(f.listings.includes(parent), 'missing stat must check directory entries');
+        }
+    });
+}
+
+test('late unsafe output blocks earlier changed and missing outputs', { timeout: 5000 }, async () => {
+    for (const existing of [false, true]) {
+        const f = fixture();
+        const text = root('new');
+        f.put('index.literate', text);
+        const files = expected([{ path: 'index.literate', text }]);
+        assert.equal(files.at(-1)?.path, 'index.html', 'unsafe output must be last in generation order');
+        if (existing) { f.put('generated/main.txt', 'old'); }
+        f.types.set(f.uri('index.html'), f.mock.FileType.Directory);
+        const before = new Map(f.disk);
+        await assert.rejects(f.process(true), /Unsafe output path/);
+        assert.deepEqual(f.writes, []);
+        assert.deepEqual(f.directories, []);
+        assert.deepEqual(f.disk, before);
+        assert.ok(!f.reads.includes(f.uri('generated/main.txt')));
+    }
+});
+
+test('read-only refresh bypasses output preflight even with unsafe outputs', { timeout: 5000 }, async () => {
+    const f = fixture();
+    f.put('index.literate', root('hello'));
+    f.types.set(f.uri('generated'), f.mock.FileType.SymbolicLink | f.mock.FileType.Directory);
+    for (const writeFiles of [undefined, false]) { await f.process(writeFiles); }
+    assert.deepEqual(f.stats, []);
+    assert.deepEqual(f.listings, []);
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.directories, []);
+    assert.ok(!f.reads.includes(f.uri('generated/main.txt')));
+    assert.ok(!f.reads.includes(f.uri('index.html')));
+});
+
+test('output stat permission errors propagate and the queue recovers', { timeout: 5000 }, async () => {
+    const f = fixture();
+    f.put('index.literate', root('hello'));
+    f.statErrors.set(f.uri('index.html'), 'NoPermissions');
+    await assert.rejects(f.process(true), /NoPermissions/);
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.directories, []);
+    assert.deepEqual(f.listings, [f.folder.uri.toString()], 'permission failure must not use missing-entry fallback');
+    assert.ok(!f.reads.includes(f.uri('generated/main.txt')));
+    assert.match(f.errors[0], /NoPermissions/);
+    f.statErrors.clear();
+    await f.process(true);
+    assertOutputs(f, expected([{ path: 'index.literate', text: root('hello') }]));
+});
+
+test('nested remote outputs use the workspace provider and skip unchanged bytes', { timeout: 5000 }, async () => {
+    const f = fixture('vscode-remote://example/project');
+    const text = fence('text: <<main.*>>= nested/deeper/main.txt $', 'remote');
+    f.put('index.literate', text);
+    f.types.set(f.uri('nested'), f.mock.FileType.Directory);
+    await f.process(true);
+    assertOutputs(f, expected([{ path: 'index.literate', text }]));
+    assert.ok(f.stats.includes(f.uri('nested/deeper')));
+    assert.ok(!f.stats.includes(f.uri('nested/deeper/main.txt')), 'stop at the first absent component');
+    assert.ok([...f.stats, ...f.listings, ...f.writes].every(uri => uri.startsWith('vscode-remote://example/')));
+    f.writes.length = 0;
+    f.directories.length = 0;
+    await f.process(true);
+    assert.ok(f.stats.includes(f.uri('nested/deeper/main.txt')));
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.directories, []);
+});
+
 test('invalid projects preserve existing outputs and map engine diagnostics without offset changes', { timeout: 5000 }, async () => {
     const f = fixture();
     f.put('index.literate', root('valid'));

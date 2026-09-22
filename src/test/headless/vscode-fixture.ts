@@ -99,10 +99,23 @@ export const fence = (header: string, content = '') => '```' + header + '\n' + c
 export const root = (content: string, settings = '') =>
     fence('text: <<main.*>>= generated/main.txt $ ' + settings, content);
 
-export function fixture() {
-    const folder = { name: 'project', uri: Uri.file('/project'), index: 0 };
+export function fixture(workspaceUri = 'file:///project') {
+    const folder = { name: 'project', uri: Uri.parse(workspaceUri), index: 0 };
     const other = { name: 'other', uri: Uri.file('/other'), index: 1 };
     const disk = new Map<string, Buffer>();
+    const types = new Map<string, number>();
+    const statErrors = new Map<string, string>();
+    const stats: string[] = [], listings: string[] = [];
+    const fileType = { Unknown: 0, File: 1, Directory: 2, SymbolicLink: 64 };
+    const entryType = (key: string): number | undefined => {
+        if (types.has(key)) { return types.get(key); }
+        if (disk.has(key)) { return fileType.File; }
+        if ([folder, other].some(base => base.uri.toString() === key)
+            || [...disk.keys(), ...types.keys()].some(child => child.startsWith(key + '/'))) {
+            return fileType.Directory;
+        }
+        return undefined;
+    };
     const diagnostics = new Map<string, Diagnostic[]>();
     const reads: string[] = [], writes: string[] = [], directories: string[] = [], errors: string[] = [];
     let discoveries = 0;
@@ -162,6 +175,31 @@ export function fixture() {
                 && key.endsWith('.literate')).reverse().map(Uri.parse);
         },
         fs: {
+            async stat(uri: Uri) {
+                const key = uri.toString();
+                stats.push(key);
+                await tick();
+                const error = statErrors.get(key);
+                if (error) { throw new FileSystemError(error); }
+                const type = entryType(key);
+                if (type === undefined) { throw new FileSystemError('FileNotFound'); }
+                return { type, ctime: 0, mtime: 0, size: disk.get(key)?.length || 0 };
+            },
+            async readDirectory(uri: Uri): Promise<[string, number][]> {
+                const key = uri.toString();
+                listings.push(key);
+                await tick();
+                const type = entryType(key);
+                if (type === undefined) { throw new FileSystemError('FileNotFound'); }
+                if (type !== fileType.Directory) { throw new FileSystemError('FileNotADirectory'); }
+                const names = new Set<string>();
+                for (const child of [...disk.keys(), ...types.keys()]) {
+                    if (child.startsWith(key + '/')) {
+                        names.add(decodeURIComponent(child.slice(key.length + 1).split('/')[0]));
+                    }
+                }
+                return [...names].map(name => [name, entryType(Uri.joinPath(uri, name).toString())!]);
+            },
             async readFile(uri: Uri) {
                 reads.push(uri.toString());
                 await tick();
@@ -173,6 +211,7 @@ export function fixture() {
             async createDirectory(uri: Uri) {
                 await tick();
                 directories.push(uri.toString());
+                types.set(uri.toString(), fileType.Directory);
             },
             async writeFile(uri: Uri, content: Uint8Array) {
                 assert.ok(directories.includes(Uri.joinPath(uri, '..').toString()),
@@ -192,7 +231,7 @@ export function fixture() {
         providers.set(kind, provider); return disposable();
     };
     const mock = {
-        Uri, FileSystemError, Position, Range, WorkspaceEdit, Location, Hover, MarkdownString, EventEmitter,
+        Uri, FileSystemError, FileType: fileType, Position, Range, WorkspaceEdit, Location, Hover, MarkdownString, EventEmitter,
         Diagnostic, DiagnosticSeverity: { Error: 0 }, RelativePattern, workspace,
         TreeItem: class { constructor(readonly label: string, readonly collapsibleState: number) {} },
         ThemeIcon: class { constructor(readonly id: string) {} },
@@ -250,7 +289,7 @@ export function fixture() {
     }
     const process = (writeFiles?: boolean) => repository.processLiterateFiles(
         folder as unknown as vscode.WorkspaceFolder, writeFiles);
-    return { folder, other, disk, diagnostics, reads, writes, directories, errors, controls,
+    return { folder, other, disk, types, statErrors, stats, listings, diagnostics, reads, writes, directories, errors, controls,
         workspace, repository, extension, mock, providers, commands, document, open, uri, put, change, process,
         get docs() { return workspace.textDocuments; }, discoveries: () => discoveries };
 }
