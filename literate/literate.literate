@@ -180,6 +180,7 @@ properly. We'll need an instance of a properly configured *MarkdownIt* parser.
 
 ``` ts : <<fragment repository member variables>>=
 private md : MarkdownIt;
+private processingQueue: Promise<void> = Promise.resolve();
 ```
 
 The *MarkdownIt* parser will handle the actual tokenizing and parsing of the
@@ -252,20 +253,18 @@ context.subscriptions.push(this.diagnostics);
 
 ##### Subscribing to text document changes
 
-The repository subscribes to the `onDidChangeTextDocument` event on the
-workspace. It could process **literate** files on each change, but the
-completion item provider needs to trigger itself processing of literate files.
-Since completion item provider gets called on typing a opening chevron (`<`) we
-skip triggering the processing here when such a character has been typed.
+The repository processes every literate content change, including an opening
+chevron. Completion refreshes are read-only, and generated source/HTML changes
+are ignored so they cannot create a generation feedback loop.
 
 ``` ts :  <<subscribe to text document changes>>=
 context.subscriptions.push(
   vscode.workspace.onDidChangeTextDocument(
     async (e : vscode.TextDocumentChangeEvent) =>
     {
-      if(!(e.contentChanges.length>0 && e.contentChanges[0].text.startsWith('<')))
+      if(e.contentChanges.length > 0 && e.document.uri.path.endsWith('.literate'))
       {
-        await this.processLiterateFiles(e.document);
+        await this.processLiterateFiles(e.document, true).catch(() => undefined);
       }
     }
   )
@@ -285,7 +284,7 @@ context.subscriptions.push(
     async (e : vscode.WorkspaceFoldersChangeEvent) =>
     {
       for(const addedWorkspaceFolder of e.added) {
-        await this.processLiterateFiles(addedWorkspaceFolder);
+        await this.processLiterateFiles(addedWorkspaceFolder, true).catch(() => undefined);
       }
       for(const removedWorkspaceFolder of e.removed)
       {
@@ -299,176 +298,136 @@ context.subscriptions.push(
 
 #### Processing literate files
 
-The parsing and setting up of the `fragments` map is handled with the method
-`processLiterateFiles`. Additionally the method will write out all specified
-source files.
+The extension is an I/O adapter for the same pure `generateProject` engine used
+by the CLI. It snapshots every discovered document, preferring open editor
+buffers (including empty unsaved buffers), and loads the templates requested by
+`templateReferences`. Paths returned by that helper have already been checked
+by the engine. Missing template files are omitted so the engine can report the
+error at the declaration, rather than hiding it behind a filesystem exception.
+Other I/O failures reject the operation and are reported to the user. If template
+discovery rejects an invalid declaration, generation still runs to diagnose it
+at its source location. If document ordering rejects invalid input, the engine
+has already diagnosed it and the navigation parser does not parse it again.
 
-Processing the literate files is started generally in one of three cases: 1) change
-in workspace due to addition or removal of a workspace folder, 2) change to a
-literate document or through triggering of the `literate.process` command.
+`processLiterateFiles` defaults to a read-only refresh for completion providers.
+Activation, content changes and the Process command explicitly request writes.
+All requests share a serial queue: parsing and writing cannot overlap, and a
+failed request does not poison later requests. The returned promise covers the
+whole operation, including directory creation and file writes. Generated source
+and HTML changes do not themselves trigger processing.
+
+The engine owns validation, expansion, settings, templates and HTML generation.
+Its zero-based diagnostic positions map directly to VS Code ranges. Diagnostics
+are replaced only for the workspace being processed, preserving other folders.
+An invalid project produces no writes; existing outputs remain untouched. For a
+valid project the adapter compares UTF-8 bytes with disk, creates parent
+directories, and awaits writes only for changed files. This avoids unnecessary
+watcher events and preserves the engine's identical output across platforms.
+Writes are sequential but are not a transactional filesystem commit: an I/O
+failure can leave earlier writes applied. Obsolete outputs are not deleted.
+
+The navigation map is deliberately unexpanded and is built from the same
+snapshot, ordered by the engine's `orderSourceDocuments`: root index first,
+linked chapters next, and every remaining document in deterministic order.
+This map is not another generator and never supplies generation diagnostics.
 
 ``` ts : <<fragment generation method>>=
-async processLiterateFiles(
-  trigger :
-    vscode.WorkspaceFolder
-    | vscode.TextDocument
-    | undefined) {
-      <<set up workspace folder array>>
-      <<iterate over workspace folders and parse>>
-}
-```
-
-First we determine the workspace folder or workspace folders to process. In the
-case where `trigger` is a workspace folder or a text document we use the given
-workspace folder or determine the one to which the text document belongs. In
-these cases we'll have an array with just the one workspace folder as element.
-When the trigger is `undefined` we'll use all workspace folders registered to
-this workspace.
-
-``` ts : <<set up workspace folder array>>=
-const workspaceFolders : Array<vscode.WorkspaceFolder> | undefined = (() => {
-  if(trigger)
-  {
-    <<get workspace if text document>>
-    <<else just use passed in workspace>>
-    if("eol" in trigger) {
-      const ws = determineWorkspaceFolder(trigger);
-      if(ws)
-      {
-        return [ws];
+processLiterateFiles(
+  trigger : vscode.WorkspaceFolder | vscode.TextDocument | undefined,
+  writeFiles = false
+) : Promise<void> {
+  const operation = this.processingQueue.then(async () => {
+    const folder = trigger && ("eol" in trigger
+      ? determineWorkspaceFolder(trigger) : trigger);
+    const folders = trigger ? (folder ? [folder] : [])
+      : vscode.workspace.workspaceFolders || [];
+    for (const workspaceFolder of folders) {
+      const documents: SourceDocument[] = [];
+      for (const uri of await getLiterateFileUris(workspaceFolder)) {
+        documents.push({
+          path: path.posix.relative(workspaceFolder.uri.path, uri.path),
+          text: await getFileContent(uri)
+        });
       }
-    } else {
-      return [trigger];
+      const templates: Record<string, string> = Object.create(null);
+      let references: string[] = [];
+      try {
+        references = templateReferences(documents);
+      } catch (_) {}
+      for (const reference of references) {
+        try {
+          templates[reference] = await getFileContent(
+            vscode.Uri.joinPath(workspaceFolder.uri, reference));
+        } catch (error) {
+          if (!(error instanceof vscode.FileSystemError) || error.code !== 'FileNotFound') {
+            throw error;
+          }
+        }
+      }
+      const result = generateProject(documents, templates);
+      const diagnostics = new Map<string, vscode.Diagnostic[]>();
+      for (const diagnostic of result.diagnostics) {
+        const uri = vscode.Uri.joinPath(workspaceFolder.uri, diagnostic.path);
+        const key = uri.toString();
+        const entries = diagnostics.get(key) || [];
+        const range = new vscode.Range(diagnostic.line, diagnostic.column,
+          diagnostic.line, diagnostic.column + 1);
+        entries.push(new vscode.Diagnostic(range, diagnostic.message,
+          vscode.DiagnosticSeverity.Error));
+        diagnostics.set(key, entries);
+      }
+      const stale: vscode.Uri[] = [];
+      this.diagnostics.forEach(uri => {
+        if (vscode.workspace.getWorkspaceFolder(uri)?.uri.toString() === workspaceFolder.uri.toString()) {
+          stale.push(uri);
+        }
+      });
+      for (const uri of stale) { this.diagnostics.delete(uri); }
+      for (const [uri, entries] of diagnostics) {
+        this.diagnostics.set(vscode.Uri.parse(uri), entries);
+      }
+      const states = new GrabbedStateList();
+      const fragments = new FragmentMap();
+      this.grabbedStateForWorkspaceFolders.set(workspaceFolder.name, states);
+      this.fragmentsForWorkspaceFolders.set(workspaceFolder.name, fragments);
+      let ordered: SourceDocument[];
+      try {
+        ordered = orderSourceDocuments(documents);
+      } catch (_) {
+        continue;
+      }
+      for (const document of ordered) {
+        const env: GrabbedState = {
+          literateFileName: document.path,
+          literateUri: vscode.Uri.joinPath(workspaceFolder.uri, document.path),
+          gstate: new StateCore('', this.md, {})
+        };
+        this.md.parse(document.text, env);
+        states.list.push(env);
+      }
+      fragments.map = handleFragments(states.list);
+      if (!writeFiles || result.diagnostics.length) { continue; }
+      for (const file of result.files) {
+        const uri = vscode.Uri.joinPath(workspaceFolder.uri, file.path);
+        const content = Buffer.from(file.content, 'utf-8');
+        try {
+          const previous = await vscode.workspace.fs.readFile(uri);
+          if (content.equals(Buffer.from(previous))) { continue; }
+        } catch (error) {
+          if (!(error instanceof vscode.FileSystemError) || error.code !== 'FileNotFound') {
+            throw error;
+          }
+        }
+        await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(uri, '..'));
+        await vscode.workspace.fs.writeFile(uri, content);
+      }
     }
-  }
-  if(vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length>0) {
-    let folders = new Array<vscode.WorkspaceFolder>();
-    for(const ws of vscode.workspace.workspaceFolders)
-    {
-      folders.push(ws);
-    }
-    return folders;
-  }
-  return undefined;
+  });
+  this.processingQueue = operation.catch(error => {
+    void vscode.window.showErrorMessage(`Literate processing failed: ${String(error)}`);
+  });
+  return operation;
 }
-)();
-```
-
-We can check if our `trigger` is a `TextDocument` by checking if `eol` is a
-property. If the `eol` property exists we are dealing with an `TextDocument`, if it doesn't exist we are dealing with a `Workspace`.
-
-``` ts : <<get workspace if text document>>=
-if("eol" in trigger) {
-  const ws = determineWorkspaceFolder(trigger);
-  if(ws)
-  {
-    return [ws];
-  }
-}
-```
-
-Again, when the property `eol` is not found in the object we were passed we can
-assume it is just a workspace so return that as the one element in the array we
-return.
-
-``` ts : <<else just use passed in workspace>>=
-else
-{
-  return [trigger];
-}
-```
-
-With the list of workspace folders set up we can iterate over each folder and
-then handle **literate** files in that workspace folder.
-
-``` ts : <<iterate over workspace folders and parse>>=
-if(workspaceFolders) {
-  for(const folder of workspaceFolders)
-  {
-    <<set up fragments and grabbedStateList>>
-    if(fragments && grabbedStateList) {
-      <<clear FragmentMap and GrabbedStateList>>
-      <<iterate over all files, write out html>>
-      <<hanle fragments for map>>
-      <<extrapolate fragments and save out>>
-    }
-  }
-}
-```
-
-First we ensure entries for our workspace exist in the maps for `FragmentMap`
-and `GrabbedStateList`.
-
-``` ts : <<set up fragments and grabbedStateList>>=
-    if(!this.fragmentsForWorkspaceFolders.has(folder.name))
-    {
-      this.fragmentsForWorkspaceFolders.set(folder.name, new FragmentMap());
-    }
-    if(!this.grabbedStateForWorkspaceFolders.has(folder.name))
-    {
-      this.grabbedStateForWorkspaceFolders.set(folder.name, new GrabbedStateList());
-    }
-```
-
-Next we can get the `FragmentMap` and `GrabbedStateList` for our workspace
-folder. These we'll fill up with the data of our **literate** project.
-
-``` ts : <<set up fragments and grabbedStateList>>=+
-    const fragments = this.fragmentsForWorkspaceFolders.get(folder.name);
-    const grabbedStateList = this.grabbedStateForWorkspaceFolders.get(folder.name);
-```
-
-Each time we process a **literate** project we clear out the fragments and state
-so that we don't end up with stray elements.
-
-``` ts : <<clear FragmentMap and GrabbedStateList>>=
-fragments.clear();
-grabbedStateList.clear();
-```
-
-Our first pass is iterating over all the **literate** files in our folder,
-parsing them as we go. Each parsed file will be rendered as HTML and saved out
-to disk. The parser state with all the tokens will be set to
-`grabbedStateList.list`. We need to `await` on this `async` function, otherwise
-our state will be incomplete. The full state is needed for the next two steps.
-
-``` ts : <<iterate over all files, write out html>>=
-await iterateLiterateFiles(folder,
-                           writeOutHtml,
-                           grabbedStateList.list,
-                           this.md);
-```
-
-With the state complete, and our HTML files saved out, we are going to do two
-passes over the state. Lets do the first step here: we clear out the
-diagnostics, and then await on `handleFragments`. This function we call such
-that there is no extrapolation of fragments, nor source files are going to be
-saved. We `await` for the function to complete, otherwise our fragment map will
-be incomplete, or even just missing later on.
-
-``` ts : <<hanle fragments for map>>=
-this.diagnostics.clear();
-fragments.map = await handleFragments(folder,
-                                      grabbedStateList.list,
-                                      this.diagnostics,
-                                      false,
-                                      undefined);
-```
-
-The second step we'll call the fragment handler again, but this time we *do*
-want the fragments to be completely extrapolated, and the final source files
-written to disk. Before the call we again clear out the `DiagnosticCollection`
-so that we get the correct diagnostics in case of errors in **literate** files.
-
-Again we wait for the results, just to ensure it all completes before we go on.
-
-``` ts : <<extrapolate fragments and save out>>=
-this.diagnostics.clear();
-await handleFragments(folder,
-                      grabbedStateList.list,
-                      this.diagnostics,
-                      true,
-                      writeSourceFiles);
 ```
 
 #### Fetching fragments for workspace folder
@@ -711,7 +670,7 @@ getDocumentState(document: vscode.TextDocument) : GrabbedState
     const workspaceState = this.getWorkspaceState(ws);
     for(const state of workspaceState.list)
     {
-      if(document.uri.path === state.literateUri.path)
+      if(document.uri.toString() === state.literateUri.toString())
       {
         grabbedState = state;
       }
@@ -832,86 +791,11 @@ entries, if there were no hits the array will be empty.
 }
 ```
 
-## Iterating all literate files
+## Collecting editor state
 
-As mentioned in the introduction the main idea of the extension is to collect
-all fragments that are created in all `.literate` files. Once all fragments have
-been collected they are extrapolated until the top fragments are the full source
-files. Fully extrapolated top fragments are written to the source files as
-specicied for them.
-
-The first step is to put each `.literate` file through the *MarkdownIt*
-renderer. Each rendering will be given a special environment that will be used
-to collect the state for the render. The state will contain the document
-tokenized according the Markdown specification. The state `env` is of type
-`GrabbedState`. Among the tokens will be the code fences that are code
-fragments. For each `.literate` file the grabbed state `env` is saved in the
-list of `GrabbedState`s `envList`.
-
-```ts : <<render and collect state>>=
-async function iterateLiterateFiles(workspaceFolder : vscode.WorkspaceFolder,
-                                    writeHtml : WriteRenderCallback
-                                                | undefined
-                                                | null,
-                                    envList : Array<GrabbedState>,
-                                    md : MarkdownIt)
-{
-  <<find all literate files in workspace>>
-  try {
-    for (let fl of foundLiterateFiles) {
-      <<get text from literate document>>
-      <<parse literate file>>
-      <<write out rendered file if requested>>
-    }
-  } catch (error) {
-    console.log(error);
-  }
-}
-```
-
-We ensure that only **literate** files are going to be parsed for their program
-fragments. We do that by using a `vscode.RelativePattern` using the workspace
-folder passed into `iterateLiterateFiles`.
-
-``` ts : <<find all literate files in workspace>>=
-const foundLiterateFiles = await getLiterateFileUris(workspaceFolder);
-```
-
-We get the content of our **literate** file using `getFileContent`. We do need
-to `await` for that so that we actually get the string and not a promise.
-
-``` ts : <<get text from literate document>>=
-const text = await getFileContent(fl);
-```
-
-With the `text` for our **literate** document ready we harvest the relative file
-path to our document from the workspace folder. `fname` is then set as the
-`literateFileName` of our `GrabbedState` instance that we push into the
-`envList` so that we can access it later. Now we finally get to pass the `text`
-of our **literate** document to the *MarkdownIt* renderer. Once that is done we
-have both an HTML representation of our document as well as the entire parser
-state in `env`.
-
-``` ts : <<parse literate file>>=
-const fname = path.relative(workspaceFolder.uri.path, fl.path);
-const env: GrabbedState = { literateFileName: fname, literateUri: fl, gstate: new StateCore('', md, {}) };
-envList.push(env);
-const rendered = md.render(text, env);
-```
-
-If a callback implementing `WriteRenderCallback` is passed to
-`iterateLiterateFiles` we call that with the endered file content so that it can
-be saved as an `HTML` file with the same name as the `.literate` file that was
-being rendered, but with the extension replaced with `.html`. Conversely, if no
-callback was passed in it is not called and rendered results are not saved to
-disk.
-
-``` ts : <<write out rendered file if requested>>=
-if(writeHtml)
-{
-  await writeHtml(fname, workspaceFolder.uri, rendered);
-}
-```
+The repository parses the engine-ordered document snapshot with the grabber
+plugin to retain Markdown token locations for navigation. Parsing here does
+not render or write HTML; all generated files come from the engine.
 
 ### GrabbedState interface
 
@@ -1017,7 +901,7 @@ of fragments in code we use `FRAGMENT_USE_IN_CODE_RE`.
 ``` ts : <<fragment regular expressions>>=
 //let HTML_ENCODED_FRAGMENT_TAG_RE = /(&lt;&lt.*?&gt;&gt;)/g;
 const FRAGMENT_USE_IN_CODE_RE =
-  /(?<indent>[ \t]*)<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?/g;
+  /(?<indent>[ \t]*)\<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?/g;
 ```
 
 The regular expression captures four groups. A match will give us 5 or more
@@ -1045,7 +929,7 @@ following the language specifier.
 
 ``` ts : <<fragment regular expressions>>=+
 const FRAGMENT_RE =
-  /(?<lang>[^:]*)(?<colon>:)?.*<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*\s+\$)?(?<extraSettings>\s+.*)?/;
+  /(?<lang>[^:]*)(?<colon>:)?.*\<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*\s+\$)?(?<extraSettings>\s+.*)?/;
 ```
 
 Most of the groups correspond to the ones defined by `FRAGMENT_USE_IN_CODE_RE`
@@ -1066,251 +950,40 @@ To add to a fragment a `+` is added, so it could look like
 `py : <<a fragment name>>=+`. Having a fragment without `=` or `=+` on the code
 fence info line is an error.
 
-## Gathering all fragments
+## Gathering editor fragments
 
-All code fragments are fetched from each environment state. This is done through
-looking for all `fence` tokens. If the `token.info` for a `fence` matches the
-`FRAGMENT_RE` we can check to see whether the fragment we have currently in our
-hands is a new fragment (`root && !add`) or whether this one expands an existing
-one (`root && add`), as will be explained in more detail further down.
+`handleFragments` only collects unexpanded code and tokens for editor providers.
+It has no writer callback, expansion switch, template I/O or diagnostics. Invalid
+or incomplete declarations can still be navigated while typing; the engine is
+solely responsible for deciding whether the project is valid for generation.
+Appended parts follow the shared engine order, even when the first part is empty.
+Template metadata is not needed by these providers and remains unset.
 
 ```ts : <<handle fragments>>=
-async function handleFragments(
-  workspaceFolder : vscode.WorkspaceFolder,
-  envList : Array<GrabbedState>,
-  diagnostics : vscode.DiagnosticCollection,
-  extrapolateFragments : boolean,
-  writeSource : WriteSourceCallback | undefined) : Promise<Map<string, FragmentInformation>>
-{
-  const folderUri = workspaceFolder.uri;
-  <<build fragment map>>
-
-  if(extrapolateFragments)
-  {
-    <<extrapolate fragments>>
-  }
-
-  if(writeSource) {
-    writeSource(workspaceFolder, fragments);
-  }
-
-  return Promise.resolve(fragments);
-}
-```
-
-### Populating the fragment map
-
-First we build a map of all available fragments. These will go into `fragments`,
-which is of type `Map<string, FragmentInformation>`. The name of a fragment will
-function as the key, and an instance of `FragmentInformation` will be the value.
-
-```ts : <<build fragment map>>=
-const fragments = new Map<string, FragmentInformation>();
-const overwriteAttempts = new Array<string>();
-const missingFilenames = new Array<string>();
-const addingToNonExistant = new Array<string>();
-for (let env of envList) {
-  for (let token of env.gstate.tokens) {
-    <<handle fence tokens>>
-  }
-}
-```
-
-Each `fence` token we find we need to check. There may be of course code fences
-in the document that do not create or modify a fragment. These we need to skip.
-
-Since we are handling code fences we use `FRAGMENT_RE` to match `token.info`. A
-fragment is malformed if the colon is missing, so we need to
-`<<emit diagnostic when colon is missing>>`.
-
-```ts : <<handle fence tokens>>=
-if (token.type === 'fence') {
-  const linenumber = locationOfFragment(token);
-  const match = token.info.match(FRAGMENT_RE);
-  if (match && match.groups) {
-    let lang = match.groups.lang.trim();
-    let colon = match.groups.colon;
-    let name = match.groups.tagName;
-    let root = match.groups.root;
-    let add = match.groups.add;
-    let fileName = match.groups.fileName;
-    let extraSettings = match.groups.extraSettings;
-    <<emit diagnostic when colon is missing>>
-    <<add to existing fragment>>
-    <<create a new fragment>>
-  }
-}
-```
-
-### Error diagnostic when fragment malformed
-
-The diagnostic emitted has a message telling the colon is missing, along with
-the line number and the literate file this happened in.
-
-```ts: <<emit diagnostic when colon is missing>>=
-if(lang && !match.groups.colon) {
-  let msg = `Missing colon for fragment: ${name}. ${env.literateFileName}${linenumber}`;
-  const diag = createErrorDiagnostic(token, msg);
-  updateDiagnostics(env.literateUri, diagnostics, diag);
-}
-
-```
-
-### Creating a new fragment
-
-If the `root` group has captured a result but not the `add` group we know we
-have a new fragment on our hand.
-
-If we already have in our `fragments` map a key with the same `name` as the
-fragment we are currently handling we add an error diagnostic message. We don't
-stop handling fences, or the entire `literate.process` command for that matter.
-We keep on going, but leave it up to the programmer to see and handle the error
-messages.
-
-If a fragment name with `.*` is found we need to ensure there is a result in the
-`fileName` capture group. That is going to be needed to write out the source
-code file eventually. A file defining fragment without a file name is an error.
-
-When everything appears to be in order a new `FragmentInformation` instance is
-created with the information found. The code for this fragment is the token
-content in `token.content`. Finally the new `FragmentInformation` instance is
-added to the `fragments` map.
-
-If a new fragment is going to be created, but it already exists in the fragment
-map we emit an error diagnostic. To ensure we emit the error diagnostic only
-once the fragment name is added to `overwriteAttempts`.
-
-``` ts : <<create a new fragment>>=
-if (root && !add) {
-  if (fragments.has(name)) {
-    if(!overwriteAttempts.includes(name))
-    {
-      let msg = `Trying to overwrite existing fragment fragment ${name}. ${env.literateFileName}${linenumber}`;
-      const diag = createErrorDiagnostic(token, msg);
-      updateDiagnostics(env.literateUri, diagnostics, diag);
-      overwriteAttempts.push(name);
-    }
-  }
-```
-
-If it does not yet exist in the fragment map we can proceed. We need to check
-though if we have a top-level fragment. In that case we require a file name, so
-emit an error diagnostic when that is missing.
-
-
-```ts : <<create a new fragment>>=+
-  else {
-    if (!fileName && name.indexOf(".*") > -1 ) {
-      if(!missingFilenames.includes(name)) {
-        let msg = `Expected filename for star fragment ${name}`;
-        const diag = createErrorDiagnostic(token, msg);
-        updateDiagnostics(env.literateUri, diagnostics, diag);
-        missingFilenames.push(name);
-      }
-    }
-```
-
-On the contrary, if we have a non-starred fragment but we do get a filename we
-also issue a diagnostic to notify the programmer of the mistake.
-
-```ts : <<create a new fragment>>=+
-    if(fileName && name.indexOf(".*")===-1) {
-        let msg = `Unexpected filename for non-star fragment ${name}`;
-        const diag = createErrorDiagnostic(token, msg);
-        updateDiagnostics(env.literateUri, diagnostics, diag);
-    }
-```
-
-We do need to make sure that the fileName gets cleaned up because the matching
-expression for this contains whitespace and a dollar sign.
-
-
-```ts : <<create a new fragment>>=+
-    if(fileName) {
-      fileName = fileName.replace(/\s+\$/, "");
-    }
-```
-
-Check the `extraSettings` group if a template is specified. Find the
-`vscode.Uri` for the file specified. Use that if it exists, otherwise keep
-`sourceTemplateUri` at `undefined`.
-
-```ts : <<create a new fragment>>=+
-    let sourceTemplateUri : vscode.Uri | undefined = undefined;
-    if(extraSettings) {
-      let settings = extraSettings.split(";");
-      for(let setting of settings)
-      {
-        setting = setting.trim();
-        if(setting.startsWith("template"))
-        {
-          let settingParts = setting.split("=");
-          const sourceTemplateFilePattern : vscode.RelativePattern = new vscode.RelativePattern(workspaceFolder, settingParts[1]);
-          const _foundSourceTemplateFile = await vscode.workspace
-            .findFiles(sourceTemplateFilePattern)
-            .then(files => Promise.all(files.map(file => file)));
-          if(_foundSourceTemplateFile.length===1)
-          {
-            sourceTemplateUri = _foundSourceTemplateFile[0];
-          }
+function handleFragments(envList: Array<GrabbedState>): Map<string, FragmentInformation> {
+  const fragments = new Map<string, FragmentInformation>();
+  for (const env of envList) {
+    for (const token of env.gstate.tokens) {
+      if (token.type !== 'fence') { continue; }
+      const match = token.info.match(FRAGMENT_RE);
+      if (!match || !match.groups || !match.groups.root) { continue; }
+      const { tagName: name, lang, add, fileName } = match.groups;
+      if (add) {
+        const fragment = fragments.get(name);
+        if (fragment) {
+          fragment.code += token.content;
+          fragment.tokens.push(token);
         }
+      } else if (!fragments.has(name)) {
+        fragments.set(name, {
+          lang: lang.trim(), literateFileName: env.literateFileName,
+          sourceFileName: fileName ? fileName.replace(/\s+\$/, '').trim() : '',
+          templateFileName: undefined, code: token.content, tokens: [token], env
+        });
       }
     }
-```
-
-
-We can now finally create the `FragmentInformation` instance and add it to our
-fragment map.
-
-```ts : <<create a new fragment>>=+
-    let code = token.content;
-    let fragmentInfo: FragmentInformation = {
-      lang: lang,
-      literateFileName: env.literateFileName,
-      sourceFileName: fileName,
-      templateFileName: sourceTemplateUri,
-      code: code,
-      tokens: [token],
-      env: env,
-    };
-    fragments.set(name, fragmentInfo);
   }
-}
-```
-
-### Modifying an existing fragment
-
-If both the `root` and `add` groups have capture their results, an `=` and an
-`+` respectively we need to add code to an existing fragment.
-
-For this to work a new fragment needs to be always present before the modifying
-fragment. It is an error to try to modify a fragment that hasn't been seen yet.
-
-The fragment with specified `name` is fetched, and when it is not `undefined`
-the `token.content` is appended to the `code` of the `FragmentInformation`
-instance we got from the map. The current token is also appended to the `tokens`
-list.
-
-The fragments map is updated with the modified  `FragmentInformation` instance.
-
-``` ts : <<add to existing fragment>>=
-if (root && add) {
-  if (fragments.has(name)) {
-    let fragmentInfo = fragments.get(name) || undefined;
-    if(fragmentInfo && fragmentInfo.code) {
-      let additionalCode = token.content;
-      fragmentInfo.code = `${fragmentInfo.code}${additionalCode}`;
-      fragmentInfo.tokens.push(token);
-      fragments.set(name, fragmentInfo);
-    }
-  } else {
-    if(!addingToNonExistant.includes(name)) {
-      let msg = `Trying to add to non-existant fragment ${name}. ${env.literateFileName}:${linenumber}`;
-      const diag = createErrorDiagnostic(token, msg);
-      updateDiagnostics(env.literateUri, diagnostics, diag);
-      addingToNonExistant.push(name);
-    }
-  }
+  return fragments;
 }
 ```
 
@@ -1366,137 +1039,25 @@ interface FragmentInformation {
 }
 ```
 
-### Writing source files
+### One output generator
 
-Writing source files is a matter of looping through the keys of a fragments map.
-For each key that ends with the `.*` string we check if a fragment exists, and
-if for that fragment a source filename is recorded. If that is the case write
-out the file with the code content of the fragment.
-
-If a `vscode.Uri` is defined for `templateFileName` read the file contents and
-use that instead of the default one that says just `[CODE]`. This means that for
-a template to work properly it needs to contain the string `[CODE]`, since that
-will be replaced with the code generated for this file.
-
-For newline handling we'll replace all single LF occurances with CRLF when the
-underlying operating system is Windows. Otherwise do the reverse: replace CRLF
-with a single LF.
-
-```ts : <<method to write out source files>>=
-async function writeSourceFiles(workspaceFolder : vscode.WorkspaceFolder,
-                fragments : Map<string, FragmentInformation>)
-{
-  const folderUri = workspaceFolder.uri;
-  /* now write out the source files. */
-  for(const name of fragments.keys()) {
-    if (name.endsWith(".*")) {
-      let fragmentInfo = fragments.get(name) || undefined;
-      if (fragmentInfo && fragmentInfo.sourceFileName) {
-        let sourceTemplate = '[CODE]';
-        if(fragmentInfo.templateFileName) {
-          sourceTemplate = await getFileContent(fragmentInfo.templateFileName);
-        }
-        let code = sourceTemplate.replace("[CODE]", fragmentInfo.code);
-        let fixed = '';
-        if(os.platform()==='win32')
-        {
-          const lf2crlf = /([^\r])\n/g;
-          fixed = code.replaceAll(lf2crlf, '$1\r\n');
-        } else {
-          const crlf2lf = /\r\n/g;
-          fixed = code.replaceAll(crlf2lf, '\n');
-        }
-        const encoded = Buffer.from(fixed, 'utf-8');
-        let fileName = fragmentInfo.sourceFileName.trim();
-        const fileUri = vscode.Uri.joinPath(folderUri, fileName);
-        try {
-          await vscode.workspace.fs.writeFile(fileUri, encoded);
-        } catch(writeError)
-        {
-          console.log(writeError);
-        }
-      }
-    }
-  }
-}
-```
-
-
-## Extrapolating fragments
-
-Once all fragments have been collected from the `.literate` files of the project
-fragments can be combined into source code.
-
-``` ts : <<extrapolate fragments>>=
-// for now do several passes
-let pass: number = 0;
-const rootIncorrect = new Array<string>();
-const addIncorrect = new Array<string>();
-const fragmentNotFound = new Array<string>();
-do {
-  pass++;
-  let fragmentReplaced = false;
-  for (let fragmentName of fragments.keys()) {
-    let fragmentInfo = fragments.get(fragmentName) || undefined;
-    if (!fragmentInfo) {
-      continue;
-    }
-
-    const casesToReplace = [...fragmentInfo.code.matchAll(FRAGMENT_USE_IN_CODE_RE)];
-    for (let match of casesToReplace) {
-      if(!match || !match.groups) {
-        continue;
-      }
-      let tag = match[0];
-      let indent = match.groups.indent;
-      let tagName = match.groups.tagName;
-      let root = match.groups.root;
-      let add = match.groups.add;
-      if (root && !rootIncorrect.includes(tag)) {
-        let msg = `Found '=': incorrect fragment tag in fragment, ${tag}`;
-        const diag = createErrorDiagnostic(fragmentInfo.tokens[0], msg);
-        updateDiagnostics(fragmentInfo.env.literateUri, diagnostics, diag);
-        rootIncorrect.push(tag);
-      }
-      if (add && !addIncorrect.includes(tag)) {
-        let msg = `Found '+': incorrect fragment tag in fragment: ${tag}`;
-        const diag = createErrorDiagnostic(fragmentInfo.tokens[0], msg);
-        updateDiagnostics(fragmentInfo.env.literateUri, diagnostics, diag);
-        addIncorrect.push(tag);
-      }
-      if (!fragments.has(match.groups.tagName) && tagName !== "(?<tagName>.+)" && !fragmentNotFound.includes(tagName)) {
-        let msg = `Could not find fragment ${tag} (${tagName})`;
-        let range = fragmentUsageRange(fragmentInfo.tokens[0], tagName);
-        const diag = createErrorDiagnostic(fragmentInfo.tokens[0], msg, range);
-        updateDiagnostics(fragmentInfo.env.literateUri, diagnostics, diag);
-        fragmentNotFound.push(tagName);
-      }
-      let fragmentToReplaceWith = fragments.get(tagName) || undefined;
-      if (fragmentToReplaceWith) {
-        let code = fragmentToReplaceWith.code;
-        let lines = code.split("\n").slice(0, -1);
-        let indentedLines = lines.flatMap(function (e, _) {
-          return indent + e;
-
-        });
-        let newcode = indentedLines.join("\n");
-        fragmentReplaced = true;
-        fragmentInfo.code = fragmentInfo.code.replace(tag, newcode);
-        fragments.set(fragmentName, fragmentInfo);
-      }
-    }
-  }
-  if(!fragmentReplaced) {
-    break;
-  }
-}
-while (pass < 25);
-```
+Expansion, source templates and rendered book files are implemented only in the
+engine. The extension's legacy extrapolator and source/HTML writers have been
+removed; preview rendering below is exclusively for VS Code's live Markdown
+preview, not the generated book.
 
 ## custom code fence rendering
 
-Our extension uses a custom code fence rendering rule to ensure the code
-fragment name is also rendered as part of the fence.
+Our extension uses a custom code fence rendering rule for the live Markdown
+preview to ensure the code fragment name is also rendered as part of the fence.
+The generated book uses the engine renderer instead.
+
+In fragment bodies, a literal opening delimiter must be written as `\<<`,
+including delimiters inside TypeScript strings and regular expressions. Real
+fragment references remain unescaped. The engine removes the escape marker in
+generated code. For live preview we remove it from a shallow copy of the fence
+token before rendering, so editor tokens retain their original text and source
+positions. The legacy preview's fragment decoration is otherwise unchanged.
 
 Essentially the old, default rendering rule for fences is first used to create
 the original fence.
@@ -1534,7 +1095,11 @@ function renderCodeFence(tokens : Token[],
              slf : Renderer) {
   let rendered = '';
   if (oldFence && tokens[idx].info.indexOf("SETTINGS")<0) {
-    rendered = oldFence(tokens, idx, options, env, slf);
+    const previewToken = Object.assign(Object.create(Object.getPrototypeOf(tokens[idx])), tokens[idx]);
+    previewToken.content = previewToken.content.replace(/\\\<</g, '\<<');
+    const previewTokens = tokens.slice();
+    previewTokens[idx] = previewToken;
+    rendered = oldFence(previewTokens, idx, options, env, slf);
 
     let token = tokens[idx];
     if (token.info) {
@@ -1564,7 +1129,7 @@ ${rendered}
       else if(token.info.endsWith('mermaid')) {
         rendered =
 `<pre class="mermaid">
-${token.content}
+${previewToken.content}
 </pre>`;
       }
     }
@@ -1667,7 +1232,7 @@ task. That is obviously not good for the workflow.
 let literateProcessDisposable = vscode.commands.registerCommand(
   'literate.process',
   async function () {
-    theOneRepository.processLiterateFiles(undefined);
+    await theOneRepository.processLiterateFiles(undefined, true);
     return vscode.window.setStatusBarMessage("Literate Process completed", 5000);
 });
 
@@ -1878,397 +1443,60 @@ the cursor, and apply the edit.
 
 ## Diagnostics
 
-In this chapter are a few methods that help creating and updating diagnostics.
-These diagnostics help the literate programmer determining if there are
-problems with the text and where.
-
-### Updating diagnostics
-
-Diagnostic messages are instances of `vscode.Diagnostic`. To show them in the Problems panel in VSCode we add the `diagnostics` collection, which typically is passed into the `updateDiagnostics`.
-
-```ts : <<diagnostic updating>>=
-function updateDiagnostics(
-  uri: vscode.Uri,
-  collection: vscode.DiagnosticCollection,
-  diagnostic : vscode.Diagnostic | undefined): void {
-  if (uri) {
-    if (diagnostic) {
-      const diags = Array.from(collection.get(uri) || []);
-      diags.push(diagnostic);
-      collection.set(uri, diags);
-    }
-  } else {
-    collection.clear();
-  }
-}
-
-```
-
-### Creating an error diagnostic
-
-Instances of `vscode.Diagnostic` can be created with `createErrorDiagnostic`. This takes a `markdownIt` `token`, a `message` and a `range`. If the passed in range isn't a proper range the range is harvested from the passed in `token`.
-
-For now all messages are considered errors.
-
-```ts : <<diagnostic updating>>=+
-/**
- * Create diagnostic for a given token with message.
- * @param token Token that carries the faulty code fragment
- * @param message Error message
- */
-function createErrorDiagnostic(token: Token, message: string, range? : vscode.Range) : vscode.Diagnostic {
-  range = range ? range : fragmentRange(token);
-  let diagnostic: vscode.Diagnostic = {
-    severity: vscode.DiagnosticSeverity.Error,
-    message: message,
-    range: range
-  };
-
-  return diagnostic;
-}
-
-```
-
-### Line number of fragment start
-
-```ts : <<diagnostic updating>>=+
-/**
- * Give the location of the line in the Markup document that contains the
- * tag declaration.
- * @param token Token to extract code location from
- */
-function locationOfFragment(token: Token): number {
-  let linenumber = token.map ? (token.map[0]) : -1;
-  return linenumber;
-}
-
-```
-
-### Line number of fragment end
-
-`locationOfFragmentEnd` is used to get the last line of the given token in the
-**literate** document. This is typically used for code fences in this extension.
-
-``` ts : <<diagnostic updating>>=+
-/**
- * Give the location of the last line in the literate document that contains the
- * code fragment.
- * @param token Token to extract code location from
- */
-function locationOfFragmentEnd(token: Token): number {
-  let linenumber = token.map ? (token.map[1] ) : -1;
-  return linenumber;
-}
-
-```
-
-### Range of whole fragment in text
-
-`fragmentRange` is a method to construct a `vscode.Range` for a given token that
-is a code fragment.
-
-``` ts : <<diagnostic updating>>=+
-/**
- * Give range for the code fragment, including tag.
- * @param token Token to create range for
- */
-function fragmentRange(token: Token): vscode.Range {
-  let startTagName = token.info.indexOf("<<") + 2;
-  let endTagName = token.info.indexOf(">>") - 1;
-  let start = new vscode.Position(locationOfFragment(token), startTagName);
-  let end = new vscode.Position(locationOfFragmentEnd(token), endTagName);
-  let range: vscode.Range = new vscode.Range(start, end);
-  return range;
-}
-```
-
-### Fragment usage range
-
-This method gives a `Range` for the given tag name based on the passed in
-`Token`. The line number for the occurrance is computed, along with the begin
-and and positions within the line.
-
-``` ts : <<diagnostic updating>>=+
-function fragmentUsageRange(token : Token, tagName : string) : vscode.Range
-{
-  let startLineNumber = locationOfFragment(token);
-  const lines = token.content.split('\n');
-  let index : number = 0;
-  for(const line of lines)
-  {
-    startLineNumber++;
-    index = line.indexOf(tagName);
-    if(index > -1)
-    {
-      break;
-    }
-  }
-  let start = new vscode.Position(startLineNumber, index - 2);
-  let end = new vscode.Position(startLineNumber, index + tagName.length + 2);
-  return new vscode.Range(start, end);
-}
-```
+Generation diagnostics come exclusively from the engine, including malformed
+headers, missing templates, invalid output paths, missing fragments and cycles.
+The adapter preserves their zero-based line and column coordinates, grouping
+errors by full document URI in the Problems panel. Navigation helpers do not
+emit a second, potentially contradictory set of validation errors.
 
 ## Utility functions
 
-### Retrieving literate file uri list
+### Discovering inputs and reading buffers
 
-Function to get all literate files in a given workspace. We need to ensure that
-we give the uris in the correct order. The order will be defined by an
-`index.literate` if it exists. Otherwise use the order in which they are found
-by `findFiles`. If an `index.literate` exists also harvest the `SETTINGS` fence
-if there is any.
+Discovery includes all `.literate` files, not just index-linked chapters. Passing
+`null` as the exclusion argument avoids silently dropping files through editor
+search exclusions. Both discovered URIs and open buffers are filtered using the
+engine's shared `discoveryExcludedDirectories`, matching CLI discovery. Exact
+directory components relative to the workspace root are checked at every depth:
+`node_modules`, `out`, `dist`, `.git`, `.yarn`, and `.vscode-test` are excluded.
+Similar names and filenames are not excluded. Open workspace documents are
+merged by full URI so new,
+not-yet-saved file-backed documents participate too. Untitled documents have no
+workspace-relative output location and are not included. Discovery sorts full
+URIs; the engine applies the semantic chapter ordering after contents are read.
+
+The buffer lookup uses full URI equality, not relative names that can collide
+between workspace folders. Presence, rather than truthiness of the text,
+decides whether to read from disk: an empty buffer must stay empty. This same
+lookup applies to templates, so unsaved template edits are used on the next
+processing request. Automatic processing watches literate content changes only;
+use Process after changing a template without changing a literate document.
 
 ``` ts : <<utility functions>>=
-async function getLiterateFileUris(
-  workspaceFolder : vscode.WorkspaceFolder
-) : Promise<vscode.Uri[]>
-{
-  const literateFilesInWorkspace : vscode.RelativePattern =
-        new vscode.RelativePattern(workspaceFolder, '**/*.literate');
-  const _foundLiterateFiles = await vscode.workspace
-        .findFiles(literateFilesInWorkspace)
-        .then(files => Promise.all(files.map(file => file)));
-  let foundLiterateFiles = new Array<vscode.Uri>();
-  <<see if an index.literate exists>>
-  <<search index for html links>>
-  <<sort uris based on html link order>>
-  <<get SETTINGS from index.literate>>
-  return foundLiterateFiles;
-}
-```
-
-TBD: create instead a markup that allows us to express the literate file order
-in whichever file we want.
-
-If we don't find an `index.literate` file return the found literate files as is.
-
-```  ts  : <<see if an index.literate exists>>=
-const index = _foundLiterateFiles.find(uri => uri.path.endsWith('index.literate'));
-if(!index)
-{
-  return _foundLiterateFiles;
-}
-```
-
-We now parse the index file to get the state with markdown tokens. We don't need
-the rendered HTML of the index document, so we discard that.
-
-```  ts  : <<search index for html links>>=
-const md = createMarkdownItParserForLiterate();
-const text = await getFileContent(index);
-const env: GrabbedState = { literateFileName: 'index.literate', literateUri: index, gstate: new StateCore('', md, {}) };
-const _ = md.render(text, env);
-```
-
-We create a new list of strings to which we will add the file uris in the order
-is found in the parsed tokens. We do that by looking for `bullet_open_list` and
-`bullet_close_list`. We assume that inside these lists there will be items that
-contain links. Once we've encountered an `bullet_open_item` we start looking for
-`list_item_open`. When the token is found we get the inline token that is two
-tokens away from the `list_item_open` token. We make sure that it has child
-tokens, and that the first child token has a valid `attrs` property. Here we
-find the uri to the HTML version of a **literate** file.
-
-TBD add support for ordered list.
-
-```  ts  : <<sort uris based on html link order>>=
-let links = new Array<string>();
-let bulletListOpen = false;
-let idx = 0;
-for(let token of env.gstate.tokens)
-{
-  if(token.type==='bullet_list_open')
-  {
-    bulletListOpen = true;
+async function getLiterateFileUris(workspaceFolder: vscode.WorkspaceFolder): Promise<vscode.Uri[]> {
+  const uris = new Map<string, vscode.Uri>();
+  const excluded = new Set<string>(discoveryExcludedDirectories);
+  const included = (uri: vscode.Uri): boolean => !path.posix
+    .relative(workspaceFolder.uri.path, uri.path).split('/').slice(0, -1)
+    .some(directory => excluded.has(directory));
+  const pattern = new vscode.RelativePattern(workspaceFolder, '**/*.literate');
+  for (const uri of await vscode.workspace.findFiles(pattern, null)) {
+    if (included(uri)) { uris.set(uri.toString(), uri); }
   }
-  if(token.type==='bullet_list_close')
-  {
-    bulletListOpen = false;
-  }
-  if(bulletListOpen && token.type==='list_item_open')
-  {
-    let inline = env.gstate.tokens[idx+2];
-    if(inline.children && inline.children[0].attrs)
-    {
-      try {
-        const currentUri = inline.children[0].attrs[0][1];
-        let path = currentUri.replace("html", "literate");
-        const foundUri = _foundLiterateFiles.find(uri => uri.path.endsWith(path));
-        if(foundUri)
-        {
-          foundLiterateFiles.push(foundUri);
-        }
-      } catch(_) {}
+  for (const document of vscode.workspace.textDocuments) {
+    if (document.uri.path.endsWith('.literate') && included(document.uri) &&
+        vscode.workspace.getWorkspaceFolder(document.uri)?.uri.toString() === workspaceFolder.uri.toString()) {
+      uris.set(document.uri.toString(), document.uri);
     }
   }
-  idx++;
+  return Array.from(uris.keys()).sort().map(key => uris.get(key)!);
 }
-```
 
-Then ensure that the index file also exists in the list to return.
-
-```   ts   : <<sort uris based on html link order>>=+
-const finalCheck = foundLiterateFiles.find(uri => uri.path.endsWith('index.literate'));
-if(!finalCheck)
-{
-  foundLiterateFiles.splice(0, 0, index);
-}
-```
-
-Finally harvest code fences that have `SETTINGS` in the info. Split the content
-of the fence into lines, and loop over the lines.
-
-If a trimmed line starts with `template` harvest the filename that is given as
-its value. As an additional check ensure the file exists before assigning its
-URI to `htmlTemplateFile`.
-
-
-```ts : <<get SETTINGS from index.literate>>=
-for(let token of env.gstate.tokens)
-{
-  if(token.type==='fence' && token.tag==='code' && token.info.indexOf("SETTINGS")>=0)
-  {
-    const lines = token.content.split("\n");
-    for(let line of lines) {
-      line = line.trim();
-      if(line.startsWith("template")) {
-        let parts = line.split("=");
-        const templateFileInWorkspace : vscode.RelativePattern =
-        new vscode.RelativePattern(workspaceFolder, parts[1]);
-        const _foundHtmlTemplateFile = await vscode.workspace
-          .findFiles(templateFileInWorkspace)
-          .then(files => Promise.all(files.map(file => file)));
-        console.log(_foundHtmlTemplateFile);
-        if(_foundHtmlTemplateFile.length===1) {
-          htmlTemplateFile = _foundHtmlTemplateFile[0];
-        }
-      }
-      else if(line.startsWith("authors")) {
-        let parts = line.split("=");
-        authors = parts[1];
-      }
-    }
-  }
-}
-```
-
-### Write out HTML
-
-Function to write out the given `rendered` content out to a file. The `rendered`
-string will be set into a HTML body. The HTML template will be read from the
-file at the URI specified by `htmlTemplateFile` if it is set, otherwise use a
-hard-coded piece of HTML template.
-
-For the template to work it needs to have the string `[CONTENT]` where the
-rendered Markdown HTML is going to be substituted.
-
-The default HTML template imports `mermaid.js` as a module, so that it can work
-on any `pre` tag that has the CSS class `mermaid` set.
-
-If `authors` contains a string that is not empty one ore more Open Graph
-protocol tags will be used to replace the `[AUTHORS]` tag if it exists. If
-`authors` is empty `[AUTHORS]` will be replaced with that. If the `authors`
-string contains semi-colons it will be split on those, and for each author are
-there will be an `article:author` tag added.
-
-Regarding the file endings we do the same as for source files. On Windows we
-replace single LF instances with CRLF and vice versa on non-Windows machines
-replace CRLF instances with LF.
-
-```ts : <<utility functions>>=+
-async function writeOutHtml
-      (fname : string,
-       folderUri : vscode.Uri,
-       rendered : string) : Promise<void>
-{
-  let html = '';
-  const getContent = async () => {
-    let _html = '';
-    if(htmlTemplateFile) {
-      _html = await getFileContent(htmlTemplateFile);
-    } else {
-      _html =
-`<!DOCTYPE html>
-<html>
-<head>
-  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
-  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
-  <link rel="stylesheet" type="text/css" href="./style.css">
-  [AUTHORS]
-</head>
-<body>
-[CONTENT]
-<script type="module">
-  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-</script>
-</body>
-</html>`;
-    }
-    return _html;
-  };
-  html = await getContent();
-
-  let authorlist = authors.split(";");
-  let metaAuthors = '';
-  for(let author of authorlist) {
-    metaAuthors += `<meta name="author" content="${author}">`;
-  }
-
-  html = html
-    .replace("[CONTENT]", rendered)
-    .replace("[AUTHORS]", metaAuthors);
-
-  if(os.platform()==='win32'){
-    const lf2crlf = /([^\r])\n/g;
-    html = html.replaceAll(lf2crlf, '$1\r\n');
-  } else {
-    const crlf2lf = /\r\n/g;
-    html = html.replaceAll(crlf2lf, '\n');
-  }
-  const encoded = Buffer.from(html, 'utf-8');
-  fname = fname.replace(".literate", ".html");
-  const fileUri = vscode.Uri.joinPath(folderUri, fname);
-  return Promise.resolve(vscode.workspace.fs.writeFile(fileUri, encoded));
-};
-```
-
-### Get file content for uri
-
-For each **literate** file in the workspace we'll get eventually the text
-content, but we do have to check if any of the files are opened in an editor.
-Especially for on-the-fly updating of the tree view, but also for fragment name
-completion and similar functionality we need to get the text from the
-`TextDocument` instead of the file on disk. If there is a `TextDocument` that
-corresponds to the **literate** file we are currently handling we read the text
-into `currentContent`, otherwise we set it to an empty string.
-
-``` ts : <<utility functions>>=+
-async function getFileContent(
-  file : vscode.Uri
-) : Promise<string>
-{
-  const currentContent = (() =>
-      {
-          for(const textDocument of vscode.workspace.textDocuments) {
-              if(vscode.workspace.asRelativePath(file) === vscode.workspace.asRelativePath(textDocument.uri)) {
-                  return textDocument.getText();
-              }
-          }
-          return '';
-      }
-  )();
-```
-
-If `currentContent` is an empty string we read the content from the file on
-disk, and decode it into `text`. If on the other hand we do have
-`currentContent`, we use that for our `text` instead. The `currentContent`
-wil be more up-to-date than what we have on disk.
-
-``` ts : <<utility functions>>=+
-  const content = currentContent ? null : await vscode.workspace.fs.readFile(file);
-  const text = currentContent ? currentContent : new TextDecoder('utf-8').decode(content);
-  return text;
+async function getFileContent(file: vscode.Uri): Promise<string> {
+  const document = vscode.workspace.textDocuments.find(
+    document => document.uri.toString() === file.toString());
+  if (document !== undefined) { return document.getText(); }
+  return new TextDecoder('utf-8').decode(await vscode.workspace.fs.readFile(file));
 }
 ```
 
@@ -2299,18 +1527,15 @@ After the imports we introduce the `oldFence` where we will keep a hold of the
 fence rule from the default *MarkdownIt* parser. I was not entirely sure how to
 best tackle it, so for now it is here.
 
-Here we also find `htmlTemplateFile` and `authors`, variables that can be set in
-a **literate** program through a code fence in `index.literate` with the token
-info containing the string `SETTINGS`.
+HTML settings belong to the engine invocation, not global extension state, so
+settings cannot leak from one workspace project to another.
 
 ```ts : <<literate.*>>=+
 let oldFence : Renderer.RenderRule | undefined;
 const FENCE = '```';
-const OPENING = '<<';
+const OPENING = '\<<';
 const CLOSING = '>>';
 
-let htmlTemplateFile : vscode.Uri | undefined = undefined;
-let authors = '';
 ```
 
 With that out of the way we introduce the interfaces we use in the Literate
@@ -2354,17 +1579,11 @@ explained in more detail in the section on `<<create markdownit parser>>`.
 
 ```
 
-The central mechanism of the **Literate Programming** extension, the tools it
-provides, are expressed in `<<render and collect state>>`,
-`<<handle fragments>>` and `<<method to write out source files>>`. These all ensure that
-all **literate** files can be iterated, parsed, rendered. And that from the
-parsed state all the code fragments can be collected and extrapolated into the
-source file or source files as written in the **literate** program.
+The repository bridges editor state and the pure engine. Unexpanded fragments
+remain available for navigation without duplicating output generation.
 
 ``` ts : <<literate.*>>=+
-<<render and collect state>>
 <<handle fragments>>
-<<method to write out source files>>
 <<fragment repository>>
 <<rename provider class>>
 <<code action provider class>>
@@ -2377,19 +1596,7 @@ Utility function to determine the workspace folder for a TextDocument
 ``` ts : <<literate.*>>=+
 function determineWorkspaceFolder(document : vscode.TextDocument) : vscode.WorkspaceFolder | undefined
 {
-  if(!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0)
-  {
-    return undefined;
-  }
-  for(const ws of vscode.workspace.workspaceFolders)
-  {
-    const relativePath = path.relative(ws.uri.toString(), document.uri.toString());
-    if(!relativePath.startsWith('..'))
-    {
-      return ws;
-    }
-  }
-  return undefined;
+  return vscode.workspace.getWorkspaceFolder(document.uri);
 }
 ```
 
@@ -2400,7 +1607,6 @@ Code.
 
 ``` ts : <<literate.*>>=+
 <<activate the extension>>
-<<diagnostic updating>>
 <<utility functions>>
 <<create fragment for tag>>
 <<split fragment>>
@@ -2419,7 +1625,7 @@ export function deactivate() {}
 import { TextDecoder } from 'util';
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as os from 'os';
+import { discoveryExcludedDirectories, generateProject, orderSourceDocuments, templateReferences, SourceDocument } from './engine';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');
 import Token = require('markdown-it/lib/token');
@@ -2437,20 +1643,6 @@ import { grabberPlugin } from './grabber';
 ### Interfaces used in Literate Programming
 
 ``` ts : <<introduce interfaces>>=
-interface WriteRenderCallback {
-  (
-    fname : string,
-    folderUri : vscode.Uri,
-    content : string
-  ) : Promise<void>
-};
-interface WriteSourceCallback {
-  (
-    workspaceFolder : vscode.WorkspaceFolder,
-    fragments : Map<string, FragmentInformation>
-  ) : Thenable<void>
-};
-
 <<grabbed state type>>
 <<fragment information type>>
 <<token usage interface>>
@@ -2481,7 +1673,7 @@ With that done we place our repository in the `context.subscriptions`.
 
 ``` ts : <<activate the extension>>=+
   theOneRepository = new FragmentRepository(context);
-  await theOneRepository.processLiterateFiles(undefined);
+  await theOneRepository.processLiterateFiles(undefined, true);
   context.subscriptions.push(theOneRepository);
 ```
 

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <link rel="stylesheet" type="text/css" href="./style.css">
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<h1>Command-line generation</h1>
+<p>This chapter is the authoritative source of <code>src/cli.ts</code>. The checked-in TypeScript
+file bootstraps the CLI; subsequent generation must reproduce it byte for byte.
+The CLI is a filesystem adapter for <code>generateProject</code>, not a second generator.</p>
+<h2>Usage and exit status</h2>
+<p>Run <code>yarn literate generate [root]</code> or <code>yarn literate check [root]</code> from this
+checkout. The package command compiles the CLI first. Alternatively, compile with
+<code>yarn compile</code>, then invoke the executable directly:</p>
+<pre><code>node out/cli.js generate [root]
+node out/cli.js check [root]
+node out/cli.js --<span class="hljs-built_in">help</span>
+</code></pre>
+<p>The optional root defaults to the current working directory. <code>help</code> and <code>-h</code> also
+show usage. Success exits 0, generation/IO errors or a stale check exit 1, and
+invalid arguments exit 2. Diagnostics use one-based line and column positions.
+<code>run(args, io?)</code> is exported for callers that supply stdout/stderr callbacks.</p>
+<p><code>yarn generate</code> and <code>yarn check:generated</code> are convenience aliases. Both build
+the CLI before running it; extension bundling alone does not build the CLI.</p>
+<h2>Filesystem and generation contract</h2>
+<p>Discover <code>.literate</code> files recursively in deterministic order, skipping symbolic
+links and directories named <code>.git</code>, <code>node_modules</code>, <code>out</code>, <code>dist</code>, <code>.yarn</code>, or
+<code>.vscode-test</code>. Resolve the explicitly selected root to its real directory.
+Paths beneath that root are normalized and validated by <code>safeRelativePath</code>.</p>
+<p>Read only templates returned by the engine’s <code>templateReferences(documents)</code>.
+The engine discovers index <code>SETTINGS</code> template assignments and fragment-header
+template settings, preserving equals signs in values and semicolons in filenames.
+The CLI does not parse Markdown or duplicate the engine’s dependency scanner.
+Invalid template paths and NUL source text make this API throw; the CLI’s error
+handler reports the error and returns exit 1 without writes. Missing templates
+are reported by <code>generateProject</code> with source locations.</p>
+<p>Any engine diagnostic prevents all writes. Before any output write or directory
+creation, validate every target, reject duplicate and ancestor-conflicting
+outputs, and compare existing bytes. Reject symbolic links at any template or
+output path component, even links pointing inside the root. Reject non-directory
+ancestors and non-regular-file targets (including output directories).</p>
+<p><code>generate</code> creates parents and writes only missing or changed files. <code>check</code>
+creates and writes nothing and lists each <code>missing:</code> or <code>stale:</code> output, including
+rendered HTML. Unreferenced templates and unrelated files are never loaded as
+inputs. IO failures are concise errors. Preflight is not a transactional commit:
+an IO failure during writing can leave earlier writes in place. The root must not
+be concurrently modified; repeated link checks reduce accidental races but do
+not provide protection against a hostile process replacing directories during IO.</p>
+<h2>CLI implementation</h2>
+<p>Literal fragment openers in this source fence are escaped for engine round-trip.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli.*&gt;&gt;= src/cli.ts $</div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> fs <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;fs/promises&#x27;</span>;
+<span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> path <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;path&#x27;</span>;
+<span class="hljs-keyword">import</span> { discoveryExcludedDirectories, generateProject, safeRelativePath, templateReferences, <span class="hljs-title class_">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./engine&#x27;</span>;
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">CliIO</span> {
+    <span class="hljs-title function_">stdout</span>(<span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span>;
+    <span class="hljs-title function_">stderr</span>(<span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span>;
+}
+
+<span class="hljs-keyword">const</span> usage = <span class="hljs-string">&#x27;Usage: node out/cli.js generate|check [root]\n       node out/cli.js --help\n&#x27;</span>;
+<span class="hljs-keyword">const</span> excluded = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>(discoveryExcludedDirectories);
+<span class="hljs-keyword">const</span> <span class="hljs-attr">defaultIO</span>: <span class="hljs-title class_">CliIO</span> = {
+    <span class="hljs-attr">stdout</span>: <span class="hljs-function"><span class="hljs-params">message</span> =&gt;</span> { process.<span class="hljs-property">stdout</span>.<span class="hljs-title function_">write</span>(message); },
+    <span class="hljs-attr">stderr</span>: <span class="hljs-function"><span class="hljs-params">message</span> =&gt;</span> { process.<span class="hljs-property">stderr</span>.<span class="hljs-title function_">write</span>(message); }
+};
+
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">missing</span>(<span class="hljs-params">error: <span class="hljs-built_in">unknown</span></span>): <span class="hljs-built_in">boolean</span> {
+    <span class="hljs-keyword">return</span> (error <span class="hljs-keyword">as</span> <span class="hljs-title class_">NodeJS</span>.<span class="hljs-property">ErrnoException</span>).<span class="hljs-property">code</span> === <span class="hljs-string">&#x27;ENOENT&#x27;</span>;
+}
+
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">relative</span>(<span class="hljs-params">value: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">const</span> normalized = <span class="hljs-title function_">safeRelativePath</span>(value);
+    <span class="hljs-keyword">if</span> (!normalized) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Invalid relative path: <span class="hljs-subst">${value}</span>`</span>); }
+    <span class="hljs-keyword">return</span> normalized;
+}
+
+
+<span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">inspect</span>(<span class="hljs-params">root: <span class="hljs-built_in">string</span>, value: <span class="hljs-built_in">string</span></span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">boolean</span>&gt; {
+    <span class="hljs-keyword">const</span> parts = <span class="hljs-title function_">relative</span>(value).<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;/&#x27;</span>);
+    <span class="hljs-keyword">let</span> current = root;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = <span class="hljs-number">0</span>; index &lt; parts.<span class="hljs-property">length</span>; index++) {
+        current = path.<span class="hljs-title function_">join</span>(current, parts[index]);
+        <span class="hljs-keyword">let</span> stat;
+        <span class="hljs-keyword">try</span> { stat = <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">lstat</span>(current); }
+        <span class="hljs-keyword">catch</span> (error) {
+            <span class="hljs-keyword">if</span> (<span class="hljs-title function_">missing</span>(error)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>; }
+            <span class="hljs-keyword">throw</span> error;
+        }
+        <span class="hljs-keyword">if</span> (stat.<span class="hljs-title function_">isSymbolicLink</span>()) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Symbolic link is not allowed: <span class="hljs-subst">${value}</span>`</span>); }
+        <span class="hljs-keyword">if</span> (index &lt; parts.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>) {
+            <span class="hljs-keyword">if</span> (!stat.<span class="hljs-title function_">isDirectory</span>()) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Parent is not a directory: <span class="hljs-subst">${value}</span>`</span>); }
+        } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (!stat.<span class="hljs-title function_">isFile</span>()) {
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Target is not a regular file: <span class="hljs-subst">${value}</span>`</span>);
+        }
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+}
+
+<span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">discover</span>(<span class="hljs-params">root: <span class="hljs-built_in">string</span></span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-title class_">SourceDocument</span>[]&gt; {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">documents</span>: <span class="hljs-title class_">SourceDocument</span>[] = [];
+    <span class="hljs-keyword">const</span> visit = <span class="hljs-keyword">async</span> (<span class="hljs-attr">directory</span>: <span class="hljs-built_in">string</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; =&gt; {
+        <span class="hljs-keyword">const</span> entries = <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">readdir</span>(path.<span class="hljs-title function_">join</span>(root, directory), { <span class="hljs-attr">withFileTypes</span>: <span class="hljs-literal">true</span> });
+        entries.<span class="hljs-title function_">sort</span>(<span class="hljs-function">(<span class="hljs-params">a, b</span>) =&gt;</span> a.<span class="hljs-property">name</span> &lt; b.<span class="hljs-property">name</span> ? -<span class="hljs-number">1</span> : a.<span class="hljs-property">name</span> &gt; b.<span class="hljs-property">name</span> ? <span class="hljs-number">1</span> : <span class="hljs-number">0</span>);
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> entry <span class="hljs-keyword">of</span> entries) {
+            <span class="hljs-keyword">if</span> (entry.<span class="hljs-title function_">isSymbolicLink</span>()) { <span class="hljs-keyword">continue</span>; }
+            <span class="hljs-keyword">const</span> name = directory ? <span class="hljs-string">`<span class="hljs-subst">${directory}</span>/<span class="hljs-subst">${entry.name}</span>`</span> : entry.<span class="hljs-property">name</span>;
+            <span class="hljs-keyword">if</span> (entry.<span class="hljs-title function_">isDirectory</span>()) {
+                <span class="hljs-keyword">if</span> (!excluded.<span class="hljs-title function_">has</span>(entry.<span class="hljs-property">name</span>)) { <span class="hljs-keyword">await</span> <span class="hljs-title function_">visit</span>(name); }
+            } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (entry.<span class="hljs-title function_">isFile</span>() &amp;&amp; entry.<span class="hljs-property">name</span>.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;.literate&#x27;</span>)) {
+                <span class="hljs-keyword">const</span> normalized = <span class="hljs-title function_">relative</span>(name);
+                <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, normalized)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Source disappeared: <span class="hljs-subst">${name}</span>`</span>); }
+                documents.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">path</span>: normalized, <span class="hljs-attr">text</span>: <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">readFile</span>(path.<span class="hljs-title function_">join</span>(root, normalized), <span class="hljs-string">&#x27;utf8&#x27;</span>) });
+            }
+        }
+    };
+    <span class="hljs-keyword">await</span> <span class="hljs-title function_">visit</span>(<span class="hljs-string">&#x27;&#x27;</span>);
+    <span class="hljs-keyword">return</span> documents;
+}
+
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">run</span>(<span class="hljs-params">args: <span class="hljs-built_in">string</span>[], io: CliIO = defaultIO</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">number</span>&gt; {
+    <span class="hljs-keyword">if</span> (args.<span class="hljs-property">length</span> === <span class="hljs-number">1</span> &amp;&amp; [<span class="hljs-string">&#x27;help&#x27;</span>, <span class="hljs-string">&#x27;--help&#x27;</span>, <span class="hljs-string">&#x27;-h&#x27;</span>].<span class="hljs-title function_">includes</span>(args[<span class="hljs-number">0</span>])) {
+        io.<span class="hljs-title function_">stdout</span>(usage);
+        <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    }
+    <span class="hljs-keyword">if</span> (args.<span class="hljs-property">length</span> &lt; <span class="hljs-number">1</span> || args.<span class="hljs-property">length</span> &gt; <span class="hljs-number">2</span> || ![<span class="hljs-string">&#x27;generate&#x27;</span>, <span class="hljs-string">&#x27;check&#x27;</span>].<span class="hljs-title function_">includes</span>(args[<span class="hljs-number">0</span>]) ||
+        (args.<span class="hljs-property">length</span> === <span class="hljs-number">2</span> &amp;&amp; (!args[<span class="hljs-number">1</span>] || args[<span class="hljs-number">1</span>].<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&#x27;-&#x27;</span>)))) {
+        io.<span class="hljs-title function_">stderr</span>(usage);
+        <span class="hljs-keyword">return</span> <span class="hljs-number">2</span>;
+    }
+    <span class="hljs-keyword">try</span> {
+
+        <span class="hljs-keyword">const</span> root = <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">realpath</span>(path.<span class="hljs-title function_">resolve</span>(args[<span class="hljs-number">1</span>] || process.<span class="hljs-title function_">cwd</span>()));
+        <span class="hljs-keyword">if</span> (!(<span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">stat</span>(root)).<span class="hljs-title function_">isDirectory</span>()) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Root is not a directory&#x27;</span>); }
+        <span class="hljs-keyword">const</span> documents = <span class="hljs-keyword">await</span> <span class="hljs-title function_">discover</span>(root);
+        <span class="hljs-keyword">const</span> <span class="hljs-attr">templates</span>: <span class="hljs-title class_">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; = <span class="hljs-title class_">Object</span>.<span class="hljs-title function_">create</span>(<span class="hljs-literal">null</span>);
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> reference <span class="hljs-keyword">of</span> <span class="hljs-title function_">templateReferences</span>(documents)) {
+
+            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, reference)) {
+                templates[reference] = <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">readFile</span>(path.<span class="hljs-title function_">join</span>(root, reference), <span class="hljs-string">&#x27;utf8&#x27;</span>);
+            }
+        }
+        <span class="hljs-keyword">const</span> result = <span class="hljs-title function_">generateProject</span>(documents, templates);
+        <span class="hljs-keyword">if</span> (result.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) {
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> diagnostic <span class="hljs-keyword">of</span> result.<span class="hljs-property">diagnostics</span>) {
+                io.<span class="hljs-title function_">stderr</span>(<span class="hljs-string">`<span class="hljs-subst">${diagnostic.path}</span>:<span class="hljs-subst">${diagnostic.line + <span class="hljs-number">1</span>}</span>:<span class="hljs-subst">${diagnostic.column + <span class="hljs-number">1</span>}</span>: <span class="hljs-subst">${diagnostic.message}</span>\n`</span>);
+            }
+            <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+        }
+        <span class="hljs-keyword">const</span> files = result.<span class="hljs-property">files</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">file</span> =&gt;</span> ({ <span class="hljs-attr">path</span>: <span class="hljs-title function_">relative</span>(file.<span class="hljs-property">path</span>), <span class="hljs-attr">content</span>: file.<span class="hljs-property">content</span> }));
+        <span class="hljs-keyword">const</span> targets = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> files) {
+            <span class="hljs-keyword">if</span> (targets.<span class="hljs-title function_">has</span>(file.<span class="hljs-property">path</span>)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Duplicate output: <span class="hljs-subst">${file.path}</span>`</span>); }
+            targets.<span class="hljs-title function_">add</span>(file.<span class="hljs-property">path</span>);
+        }
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> target <span class="hljs-keyword">of</span> targets) {
+            <span class="hljs-keyword">const</span> parts = target.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;/&#x27;</span>);
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = <span class="hljs-number">1</span>; index &lt; parts.<span class="hljs-property">length</span>; index++) {
+                <span class="hljs-keyword">const</span> parent = parts.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, index).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;/&#x27;</span>);
+                <span class="hljs-keyword">if</span> (targets.<span class="hljs-title function_">has</span>(parent)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Output is also a parent directory: <span class="hljs-subst">${parent}</span>`</span>); }
+            }
+        }
+        <span class="hljs-keyword">const</span> <span class="hljs-attr">changes</span>: { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">status</span>: <span class="hljs-built_in">string</span> }[] = [];
+
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> files) {
+            <span class="hljs-keyword">const</span> exists = <span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, file.<span class="hljs-property">path</span>);
+            <span class="hljs-keyword">const</span> content = <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(file.<span class="hljs-property">content</span>, <span class="hljs-string">&#x27;utf8&#x27;</span>);
+            <span class="hljs-keyword">if</span> (!exists || !(<span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">readFile</span>(path.<span class="hljs-title function_">join</span>(root, file.<span class="hljs-property">path</span>))).<span class="hljs-title function_">equals</span>(content)) {
+                changes.<span class="hljs-title function_">push</span>({ ...file, <span class="hljs-attr">status</span>: exists ? <span class="hljs-string">&#x27;stale&#x27;</span> : <span class="hljs-string">&#x27;missing&#x27;</span> });
+            }
+        }
+        <span class="hljs-keyword">if</span> (args[<span class="hljs-number">0</span>] === <span class="hljs-string">&#x27;check&#x27;</span>) {
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> change <span class="hljs-keyword">of</span> changes) { io.<span class="hljs-title function_">stdout</span>(<span class="hljs-string">`<span class="hljs-subst">${change.status}</span>: <span class="hljs-subst">${change.path}</span>\n`</span>); }
+            <span class="hljs-keyword">return</span> changes.<span class="hljs-property">length</span> ? <span class="hljs-number">1</span> : <span class="hljs-number">0</span>;
+        }
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> change <span class="hljs-keyword">of</span> changes) {
+            <span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, change.<span class="hljs-property">path</span>);
+            <span class="hljs-keyword">const</span> target = path.<span class="hljs-title function_">join</span>(root, change.<span class="hljs-property">path</span>);
+            <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">mkdir</span>(path.<span class="hljs-title function_">dirname</span>(target), { <span class="hljs-attr">recursive</span>: <span class="hljs-literal">true</span> });
+            <span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, change.<span class="hljs-property">path</span>);
+            <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">writeFile</span>(target, change.<span class="hljs-property">content</span>, <span class="hljs-string">&#x27;utf8&#x27;</span>);
+            io.<span class="hljs-title function_">stdout</span>(<span class="hljs-string">`generated: <span class="hljs-subst">${change.path}</span>\n`</span>);
+        }
+        <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    } <span class="hljs-keyword">catch</span> (error) {
+        <span class="hljs-keyword">const</span> message = error <span class="hljs-keyword">instanceof</span> <span class="hljs-title class_">Error</span> ? error.<span class="hljs-property">message</span> : <span class="hljs-title class_">String</span>(error);
+        io.<span class="hljs-title function_">stderr</span>(<span class="hljs-string">`literate: <span class="hljs-subst">${message.replace(/[\r\n]+/g, <span class="hljs-string">&#x27; &#x27;</span>)}</span>\n`</span>);
+        <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+    }
+}
+
+<span class="hljs-keyword">if</span> (<span class="hljs-built_in">require</span>.<span class="hljs-property">main</span> === <span class="hljs-variable language_">module</span>) {
+    <span class="hljs-built_in">void</span> <span class="hljs-title function_">run</span>(process.<span class="hljs-property">argv</span>.<span class="hljs-title function_">slice</span>(<span class="hljs-number">2</span>)).<span class="hljs-title function_">then</span>(<span class="hljs-function"><span class="hljs-params">code</span> =&gt;</span> { process.<span class="hljs-property">exitCode</span> = code; });
+}
+</code></pre>
+
+</div>
+</div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+</script>
+</body>
+</html>

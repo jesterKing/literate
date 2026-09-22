@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <link rel="stylesheet" type="text/css" href="./style.css">
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<h1>Developing this literate program</h1>
+<p>The book is the source of the program. Edit its explanations and code fragments
+together, then regenerate the TypeScript and HTML. VS Code is useful for browsing
+fragments, but it is not required to build or verify this repository.</p>
+<h2>Bootstrap from a checkout</h2>
+<p>Use Node.js 22 LTS and the Yarn version pinned in <code>package.json</code>. Enable Corepack
+if necessary, then install the locked dependencies:</p>
+<pre><code>yarn install --immutable
+yarn compile
+</code></pre>
+<p>The checked-in generated TypeScript is the bootstrap: compilation produces the
+CLI in <code>out/cli.js</code> without first needing to run the extension. No global
+TypeScript compiler or published Literate extension is required. <code>.gitattributes</code>
+keeps text checkouts in LF form, matching the engine's deterministic output even
+on Windows. Output names follow a portable path policy: case-only collisions,
+Windows device names, and ambiguous trailing dots or spaces are rejected.</p>
+<h2>The editing loop</h2>
+<p>The shared engine is explained in <a href="engine.html">Headless generation engine</a>, the
+filesystem adapter in <a href="cli.html">Command-line generation</a>, and the editor adapter
+in <a href="literate.html">Literate Programming</a>. Change those <code>.literate</code> chapters, not
+<code>src/engine.ts</code>, <code>src/cli.ts</code>, or <code>src/extension.ts</code> directly. The grabber is also
+generated. Tests, package configuration, templates, and styles remain ordinary
+source files.</p>
+<pre><code>yarn literate generate
+yarn <span class="hljs-built_in">test</span>
+yarn esbuild
+</code></pre>
+<p><code>yarn literate</code> compiles the currently checked-in/generated TypeScript before
+running the CLI. <code>generate</code> writes source and HTML only when their bytes change.
+<code>yarn test</code> compiles the new implementation, lints it, runs headless regression
+tests, and checks that generation agrees with all the files on disk.
+<code>yarn esbuild</code> bundles the extension's actual entry point, <code>out/main.js</code>.</p>
+<p>Review the generated diff as well as the chapter changes. Prose-only edits should
+change HTML but not TypeScript. A reorganization intended to preserve the program
+should not alter its generated source.</p>
+<h2>Check without writing</h2>
+<pre><code>yarn literate check
+</code></pre>
+<p>The check command regenerates in memory and reports missing or stale files. It
+never updates the book or generated outputs. This is also available as
+<code>yarn check:generated</code>. The optional final argument selects another project root:</p>
+<pre><code>yarn literate generate /path/to/a/test-project
+yarn literate check /path/to/a/test-project
+</code></pre>
+<p>Both source and HTML outputs are checked. Orphaned output files are not detected
+or deleted: removing a root fragment or renaming an output requires an explicit
+review of the old file.</p>
+<h2>Changing the generator itself</h2>
+<p>A generator change needs two generations. First the previous executable produces
+the new source. Rebuild it and verify that the new executable reproduces that
+source and its documentation:</p>
+<pre><code>yarn literate generate
+yarn literate check
+yarn <span class="hljs-built_in">test</span>
+</code></pre>
+<p>If the new generator deliberately changes formatting, the check will report the
+old output. Run <code>yarn literate generate</code> again, review the differences, then repeat
+the check. Keep generated TypeScript committed so the next checkout can bootstrap.</p>
+<p>For syntax changes, retain compatibility long enough to generate the new parser
+before migrating the book. During this initial extraction the generated engine
+was bootstrapped once; subsequent changes use the same literate-first workflow.</p>
+<h2>Safe generation while editing</h2>
+<p>A missing fragment, a cycle, an invalid declaration, or an unsafe output path is
+an error. The engine returns diagnostics and no output files, preserving the last
+successful generated program. Fragments are validated even when unused. Output
+paths must remain within the project, and outputs cannot overwrite inputs or
+collide with one another.</p>
+<p>A literal opening delimiter inside a code fragment is written as <code>\&lt;&lt;</code>. It becomes
+<code>&lt;&lt;</code> in generated source and documentation, without triggering expansion. This
+allows the generator to describe and implement its own fragment syntax without
+special-case exceptions. Unescaped fragment references are expanded even inside
+strings or comments; this is a text generator, not a programming-language parser.</p>
+<p>The CLI reads saved files. The VS Code adapter uses open editor buffers, including
+empty buffers, and automatically generates on literate content changes. It shares
+the engine with the CLI; completion refreshes do not write files. Template-only
+edits currently require <code>Literate: Process</code>. Do not run CLI generation concurrently
+with editor generation against the same project or leave unsaved literate buffers
+open while checking disk-based results.</p>
+<p>Validation precedes output writes, but writing several files is not a filesystem
+transaction. An I/O failure can leave earlier writes in place. Resolve the error
+and generate again. The CLI rejects symlink targets and skips symlink inputs;
+the VS Code adapter uses the workspace filesystem provider instead.</p>
+<h2>Testing the editor</h2>
+<p>Headless tests exercise the engine, CLI, and a mocked VS Code adapter without a
+GUI or downloads. They do not replace testing the real extension host.</p>
+<p>Disable the published extension in this repository: older generators do not
+understand the explicit literal-delimiter escapes used by the new chapters.
+Bootstrap with the CLI, then debug the newly built extension.</p>
+<p>For interactive debugging, run <code>yarn esbuild-watch</code> in a terminal, select <strong>Run
+Extension</strong>, and press <strong>F5</strong>. The existing launch task compiles TypeScript but
+does not bundle <code>out/main.js</code>, so the watcher is important. Use a disposable test
+workspace and associate <code>*.literate</code> with Markdown for editor providers.</p>
+<p><code>yarn test:extension</code> builds the extension and invokes the existing VS Code test
+runner. That runner may download VS Code and requires an appropriate GUI/display
+environment. Its original sample test is not a substitute for the headless
+regression suite or an interactive smoke test.</p>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+</script>
+</body>
+</html>

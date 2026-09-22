@@ -6,10 +6,10 @@ This extension is inspired by the work done by [Physically Based Rendering: From
 Theory To Implementation](http://www.pbr-book.org) by Matt Pharr, Wenzel Jakob,
 and Greg Humphreys.
 
-The ultimate goal is to have automatic HTML and code generation as you type.
-HTML preview is already essentially available through the Markdown preview
-feature of Visual Studio Code. Code generation exists, but that has to be run
-manually still.
+The extension generates HTML and code on activation and as literate documents
+change. Markdown preview supplies an editor preview. A headless CLI uses the same
+generation engine, so VS Code is not required to regenerate or check a project.
+Invalid projects produce diagnostics without replacing generated files.
 
 Note: enabling this extension will inject the literate style CSS developed for
 this extension. Disable this extension in workspaces where you don't want the
@@ -25,8 +25,9 @@ specification is followed through the use of the markdown-it library. The code
 fence has been extended to include fragment identifiers and their related
 settings.
 
-If an `index.literate` exists the order in the given list referencing literate
-HTML files will be used to determine the order for processing `.literate` files.
+If a root `index.literate` exists, it is processed first, followed by documents
+linked from it in link order. Remaining `.literate` documents are processed in
+sorted path order; the index controls ordering, not exclusion.
 
 The `index.literate` can contain a fence with `SETTINGS` on its info line. This
 fence will be hidden from HTML, but hosts settings for controlling some aspects
@@ -56,14 +57,37 @@ The string `[CODE]` in the source template will be replaced with the generated
 source code.
 
 Code fragments can reference other code fragments in code by using the code
-fragment tag `<<some identifying string>>`.
+fragment tag `<<some identifying string>>`. To emit literal delimiter text inside
+a code fragment, escape the opening chevrons: `\<<some identifying string>>`.
+The backslash is removed from the generated code and rendered code block.
 
 If a fragment use is indented the indentation will be maintained for its
 realization. This makes it suitable for use with languages like Python that use
 indentation to denote scope.
 
-The command `Literate: Process` (`literate.process`) will process all
-`.literate` documents found in the (first) workspace folder.
+The command `Literate: Process` (`literate.process`) processes all workspace
+folders. Template-only edits currently require this command. Associate
+`*.literate` files with Markdown to enable the editor providers.
+
+## Command-line development
+
+From a checkout, use Node.js 22 LTS and the pinned Yarn version through Corepack:
+
+```sh
+yarn install --immutable
+yarn literate generate
+yarn literate check
+yarn test
+```
+
+`generate` updates source and HTML; `check` reports missing or stale outputs without
+writing. An optional final argument selects another project root. The CLI reads
+saved files, whereas the extension uses open buffers; do not run both generators
+concurrently against the same project.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[development chapter](literate/development.literate) for the self-hosting workflow.
+Edit the literate chapters rather than their generated TypeScript.
 
 ## Example and documentation
 

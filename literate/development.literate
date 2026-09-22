@@ -1,0 +1,131 @@
+# Developing this literate program
+
+The book is the source of the program. Edit its explanations and code fragments
+together, then regenerate the TypeScript and HTML. VS Code is useful for browsing
+fragments, but it is not required to build or verify this repository.
+
+## Bootstrap from a checkout
+
+Use Node.js 22 LTS and the Yarn version pinned in `package.json`. Enable Corepack
+if necessary, then install the locked dependencies:
+
+```sh
+yarn install --immutable
+yarn compile
+```
+
+The checked-in generated TypeScript is the bootstrap: compilation produces the
+CLI in `out/cli.js` without first needing to run the extension. No global
+TypeScript compiler or published Literate extension is required. `.gitattributes`
+keeps text checkouts in LF form, matching the engine's deterministic output even
+on Windows. Output names follow a portable path policy: case-only collisions,
+Windows device names, and ambiguous trailing dots or spaces are rejected.
+
+## The editing loop
+
+The shared engine is explained in [Headless generation engine](engine.html), the
+filesystem adapter in [Command-line generation](cli.html), and the editor adapter
+in [Literate Programming](literate.html). Change those `.literate` chapters, not
+`src/engine.ts`, `src/cli.ts`, or `src/extension.ts` directly. The grabber is also
+generated. Tests, package configuration, templates, and styles remain ordinary
+source files.
+
+```sh
+yarn literate generate
+yarn test
+yarn esbuild
+```
+
+`yarn literate` compiles the currently checked-in/generated TypeScript before
+running the CLI. `generate` writes source and HTML only when their bytes change.
+`yarn test` compiles the new implementation, lints it, runs headless regression
+tests, and checks that generation agrees with all the files on disk.
+`yarn esbuild` bundles the extension's actual entry point, `out/main.js`.
+
+Review the generated diff as well as the chapter changes. Prose-only edits should
+change HTML but not TypeScript. A reorganization intended to preserve the program
+should not alter its generated source.
+
+## Check without writing
+
+```sh
+yarn literate check
+```
+
+The check command regenerates in memory and reports missing or stale files. It
+never updates the book or generated outputs. This is also available as
+`yarn check:generated`. The optional final argument selects another project root:
+
+```sh
+yarn literate generate /path/to/a/test-project
+yarn literate check /path/to/a/test-project
+```
+
+Both source and HTML outputs are checked. Orphaned output files are not detected
+or deleted: removing a root fragment or renaming an output requires an explicit
+review of the old file.
+
+## Changing the generator itself
+
+A generator change needs two generations. First the previous executable produces
+the new source. Rebuild it and verify that the new executable reproduces that
+source and its documentation:
+
+```sh
+yarn literate generate
+yarn literate check
+yarn test
+```
+
+If the new generator deliberately changes formatting, the check will report the
+old output. Run `yarn literate generate` again, review the differences, then repeat
+the check. Keep generated TypeScript committed so the next checkout can bootstrap.
+
+For syntax changes, retain compatibility long enough to generate the new parser
+before migrating the book. During this initial extraction the generated engine
+was bootstrapped once; subsequent changes use the same literate-first workflow.
+
+## Safe generation while editing
+
+A missing fragment, a cycle, an invalid declaration, or an unsafe output path is
+an error. The engine returns diagnostics and no output files, preserving the last
+successful generated program. Fragments are validated even when unused. Output
+paths must remain within the project, and outputs cannot overwrite inputs or
+collide with one another.
+
+A literal opening delimiter inside a code fragment is written as `\<<`. It becomes
+`<<` in generated source and documentation, without triggering expansion. This
+allows the generator to describe and implement its own fragment syntax without
+special-case exceptions. Unescaped fragment references are expanded even inside
+strings or comments; this is a text generator, not a programming-language parser.
+
+The CLI reads saved files. The VS Code adapter uses open editor buffers, including
+empty buffers, and automatically generates on literate content changes. It shares
+the engine with the CLI; completion refreshes do not write files. Template-only
+edits currently require `Literate: Process`. Do not run CLI generation concurrently
+with editor generation against the same project or leave unsaved literate buffers
+open while checking disk-based results.
+
+Validation precedes output writes, but writing several files is not a filesystem
+transaction. An I/O failure can leave earlier writes in place. Resolve the error
+and generate again. The CLI rejects symlink targets and skips symlink inputs;
+the VS Code adapter uses the workspace filesystem provider instead.
+
+## Testing the editor
+
+Headless tests exercise the engine, CLI, and a mocked VS Code adapter without a
+GUI or downloads. They do not replace testing the real extension host.
+
+Disable the published extension in this repository: older generators do not
+understand the explicit literal-delimiter escapes used by the new chapters.
+Bootstrap with the CLI, then debug the newly built extension.
+
+For interactive debugging, run `yarn esbuild-watch` in a terminal, select **Run
+Extension**, and press **F5**. The existing launch task compiles TypeScript but
+does not bundle `out/main.js`, so the watcher is important. Use a disposable test
+workspace and associate `*.literate` with Markdown for editor providers.
+
+`yarn test:extension` builds the extension and invokes the existing VS Code test
+runner. That runner may download VS Code and requires an appropriate GUI/display
+environment. Its original sample test is not a substitute for the headless
+regression suite or an interactive smoke test.

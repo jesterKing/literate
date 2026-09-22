@@ -1,0 +1,544 @@
+# The headless generation engine
+
+The engine turns a collection of literate documents into a complete generation
+plan. It does not read or write files, depend on VS Code, or consult platform
+state. CLI and editor adapters supply the inputs and decide when to write a
+successful result. This chapter is authoritative for `src/engine.ts`.
+
+`generateProject(documents, templates = {})` returns generated files and
+source-position diagnostics. Its central guarantee is atomic planning: **any
+diagnostic makes the entire file list empty**, including documentation HTML.
+A valid plan contains both tangled source and rendered documentation.
+
+The root fragment assembles the implementation in dependency order. The final
+fragment describes the generation phases; the preceding fragments provide
+shared contracts and helpers for both generation and its adapters.
+
+```ts : <<headless generation engine.*>>= ./src/engine.ts $
+<<engine interfaces and dependencies>>
+<<engine path and source validation>>
+<<engine document ordering>>
+<<engine template dependency discovery>>
+<<engine literal template substitution>>
+<<engine default HTML template>>
+<<engine generation orchestration>>
+```
+
+## Contracts at the adapter boundary
+
+A `SourceDocument` supplies a workspace-relative POSIX path and source text.
+A `GeneratedFile` supplies a relative destination and its complete content.
+Templates arrive as an explicit mapping of paths to text, rather than being
+loaded implicitly. All mutable generation state belongs to a single call.
+
+Diagnostic `line` and `column` coordinates are zero-based; columns count
+JavaScript string positions. Adapters may translate them for display without
+changing the engine contract. Internal fragment parts retain their own source
+locations, so an error in an appended part points back to that part's document.
+Markdown-it supplies parsing and rendering, while highlight.js handles known
+code languages. Adapters share the readonly `discoveryExcludedDirectories`
+list to avoid discovering sources in version control, dependency, build, and
+test-runtime directories.
+
+```ts : <<engine interfaces and dependencies>>=
+import MarkdownIt = require('markdown-it');
+import Token = require('markdown-it/lib/token');
+import hljs from 'highlight.js';
+
+export interface SourceDocument { path: string; text: string; }
+export interface GenerationDiagnostic { path: string; line: number; column: number; message: string; }
+export interface GeneratedFile { path: string; content: string; }
+
+export const discoveryExcludedDirectories: readonly string[] = Object.freeze([
+    '.git', 'node_modules', 'out', 'dist', '.yarn', '.vscode-test'
+]);
+
+interface Location { path: string; line: number; column: number; }
+interface Header { name: string; language: string; append: boolean; output?: string; template?: string; }
+interface Part { content: string; location: Location; }
+interface Fragment { header: Header; parts: Part[]; location: Location; }
+
+```
+
+## Paths and source text must survive parsing unchanged
+
+`safeRelativePath` canonicalizes paths inside the workspace, rejecting absolute
+paths, backslashes, control characters, and parent traversal beyond the root.
+The policy is portable even when generation runs on a case-sensitive host:
+components cannot contain Windows-invalid characters (including colons used
+for alternate data streams), end in a dot or space, or use reserved device
+names such as `CON`, `NUL.txt`, or `COM1`. Device names are checked without
+regard to case, including extensions and Windows' reserved superscript digits.
+The navigation components `.` and `..` are handled first, so parent traversal
+that remains within the workspace still normalizes safely.
+
+Collision keys use locale-independent lowercase paths for sources, templates,
+and outputs. Output/input aliases, duplicate output aliases, and ancestor
+conflicts are rejected: a planned file cannot also be a directory containing
+another planned file or supplied input. This conservative lexical policy does
+not replace adapters' filesystem checks, including symbolic-link handling.
+
+The shared header grammar distinguishes fragment definitions and appends from
+their output filename and optional settings. Empty output names are rejected
+later when collecting definitions. Actual NUL characters are rejected in source
+text **before** Markdown-it can normalize them into replacement characters,
+which would otherwise conceal invalid names. Their diagnostic coordinates are
+computed from the original text, including its original line endings.
+
+```ts : <<engine path and source validation>>=
+/** Canonical workspace-relative POSIX path; never permits escaping the workspace. */
+export function safeRelativePath(value: string): string | undefined {
+    if (!value || /^(?:\/|[a-zA-Z]:)/.test(value) || /[\\\x00-\x1f]/.test(value)) { return undefined; }
+    const parts: string[] = [];
+    for (const part of value.split('/')) {
+        if (!part || part === '.') { continue; }
+        if (part === '..') {
+            if (!parts.length) { return undefined; }
+            parts.pop();
+        } else {
+            if (/[<>:"|?*]/.test(part) || /[. ]$/.test(part)) { return undefined; }
+            const device = part.split('.')[0].replace(/ +$/, '');
+            if (/^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³]|conin\$|conout\$)$/i.test(device)) { return undefined; }
+            parts.push(part);
+        }
+    }
+    return parts.length ? parts.join('/') : undefined;
+}
+
+/** Paths are already normalized before computing portable collision keys. */
+function pathKey(path: string): string { return path.toLowerCase(); }
+
+function ancestorConflict(left: string, right: string): boolean {
+    return left.startsWith(right + '/') || right.startsWith(left + '/');
+}
+
+const fragmentHeader = /^\s*(?:(\S+)\s*:\s*|:\s*)?\<<([^<>\r\n]+)>>=(\+)?\s*(.*?)\s*$/;
+const outputFilename = /^(.*?)\s+\$(?:\s+|$)|^\$(?:\s+|$)/;
+
+function sourceNulDiagnostic(document: SourceDocument): GenerationDiagnostic | undefined {
+    const offset = document.text.indexOf('\0');
+    if (offset < 0) { return undefined; }
+    const lines = document.text.slice(0, offset).split(/\r\n|\r|\n/);
+    return {
+        path: document.path, line: lines.length - 1, column: lines[lines.length - 1].length,
+        message: 'Invalid output path or source text: NUL characters are not allowed'
+    };
+}
+
+```
+
+## One document order for generation and editor maps
+
+Fragment appends make document order significant. The root `index.literate`
+comes first, followed by documents linked from it in link order, then all
+remaining documents sorted by normalized path. HTML links select the matching
+literate source; query strings and anchors do not affect selection. Repeated
+links do not give a document another position in the order.
+
+`orderSourceDocuments` exposes this policy to editor adapters. It returns a
+new array containing the original objects and preserves all input documents.
+Generation, rather than this helper, owns duplicate and invalid-path checks.
+The standalone helper throws an ordinary `Error` for NUL-containing source.
+
+```ts : <<engine document ordering>>=
+/** Index first, then linked documents, then remaining paths sorted; preserves input objects. */
+export function orderSourceDocuments(documents: SourceDocument[]): SourceDocument[] {
+    const paths = new Map<string, number>();
+    for (const document of documents) {
+        const diagnostic = sourceNulDiagnostic(document);
+        if (diagnostic) { throw new Error(`${diagnostic.path}: ${diagnostic.message}`); }
+    }
+    const canonical = (document: SourceDocument): string => safeRelativePath(document.path) ?? document.path;
+    paths.set('index.literate', 0);
+    const index = documents.find(document => canonical(document) === 'index.literate');
+    if (index) {
+        for (const token of new MarkdownIt().parse(index.text, {})) {
+            for (const child of token.children || []) {
+                if (child.type !== 'link_open') { continue; }
+                const href = child.attrGet('href');
+                if (!href) { continue; }
+                let target = href.split(/[?#]/)[0];
+                try { target = decodeURIComponent(target); } catch { continue; }
+                const path = safeRelativePath(target.replace(/\.html$/, '.literate'));
+                if (path && !paths.has(path)) { paths.set(path, paths.size); }
+            }
+        }
+    }
+    return [...documents].sort((a, b) => {
+        const left = canonical(a), right = canonical(b);
+        const rank = (paths.get(left) ?? paths.size) - (paths.get(right) ?? paths.size);
+        return rank || (left < right ? -1 : left > right ? 1 : 0);
+    });
+}
+
+```
+
+## Discover templates without generating outputs
+
+Adapters need to know which templates to load before they can call generation.
+`templateReferences` therefore performs dependency discovery only: it reads the
+root SETTINGS fence and fragment headers, returning sorted, unique, normalized
+template paths. It neither expands fragments nor validates their dependency
+graph. Invalid or empty template paths and NUL source text throw ordinary
+`Error` objects, while missing template contents become generation diagnostics.
+
+Output filenames are stripped before splitting fragment settings. This matters
+because a filename may itself contain semicolons; they are not settings
+separators until after the filename terminator.
+
+```ts : <<engine template dependency discovery>>=
+/** Discover template dependencies only. Invalid paths or NUL source text throw ordinary Errors. */
+export function templateReferences(documents: SourceDocument[]): string[] {
+    const references = new Set<string>();
+    const md = new MarkdownIt();
+    const add = (value: string): void => {
+        const path = safeRelativePath(value);
+        if (!path) { throw new Error(`Invalid relative path: ${value}`); }
+        references.add(path);
+    };
+    for (const document of documents) {
+        const diagnostic = sourceNulDiagnostic(document);
+        if (diagnostic) { throw new Error(`${diagnostic.path}: ${diagnostic.message}`); }
+        for (const token of md.parse(document.text, {})) {
+            if (token.type !== 'fence') { continue; }
+            if (token.info.trim() === 'SETTINGS') {
+                if (safeRelativePath(document.path) === 'index.literate') {
+                    for (const line of token.content.split('\n')) {
+                        const setting = /^\s*template\s*=(.*)$/.exec(line);
+                        if (setting) { add(setting[1].trim()); }
+                    }
+                }
+                continue;
+            }
+            const header = fragmentHeader.exec(token.info);
+            if (!header) { continue; }
+            let settings = header[4];
+
+            const filename = outputFilename.exec(settings);
+            if (filename) { settings = settings.slice(filename[0].length); }
+            for (const setting of settings.split(';').map(value => value.trim()).filter(Boolean)) {
+                const template = /^template\s*=\s*(.*)$/.exec(setting);
+                if (template) { add(template[1].trim()); }
+            }
+        }
+    }
+    return Array.from(references).sort();
+}
+
+```
+
+## Templates are literal, single-pass substitutions
+
+Source templates recognize `[CODE]`; HTML templates recognize `[CONTENT]` and
+`[AUTHORS]`. A callback replaces every matching original placeholder literally.
+Inserted text is never scanned again, so dollar replacement sequences and
+placeholders inside generated code, author metadata, or rendered prose cannot
+trigger a second substitution. Unknown placeholders remain untouched.
+
+```ts : <<engine literal template substitution>>=
+/** Replacement values are literal and are never scanned for more placeholders. */
+function substitute(template: string, values: Record<string, string>): string {
+    return template.replace(/\[(CODE|CONTENT|AUTHORS)\]/g, (match, key: string) =>
+        Object.prototype.hasOwnProperty.call(values, key.toLowerCase()) ? values[key.toLowerCase()] : match);
+}
+
+```
+
+### The compatible default HTML page
+
+Without an explicit HTML template, documentation keeps the extension's default
+page structure, local stylesheet, author metadata slot, and Mermaid module.
+An explicitly requested but missing template is an error, not a reason to
+silently use this default.
+
+```ts : <<engine default HTML template>>=
+const defaultTemplate = `<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <link rel="stylesheet" type="text/css" href="./style.css">
+  [AUTHORS]
+</head>
+<body>
+[CONTENT]
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+</script>
+</body>
+</html>`;
+
+```
+
+## Generation is a validation pipeline
+
+The orchestration is deliberately split at phase boundaries rather than into
+independent runtime functions. These fragments share the local scope of
+`generateProject`: first establish inputs and settings, then collect fragment
+definitions and reserve destinations, then validate and expand dependencies,
+and only then construct output files. The validation barrier is before both
+source emission and HTML rendering.
+
+```ts : <<engine generation orchestration>>=
+<<engine generation inputs and settings>>
+<<engine fragment collection and output reservation>>
+<<engine dependency expansion and validation barrier>>
+<<engine source and HTML emission>>
+```
+
+### Establish inputs, ordering, and project settings
+
+Input paths are normalized and duplicate source or template keys diagnosed.
+NUL-containing documents never reach Markdown parsing. Generation then uses
+the same ordering helper exposed to editor maps. Root SETTINGS supplies the
+semicolon-separated `authors` and optional HTML `template` path; explicit
+template references must resolve in the supplied template map.
+
+```ts : <<engine generation inputs and settings>>=
+/** Pure, atomic generation. Diagnostic positions are zero-based. */
+export function generateProject(documents: SourceDocument[], templates: Record<string, string> = {}): {
+    files: GeneratedFile[]; diagnostics: GenerationDiagnostic[];
+} {
+    const diagnostics: GenerationDiagnostic[] = [];
+    const files: GeneratedFile[] = [];
+    const report = (location: Location, message: string): void => {
+        diagnostics.push({ ...location, message });
+    };
+    const md = new MarkdownIt();
+    const escape = (value: string): string => md.utils.escapeHtml(value);
+    const sources = new Map<string, SourceDocument>();
+    const templateMap = new Map<string, string>();
+    const sourceKeys = new Set<string>();
+    const templateKeys = new Set<string>();
+    for (const document of documents) {
+        const path = safeRelativePath(document.path);
+        const location = { path: document.path, line: 0, column: 0 };
+        if (!path) { report(location, 'Invalid source path'); continue; }
+        if (sourceKeys.has(pathKey(path))) { report(location, `Duplicate source document: ${path}`); continue; }
+        sourceKeys.add(pathKey(path));
+        const nul = sourceNulDiagnostic(document);
+        if (nul) { diagnostics.push(nul); continue; }
+        sources.set(path, { path, text: document.text });
+    }
+    for (const key of Object.keys(templates).sort()) {
+        const path = safeRelativePath(key);
+        const location = { path: key, line: 0, column: 0 };
+        if (!path) { report(location, 'Invalid template path'); continue; }
+        if (templateKeys.has(pathKey(path))) { report(location, `Duplicate template path: ${path}`); continue; }
+        templateKeys.add(pathKey(path));
+        templateMap.set(path, templates[key]);
+    }
+    const tokens = new Map<string, Token[]>();
+    for (const document of sources.values()) { tokens.set(document.path, md.parse(document.text, {})); }
+    const order = orderSourceDocuments(Array.from(sources.values())).map(document => document.path);
+    const loadTemplate = (value: string, location: Location): string | undefined => {
+        const path = safeRelativePath(value);
+        if (!path) { report(location, `Invalid template path: ${value}`); return undefined; }
+        if (!templateMap.has(path)) { report(location, `Missing template: ${path}`); return undefined; }
+        return templateMap.get(path);
+    };
+    let authors = '';
+    let htmlTemplate = defaultTemplate;
+    for (const token of tokens.get('index.literate') || []) {
+        if (token.type !== 'fence' || token.info.trim() !== 'SETTINGS') { continue; }
+        token.content.split('\n').forEach((line: string, index: number) => {
+            const match = /^\s*(authors|template)\s*=(.*)$/.exec(line);
+            if (!match) { return; }
+            const value = match[2].trim();
+            if (match[1] === 'authors') { authors = value; }
+            else {
+                const loaded = loadTemplate(value, { path: 'index.literate', line: (token.map?.[0] || 0) + index + 1, column: 0 });
+                if (loaded !== undefined) { htmlTemplate = loaded; }
+            }
+        });
+    }
+```
+
+### Collect definitions and reserve every destination
+
+Named fences use a language followed by a colon, a double-chevron name, and
+`=` for a definition or `=+` for an ordered append; a language may be omitted.
+Appends require an earlier definition and cannot change its output or template.
+Top-level names end in `.*` and require a filename terminated by a space and
+`$`, optionally followed by `template=path`.
+
+Collection diagnoses malformed headers, empty names or filenames, duplicate
+definitions, and invalid append targets. Source and HTML output paths share
+one reservation set: destinations must be unique and must not overwrite any
+supplied source document or template. Reserving destinations here ensures that
+collisions are found before any output is returned.
+
+```ts : <<engine fragment collection and output reservation>>=
+    const fragments = new Map<string, Fragment>();
+    const headers = new Map<Token, Header>();
+    const sourceTemplates = new Map<string, string>();
+    const outputs = new Set<string>();
+    const inputKeys = new Set([...sourceKeys, ...templateKeys]);
+    const reserve = (value: string, location: Location): string | undefined => {
+        const path = safeRelativePath(value);
+        if (!path) { report(location, `Invalid output path: ${value}`); return undefined; }
+        const key = pathKey(path);
+        if (inputKeys.has(key)) { report(location, `Output collides with input: ${path}`); }
+        if (outputs.has(key)) { report(location, `Duplicate output path: ${path}`); }
+        for (const input of inputKeys) {
+            if (ancestorConflict(key, input)) { report(location, `Output/input ancestor conflict: ${path} and ${input}`); }
+        }
+        for (const output of outputs) {
+            if (ancestorConflict(key, output)) { report(location, `Output ancestor conflict: ${path} and ${output}`); }
+        }
+        outputs.add(key);
+        return path;
+    };
+    for (const path of order) {
+        reserve(path.replace(/\.literate$/, '.html'), { path, line: 0, column: 0 });
+        for (const token of tokens.get(path) || []) {
+            if (token.type !== 'fence' || token.info.trim() === 'SETTINGS' || !token.info.includes('\<<')) { continue; }
+            const location = { path, line: token.map?.[0] || 0, column: 0 };
+            const match = fragmentHeader.exec(token.info);
+            if (!match) { report(location, 'Invalid fragment header (expected language colon and \<<name>>= or =+)'); continue; }
+            const header: Header = { language: match[1] || '', name: match[2], append: !!match[3] };
+            if (!header.name.trim()) { report(location, 'Empty fragment name'); continue; }
+            let remainder = match[4];
+            const filename = outputFilename.exec(remainder);
+            if (filename) {
+                header.output = (filename[1] || '').trim();
+                remainder = remainder.slice(filename[0].length);
+                if (!header.output) { report(location, 'Invalid output path: empty filename'); }
+            }
+            for (const setting of remainder.split(';').map(value => value.trim()).filter(Boolean)) {
+                const template = /^template\s*=\s*(.+)$/.exec(setting);
+                if (!template || header.template !== undefined) { report(location, `Invalid fragment setting: ${setting}`); }
+                else { header.template = template[1].trim(); }
+            }
+            headers.set(token, header);
+            const part = { content: token.content, location: { ...location, line: location.line + 1 } };
+            if (header.append) {
+                if (header.output !== undefined || header.template !== undefined) { report(location, 'Append fragments cannot specify output or template'); }
+                const fragment = fragments.get(header.name);
+                if (!fragment) { report(location, `Cannot append to missing fragment: ${header.name}`); }
+                else { fragment.parts.push(part); }
+                continue;
+            }
+            if (fragments.has(header.name)) { report(location, `Duplicate fragment: ${header.name}`); continue; }
+            if (header.name.endsWith('.*')) {
+                if (!header.output) { report(location, `Missing filename for top-level fragment: ${header.name}`); }
+                else { header.output = reserve(header.output, location); }
+            } else if (header.output !== undefined || header.template !== undefined) {
+                report(location, `Only top-level fragments may specify output or template: ${header.name}`);
+            }
+            if (header.template !== undefined) {
+                const template = loadTemplate(header.template, location);
+                if (template !== undefined) { sourceTemplates.set(header.name, template); }
+            }
+            fragments.set(header.name, { header, parts: [part], location });
+        }
+    }
+```
+
+### Expand dependencies while keeping literal text literal
+
+Depth-first expansion detects missing fragments and cycles, memoizes completed
+expansions, and checks even unused fragments. It has no arbitrary pass-count
+cutoff. Reference diagnostics use the originating part's position, including
+the reference's column within its code line.
+
+A backslash immediately before an opening double chevron escapes it. Every
+literal opening double chevron in this chapter's implementation fences is
+escaped, including those inside regular expressions and strings; only the
+assembly references are unescaped. Escapes survive dependency expansion and
+are removed at final emission. Replacement results are never rescanned, so a
+literal tag introduced by a referenced fragment cannot become a dependency.
+
+Callbacks also preserve dollar signs and other replacement metacharacters.
+Repeated inline references expand independently. Preceding whitespace is
+carried onto continuation lines. Fence bodies retain their Markdown-normalized
+trailing newline, while insertion removes exactly one trailing newline from a
+referenced fragment. The assembly fences in this chapter use that same rule to
+preserve the generated file's original whitespace and final newline exactly.
+
+The last statement in this phase enforces the atomic-plan guarantee: any
+recorded diagnostic returns an empty file list before emission can begin.
+
+```ts : <<engine dependency expansion and validation barrier>>=
+    const expanded = new Map<string, string>();
+    const visiting: string[] = [];
+    const expand = (name: string, location: Location): string => {
+        if (expanded.has(name)) { return expanded.get(name)!; }
+        const fragment = fragments.get(name);
+        if (!fragment) { report(location, `Missing fragment: ${name}`); return ''; }
+        if (visiting.includes(name)) { report(location, `Fragment cycle: ${visiting.concat(name).join(' -> ')}`); return ''; }
+        visiting.push(name);
+        const content = fragment.parts.map(part => {
+
+            return part.content.replace(/\\\<<|\<<([^<>\r\n]+)>>(=\+?|\+)?/g,
+                (whole: string, reference: string | undefined, modifier: string | undefined, offset: number) => {
+                    if (reference === undefined) { return whole; }
+                    const before = part.content.slice(0, offset);
+                    const lineStart = before.lastIndexOf('\n') + 1;
+                    const prefix = before.slice(lineStart);
+                    const at = { path: part.location.path, line: part.location.line + before.split('\n').length - 1, column: prefix.length };
+                    if (modifier) { report(at, `Invalid definition operator on reference: ${reference}`); }
+                    const replacement = expand(reference, at).replace(/\n$/, '');
+                    const indent = /^[ \t]*$/.test(prefix) ? prefix : (/[ \t]*$/.exec(prefix)?.[0] || '');
+                    return replacement.replace(/\n/g, () => '\n' + indent);
+                });
+        }).join('');
+        visiting.pop();
+        expanded.set(name, content);
+        return content;
+    };
+
+    for (const fragment of fragments.values()) { expand(fragment.header.name, fragment.location); }
+    if (diagnostics.length) { return { files: [], diagnostics }; }
+```
+
+### Emit sources and render documentation only after validation
+
+Successful source expansion is unescaped once, then inserted into its source
+template. Template text itself is not treated as fragment source. The engine
+builds an in-memory file list; it never performs filesystem writes.
+
+Documentation hides SETTINGS fences and highlighted comments in named code
+fences without removing comments from generated source. Named fences retain
+the `codefragment`, `fragmentname`, `code`, and `literate-tag-name` styling hooks.
+Labels and author metadata are HTML escaped. Mermaid receives escaped raw code
+rather than syntax-highlighted markup. Finally the HTML template receives the
+rendered content and author metadata in one literal substitution pass. Before
+returning, every final source and HTML file is normalized to LF line endings,
+including text supplied by templates. This produces deterministic bytes across
+hosts without adding or removing a final newline.
+
+```ts : <<engine source and HTML emission>>=
+    for (const fragment of fragments.values()) {
+        if (!fragment.header.output) { continue; }
+        const code = expanded.get(fragment.header.name)!.replace(/\\\<</g, () => '\<<');
+        files.push({ path: fragment.header.output, content: substitute(sourceTemplates.get(fragment.header.name) ?? '[CODE]', { code }) });
+    }
+    md.renderer.rules.fence = (fenceTokens: Token[], index: number) => {
+        const token = fenceTokens[index];
+        if (token.info.trim() === 'SETTINGS') { return ''; }
+        const header = headers.get(token);
+        const language = header?.language || token.info.trim().split(/\s+/)[0];
+        const code = token.content.replace(/\\\<</g, () => '\<<');
+        if (!header && language === 'mermaid') { return `<pre class="mermaid">\n${escape(code)}</pre>\n`; }
+        let rendered = language && hljs.getLanguage(language)
+            ? hljs.highlight(code, { language }).value : escape(code);
+        if (header) {
+            rendered = rendered.replace(/<span class="hljs-comment">.*?<\/span>/gs, () => '');
+            rendered = rendered.replace(/&lt;&lt;.*?&gt;&gt;/g, (tag: string) =>
+                `<span class="literate-tag-name">${tag.replace(/<\/?span\b[^>]*>/g, () => '')}</span>`);
+        }
+        const block = `<pre><code>${rendered}</code></pre>\n`;
+        if (!header) { return block; }
+        const label = escape(`\<<${header.name}>>=${header.append ? '+' : ''} ${header.output ? header.output + ' $' : ''}`);
+        return `<div class="codefragment">\n<div class="fragmentname">${label}</div>\n<div class="code">\n${block}\n</div>\n</div>`;
+    };
+    const metaAuthors = authors.split(';').map(author => `<meta name="author" content="${escape(author)}">`).join('');
+    for (const path of order) {
+        const content = md.renderer.render(tokens.get(path)!, md.options, {});
+        files.push({ path: safeRelativePath(path.replace(/\.literate$/, '.html'))!, content: substitute(htmlTemplate, { content, authors: metaAuthors }) });
+    }
+    for (const file of files) { file.content = file.content.replace(/\r\n|\r/g, '\n'); }
+    return { files, diagnostics };
+}
+```

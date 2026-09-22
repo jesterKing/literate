@@ -84,11 +84,11 @@ if(!workspaceFolder) { return []; }
 
 ### Retrieving fragments of project
 
-Code completion item providers run essentially on document changes. The
-`FragmentRepository` in most cases handles processing of **literate** files
-automatically, but it skips that when a change is caused by typing `<`, the
-opening chevron. That means we need to ensure **literate** files are processed
-before getting the fragment map for our workspace folder.
+Completion refreshes the fragment repository from current editor buffers before
+reading its map. This uses the same serialized processing queue as generation,
+but the default is read-only: asking for suggestions never writes source or HTML.
+Literate content changes independently request generation, including changes
+beginning with an opening chevron.
 
 ``` ts : <<get fragments for completion items>>=
 await theOneRepository.processLiterateFiles(workspaceFolder);

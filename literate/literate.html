@@ -175,6 +175,7 @@ properly. We'll need an instance of a properly configured <em>MarkdownIt</em> pa
 <div class="fragmentname">&lt;&lt;fragment repository member variables&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">private</span> md : <span class="hljs-title class_">MarkdownIt</span>;
+<span class="hljs-keyword">private</span> <span class="hljs-attr">processingQueue</span>: <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; = <span class="hljs-title class_">Promise</span>.<span class="hljs-title function_">resolve</span>();
 </code></pre>
 
 </div>
@@ -254,11 +255,9 @@ context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title
 
 </div>
 </div><h5>Subscribing to text document changes</h5>
-<p>The repository subscribes to the <code>onDidChangeTextDocument</code> event on the
-workspace. It could process <strong>literate</strong> files on each change, but the
-completion item provider needs to trigger itself processing of literate files.
-Since completion item provider gets called on typing a opening chevron (<code>&lt;</code>) we
-skip triggering the processing here when such a character has been typed.</p>
+<p>The repository processes every literate content change, including an opening
+chevron. Completion refreshes are read-only, and generated source/HTML changes
+are ignored so they cannot create a generation feedback loop.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;subscribe to text document changes&gt;&gt;= </div>
 <div class="code">
@@ -266,9 +265,9 @@ skip triggering the processing here when such a character has been typed.</p>
   vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title function_">onDidChangeTextDocument</span>(
     <span class="hljs-keyword">async</span> (e : vscode.<span class="hljs-property">TextDocumentChangeEvent</span>) =&gt;
     {
-      <span class="hljs-keyword">if</span>(!(e.<span class="hljs-property">contentChanges</span>.<span class="hljs-property">length</span>&gt;<span class="hljs-number">0</span> &amp;&amp; e.<span class="hljs-property">contentChanges</span>[<span class="hljs-number">0</span>].<span class="hljs-property">text</span>.<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&#x27;&lt;&#x27;</span>)))
+      <span class="hljs-keyword">if</span>(e.<span class="hljs-property">contentChanges</span>.<span class="hljs-property">length</span> &gt; <span class="hljs-number">0</span> &amp;&amp; e.<span class="hljs-property">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;.literate&#x27;</span>))
       {
-        <span class="hljs-keyword">await</span> <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">processLiterateFiles</span>(e.<span class="hljs-property">document</span>);
+        <span class="hljs-keyword">await</span> <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">processLiterateFiles</span>(e.<span class="hljs-property">document</span>, <span class="hljs-literal">true</span>).<span class="hljs-title function_">catch</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-literal">undefined</span>);
       }
     }
   )
@@ -289,7 +288,7 @@ workspace folder.</p>
     <span class="hljs-keyword">async</span> (e : vscode.<span class="hljs-property">WorkspaceFoldersChangeEvent</span>) =&gt;
     {
       <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> addedWorkspaceFolder <span class="hljs-keyword">of</span> e.<span class="hljs-property">added</span>) {
-        <span class="hljs-keyword">await</span> <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">processLiterateFiles</span>(addedWorkspaceFolder);
+        <span class="hljs-keyword">await</span> <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">processLiterateFiles</span>(addedWorkspaceFolder, <span class="hljs-literal">true</span>).<span class="hljs-title function_">catch</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-literal">undefined</span>);
       }
       <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> removedWorkspaceFolder <span class="hljs-keyword">of</span> e.<span class="hljs-property">removed</span>)
       {
@@ -303,195 +302,134 @@ workspace folder.</p>
 
 </div>
 </div><h4>Processing literate files</h4>
-<p>The parsing and setting up of the <code>fragments</code> map is handled with the method
-<code>processLiterateFiles</code>. Additionally the method will write out all specified
-source files.</p>
-<p>Processing the literate files is started generally in one of three cases: 1) change
-in workspace due to addition or removal of a workspace folder, 2) change to a
-literate document or through triggering of the <code>literate.process</code> command.</p>
+<p>The extension is an I/O adapter for the same pure <code>generateProject</code> engine used
+by the CLI. It snapshots every discovered document, preferring open editor
+buffers (including empty unsaved buffers), and loads the templates requested by
+<code>templateReferences</code>. Paths returned by that helper have already been checked
+by the engine. Missing template files are omitted so the engine can report the
+error at the declaration, rather than hiding it behind a filesystem exception.
+Other I/O failures reject the operation and are reported to the user. If template
+discovery rejects an invalid declaration, generation still runs to diagnose it
+at its source location. If document ordering rejects invalid input, the engine
+has already diagnosed it and the navigation parser does not parse it again.</p>
+<p><code>processLiterateFiles</code> defaults to a read-only refresh for completion providers.
+Activation, content changes and the Process command explicitly request writes.
+All requests share a serial queue: parsing and writing cannot overlap, and a
+failed request does not poison later requests. The returned promise covers the
+whole operation, including directory creation and file writes. Generated source
+and HTML changes do not themselves trigger processing.</p>
+<p>The engine owns validation, expansion, settings, templates and HTML generation.
+Its zero-based diagnostic positions map directly to VS Code ranges. Diagnostics
+are replaced only for the workspace being processed, preserving other folders.
+An invalid project produces no writes; existing outputs remain untouched. For a
+valid project the adapter compares UTF-8 bytes with disk, creates parent
+directories, and awaits writes only for changed files. This avoids unnecessary
+watcher events and preserves the engine's identical output across platforms.
+Writes are sequential but are not a transactional filesystem commit: an I/O
+failure can leave earlier writes applied. Obsolete outputs are not deleted.</p>
+<p>The navigation map is deliberately unexpanded and is built from the same
+snapshot, ordered by the engine's <code>orderSourceDocuments</code>: root index first,
+linked chapters next, and every remaining document in deterministic order.
+This map is not another generator and never supplies generation diagnostics.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;fragment generation method&gt;&gt;= </div>
 <div class="code">
-<pre><code><span class="hljs-keyword">async</span> <span class="hljs-title function_">processLiterateFiles</span>(<span class="hljs-params">
-  trigger :
-    vscode.WorkspaceFolder
-    | vscode.TextDocument
-    | <span class="hljs-literal">undefined</span></span>) {
-      <span class="literate-tag-name">&lt;&lt;set up workspace folder array&gt;&gt;</span>
-      <span class="literate-tag-name">&lt;&lt;iterate over workspace folders and parse&gt;&gt;</span>
-}
-</code></pre>
-
-</div>
-</div><p>First we determine the workspace folder or workspace folders to process. In the
-case where <code>trigger</code> is a workspace folder or a text document we use the given
-workspace folder or determine the one to which the text document belongs. In
-these cases we'll have an array with just the one workspace folder as element.
-When the trigger is <code>undefined</code> we'll use all workspace folders registered to
-this workspace.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;set up workspace folder array&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">const</span> workspaceFolders : <span class="hljs-title class_">Array</span>&lt;vscode.<span class="hljs-property">WorkspaceFolder</span>&gt; | <span class="hljs-literal">undefined</span> = (<span class="hljs-function">() =&gt;</span> {
-  <span class="hljs-keyword">if</span>(trigger)
-  {
-    <span class="literate-tag-name">&lt;&lt;get workspace if text document&gt;&gt;</span>
-    <span class="literate-tag-name">&lt;&lt;else just use passed in workspace&gt;&gt;</span>
-    <span class="hljs-keyword">if</span>(<span class="hljs-string">&quot;eol&quot;</span> <span class="hljs-keyword">in</span> trigger) {
-      <span class="hljs-keyword">const</span> ws = <span class="hljs-title function_">determineWorkspaceFolder</span>(trigger);
-      <span class="hljs-keyword">if</span>(ws)
-      {
-        <span class="hljs-keyword">return</span> [ws];
+<pre><code><span class="hljs-title function_">processLiterateFiles</span>(
+  trigger : vscode.<span class="hljs-property">WorkspaceFolder</span> | vscode.<span class="hljs-property">TextDocument</span> | <span class="hljs-literal">undefined</span>,
+  writeFiles = <span class="hljs-literal">false</span>
+) : <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; {
+  <span class="hljs-keyword">const</span> operation = <span class="hljs-variable language_">this</span>.<span class="hljs-property">processingQueue</span>.<span class="hljs-title function_">then</span>(<span class="hljs-keyword">async</span> () =&gt; {
+    <span class="hljs-keyword">const</span> folder = trigger &amp;&amp; (<span class="hljs-string">&quot;eol&quot;</span> <span class="hljs-keyword">in</span> trigger
+      ? <span class="hljs-title function_">determineWorkspaceFolder</span>(trigger) : trigger);
+    <span class="hljs-keyword">const</span> folders = trigger ? (folder ? [folder] : [])
+      : vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span> || [];
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> workspaceFolder <span class="hljs-keyword">of</span> folders) {
+      <span class="hljs-keyword">const</span> <span class="hljs-attr">documents</span>: <span class="hljs-title class_">SourceDocument</span>[] = [];
+      <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> uri <span class="hljs-keyword">of</span> <span class="hljs-keyword">await</span> <span class="hljs-title function_">getLiterateFileUris</span>(workspaceFolder)) {
+        documents.<span class="hljs-title function_">push</span>({
+          <span class="hljs-attr">path</span>: path.<span class="hljs-property">posix</span>.<span class="hljs-title function_">relative</span>(workspaceFolder.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>, uri.<span class="hljs-property">path</span>),
+          <span class="hljs-attr">text</span>: <span class="hljs-keyword">await</span> <span class="hljs-title function_">getFileContent</span>(uri)
+        });
       }
-    } <span class="hljs-keyword">else</span> {
-      <span class="hljs-keyword">return</span> [trigger];
+      <span class="hljs-keyword">const</span> <span class="hljs-attr">templates</span>: <span class="hljs-title class_">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; = <span class="hljs-title class_">Object</span>.<span class="hljs-title function_">create</span>(<span class="hljs-literal">null</span>);
+      <span class="hljs-keyword">let</span> <span class="hljs-attr">references</span>: <span class="hljs-built_in">string</span>[] = [];
+      <span class="hljs-keyword">try</span> {
+        references = <span class="hljs-title function_">templateReferences</span>(documents);
+      } <span class="hljs-keyword">catch</span> (_) {}
+      <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> reference <span class="hljs-keyword">of</span> references) {
+        <span class="hljs-keyword">try</span> {
+          templates[reference] = <span class="hljs-keyword">await</span> <span class="hljs-title function_">getFileContent</span>(
+            vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">joinPath</span>(workspaceFolder.<span class="hljs-property">uri</span>, reference));
+        } <span class="hljs-keyword">catch</span> (error) {
+          <span class="hljs-keyword">if</span> (!(error <span class="hljs-keyword">instanceof</span> vscode.<span class="hljs-property">FileSystemError</span>) || error.<span class="hljs-property">code</span> !== <span class="hljs-string">&#x27;FileNotFound&#x27;</span>) {
+            <span class="hljs-keyword">throw</span> error;
+          }
+        }
+      }
+      <span class="hljs-keyword">const</span> result = <span class="hljs-title function_">generateProject</span>(documents, templates);
+      <span class="hljs-keyword">const</span> diagnostics = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, vscode.<span class="hljs-property">Diagnostic</span>[]&gt;();
+      <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> diagnostic <span class="hljs-keyword">of</span> result.<span class="hljs-property">diagnostics</span>) {
+        <span class="hljs-keyword">const</span> uri = vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">joinPath</span>(workspaceFolder.<span class="hljs-property">uri</span>, diagnostic.<span class="hljs-property">path</span>);
+        <span class="hljs-keyword">const</span> key = uri.<span class="hljs-title function_">toString</span>();
+        <span class="hljs-keyword">const</span> entries = diagnostics.<span class="hljs-title function_">get</span>(key) || [];
+        <span class="hljs-keyword">const</span> range = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(diagnostic.<span class="hljs-property">line</span>, diagnostic.<span class="hljs-property">column</span>,
+          diagnostic.<span class="hljs-property">line</span>, diagnostic.<span class="hljs-property">column</span> + <span class="hljs-number">1</span>);
+        entries.<span class="hljs-title function_">push</span>(<span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Diagnostic</span>(range, diagnostic.<span class="hljs-property">message</span>,
+          vscode.<span class="hljs-property">DiagnosticSeverity</span>.<span class="hljs-property">Error</span>));
+        diagnostics.<span class="hljs-title function_">set</span>(key, entries);
+      }
+      <span class="hljs-keyword">const</span> <span class="hljs-attr">stale</span>: vscode.<span class="hljs-property">Uri</span>[] = [];
+      <span class="hljs-variable language_">this</span>.<span class="hljs-property">diagnostics</span>.<span class="hljs-title function_">forEach</span>(<span class="hljs-function"><span class="hljs-params">uri</span> =&gt;</span> {
+        <span class="hljs-keyword">if</span> (vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title function_">getWorkspaceFolder</span>(uri)?.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>() === workspaceFolder.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>()) {
+          stale.<span class="hljs-title function_">push</span>(uri);
+        }
+      });
+      <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> uri <span class="hljs-keyword">of</span> stale) { <span class="hljs-variable language_">this</span>.<span class="hljs-property">diagnostics</span>.<span class="hljs-title function_">delete</span>(uri); }
+      <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [uri, entries] <span class="hljs-keyword">of</span> diagnostics) {
+        <span class="hljs-variable language_">this</span>.<span class="hljs-property">diagnostics</span>.<span class="hljs-title function_">set</span>(vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">parse</span>(uri), entries);
+      }
+      <span class="hljs-keyword">const</span> states = <span class="hljs-keyword">new</span> <span class="hljs-title class_">GrabbedStateList</span>();
+      <span class="hljs-keyword">const</span> fragments = <span class="hljs-keyword">new</span> <span class="hljs-title class_">FragmentMap</span>();
+      <span class="hljs-variable language_">this</span>.<span class="hljs-property">grabbedStateForWorkspaceFolders</span>.<span class="hljs-title function_">set</span>(workspaceFolder.<span class="hljs-property">name</span>, states);
+      <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentsForWorkspaceFolders</span>.<span class="hljs-title function_">set</span>(workspaceFolder.<span class="hljs-property">name</span>, fragments);
+      <span class="hljs-keyword">let</span> <span class="hljs-attr">ordered</span>: <span class="hljs-title class_">SourceDocument</span>[];
+      <span class="hljs-keyword">try</span> {
+        ordered = <span class="hljs-title function_">orderSourceDocuments</span>(documents);
+      } <span class="hljs-keyword">catch</span> (_) {
+        <span class="hljs-keyword">continue</span>;
+      }
+      <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> <span class="hljs-variable language_">document</span> <span class="hljs-keyword">of</span> ordered) {
+        <span class="hljs-keyword">const</span> <span class="hljs-attr">env</span>: <span class="hljs-title class_">GrabbedState</span> = {
+          <span class="hljs-attr">literateFileName</span>: <span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>,
+          <span class="hljs-attr">literateUri</span>: vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">joinPath</span>(workspaceFolder.<span class="hljs-property">uri</span>, <span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>),
+          <span class="hljs-attr">gstate</span>: <span class="hljs-keyword">new</span> <span class="hljs-title class_">StateCore</span>(<span class="hljs-string">&#x27;&#x27;</span>, <span class="hljs-variable language_">this</span>.<span class="hljs-property">md</span>, {})
+        };
+        <span class="hljs-variable language_">this</span>.<span class="hljs-property">md</span>.<span class="hljs-title function_">parse</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">text</span>, env);
+        states.<span class="hljs-property">list</span>.<span class="hljs-title function_">push</span>(env);
+      }
+      fragments.<span class="hljs-property">map</span> = <span class="hljs-title function_">handleFragments</span>(states.<span class="hljs-property">list</span>);
+      <span class="hljs-keyword">if</span> (!writeFiles || result.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) { <span class="hljs-keyword">continue</span>; }
+      <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> result.<span class="hljs-property">files</span>) {
+        <span class="hljs-keyword">const</span> uri = vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">joinPath</span>(workspaceFolder.<span class="hljs-property">uri</span>, file.<span class="hljs-property">path</span>);
+        <span class="hljs-keyword">const</span> content = <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(file.<span class="hljs-property">content</span>, <span class="hljs-string">&#x27;utf-8&#x27;</span>);
+        <span class="hljs-keyword">try</span> {
+          <span class="hljs-keyword">const</span> previous = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">readFile</span>(uri);
+          <span class="hljs-keyword">if</span> (content.<span class="hljs-title function_">equals</span>(<span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(previous))) { <span class="hljs-keyword">continue</span>; }
+        } <span class="hljs-keyword">catch</span> (error) {
+          <span class="hljs-keyword">if</span> (!(error <span class="hljs-keyword">instanceof</span> vscode.<span class="hljs-property">FileSystemError</span>) || error.<span class="hljs-property">code</span> !== <span class="hljs-string">&#x27;FileNotFound&#x27;</span>) {
+            <span class="hljs-keyword">throw</span> error;
+          }
+        }
+        <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">createDirectory</span>(vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">joinPath</span>(uri, <span class="hljs-string">&#x27;..&#x27;</span>));
+        <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">writeFile</span>(uri, content);
+      }
     }
-  }
-  <span class="hljs-keyword">if</span>(vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span> &amp;&amp; vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span>.<span class="hljs-property">length</span>&gt;<span class="hljs-number">0</span>) {
-    <span class="hljs-keyword">let</span> folders = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;vscode.<span class="hljs-property">WorkspaceFolder</span>&gt;();
-    <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> ws <span class="hljs-keyword">of</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span>)
-    {
-      folders.<span class="hljs-title function_">push</span>(ws);
-    }
-    <span class="hljs-keyword">return</span> folders;
-  }
-  <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
+  });
+  <span class="hljs-variable language_">this</span>.<span class="hljs-property">processingQueue</span> = operation.<span class="hljs-title function_">catch</span>(<span class="hljs-function"><span class="hljs-params">error</span> =&gt;</span> {
+    <span class="hljs-built_in">void</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title function_">showErrorMessage</span>(<span class="hljs-string">`Literate processing failed: <span class="hljs-subst">${<span class="hljs-built_in">String</span>(error)}</span>`</span>);
+  });
+  <span class="hljs-keyword">return</span> operation;
 }
-)();
-</code></pre>
-
-</div>
-</div><p>We can check if our <code>trigger</code> is a <code>TextDocument</code> by checking if <code>eol</code> is a
-property. If the <code>eol</code> property exists we are dealing with an <code>TextDocument</code>, if it doesn't exist we are dealing with a <code>Workspace</code>.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;get workspace if text document&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">if</span>(<span class="hljs-string">&quot;eol&quot;</span> <span class="hljs-keyword">in</span> trigger) {
-  <span class="hljs-keyword">const</span> ws = <span class="hljs-title function_">determineWorkspaceFolder</span>(trigger);
-  <span class="hljs-keyword">if</span>(ws)
-  {
-    <span class="hljs-keyword">return</span> [ws];
-  }
-}
-</code></pre>
-
-</div>
-</div><p>Again, when the property <code>eol</code> is not found in the object we were passed we can
-assume it is just a workspace so return that as the one element in the array we
-return.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;else just use passed in workspace&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">else</span>
-{
-  <span class="hljs-keyword">return</span> [trigger];
-}
-</code></pre>
-
-</div>
-</div><p>With the list of workspace folders set up we can iterate over each folder and
-then handle <strong>literate</strong> files in that workspace folder.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;iterate over workspace folders and parse&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">if</span>(workspaceFolders) {
-  <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> folder <span class="hljs-keyword">of</span> workspaceFolders)
-  {
-    <span class="literate-tag-name">&lt;&lt;set up fragments and grabbedStateList&gt;&gt;</span>
-    <span class="hljs-keyword">if</span>(fragments &amp;&amp; grabbedStateList) {
-      <span class="literate-tag-name">&lt;&lt;clear FragmentMap and GrabbedStateList&gt;&gt;</span>
-      <span class="literate-tag-name">&lt;&lt;iterate over all files, write out html&gt;&gt;</span>
-      <span class="literate-tag-name">&lt;&lt;hanle fragments for map&gt;&gt;</span>
-      <span class="literate-tag-name">&lt;&lt;extrapolate fragments and save out&gt;&gt;</span>
-    }
-  }
-}
-</code></pre>
-
-</div>
-</div><p>First we ensure entries for our workspace exist in the maps for <code>FragmentMap</code>
-and <code>GrabbedStateList</code>.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;set up fragments and grabbedStateList&gt;&gt;= </div>
-<div class="code">
-<pre><code>    <span class="hljs-keyword">if</span>(!<span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentsForWorkspaceFolders</span>.<span class="hljs-title function_">has</span>(folder.<span class="hljs-property">name</span>))
-    {
-      <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentsForWorkspaceFolders</span>.<span class="hljs-title function_">set</span>(folder.<span class="hljs-property">name</span>, <span class="hljs-keyword">new</span> <span class="hljs-title class_">FragmentMap</span>());
-    }
-    <span class="hljs-keyword">if</span>(!<span class="hljs-variable language_">this</span>.<span class="hljs-property">grabbedStateForWorkspaceFolders</span>.<span class="hljs-title function_">has</span>(folder.<span class="hljs-property">name</span>))
-    {
-      <span class="hljs-variable language_">this</span>.<span class="hljs-property">grabbedStateForWorkspaceFolders</span>.<span class="hljs-title function_">set</span>(folder.<span class="hljs-property">name</span>, <span class="hljs-keyword">new</span> <span class="hljs-title class_">GrabbedStateList</span>());
-    }
-</code></pre>
-
-</div>
-</div><p>Next we can get the <code>FragmentMap</code> and <code>GrabbedStateList</code> for our workspace
-folder. These we'll fill up with the data of our <strong>literate</strong> project.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;set up fragments and grabbedStateList&gt;&gt;=+ </div>
-<div class="code">
-<pre><code>    <span class="hljs-keyword">const</span> fragments = <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentsForWorkspaceFolders</span>.<span class="hljs-title function_">get</span>(folder.<span class="hljs-property">name</span>);
-    <span class="hljs-keyword">const</span> grabbedStateList = <span class="hljs-variable language_">this</span>.<span class="hljs-property">grabbedStateForWorkspaceFolders</span>.<span class="hljs-title function_">get</span>(folder.<span class="hljs-property">name</span>);
-</code></pre>
-
-</div>
-</div><p>Each time we process a <strong>literate</strong> project we clear out the fragments and state
-so that we don't end up with stray elements.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;clear FragmentMap and GrabbedStateList&gt;&gt;= </div>
-<div class="code">
-<pre><code>fragments.<span class="hljs-title function_">clear</span>();
-grabbedStateList.<span class="hljs-title function_">clear</span>();
-</code></pre>
-
-</div>
-</div><p>Our first pass is iterating over all the <strong>literate</strong> files in our folder,
-parsing them as we go. Each parsed file will be rendered as HTML and saved out
-to disk. The parser state with all the tokens will be set to
-<code>grabbedStateList.list</code>. We need to <code>await</code> on this <code>async</code> function, otherwise
-our state will be incomplete. The full state is needed for the next two steps.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;iterate over all files, write out html&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">await</span> <span class="hljs-title function_">iterateLiterateFiles</span>(folder,
-                           writeOutHtml,
-                           grabbedStateList.<span class="hljs-property">list</span>,
-                           <span class="hljs-variable language_">this</span>.<span class="hljs-property">md</span>);
-</code></pre>
-
-</div>
-</div><p>With the state complete, and our HTML files saved out, we are going to do two
-passes over the state. Lets do the first step here: we clear out the
-diagnostics, and then await on <code>handleFragments</code>. This function we call such
-that there is no extrapolation of fragments, nor source files are going to be
-saved. We <code>await</code> for the function to complete, otherwise our fragment map will
-be incomplete, or even just missing later on.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;hanle fragments for map&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-variable language_">this</span>.<span class="hljs-property">diagnostics</span>.<span class="hljs-title function_">clear</span>();
-fragments.<span class="hljs-property">map</span> = <span class="hljs-keyword">await</span> <span class="hljs-title function_">handleFragments</span>(folder,
-                                      grabbedStateList.<span class="hljs-property">list</span>,
-                                      <span class="hljs-variable language_">this</span>.<span class="hljs-property">diagnostics</span>,
-                                      <span class="hljs-literal">false</span>,
-                                      <span class="hljs-literal">undefined</span>);
-</code></pre>
-
-</div>
-</div><p>The second step we'll call the fragment handler again, but this time we <em>do</em>
-want the fragments to be completely extrapolated, and the final source files
-written to disk. Before the call we again clear out the <code>DiagnosticCollection</code>
-so that we get the correct diagnostics in case of errors in <strong>literate</strong> files.</p>
-<p>Again we wait for the results, just to ensure it all completes before we go on.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;extrapolate fragments and save out&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-variable language_">this</span>.<span class="hljs-property">diagnostics</span>.<span class="hljs-title function_">clear</span>();
-<span class="hljs-keyword">await</span> <span class="hljs-title function_">handleFragments</span>(folder,
-                      grabbedStateList.<span class="hljs-property">list</span>,
-                      <span class="hljs-variable language_">this</span>.<span class="hljs-property">diagnostics</span>,
-                      <span class="hljs-literal">true</span>,
-                      writeSourceFiles);
 </code></pre>
 
 </div>
@@ -751,7 +689,7 @@ TBD: we can probably get rid of this interface and just use a <code>Token</code>
     <span class="hljs-keyword">const</span> workspaceState = <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">getWorkspaceState</span>(ws);
     <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> state <span class="hljs-keyword">of</span> workspaceState.<span class="hljs-property">list</span>)
     {
-      <span class="hljs-keyword">if</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span> === state.<span class="hljs-property">literateUri</span>.<span class="hljs-property">path</span>)
+      <span class="hljs-keyword">if</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>() === state.<span class="hljs-property">literateUri</span>.<span class="hljs-title function_">toString</span>())
       {
         grabbedState = state;
       }
@@ -887,96 +825,11 @@ entries, if there were no hits the array will be empty.</p>
 </code></pre>
 
 </div>
-</div><h2>Iterating all literate files</h2>
-<p>As mentioned in the introduction the main idea of the extension is to collect
-all fragments that are created in all <code>.literate</code> files. Once all fragments have
-been collected they are extrapolated until the top fragments are the full source
-files. Fully extrapolated top fragments are written to the source files as
-specicied for them.</p>
-<p>The first step is to put each <code>.literate</code> file through the <em>MarkdownIt</em>
-renderer. Each rendering will be given a special environment that will be used
-to collect the state for the render. The state will contain the document
-tokenized according the Markdown specification. The state <code>env</code> is of type
-<code>GrabbedState</code>. Among the tokens will be the code fences that are code
-fragments. For each <code>.literate</code> file the grabbed state <code>env</code> is saved in the
-list of <code>GrabbedState</code>s <code>envList</code>.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;render and collect state&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">iterateLiterateFiles</span>(<span class="hljs-params">workspaceFolder : vscode.WorkspaceFolder,
-                                    writeHtml : WriteRenderCallback
-                                                | <span class="hljs-literal">undefined</span>
-                                                | <span class="hljs-literal">null</span>,
-                                    envList : <span class="hljs-built_in">Array</span>&lt;GrabbedState&gt;,
-                                    md : MarkdownIt</span>)
-{
-  <span class="literate-tag-name">&lt;&lt;find all literate files in workspace&gt;&gt;</span>
-  <span class="hljs-keyword">try</span> {
-    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> fl <span class="hljs-keyword">of</span> foundLiterateFiles) {
-      <span class="literate-tag-name">&lt;&lt;get text from literate document&gt;&gt;</span>
-      <span class="literate-tag-name">&lt;&lt;parse literate file&gt;&gt;</span>
-      <span class="literate-tag-name">&lt;&lt;write out rendered file if requested&gt;&gt;</span>
-    }
-  } <span class="hljs-keyword">catch</span> (error) {
-    <span class="hljs-variable language_">console</span>.<span class="hljs-title function_">log</span>(error);
-  }
-}
-</code></pre>
-
-</div>
-</div><p>We ensure that only <strong>literate</strong> files are going to be parsed for their program
-fragments. We do that by using a <code>vscode.RelativePattern</code> using the workspace
-folder passed into <code>iterateLiterateFiles</code>.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;find all literate files in workspace&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">const</span> foundLiterateFiles = <span class="hljs-keyword">await</span> <span class="hljs-title function_">getLiterateFileUris</span>(workspaceFolder);
-</code></pre>
-
-</div>
-</div><p>We get the content of our <strong>literate</strong> file using <code>getFileContent</code>. We do need
-to <code>await</code> for that so that we actually get the string and not a promise.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;get text from literate document&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">const</span> text = <span class="hljs-keyword">await</span> <span class="hljs-title function_">getFileContent</span>(fl);
-</code></pre>
-
-</div>
-</div><p>With the <code>text</code> for our <strong>literate</strong> document ready we harvest the relative file
-path to our document from the workspace folder. <code>fname</code> is then set as the
-<code>literateFileName</code> of our <code>GrabbedState</code> instance that we push into the
-<code>envList</code> so that we can access it later. Now we finally get to pass the <code>text</code>
-of our <strong>literate</strong> document to the <em>MarkdownIt</em> renderer. Once that is done we
-have both an HTML representation of our document as well as the entire parser
-state in <code>env</code>.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;parse literate file&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">const</span> fname = path.<span class="hljs-title function_">relative</span>(workspaceFolder.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>, fl.<span class="hljs-property">path</span>);
-<span class="hljs-keyword">const</span> <span class="hljs-attr">env</span>: <span class="hljs-title class_">GrabbedState</span> = { <span class="hljs-attr">literateFileName</span>: fname, <span class="hljs-attr">literateUri</span>: fl, <span class="hljs-attr">gstate</span>: <span class="hljs-keyword">new</span> <span class="hljs-title class_">StateCore</span>(<span class="hljs-string">&#x27;&#x27;</span>, md, {}) };
-envList.<span class="hljs-title function_">push</span>(env);
-<span class="hljs-keyword">const</span> rendered = md.<span class="hljs-title function_">render</span>(text, env);
-</code></pre>
-
-</div>
-</div><p>If a callback implementing <code>WriteRenderCallback</code> is passed to
-<code>iterateLiterateFiles</code> we call that with the endered file content so that it can
-be saved as an <code>HTML</code> file with the same name as the <code>.literate</code> file that was
-being rendered, but with the extension replaced with <code>.html</code>. Conversely, if no
-callback was passed in it is not called and rendered results are not saved to
-disk.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;write out rendered file if requested&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">if</span>(writeHtml)
-{
-  <span class="hljs-keyword">await</span> <span class="hljs-title function_">writeHtml</span>(fname, workspaceFolder.<span class="hljs-property">uri</span>, rendered);
-}
-</code></pre>
-
-</div>
-</div><h3>GrabbedState interface</h3>
+</div><h2>Collecting editor state</h2>
+<p>The repository parses the engine-ordered document snapshot with the grabber
+plugin to retain Markdown token locations for navigation. Parsing here does
+not render or write HTML; all generated files come from the engine.</p>
+<h3>GrabbedState interface</h3>
 <p>The <code>GrabbedState</code> interface is used to create a type that helps us collecting
 the tokens for each <code>.literate</code> file. Instances of objects with this interface
 are passed to a <em>MarkdownIt</em> renderer. The renderer will have the
@@ -1120,256 +973,40 @@ detect this and emit a diagnostic accordingly.</p>
 <p>To add to a fragment a <code>+</code> is added, so it could look like
 <code>py : &lt;&lt;a fragment name&gt;&gt;=+</code>. Having a fragment without <code>=</code> or <code>=+</code> on the code
 fence info line is an error.</p>
-<h2>Gathering all fragments</h2>
-<p>All code fragments are fetched from each environment state. This is done through
-looking for all <code>fence</code> tokens. If the <code>token.info</code> for a <code>fence</code> matches the
-<code>FRAGMENT_RE</code> we can check to see whether the fragment we have currently in our
-hands is a new fragment (<code>root &amp;&amp; !add</code>) or whether this one expands an existing
-one (<code>root &amp;&amp; add</code>), as will be explained in more detail further down.</p>
+<h2>Gathering editor fragments</h2>
+<p><code>handleFragments</code> only collects unexpanded code and tokens for editor providers.
+It has no writer callback, expansion switch, template I/O or diagnostics. Invalid
+or incomplete declarations can still be navigated while typing; the engine is
+solely responsible for deciding whether the project is valid for generation.
+Appended parts follow the shared engine order, even when the first part is empty.
+Template metadata is not needed by these providers and remains unset.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;handle fragments&gt;&gt;= </div>
 <div class="code">
-<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">handleFragments</span>(<span class="hljs-params">
-  workspaceFolder : vscode.WorkspaceFolder,
-  envList : <span class="hljs-built_in">Array</span>&lt;GrabbedState&gt;,
-  diagnostics : vscode.DiagnosticCollection,
-  extrapolateFragments : <span class="hljs-built_in">boolean</span>,
-  writeSource : WriteSourceCallback | <span class="hljs-literal">undefined</span></span>) : <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">FragmentInformation</span>&gt;&gt;
-{
-  <span class="hljs-keyword">const</span> folderUri = workspaceFolder.<span class="hljs-property">uri</span>;
-  <span class="literate-tag-name">&lt;&lt;build fragment map&gt;&gt;</span>
-
-  <span class="hljs-keyword">if</span>(extrapolateFragments)
-  {
-    <span class="literate-tag-name">&lt;&lt;extrapolate fragments&gt;&gt;</span>
-  }
-
-  <span class="hljs-keyword">if</span>(writeSource) {
-    <span class="hljs-title function_">writeSource</span>(workspaceFolder, fragments);
-  }
-
-  <span class="hljs-keyword">return</span> <span class="hljs-title class_">Promise</span>.<span class="hljs-title function_">resolve</span>(fragments);
-}
-</code></pre>
-
-</div>
-</div><h3>Populating the fragment map</h3>
-<p>First we build a map of all available fragments. These will go into <code>fragments</code>,
-which is of type <code>Map&lt;string, FragmentInformation&gt;</code>. The name of a fragment will
-function as the key, and an instance of <code>FragmentInformation</code> will be the value.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;build fragment map&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">const</span> fragments = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">FragmentInformation</span>&gt;();
-<span class="hljs-keyword">const</span> overwriteAttempts = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;<span class="hljs-built_in">string</span>&gt;();
-<span class="hljs-keyword">const</span> missingFilenames = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;<span class="hljs-built_in">string</span>&gt;();
-<span class="hljs-keyword">const</span> addingToNonExistant = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;<span class="hljs-built_in">string</span>&gt;();
-<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> env <span class="hljs-keyword">of</span> envList) {
-  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> token <span class="hljs-keyword">of</span> env.<span class="hljs-property">gstate</span>.<span class="hljs-property">tokens</span>) {
-    <span class="literate-tag-name">&lt;&lt;handle fence tokens&gt;&gt;</span>
-  }
-}
-</code></pre>
-
-</div>
-</div><p>Each <code>fence</code> token we find we need to check. There may be of course code fences
-in the document that do not create or modify a fragment. These we need to skip.</p>
-<p>Since we are handling code fences we use <code>FRAGMENT_RE</code> to match <code>token.info</code>. A
-fragment is malformed if the colon is missing, so we need to
-<code>&lt;&lt;emit diagnostic when colon is missing&gt;&gt;</code>.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;handle fence tokens&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> === <span class="hljs-string">&#x27;fence&#x27;</span>) {
-  <span class="hljs-keyword">const</span> linenumber = <span class="hljs-title function_">locationOfFragment</span>(token);
-  <span class="hljs-keyword">const</span> match = token.<span class="hljs-property">info</span>.<span class="hljs-title function_">match</span>(<span class="hljs-variable constant_">FRAGMENT_RE</span>);
-  <span class="hljs-keyword">if</span> (match &amp;&amp; match.<span class="hljs-property">groups</span>) {
-    <span class="hljs-keyword">let</span> lang = match.<span class="hljs-property">groups</span>.<span class="hljs-property">lang</span>.<span class="hljs-title function_">trim</span>();
-    <span class="hljs-keyword">let</span> colon = match.<span class="hljs-property">groups</span>.<span class="hljs-property">colon</span>;
-    <span class="hljs-keyword">let</span> name = match.<span class="hljs-property">groups</span>.<span class="hljs-property">tagName</span>;
-    <span class="hljs-keyword">let</span> root = match.<span class="hljs-property">groups</span>.<span class="hljs-property">root</span>;
-    <span class="hljs-keyword">let</span> add = match.<span class="hljs-property">groups</span>.<span class="hljs-property">add</span>;
-    <span class="hljs-keyword">let</span> fileName = match.<span class="hljs-property">groups</span>.<span class="hljs-property">fileName</span>;
-    <span class="hljs-keyword">let</span> extraSettings = match.<span class="hljs-property">groups</span>.<span class="hljs-property">extraSettings</span>;
-    <span class="literate-tag-name">&lt;&lt;emit diagnostic when colon is missing&gt;&gt;</span>
-    <span class="literate-tag-name">&lt;&lt;add to existing fragment&gt;&gt;</span>
-    <span class="literate-tag-name">&lt;&lt;create a new fragment&gt;&gt;</span>
-  }
-}
-</code></pre>
-
-</div>
-</div><h3>Error diagnostic when fragment malformed</h3>
-<p>The diagnostic emitted has a message telling the colon is missing, along with
-the line number and the literate file this happened in.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;emit diagnostic when colon is missing&gt;&gt;= </div>
-<div class="code">
-<pre title="<<emit diagnostic when colon is missing>>=">if(lang &amp;&amp; !match.groups.colon) {
-  let msg = `Missing colon for fragment: ${name}. ${env.literateFileName}${linenumber}`;
-  const diag = createErrorDiagnostic(token, msg);
-  updateDiagnostics(env.literateUri, diagnostics, diag);
-}
-
-</pre>
-
-</div>
-</div><h3>Creating a new fragment</h3>
-<p>If the <code>root</code> group has captured a result but not the <code>add</code> group we know we
-have a new fragment on our hand.</p>
-<p>If we already have in our <code>fragments</code> map a key with the same <code>name</code> as the
-fragment we are currently handling we add an error diagnostic message. We don't
-stop handling fences, or the entire <code>literate.process</code> command for that matter.
-We keep on going, but leave it up to the programmer to see and handle the error
-messages.</p>
-<p>If a fragment name with <code>.*</code> is found we need to ensure there is a result in the
-<code>fileName</code> capture group. That is going to be needed to write out the source
-code file eventually. A file defining fragment without a file name is an error.</p>
-<p>When everything appears to be in order a new <code>FragmentInformation</code> instance is
-created with the information found. The code for this fragment is the token
-content in <code>token.content</code>. Finally the new <code>FragmentInformation</code> instance is
-added to the <code>fragments</code> map.</p>
-<p>If a new fragment is going to be created, but it already exists in the fragment
-map we emit an error diagnostic. To ensure we emit the error diagnostic only
-once the fragment name is added to <code>overwriteAttempts</code>.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;create a new fragment&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">if</span> (root &amp;&amp; !add) {
-  <span class="hljs-keyword">if</span> (fragments.<span class="hljs-title function_">has</span>(name)) {
-    <span class="hljs-keyword">if</span>(!overwriteAttempts.<span class="hljs-title function_">includes</span>(name))
-    {
-      <span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Trying to overwrite existing fragment fragment <span class="hljs-subst">${name}</span>. <span class="hljs-subst">${env.literateFileName}</span><span class="hljs-subst">${linenumber}</span>`</span>;
-      <span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(token, msg);
-      <span class="hljs-title function_">updateDiagnostics</span>(env.<span class="hljs-property">literateUri</span>, diagnostics, diag);
-      overwriteAttempts.<span class="hljs-title function_">push</span>(name);
-    }
-  }
-</code></pre>
-
-</div>
-</div><p>If it does not yet exist in the fragment map we can proceed. We need to check
-though if we have a top-level fragment. In that case we require a file name, so
-emit an error diagnostic when that is missing.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;create a new fragment&gt;&gt;=+ </div>
-<div class="code">
-<pre><code>  <span class="hljs-keyword">else</span> {
-    <span class="hljs-keyword">if</span> (!fileName &amp;&amp; name.<span class="hljs-title function_">indexOf</span>(<span class="hljs-string">&quot;.*&quot;</span>) &gt; -<span class="hljs-number">1</span> ) {
-      <span class="hljs-keyword">if</span>(!missingFilenames.<span class="hljs-title function_">includes</span>(name)) {
-        <span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Expected filename for star fragment <span class="hljs-subst">${name}</span>`</span>;
-        <span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(token, msg);
-        <span class="hljs-title function_">updateDiagnostics</span>(env.<span class="hljs-property">literateUri</span>, diagnostics, diag);
-        missingFilenames.<span class="hljs-title function_">push</span>(name);
-      }
-    }
-</code></pre>
-
-</div>
-</div><p>On the contrary, if we have a non-starred fragment but we do get a filename we
-also issue a diagnostic to notify the programmer of the mistake.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;create a new fragment&gt;&gt;=+ </div>
-<div class="code">
-<pre><code>    <span class="hljs-keyword">if</span>(fileName &amp;&amp; name.<span class="hljs-title function_">indexOf</span>(<span class="hljs-string">&quot;.*&quot;</span>)===-<span class="hljs-number">1</span>) {
-        <span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Unexpected filename for non-star fragment <span class="hljs-subst">${name}</span>`</span>;
-        <span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(token, msg);
-        <span class="hljs-title function_">updateDiagnostics</span>(env.<span class="hljs-property">literateUri</span>, diagnostics, diag);
-    }
-</code></pre>
-
-</div>
-</div><p>We do need to make sure that the fileName gets cleaned up because the matching
-expression for this contains whitespace and a dollar sign.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;create a new fragment&gt;&gt;=+ </div>
-<div class="code">
-<pre><code>    <span class="hljs-keyword">if</span>(fileName) {
-      fileName = fileName.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\s+\$/</span>, <span class="hljs-string">&quot;&quot;</span>);
-    }
-</code></pre>
-
-</div>
-</div><p>Check the <code>extraSettings</code> group if a template is specified. Find the
-<code>vscode.Uri</code> for the file specified. Use that if it exists, otherwise keep
-<code>sourceTemplateUri</code> at <code>undefined</code>.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;create a new fragment&gt;&gt;=+ </div>
-<div class="code">
-<pre><code>    <span class="hljs-keyword">let</span> sourceTemplateUri : vscode.<span class="hljs-property">Uri</span> | <span class="hljs-literal">undefined</span> = <span class="hljs-literal">undefined</span>;
-    <span class="hljs-keyword">if</span>(extraSettings) {
-      <span class="hljs-keyword">let</span> settings = extraSettings.<span class="hljs-title function_">split</span>(<span class="hljs-string">&quot;;&quot;</span>);
-      <span class="hljs-keyword">for</span>(<span class="hljs-keyword">let</span> setting <span class="hljs-keyword">of</span> settings)
-      {
-        setting = setting.<span class="hljs-title function_">trim</span>();
-        <span class="hljs-keyword">if</span>(setting.<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&quot;template&quot;</span>))
-        {
-          <span class="hljs-keyword">let</span> settingParts = setting.<span class="hljs-title function_">split</span>(<span class="hljs-string">&quot;=&quot;</span>);
-          <span class="hljs-keyword">const</span> sourceTemplateFilePattern : vscode.<span class="hljs-property">RelativePattern</span> = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">RelativePattern</span>(workspaceFolder, settingParts[<span class="hljs-number">1</span>]);
-          <span class="hljs-keyword">const</span> _foundSourceTemplateFile = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>
-            .<span class="hljs-title function_">findFiles</span>(sourceTemplateFilePattern)
-            .<span class="hljs-title function_">then</span>(<span class="hljs-function"><span class="hljs-params">files</span> =&gt;</span> <span class="hljs-title class_">Promise</span>.<span class="hljs-title function_">all</span>(files.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">file</span> =&gt;</span> file)));
-          <span class="hljs-keyword">if</span>(_foundSourceTemplateFile.<span class="hljs-property">length</span>===<span class="hljs-number">1</span>)
-          {
-            sourceTemplateUri = _foundSourceTemplateFile[<span class="hljs-number">0</span>];
-          }
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">handleFragments</span>(<span class="hljs-params">envList: <span class="hljs-built_in">Array</span>&lt;GrabbedState&gt;</span>): <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">FragmentInformation</span>&gt; {
+  <span class="hljs-keyword">const</span> fragments = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">FragmentInformation</span>&gt;();
+  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> env <span class="hljs-keyword">of</span> envList) {
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> env.<span class="hljs-property">gstate</span>.<span class="hljs-property">tokens</span>) {
+      <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> !== <span class="hljs-string">&#x27;fence&#x27;</span>) { <span class="hljs-keyword">continue</span>; }
+      <span class="hljs-keyword">const</span> match = token.<span class="hljs-property">info</span>.<span class="hljs-title function_">match</span>(<span class="hljs-variable constant_">FRAGMENT_RE</span>);
+      <span class="hljs-keyword">if</span> (!match || !match.<span class="hljs-property">groups</span> || !match.<span class="hljs-property">groups</span>.<span class="hljs-property">root</span>) { <span class="hljs-keyword">continue</span>; }
+      <span class="hljs-keyword">const</span> { <span class="hljs-attr">tagName</span>: name, lang, add, fileName } = match.<span class="hljs-property">groups</span>;
+      <span class="hljs-keyword">if</span> (add) {
+        <span class="hljs-keyword">const</span> fragment = fragments.<span class="hljs-title function_">get</span>(name);
+        <span class="hljs-keyword">if</span> (fragment) {
+          fragment.<span class="hljs-property">code</span> += token.<span class="hljs-property">content</span>;
+          fragment.<span class="hljs-property">tokens</span>.<span class="hljs-title function_">push</span>(token);
         }
+      } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (!fragments.<span class="hljs-title function_">has</span>(name)) {
+        fragments.<span class="hljs-title function_">set</span>(name, {
+          <span class="hljs-attr">lang</span>: lang.<span class="hljs-title function_">trim</span>(), <span class="hljs-attr">literateFileName</span>: env.<span class="hljs-property">literateFileName</span>,
+          <span class="hljs-attr">sourceFileName</span>: fileName ? fileName.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\s+\$/</span>, <span class="hljs-string">&#x27;&#x27;</span>).<span class="hljs-title function_">trim</span>() : <span class="hljs-string">&#x27;&#x27;</span>,
+          <span class="hljs-attr">templateFileName</span>: <span class="hljs-literal">undefined</span>, <span class="hljs-attr">code</span>: token.<span class="hljs-property">content</span>, <span class="hljs-attr">tokens</span>: [token], env
+        });
       }
     }
-</code></pre>
-
-</div>
-</div><p>We can now finally create the <code>FragmentInformation</code> instance and add it to our
-fragment map.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;create a new fragment&gt;&gt;=+ </div>
-<div class="code">
-<pre><code>    <span class="hljs-keyword">let</span> code = token.<span class="hljs-property">content</span>;
-    <span class="hljs-keyword">let</span> <span class="hljs-attr">fragmentInfo</span>: <span class="hljs-title class_">FragmentInformation</span> = {
-      <span class="hljs-attr">lang</span>: lang,
-      <span class="hljs-attr">literateFileName</span>: env.<span class="hljs-property">literateFileName</span>,
-      <span class="hljs-attr">sourceFileName</span>: fileName,
-      <span class="hljs-attr">templateFileName</span>: sourceTemplateUri,
-      <span class="hljs-attr">code</span>: code,
-      <span class="hljs-attr">tokens</span>: [token],
-      <span class="hljs-attr">env</span>: env,
-    };
-    fragments.<span class="hljs-title function_">set</span>(name, fragmentInfo);
   }
-}
-</code></pre>
-
-</div>
-</div><h3>Modifying an existing fragment</h3>
-<p>If both the <code>root</code> and <code>add</code> groups have capture their results, an <code>=</code> and an
-<code>+</code> respectively we need to add code to an existing fragment.</p>
-<p>For this to work a new fragment needs to be always present before the modifying
-fragment. It is an error to try to modify a fragment that hasn't been seen yet.</p>
-<p>The fragment with specified <code>name</code> is fetched, and when it is not <code>undefined</code>
-the <code>token.content</code> is appended to the <code>code</code> of the <code>FragmentInformation</code>
-instance we got from the map. The current token is also appended to the <code>tokens</code>
-list.</p>
-<p>The fragments map is updated with the modified  <code>FragmentInformation</code> instance.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;add to existing fragment&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">if</span> (root &amp;&amp; add) {
-  <span class="hljs-keyword">if</span> (fragments.<span class="hljs-title function_">has</span>(name)) {
-    <span class="hljs-keyword">let</span> fragmentInfo = fragments.<span class="hljs-title function_">get</span>(name) || <span class="hljs-literal">undefined</span>;
-    <span class="hljs-keyword">if</span>(fragmentInfo &amp;&amp; fragmentInfo.<span class="hljs-property">code</span>) {
-      <span class="hljs-keyword">let</span> additionalCode = token.<span class="hljs-property">content</span>;
-      fragmentInfo.<span class="hljs-property">code</span> = <span class="hljs-string">`<span class="hljs-subst">${fragmentInfo.code}</span><span class="hljs-subst">${additionalCode}</span>`</span>;
-      fragmentInfo.<span class="hljs-property">tokens</span>.<span class="hljs-title function_">push</span>(token);
-      fragments.<span class="hljs-title function_">set</span>(name, fragmentInfo);
-    }
-  } <span class="hljs-keyword">else</span> {
-    <span class="hljs-keyword">if</span>(!addingToNonExistant.<span class="hljs-title function_">includes</span>(name)) {
-      <span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Trying to add to non-existant fragment <span class="hljs-subst">${name}</span>. <span class="hljs-subst">${env.literateFileName}</span>:<span class="hljs-subst">${linenumber}</span>`</span>;
-      <span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(token, msg);
-      <span class="hljs-title function_">updateDiagnostics</span>(env.<span class="hljs-property">literateUri</span>, diagnostics, diag);
-      addingToNonExistant.<span class="hljs-title function_">push</span>(name);
-    }
-  }
+  <span class="hljs-keyword">return</span> fragments;
 }
 </code></pre>
 
@@ -1408,135 +1045,21 @@ module.</p>
 </code></pre>
 
 </div>
-</div><h3>Writing source files</h3>
-<p>Writing source files is a matter of looping through the keys of a fragments map.
-For each key that ends with the <code>.*</code> string we check if a fragment exists, and
-if for that fragment a source filename is recorded. If that is the case write
-out the file with the code content of the fragment.</p>
-<p>If a <code>vscode.Uri</code> is defined for <code>templateFileName</code> read the file contents and
-use that instead of the default one that says just <code>[CODE]</code>. This means that for
-a template to work properly it needs to contain the string <code>[CODE]</code>, since that
-will be replaced with the code generated for this file.</p>
-<p>For newline handling we'll replace all single LF occurances with CRLF when the
-underlying operating system is Windows. Otherwise do the reverse: replace CRLF
-with a single LF.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;method to write out source files&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">writeSourceFiles</span>(<span class="hljs-params">workspaceFolder : vscode.WorkspaceFolder,
-                fragments : <span class="hljs-built_in">Map</span>&lt;<span class="hljs-built_in">string</span>, FragmentInformation&gt;</span>)
-{
-  <span class="hljs-keyword">const</span> folderUri = workspaceFolder.<span class="hljs-property">uri</span>;
-  
-  <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> name <span class="hljs-keyword">of</span> fragments.<span class="hljs-title function_">keys</span>()) {
-    <span class="hljs-keyword">if</span> (name.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&quot;.*&quot;</span>)) {
-      <span class="hljs-keyword">let</span> fragmentInfo = fragments.<span class="hljs-title function_">get</span>(name) || <span class="hljs-literal">undefined</span>;
-      <span class="hljs-keyword">if</span> (fragmentInfo &amp;&amp; fragmentInfo.<span class="hljs-property">sourceFileName</span>) {
-        <span class="hljs-keyword">let</span> sourceTemplate = <span class="hljs-string">&#x27;[CODE]&#x27;</span>;
-        <span class="hljs-keyword">if</span>(fragmentInfo.<span class="hljs-property">templateFileName</span>) {
-          sourceTemplate = <span class="hljs-keyword">await</span> <span class="hljs-title function_">getFileContent</span>(fragmentInfo.<span class="hljs-property">templateFileName</span>);
-        }
-        <span class="hljs-keyword">let</span> code = sourceTemplate.<span class="hljs-title function_">replace</span>(<span class="hljs-string">&quot;[CODE]&quot;</span>, fragmentInfo.<span class="hljs-property">code</span>);
-        <span class="hljs-keyword">let</span> fixed = <span class="hljs-string">&#x27;&#x27;</span>;
-        <span class="hljs-keyword">if</span>(os.<span class="hljs-title function_">platform</span>()===<span class="hljs-string">&#x27;win32&#x27;</span>)
-        {
-          <span class="hljs-keyword">const</span> lf2crlf = <span class="hljs-regexp">/([^\r])\n/g</span>;
-          fixed = code.<span class="hljs-title function_">replaceAll</span>(lf2crlf, <span class="hljs-string">&#x27;$1\r\n&#x27;</span>);
-        } <span class="hljs-keyword">else</span> {
-          <span class="hljs-keyword">const</span> crlf2lf = <span class="hljs-regexp">/\r\n/g</span>;
-          fixed = code.<span class="hljs-title function_">replaceAll</span>(crlf2lf, <span class="hljs-string">&#x27;\n&#x27;</span>);
-        }
-        <span class="hljs-keyword">const</span> encoded = <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(fixed, <span class="hljs-string">&#x27;utf-8&#x27;</span>);
-        <span class="hljs-keyword">let</span> fileName = fragmentInfo.<span class="hljs-property">sourceFileName</span>.<span class="hljs-title function_">trim</span>();
-        <span class="hljs-keyword">const</span> fileUri = vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">joinPath</span>(folderUri, fileName);
-        <span class="hljs-keyword">try</span> {
-          <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">writeFile</span>(fileUri, encoded);
-        } <span class="hljs-keyword">catch</span>(writeError)
-        {
-          <span class="hljs-variable language_">console</span>.<span class="hljs-title function_">log</span>(writeError);
-        }
-      }
-    }
-  }
-}
-</code></pre>
-
-</div>
-</div><h2>Extrapolating fragments</h2>
-<p>Once all fragments have been collected from the <code>.literate</code> files of the project
-fragments can be combined into source code.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;extrapolate fragments&gt;&gt;= </div>
-<div class="code">
-<pre><code>
-<span class="hljs-keyword">let</span> <span class="hljs-attr">pass</span>: <span class="hljs-built_in">number</span> = <span class="hljs-number">0</span>;
-<span class="hljs-keyword">const</span> rootIncorrect = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;<span class="hljs-built_in">string</span>&gt;();
-<span class="hljs-keyword">const</span> addIncorrect = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;<span class="hljs-built_in">string</span>&gt;();
-<span class="hljs-keyword">const</span> fragmentNotFound = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;<span class="hljs-built_in">string</span>&gt;();
-<span class="hljs-keyword">do</span> {
-  pass++;
-  <span class="hljs-keyword">let</span> fragmentReplaced = <span class="hljs-literal">false</span>;
-  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> fragmentName <span class="hljs-keyword">of</span> fragments.<span class="hljs-title function_">keys</span>()) {
-    <span class="hljs-keyword">let</span> fragmentInfo = fragments.<span class="hljs-title function_">get</span>(fragmentName) || <span class="hljs-literal">undefined</span>;
-    <span class="hljs-keyword">if</span> (!fragmentInfo) {
-      <span class="hljs-keyword">continue</span>;
-    }
-
-    <span class="hljs-keyword">const</span> casesToReplace = [...fragmentInfo.<span class="hljs-property">code</span>.<span class="hljs-title function_">matchAll</span>(<span class="hljs-variable constant_">FRAGMENT_USE_IN_CODE_RE</span>)];
-    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> match <span class="hljs-keyword">of</span> casesToReplace) {
-      <span class="hljs-keyword">if</span>(!match || !match.<span class="hljs-property">groups</span>) {
-        <span class="hljs-keyword">continue</span>;
-      }
-      <span class="hljs-keyword">let</span> tag = match[<span class="hljs-number">0</span>];
-      <span class="hljs-keyword">let</span> indent = match.<span class="hljs-property">groups</span>.<span class="hljs-property">indent</span>;
-      <span class="hljs-keyword">let</span> tagName = match.<span class="hljs-property">groups</span>.<span class="hljs-property">tagName</span>;
-      <span class="hljs-keyword">let</span> root = match.<span class="hljs-property">groups</span>.<span class="hljs-property">root</span>;
-      <span class="hljs-keyword">let</span> add = match.<span class="hljs-property">groups</span>.<span class="hljs-property">add</span>;
-      <span class="hljs-keyword">if</span> (root &amp;&amp; !rootIncorrect.<span class="hljs-title function_">includes</span>(tag)) {
-        <span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Found &#x27;=&#x27;: incorrect fragment tag in fragment, <span class="hljs-subst">${tag}</span>`</span>;
-        <span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(fragmentInfo.<span class="hljs-property">tokens</span>[<span class="hljs-number">0</span>], msg);
-        <span class="hljs-title function_">updateDiagnostics</span>(fragmentInfo.<span class="hljs-property">env</span>.<span class="hljs-property">literateUri</span>, diagnostics, diag);
-        rootIncorrect.<span class="hljs-title function_">push</span>(tag);
-      }
-      <span class="hljs-keyword">if</span> (add &amp;&amp; !addIncorrect.<span class="hljs-title function_">includes</span>(tag)) {
-        <span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Found &#x27;+&#x27;: incorrect fragment tag in fragment: <span class="hljs-subst">${tag}</span>`</span>;
-        <span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(fragmentInfo.<span class="hljs-property">tokens</span>[<span class="hljs-number">0</span>], msg);
-        <span class="hljs-title function_">updateDiagnostics</span>(fragmentInfo.<span class="hljs-property">env</span>.<span class="hljs-property">literateUri</span>, diagnostics, diag);
-        addIncorrect.<span class="hljs-title function_">push</span>(tag);
-      }
-      <span class="hljs-keyword">if</span> (!fragments.<span class="hljs-title function_">has</span>(match.<span class="hljs-property">groups</span>.<span class="hljs-property">tagName</span>) &amp;&amp; tagName !== <span class="hljs-string">&quot;(?&lt;tagName&gt;.+)&quot;</span> &amp;&amp; !fragmentNotFound.<span class="hljs-title function_">includes</span>(tagName)) {
-        <span class="hljs-keyword">let</span> msg = <span class="hljs-string">`Could not find fragment <span class="hljs-subst">${tag}</span> (<span class="hljs-subst">${tagName}</span>)`</span>;
-        <span class="hljs-keyword">let</span> range = <span class="hljs-title function_">fragmentUsageRange</span>(fragmentInfo.<span class="hljs-property">tokens</span>[<span class="hljs-number">0</span>], tagName);
-        <span class="hljs-keyword">const</span> diag = <span class="hljs-title function_">createErrorDiagnostic</span>(fragmentInfo.<span class="hljs-property">tokens</span>[<span class="hljs-number">0</span>], msg, range);
-        <span class="hljs-title function_">updateDiagnostics</span>(fragmentInfo.<span class="hljs-property">env</span>.<span class="hljs-property">literateUri</span>, diagnostics, diag);
-        fragmentNotFound.<span class="hljs-title function_">push</span>(tagName);
-      }
-      <span class="hljs-keyword">let</span> fragmentToReplaceWith = fragments.<span class="hljs-title function_">get</span>(tagName) || <span class="hljs-literal">undefined</span>;
-      <span class="hljs-keyword">if</span> (fragmentToReplaceWith) {
-        <span class="hljs-keyword">let</span> code = fragmentToReplaceWith.<span class="hljs-property">code</span>;
-        <span class="hljs-keyword">let</span> lines = code.<span class="hljs-title function_">split</span>(<span class="hljs-string">&quot;\n&quot;</span>).<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, -<span class="hljs-number">1</span>);
-        <span class="hljs-keyword">let</span> indentedLines = lines.<span class="hljs-title function_">flatMap</span>(<span class="hljs-keyword">function</span> (<span class="hljs-params">e, _</span>) {
-          <span class="hljs-keyword">return</span> indent + e;
-
-        });
-        <span class="hljs-keyword">let</span> newcode = indentedLines.<span class="hljs-title function_">join</span>(<span class="hljs-string">&quot;\n&quot;</span>);
-        fragmentReplaced = <span class="hljs-literal">true</span>;
-        fragmentInfo.<span class="hljs-property">code</span> = fragmentInfo.<span class="hljs-property">code</span>.<span class="hljs-title function_">replace</span>(tag, newcode);
-        fragments.<span class="hljs-title function_">set</span>(fragmentName, fragmentInfo);
-      }
-    }
-  }
-  <span class="hljs-keyword">if</span>(!fragmentReplaced) {
-    <span class="hljs-keyword">break</span>;
-  }
-}
-<span class="hljs-keyword">while</span> (pass &lt; <span class="hljs-number">25</span>);
-</code></pre>
-
-</div>
-</div><h2>custom code fence rendering</h2>
-<p>Our extension uses a custom code fence rendering rule to ensure the code
-fragment name is also rendered as part of the fence.</p>
+</div><h3>One output generator</h3>
+<p>Expansion, source templates and rendered book files are implemented only in the
+engine. The extension's legacy extrapolator and source/HTML writers have been
+removed; preview rendering below is exclusively for VS Code's live Markdown
+preview, not the generated book.</p>
+<h2>custom code fence rendering</h2>
+<p>Our extension uses a custom code fence rendering rule for the live Markdown
+preview to ensure the code fragment name is also rendered as part of the fence.
+The generated book uses the engine renderer instead.</p>
+<p>In fragment bodies, a literal opening delimiter must be written as <code>\&lt;&lt;</code>,
+including delimiters inside TypeScript strings and regular expressions. Real
+fragment references remain unescaped. The engine removes the escape marker in
+generated code. For live preview we remove it from a shallow copy of the fence
+token before rendering, so editor tokens retain their original text and source
+positions. The legacy preview's fragment decoration is otherwise unchanged.</p>
 <p>Essentially the old, default rendering rule for fences is first used to create
 the original fence.</p>
 <p>Then the <code>token.info</code> is matched against the <code>FRAGMENT_RE</code> regular expression.
@@ -1570,7 +1093,11 @@ module import of <code>mermaid.js</code> to render diagrams expressed in these t
              slf : Renderer</span>) {
   <span class="hljs-keyword">let</span> rendered = <span class="hljs-string">&#x27;&#x27;</span>;
   <span class="hljs-keyword">if</span> (oldFence &amp;&amp; tokens[idx].<span class="hljs-property">info</span>.<span class="hljs-title function_">indexOf</span>(<span class="hljs-string">&quot;SETTINGS&quot;</span>)&lt;<span class="hljs-number">0</span>) {
-    rendered = <span class="hljs-title function_">oldFence</span>(tokens, idx, options, env, slf);
+    <span class="hljs-keyword">const</span> previewToken = <span class="hljs-title class_">Object</span>.<span class="hljs-title function_">assign</span>(<span class="hljs-title class_">Object</span>.<span class="hljs-title function_">create</span>(<span class="hljs-title class_">Object</span>.<span class="hljs-title function_">getPrototypeOf</span>(tokens[idx])), tokens[idx]);
+    previewToken.<span class="hljs-property">content</span> = previewToken.<span class="hljs-property">content</span>.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\\&lt;&lt;/g</span>, <span class="hljs-string">&#x27;&lt;&lt;&#x27;</span>);
+    <span class="hljs-keyword">const</span> previewTokens = tokens.<span class="hljs-title function_">slice</span>();
+    previewTokens[idx] = previewToken;
+    rendered = <span class="hljs-title function_">oldFence</span>(previewTokens, idx, options, env, slf);
 
     <span class="hljs-keyword">let</span> token = tokens[idx];
     <span class="hljs-keyword">if</span> (token.<span class="hljs-property">info</span>) {
@@ -1600,7 +1127,7 @@ module import of <code>mermaid.js</code> to render diagrams expressed in these t
       <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(token.<span class="hljs-property">info</span>.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;mermaid&#x27;</span>)) {
         rendered =
 <span class="hljs-string">`&lt;pre class=&quot;mermaid&quot;&gt;
-<span class="hljs-subst">${token.content}</span>
+<span class="hljs-subst">${previewToken.content}</span>
 &lt;/pre&gt;`</span>;
       }
     }
@@ -1704,7 +1231,7 @@ task. That is obviously not good for the workflow.</p>
 <pre><code><span class="hljs-keyword">let</span> literateProcessDisposable = vscode.<span class="hljs-property">commands</span>.<span class="hljs-title function_">registerCommand</span>(
   <span class="hljs-string">&#x27;literate.process&#x27;</span>,
   <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) {
-    theOneRepository.<span class="hljs-title function_">processLiterateFiles</span>(<span class="hljs-literal">undefined</span>);
+    <span class="hljs-keyword">await</span> theOneRepository.<span class="hljs-title function_">processLiterateFiles</span>(<span class="hljs-literal">undefined</span>, <span class="hljs-literal">true</span>);
     <span class="hljs-keyword">return</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title function_">setStatusBarMessage</span>(<span class="hljs-string">&quot;Literate Process completed&quot;</span>, <span class="hljs-number">5000</span>);
 });
 
@@ -1937,365 +1464,57 @@ the cursor, and apply the edit.</p>
 
 </div>
 </div><h2>Diagnostics</h2>
-<p>In this chapter are a few methods that help creating and updating diagnostics.
-These diagnostics help the literate programmer determining if there are
-problems with the text and where.</p>
-<h3>Updating diagnostics</h3>
-<p>Diagnostic messages are instances of <code>vscode.Diagnostic</code>. To show them in the Problems panel in VSCode we add the <code>diagnostics</code> collection, which typically is passed into the <code>updateDiagnostics</code>.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">updateDiagnostics</span>(<span class="hljs-params">
-  uri: vscode.Uri,
-  collection: vscode.DiagnosticCollection,
-  diagnostic : vscode.Diagnostic | <span class="hljs-literal">undefined</span></span>): <span class="hljs-built_in">void</span> {
-  <span class="hljs-keyword">if</span> (uri) {
-    <span class="hljs-keyword">if</span> (diagnostic) {
-      <span class="hljs-keyword">const</span> diags = <span class="hljs-title class_">Array</span>.<span class="hljs-title function_">from</span>(collection.<span class="hljs-title function_">get</span>(uri) || []);
-      diags.<span class="hljs-title function_">push</span>(diagnostic);
-      collection.<span class="hljs-title function_">set</span>(uri, diags);
-    }
-  } <span class="hljs-keyword">else</span> {
-    collection.<span class="hljs-title function_">clear</span>();
-  }
-}
-
-</code></pre>
-
-</div>
-</div><h3>Creating an error diagnostic</h3>
-<p>Instances of <code>vscode.Diagnostic</code> can be created with <code>createErrorDiagnostic</code>. This takes a <code>markdownIt</code> <code>token</code>, a <code>message</code> and a <code>range</code>. If the passed in range isn't a proper range the range is harvested from the passed in <code>token</code>.</p>
-<p>For now all messages are considered errors.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=+ </div>
-<div class="code">
-<pre><code> token Token that carries the faulty code fragment
- * <span class="hljs-doctag">@param</span> message Error message
- */</span>
-<span class="hljs-keyword">function</span> <span class="hljs-title function_">createErrorDiagnostic</span>(<span class="hljs-params">token: Token, message: <span class="hljs-built_in">string</span>, range? : vscode.Range</span>) : vscode.<span class="hljs-property">Diagnostic</span> {
-  range = range ? range : <span class="hljs-title function_">fragmentRange</span>(token);
-  <span class="hljs-keyword">let</span> <span class="hljs-attr">diagnostic</span>: vscode.<span class="hljs-property">Diagnostic</span> = {
-    <span class="hljs-attr">severity</span>: vscode.<span class="hljs-property">DiagnosticSeverity</span>.<span class="hljs-property">Error</span>,
-    <span class="hljs-attr">message</span>: message,
-    <span class="hljs-attr">range</span>: range
-  };
-
-  <span class="hljs-keyword">return</span> diagnostic;
-}
-
-</code></pre>
-
-</div>
-</div><h3>Line number of fragment start</h3>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=+ </div>
-<div class="code">
-<pre><code> token Token to extract code location from
- */</span>
-<span class="hljs-keyword">function</span> <span class="hljs-title function_">locationOfFragment</span>(<span class="hljs-params">token: Token</span>): <span class="hljs-built_in">number</span> {
-  <span class="hljs-keyword">let</span> linenumber = token.<span class="hljs-property">map</span> ? (token.<span class="hljs-property">map</span>[<span class="hljs-number">0</span>]) : -<span class="hljs-number">1</span>;
-  <span class="hljs-keyword">return</span> linenumber;
-}
-
-</code></pre>
-
-</div>
-</div><h3>Line number of fragment end</h3>
-<p><code>locationOfFragmentEnd</code> is used to get the last line of the given token in the
-<strong>literate</strong> document. This is typically used for code fences in this extension.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=+ </div>
-<div class="code">
-<pre><code> token Token to extract code location from
- */</span>
-<span class="hljs-keyword">function</span> <span class="hljs-title function_">locationOfFragmentEnd</span>(<span class="hljs-params">token: Token</span>): <span class="hljs-built_in">number</span> {
-  <span class="hljs-keyword">let</span> linenumber = token.<span class="hljs-property">map</span> ? (token.<span class="hljs-property">map</span>[<span class="hljs-number">1</span>] ) : -<span class="hljs-number">1</span>;
-  <span class="hljs-keyword">return</span> linenumber;
-}
-
-</code></pre>
-
-</div>
-</div><h3>Range of whole fragment in text</h3>
-<p><code>fragmentRange</code> is a method to construct a <code>vscode.Range</code> for a given token that
-is a code fragment.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=+ </div>
-<div class="code">
-<pre><code> token Token to create range for
- */</span>
-<span class="hljs-keyword">function</span> <span class="hljs-title function_">fragmentRange</span>(<span class="hljs-params">token: Token</span>): vscode.<span class="hljs-property">Range</span> {
-  <span class="hljs-keyword">let</span> startTagName = token.<span class="hljs-property">info</span>.<span class="hljs-title function_">indexOf</span>(<span class="hljs-string">&quot;&lt;&lt;&quot;</span>) + <span class="hljs-number">2</span>;
-  <span class="hljs-keyword">let</span> endTagName = token.<span class="hljs-property">info</span>.<span class="hljs-title function_">indexOf</span>(<span class="hljs-string">&quot;&gt;&gt;&quot;</span>) - <span class="hljs-number">1</span>;
-  <span class="hljs-keyword">let</span> start = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Position</span>(<span class="hljs-title function_">locationOfFragment</span>(token), startTagName);
-  <span class="hljs-keyword">let</span> end = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Position</span>(<span class="hljs-title function_">locationOfFragmentEnd</span>(token), endTagName);
-  <span class="hljs-keyword">let</span> <span class="hljs-attr">range</span>: vscode.<span class="hljs-property">Range</span> = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(start, end);
-  <span class="hljs-keyword">return</span> range;
-}
-</code></pre>
-
-</div>
-</div><h3>Fragment usage range</h3>
-<p>This method gives a <code>Range</code> for the given tag name based on the passed in
-<code>Token</code>. The line number for the occurrance is computed, along with the begin
-and and positions within the line.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;diagnostic updating&gt;&gt;=+ </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">fragmentUsageRange</span>(<span class="hljs-params">token : Token, tagName : <span class="hljs-built_in">string</span></span>) : vscode.<span class="hljs-property">Range</span>
-{
-  <span class="hljs-keyword">let</span> startLineNumber = <span class="hljs-title function_">locationOfFragment</span>(token);
-  <span class="hljs-keyword">const</span> lines = token.<span class="hljs-property">content</span>.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;\n&#x27;</span>);
-  <span class="hljs-keyword">let</span> index : <span class="hljs-built_in">number</span> = <span class="hljs-number">0</span>;
-  <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> line <span class="hljs-keyword">of</span> lines)
-  {
-    startLineNumber++;
-    index = line.<span class="hljs-title function_">indexOf</span>(tagName);
-    <span class="hljs-keyword">if</span>(index &gt; -<span class="hljs-number">1</span>)
-    {
-      <span class="hljs-keyword">break</span>;
-    }
-  }
-  <span class="hljs-keyword">let</span> start = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Position</span>(startLineNumber, index - <span class="hljs-number">2</span>);
-  <span class="hljs-keyword">let</span> end = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Position</span>(startLineNumber, index + tagName.<span class="hljs-property">length</span> + <span class="hljs-number">2</span>);
-  <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(start, end);
-}
-</code></pre>
-
-</div>
-</div><h2>Utility functions</h2>
-<h3>Retrieving literate file uri list</h3>
-<p>Function to get all literate files in a given workspace. We need to ensure that
-we give the uris in the correct order. The order will be defined by an
-<code>index.literate</code> if it exists. Otherwise use the order in which they are found
-by <code>findFiles</code>. If an <code>index.literate</code> exists also harvest the <code>SETTINGS</code> fence
-if there is any.</p>
+<p>Generation diagnostics come exclusively from the engine, including malformed
+headers, missing templates, invalid output paths, missing fragments and cycles.
+The adapter preserves their zero-based line and column coordinates, grouping
+errors by full document URI in the Problems panel. Navigation helpers do not
+emit a second, potentially contradictory set of validation errors.</p>
+<h2>Utility functions</h2>
+<h3>Discovering inputs and reading buffers</h3>
+<p>Discovery includes all <code>.literate</code> files, not just index-linked chapters. Passing
+<code>null</code> as the exclusion argument avoids silently dropping files through editor
+search exclusions. Both discovered URIs and open buffers are filtered using the
+engine's shared <code>discoveryExcludedDirectories</code>, matching CLI discovery. Exact
+directory components relative to the workspace root are checked at every depth:
+<code>node_modules</code>, <code>out</code>, <code>dist</code>, <code>.git</code>, <code>.yarn</code>, and <code>.vscode-test</code> are excluded.
+Similar names and filenames are not excluded. Open workspace documents are
+merged by full URI so new,
+not-yet-saved file-backed documents participate too. Untitled documents have no
+workspace-relative output location and are not included. Discovery sorts full
+URIs; the engine applies the semantic chapter ordering after contents are read.</p>
+<p>The buffer lookup uses full URI equality, not relative names that can collide
+between workspace folders. Presence, rather than truthiness of the text,
+decides whether to read from disk: an empty buffer must stay empty. This same
+lookup applies to templates, so unsaved template edits are used on the next
+processing request. Automatic processing watches literate content changes only;
+use Process after changing a template without changing a literate document.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;utility functions&gt;&gt;= </div>
 <div class="code">
-<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">getLiterateFileUris</span>(<span class="hljs-params">
-  workspaceFolder : vscode.WorkspaceFolder
-</span>) : <span class="hljs-title class_">Promise</span>&lt;vscode.<span class="hljs-property">Uri</span>[]&gt;
-{
-  <span class="hljs-keyword">const</span> literateFilesInWorkspace : vscode.<span class="hljs-property">RelativePattern</span> =
-        <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">RelativePattern</span>(workspaceFolder, <span class="hljs-string">&#x27;**/*.literate&#x27;</span>);
-  <span class="hljs-keyword">const</span> _foundLiterateFiles = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>
-        .<span class="hljs-title function_">findFiles</span>(literateFilesInWorkspace)
-        .<span class="hljs-title function_">then</span>(<span class="hljs-function"><span class="hljs-params">files</span> =&gt;</span> <span class="hljs-title class_">Promise</span>.<span class="hljs-title function_">all</span>(files.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">file</span> =&gt;</span> file)));
-  <span class="hljs-keyword">let</span> foundLiterateFiles = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;vscode.<span class="hljs-property">Uri</span>&gt;();
-  <span class="literate-tag-name">&lt;&lt;see if an index.literate exists&gt;&gt;</span>
-  <span class="literate-tag-name">&lt;&lt;search index for html links&gt;&gt;</span>
-  <span class="literate-tag-name">&lt;&lt;sort uris based on html link order&gt;&gt;</span>
-  <span class="literate-tag-name">&lt;&lt;get SETTINGS from index.literate&gt;&gt;</span>
-  <span class="hljs-keyword">return</span> foundLiterateFiles;
-}
-</code></pre>
-
-</div>
-</div><p>TBD: create instead a markup that allows us to express the literate file order
-in whichever file we want.</p>
-<p>If we don't find an <code>index.literate</code> file return the found literate files as is.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;see if an index.literate exists&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">const</span> index = _foundLiterateFiles.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">uri</span> =&gt;</span> uri.<span class="hljs-property">path</span>.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;index.literate&#x27;</span>));
-<span class="hljs-keyword">if</span>(!index)
-{
-  <span class="hljs-keyword">return</span> _foundLiterateFiles;
-}
-</code></pre>
-
-</div>
-</div><p>We now parse the index file to get the state with markdown tokens. We don't need
-the rendered HTML of the index document, so we discard that.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;search index for html links&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">const</span> md = <span class="hljs-title function_">createMarkdownItParserForLiterate</span>();
-<span class="hljs-keyword">const</span> text = <span class="hljs-keyword">await</span> <span class="hljs-title function_">getFileContent</span>(index);
-<span class="hljs-keyword">const</span> <span class="hljs-attr">env</span>: <span class="hljs-title class_">GrabbedState</span> = { <span class="hljs-attr">literateFileName</span>: <span class="hljs-string">&#x27;index.literate&#x27;</span>, <span class="hljs-attr">literateUri</span>: index, <span class="hljs-attr">gstate</span>: <span class="hljs-keyword">new</span> <span class="hljs-title class_">StateCore</span>(<span class="hljs-string">&#x27;&#x27;</span>, md, {}) };
-<span class="hljs-keyword">const</span> _ = md.<span class="hljs-title function_">render</span>(text, env);
-</code></pre>
-
-</div>
-</div><p>We create a new list of strings to which we will add the file uris in the order
-is found in the parsed tokens. We do that by looking for <code>bullet_open_list</code> and
-<code>bullet_close_list</code>. We assume that inside these lists there will be items that
-contain links. Once we've encountered an <code>bullet_open_item</code> we start looking for
-<code>list_item_open</code>. When the token is found we get the inline token that is two
-tokens away from the <code>list_item_open</code> token. We make sure that it has child
-tokens, and that the first child token has a valid <code>attrs</code> property. Here we
-find the uri to the HTML version of a <strong>literate</strong> file.</p>
-<p>TBD add support for ordered list.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;sort uris based on html link order&gt;&gt;= </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">let</span> links = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;<span class="hljs-built_in">string</span>&gt;();
-<span class="hljs-keyword">let</span> bulletListOpen = <span class="hljs-literal">false</span>;
-<span class="hljs-keyword">let</span> idx = <span class="hljs-number">0</span>;
-<span class="hljs-keyword">for</span>(<span class="hljs-keyword">let</span> token <span class="hljs-keyword">of</span> env.<span class="hljs-property">gstate</span>.<span class="hljs-property">tokens</span>)
-{
-  <span class="hljs-keyword">if</span>(token.<span class="hljs-property">type</span>===<span class="hljs-string">&#x27;bullet_list_open&#x27;</span>)
-  {
-    bulletListOpen = <span class="hljs-literal">true</span>;
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">getLiterateFileUris</span>(<span class="hljs-params">workspaceFolder: vscode.WorkspaceFolder</span>): <span class="hljs-title class_">Promise</span>&lt;vscode.<span class="hljs-property">Uri</span>[]&gt; {
+  <span class="hljs-keyword">const</span> uris = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, vscode.<span class="hljs-property">Uri</span>&gt;();
+  <span class="hljs-keyword">const</span> excluded = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;(discoveryExcludedDirectories);
+  <span class="hljs-keyword">const</span> included = (<span class="hljs-attr">uri</span>: vscode.<span class="hljs-property">Uri</span>): <span class="hljs-function"><span class="hljs-params">boolean</span> =&gt;</span> !path.<span class="hljs-property">posix</span>
+    .<span class="hljs-title function_">relative</span>(workspaceFolder.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>, uri.<span class="hljs-property">path</span>).<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;/&#x27;</span>).<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, -<span class="hljs-number">1</span>)
+    .<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">directory</span> =&gt;</span> excluded.<span class="hljs-title function_">has</span>(directory));
+  <span class="hljs-keyword">const</span> pattern = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">RelativePattern</span>(workspaceFolder, <span class="hljs-string">&#x27;**/*.literate&#x27;</span>);
+  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> uri <span class="hljs-keyword">of</span> <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title function_">findFiles</span>(pattern, <span class="hljs-literal">null</span>)) {
+    <span class="hljs-keyword">if</span> (<span class="hljs-title function_">included</span>(uri)) { uris.<span class="hljs-title function_">set</span>(uri.<span class="hljs-title function_">toString</span>(), uri); }
   }
-  <span class="hljs-keyword">if</span>(token.<span class="hljs-property">type</span>===<span class="hljs-string">&#x27;bullet_list_close&#x27;</span>)
-  {
-    bulletListOpen = <span class="hljs-literal">false</span>;
-  }
-  <span class="hljs-keyword">if</span>(bulletListOpen &amp;&amp; token.<span class="hljs-property">type</span>===<span class="hljs-string">&#x27;list_item_open&#x27;</span>)
-  {
-    <span class="hljs-keyword">let</span> inline = env.<span class="hljs-property">gstate</span>.<span class="hljs-property">tokens</span>[idx+<span class="hljs-number">2</span>];
-    <span class="hljs-keyword">if</span>(inline.<span class="hljs-property">children</span> &amp;&amp; inline.<span class="hljs-property">children</span>[<span class="hljs-number">0</span>].<span class="hljs-property">attrs</span>)
-    {
-      <span class="hljs-keyword">try</span> {
-        <span class="hljs-keyword">const</span> currentUri = inline.<span class="hljs-property">children</span>[<span class="hljs-number">0</span>].<span class="hljs-property">attrs</span>[<span class="hljs-number">0</span>][<span class="hljs-number">1</span>];
-        <span class="hljs-keyword">let</span> path = currentUri.<span class="hljs-title function_">replace</span>(<span class="hljs-string">&quot;html&quot;</span>, <span class="hljs-string">&quot;literate&quot;</span>);
-        <span class="hljs-keyword">const</span> foundUri = _foundLiterateFiles.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">uri</span> =&gt;</span> uri.<span class="hljs-property">path</span>.<span class="hljs-title function_">endsWith</span>(path));
-        <span class="hljs-keyword">if</span>(foundUri)
-        {
-          foundLiterateFiles.<span class="hljs-title function_">push</span>(foundUri);
-        }
-      } <span class="hljs-keyword">catch</span>(_) {}
+  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> <span class="hljs-variable language_">document</span> <span class="hljs-keyword">of</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">textDocuments</span>) {
+    <span class="hljs-keyword">if</span> (<span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;.literate&#x27;</span>) &amp;&amp; <span class="hljs-title function_">included</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>) &amp;&amp;
+        vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title function_">getWorkspaceFolder</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>)?.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>() === workspaceFolder.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>()) {
+      uris.<span class="hljs-title function_">set</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>(), <span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>);
     }
   }
-  idx++;
+  <span class="hljs-keyword">return</span> <span class="hljs-title class_">Array</span>.<span class="hljs-title function_">from</span>(uris.<span class="hljs-title function_">keys</span>()).<span class="hljs-title function_">sort</span>().<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">key</span> =&gt;</span> uris.<span class="hljs-title function_">get</span>(key)!);
 }
-</code></pre>
 
-</div>
-</div><p>Then ensure that the index file also exists in the list to return.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;sort uris based on html link order&gt;&gt;=+ </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">const</span> finalCheck = foundLiterateFiles.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">uri</span> =&gt;</span> uri.<span class="hljs-property">path</span>.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;index.literate&#x27;</span>));
-<span class="hljs-keyword">if</span>(!finalCheck)
-{
-  foundLiterateFiles.<span class="hljs-title function_">splice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>, index);
-}
-</code></pre>
-
-</div>
-</div><p>Finally harvest code fences that have <code>SETTINGS</code> in the info. Split the content
-of the fence into lines, and loop over the lines.</p>
-<p>If a trimmed line starts with <code>template</code> harvest the filename that is given as
-its value. As an additional check ensure the file exists before assigning its
-URI to <code>htmlTemplateFile</code>.</p>
-<h3>Write out HTML</h3>
-<p>Function to write out the given <code>rendered</code> content out to a file. The <code>rendered</code>
-string will be set into a HTML body. The HTML template will be read from the
-file at the URI specified by <code>htmlTemplateFile</code> if it is set, otherwise use a
-hard-coded piece of HTML template.</p>
-<p>For the template to work it needs to have the string <code>[CONTENT]</code> where the
-rendered Markdown HTML is going to be substituted.</p>
-<p>The default HTML template imports <code>mermaid.js</code> as a module, so that it can work
-on any <code>pre</code> tag that has the CSS class <code>mermaid</code> set.</p>
-<p>If <code>authors</code> contains a string that is not empty one ore more Open Graph
-protocol tags will be used to replace the <code>[AUTHORS]</code> tag if it exists. If
-<code>authors</code> is empty <code>[AUTHORS]</code> will be replaced with that. If the <code>authors</code>
-string contains semi-colons it will be split on those, and for each author are
-there will be an <code>article:author</code> tag added.</p>
-<p>Regarding the file endings we do the same as for source files. On Windows we
-replace single LF instances with CRLF and vice versa on non-Windows machines
-replace CRLF instances with LF.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;utility functions&gt;&gt;=+ </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">writeOutHtml</span>
-      (fname : <span class="hljs-built_in">string</span>,
-       folderUri : vscode.<span class="hljs-property">Uri</span>,
-       rendered : <span class="hljs-built_in">string</span>) : <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt;
-{
-  <span class="hljs-keyword">let</span> html = <span class="hljs-string">&#x27;&#x27;</span>;
-  <span class="hljs-keyword">const</span> <span class="hljs-title function_">getContent</span> = <span class="hljs-keyword">async</span> (<span class="hljs-params"></span>) =&gt; {
-    <span class="hljs-keyword">let</span> _html = <span class="hljs-string">&#x27;&#x27;</span>;
-    <span class="hljs-keyword">if</span>(htmlTemplateFile) {
-      _html = <span class="hljs-keyword">await</span> <span class="hljs-title function_">getFileContent</span>(htmlTemplateFile);
-    } <span class="hljs-keyword">else</span> {
-      _html =
-<span class="hljs-string">`&lt;!DOCTYPE html&gt;
-&lt;html&gt;
-&lt;head&gt;
-  &lt;meta name=&quot;description&quot; content=&quot;A Literate Program written with the Literate Programming vscode extension by Nathan &#x27;jesterKing&#x27; Letwory and contributors&quot; /&gt;
-  &lt;meta property=&quot;og:description&quot; content=&quot;A Literate Program written with the Literate Programming vscode extension by Nathan &#x27;jesterKing&#x27; Letwory and contributors&quot; /&gt;
-  &lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;./style.css&quot;&gt;
-  [AUTHORS]
-&lt;/head&gt;
-&lt;body&gt;
-[CONTENT]
-&lt;script type=&quot;module&quot;&gt;
-  import mermaid from &#x27;https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs&#x27;;
-&lt;/script&gt;
-&lt;/body&gt;
-&lt;/html&gt;`</span>;
-    }
-    <span class="hljs-keyword">return</span> _html;
-  };
-  html = <span class="hljs-keyword">await</span> <span class="hljs-title function_">getContent</span>();
-
-  <span class="hljs-keyword">let</span> authorlist = authors.<span class="hljs-title function_">split</span>(<span class="hljs-string">&quot;;&quot;</span>);
-  <span class="hljs-keyword">let</span> metaAuthors = <span class="hljs-string">&#x27;&#x27;</span>;
-  <span class="hljs-keyword">for</span>(<span class="hljs-keyword">let</span> author <span class="hljs-keyword">of</span> authorlist) {
-    metaAuthors += <span class="hljs-string">`&lt;meta name=&quot;author&quot; content=&quot;<span class="hljs-subst">${author}</span>&quot;&gt;`</span>;
-  }
-
-  html = html
-    .<span class="hljs-title function_">replace</span>(<span class="hljs-string">&quot;[CONTENT]&quot;</span>, rendered)
-    .<span class="hljs-title function_">replace</span>(<span class="hljs-string">&quot;[AUTHORS]&quot;</span>, metaAuthors);
-
-  <span class="hljs-keyword">if</span>(os.<span class="hljs-title function_">platform</span>()===<span class="hljs-string">&#x27;win32&#x27;</span>){
-    <span class="hljs-keyword">const</span> lf2crlf = <span class="hljs-regexp">/([^\r])\n/g</span>;
-    html = html.<span class="hljs-title function_">replaceAll</span>(lf2crlf, <span class="hljs-string">&#x27;$1\r\n&#x27;</span>);
-  } <span class="hljs-keyword">else</span> {
-    <span class="hljs-keyword">const</span> crlf2lf = <span class="hljs-regexp">/\r\n/g</span>;
-    html = html.<span class="hljs-title function_">replaceAll</span>(crlf2lf, <span class="hljs-string">&#x27;\n&#x27;</span>);
-  }
-  <span class="hljs-keyword">const</span> encoded = <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(html, <span class="hljs-string">&#x27;utf-8&#x27;</span>);
-  fname = fname.<span class="hljs-title function_">replace</span>(<span class="hljs-string">&quot;.literate&quot;</span>, <span class="hljs-string">&quot;.html&quot;</span>);
-  <span class="hljs-keyword">const</span> fileUri = vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">joinPath</span>(folderUri, fname);
-  <span class="hljs-keyword">return</span> <span class="hljs-title class_">Promise</span>.<span class="hljs-title function_">resolve</span>(vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">writeFile</span>(fileUri, encoded));
-};
-</code></pre>
-
-</div>
-</div><h3>Get file content for uri</h3>
-<p>For each <strong>literate</strong> file in the workspace we'll get eventually the text
-content, but we do have to check if any of the files are opened in an editor.
-Especially for on-the-fly updating of the tree view, but also for fragment name
-completion and similar functionality we need to get the text from the
-<code>TextDocument</code> instead of the file on disk. If there is a <code>TextDocument</code> that
-corresponds to the <strong>literate</strong> file we are currently handling we read the text
-into <code>currentContent</code>, otherwise we set it to an empty string.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;utility functions&gt;&gt;=+ </div>
-<div class="code">
-<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">getFileContent</span>(<span class="hljs-params">
-  file : vscode.Uri
-</span>) : <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">string</span>&gt;
-{
-  <span class="hljs-keyword">const</span> currentContent = (<span class="hljs-function">() =&gt;</span>
-      {
-          <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> textDocument <span class="hljs-keyword">of</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">textDocuments</span>) {
-              <span class="hljs-keyword">if</span>(vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title function_">asRelativePath</span>(file) === vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title function_">asRelativePath</span>(textDocument.<span class="hljs-property">uri</span>)) {
-                  <span class="hljs-keyword">return</span> textDocument.<span class="hljs-title function_">getText</span>();
-              }
-          }
-          <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;&#x27;</span>;
-      }
-  )();
-</code></pre>
-
-</div>
-</div><p>If <code>currentContent</code> is an empty string we read the content from the file on
-disk, and decode it into <code>text</code>. If on the other hand we do have
-<code>currentContent</code>, we use that for our <code>text</code> instead. The <code>currentContent</code>
-wil be more up-to-date than what we have on disk.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;utility functions&gt;&gt;=+ </div>
-<div class="code">
-<pre><code>  <span class="hljs-keyword">const</span> content = currentContent ? <span class="hljs-literal">null</span> : <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">readFile</span>(file);
-  <span class="hljs-keyword">const</span> text = currentContent ? currentContent : <span class="hljs-keyword">new</span> <span class="hljs-title class_">TextDecoder</span>(<span class="hljs-string">&#x27;utf-8&#x27;</span>).<span class="hljs-title function_">decode</span>(content);
-  <span class="hljs-keyword">return</span> text;
+<span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">getFileContent</span>(<span class="hljs-params">file: vscode.Uri</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">string</span>&gt; {
+  <span class="hljs-keyword">const</span> <span class="hljs-variable language_">document</span> = vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">textDocuments</span>.<span class="hljs-title function_">find</span>(
+    <span class="hljs-function"><span class="hljs-params">document</span> =&gt;</span> <span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>() === file.<span class="hljs-title function_">toString</span>());
+  <span class="hljs-keyword">if</span> (<span class="hljs-variable language_">document</span> !== <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">getText</span>(); }
+  <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">TextDecoder</span>(<span class="hljs-string">&#x27;utf-8&#x27;</span>).<span class="hljs-title function_">decode</span>(<span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">readFile</span>(file));
 }
 </code></pre>
 
@@ -2314,7 +1533,7 @@ size, but properly configured it is under 400KB.</p>
 bits and pieces that are required for the proper functioning of the tools.</p>
 <p>First of all we import all the functionality and modules we are going to need.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;literate.*&gt;&gt;= ./src/extension.ts $</div>
+<div class="fragmentname">&lt;&lt;literate.*&gt;&gt;= src/extension.ts $</div>
 <div class="code">
 <pre><code>
 
@@ -2325,9 +1544,8 @@ bits and pieces that are required for the proper functioning of the tools.</p>
 </div><p>After the imports we introduce the <code>oldFence</code> where we will keep a hold of the
 fence rule from the default <em>MarkdownIt</em> parser. I was not entirely sure how to
 best tackle it, so for now it is here.</p>
-<p>Here we also find <code>htmlTemplateFile</code> and <code>authors</code>, variables that can be set in
-a <strong>literate</strong> program through a code fence in <code>index.literate</code> with the token
-info containing the string <code>SETTINGS</code>.</p>
+<p>HTML settings belong to the engine invocation, not global extension state, so
+settings cannot leak from one workspace project to another.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;literate.*&gt;&gt;=+ </div>
 <div class="code">
@@ -2336,8 +1554,6 @@ info containing the string <code>SETTINGS</code>.</p>
 <span class="hljs-keyword">const</span> <span class="hljs-variable constant_">OPENING</span> = <span class="hljs-string">&#x27;&lt;&lt;&#x27;</span>;
 <span class="hljs-keyword">const</span> <span class="hljs-variable constant_">CLOSING</span> = <span class="hljs-string">&#x27;&gt;&gt;&#x27;</span>;
 
-<span class="hljs-keyword">let</span> htmlTemplateFile : vscode.<span class="hljs-property">Uri</span> | <span class="hljs-literal">undefined</span> = <span class="hljs-literal">undefined</span>;
-<span class="hljs-keyword">let</span> authors = <span class="hljs-string">&#x27;&#x27;</span>;
 </code></pre>
 
 </div>
@@ -2387,18 +1603,12 @@ explained in more detail in the section on <code>&lt;&lt;create markdownit parse
 </code></pre>
 
 </div>
-</div><p>The central mechanism of the <strong>Literate Programming</strong> extension, the tools it
-provides, are expressed in <code>&lt;&lt;render and collect state&gt;&gt;</code>,
-<code>&lt;&lt;handle fragments&gt;&gt;</code> and <code>&lt;&lt;method to write out source files&gt;&gt;</code>. These all ensure that
-all <strong>literate</strong> files can be iterated, parsed, rendered. And that from the
-parsed state all the code fragments can be collected and extrapolated into the
-source file or source files as written in the <strong>literate</strong> program.</p>
+</div><p>The repository bridges editor state and the pure engine. Unexpanded fragments
+remain available for navigation without duplicating output generation.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;literate.*&gt;&gt;=+ </div>
 <div class="code">
-<pre><code><span class="literate-tag-name">&lt;&lt;render and collect state&gt;&gt;</span>
-<span class="literate-tag-name">&lt;&lt;handle fragments&gt;&gt;</span>
-<span class="literate-tag-name">&lt;&lt;method to write out source files&gt;&gt;</span>
+<pre><code><span class="literate-tag-name">&lt;&lt;handle fragments&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;fragment repository&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;rename provider class&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;code action provider class&gt;&gt;</span>
@@ -2413,19 +1623,7 @@ source file or source files as written in the <strong>literate</strong> program.
 <div class="code">
 <pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">determineWorkspaceFolder</span>(<span class="hljs-params"><span class="hljs-variable language_">document</span> : vscode.TextDocument</span>) : vscode.<span class="hljs-property">WorkspaceFolder</span> | <span class="hljs-literal">undefined</span>
 {
-  <span class="hljs-keyword">if</span>(!vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span> || vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span>.<span class="hljs-property">length</span> === <span class="hljs-number">0</span>)
-  {
-    <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
-  }
-  <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> ws <span class="hljs-keyword">of</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span>)
-  {
-    <span class="hljs-keyword">const</span> relativePath = path.<span class="hljs-title function_">relative</span>(ws.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>(), <span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>());
-    <span class="hljs-keyword">if</span>(!relativePath.<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&#x27;..&#x27;</span>))
-    {
-      <span class="hljs-keyword">return</span> ws;
-    }
-  }
-  <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
+  <span class="hljs-keyword">return</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title function_">getWorkspaceFolder</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>);
 }
 </code></pre>
 
@@ -2438,7 +1636,6 @@ Code.</p>
 <div class="fragmentname">&lt;&lt;literate.*&gt;&gt;=+ </div>
 <div class="code">
 <pre><code><span class="literate-tag-name">&lt;&lt;activate the extension&gt;&gt;</span>
-<span class="literate-tag-name">&lt;&lt;diagnostic updating&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;utility functions&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;create fragment for tag&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;split fragment&gt;&gt;</span>
@@ -2461,7 +1658,7 @@ just an empty-bodied implementation for it.</p>
 <pre><code><span class="hljs-keyword">import</span> { <span class="hljs-title class_">TextDecoder</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;util&#x27;</span>;
 <span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> vscode <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;vscode&#x27;</span>;
 <span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> path <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;path&#x27;</span>;
-<span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> os <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;os&#x27;</span>;
+<span class="hljs-keyword">import</span> { discoveryExcludedDirectories, generateProject, orderSourceDocuments, templateReferences, <span class="hljs-title class_">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./engine&#x27;</span>;
 
 <span class="hljs-keyword">import</span> <span class="hljs-title class_">StateCore</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/rules_core/state_core&#x27;</span>);
 <span class="hljs-keyword">import</span> <span class="hljs-title class_">Token</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/token&#x27;</span>);
@@ -2481,21 +1678,7 @@ just an empty-bodied implementation for it.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;introduce interfaces&gt;&gt;= </div>
 <div class="code">
-<pre><code><span class="hljs-keyword">interface</span> <span class="hljs-title class_">WriteRenderCallback</span> {
-  (
-    fname : <span class="hljs-built_in">string</span>,
-    folderUri : vscode.<span class="hljs-property">Uri</span>,
-    content : <span class="hljs-built_in">string</span>
-  ) : <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt;
-};
-<span class="hljs-keyword">interface</span> <span class="hljs-title class_">WriteSourceCallback</span> {
-  (
-    workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span>,
-    fragments : <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">FragmentInformation</span>&gt;
-  ) : <span class="hljs-title class_">Thenable</span>&lt;<span class="hljs-built_in">void</span>&gt;
-};
-
-<span class="literate-tag-name">&lt;&lt;grabbed state type&gt;&gt;</span>
+<pre><code><span class="literate-tag-name">&lt;&lt;grabbed state type&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;fragment information type&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;token usage interface&gt;&gt;</span>
 </code></pre>
@@ -2526,7 +1709,7 @@ repository can provide fragments when requested.</p>
 <div class="fragmentname">&lt;&lt;activate the extension&gt;&gt;=+ </div>
 <div class="code">
 <pre><code>  theOneRepository = <span class="hljs-keyword">new</span> <span class="hljs-title class_">FragmentRepository</span>(context);
-  <span class="hljs-keyword">await</span> theOneRepository.<span class="hljs-title function_">processLiterateFiles</span>(<span class="hljs-literal">undefined</span>);
+  <span class="hljs-keyword">await</span> theOneRepository.<span class="hljs-title function_">processLiterateFiles</span>(<span class="hljs-literal">undefined</span>, <span class="hljs-literal">true</span>);
   context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(theOneRepository);
 </code></pre>
 
