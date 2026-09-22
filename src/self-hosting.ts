@@ -74,7 +74,9 @@ export async function verifySelfHosting(
             if (text === undefined) { if (onError) { onError(`Cannot read ${name}`); } return undefined; }
             return ts.createSourceFile(name, text, languageVersion, true);
         };
-        const program = ts.createProgram([...new Set([...parsed.fileNames, ...generatedSources])], parsed.options, host);
+        const allowJs = parsed.options.allowJs ?? parsed.options.checkJs ?? false;
+        const generatedRoots = generatedSources.filter(name => allowJs || /\.[cm]?tsx?$/.test(name));
+        const program = ts.createProgram([...new Set([...parsed.fileNames, ...generatedRoots])], parsed.options, host);
         const diagnostics = ts.getPreEmitDiagnostics(program);
         if (diagnostics.length) { throw new Error(diagnostics.map(format).join('\n')); }
         checks.push({ name: stage, ok: true });

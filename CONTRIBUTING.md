@@ -14,8 +14,8 @@ yarn esbuild
 ## Edit the book, then generate
 
 The authoritative implementations are in `literate/*.literate`.
-`src/extension.ts`, `src/grabber.ts`, `src/engine.ts`, `src/cli.ts`, and
-`src/self-hosting.ts`, and `src/symbols.ts` are generated;
+`src/extension.ts`, `src/grabber.ts`, `src/engine.ts`, `src/cli.ts`,
+`src/self-hosting.ts`, `src/symbols.ts`, and `src/mermaid-preview.js` are generated;
 commit them together with their literate sources and rendered HTML.
 Tests and configuration remain ordinary files. Interleave prose with focused
 fragments: at most one function per fragment where practical, splitting larger
@@ -23,6 +23,9 @@ functions into named steps. Explain intent and constraints rather than narrating
 every statement.
 
 - `yarn build:cli`: bootstrap from generated CLI sources without compiling the extension.
+- `yarn build:preview`: bundle the pinned Mermaid dependency and browser preview client locally.
+- `yarn esbuild`: build both the extension and browser preview bundles.
+- `yarn watch:preview`: rebuild the browser bundle while editing its generated entry (run generation after editing the chapter).
 - `yarn literate inspect [root] --json`: locate fragment definitions, references, and outputs.
 - `yarn literate generate [root]`: build the CLI, validate, and write changed outputs.
 - `yarn literate check [root]`: build the CLI and check outputs without writing.

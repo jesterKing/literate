@@ -137,8 +137,11 @@ const format = (diagnostic: import('typescript').Diagnostic): string => {
 ### Honor configuration without emitting
 
 Read the checkout's tsconfig, but disable all emit and incremental state. Include
-fresh generated sources even when they are absent on disk: verification must not
-silently omit the very outputs it is meant to validate.
+fresh generated TypeScript sources even when they are absent on disk. Generated
+JavaScript joins the compiler roots only when the effective `allowJs` option is
+true (`checkJs` supplies its default when `allowJs` is omitted). Browser scripts
+can therefore remain outside a TypeScript-only Node project. This only limits
+compiler roots: all outputs still participate in layout and fixed-point checks.
 
 ```typescript: <<self-host compiler configuration>>=
 const configPath = path.join(root, 'tsconfig.json');
@@ -172,7 +175,9 @@ host.getSourceFile = (name, languageVersion, onError) => {
     if (text === undefined) { if (onError) { onError(`Cannot read ${name}`); } return undefined; }
     return ts.createSourceFile(name, text, languageVersion, true);
 };
-const program = ts.createProgram([...new Set([...parsed.fileNames, ...generatedSources])], parsed.options, host);
+const allowJs = parsed.options.allowJs ?? parsed.options.checkJs ?? false;
+const generatedRoots = generatedSources.filter(name => allowJs || /\.[cm]?tsx?$/.test(name));
+const program = ts.createProgram([...new Set([...parsed.fileNames, ...generatedRoots])], parsed.options, host);
 const diagnostics = ts.getPreEmitDiagnostics(program);
 if (diagnostics.length) { throw new Error(diagnostics.map(format).join('\n')); }
 checks.push({ name: stage, ok: true });

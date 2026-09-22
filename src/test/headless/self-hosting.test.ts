@@ -18,12 +18,15 @@ function snapshot(root: string): unknown {
     });
 }
 
-function fixture(t: { after(callback: () => void): void }) {
+function fixture(t: { after(callback: () => void): void }, compilerOptions: {
+    allowJs?: boolean; checkJs?: boolean;
+} = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'self-host fixture '));
     t.after(() => fs.rmSync(root, { recursive: true, force: true }));
     fs.mkdirSync(path.join(root, 'src'));
     fs.writeFileSync(path.join(root, 'tsconfig.json'), JSON.stringify({
-        compilerOptions: { strict: true, target: 'es2020', module: 'commonjs', types: [], rootDir: 'src', outDir: 'out' },
+        compilerOptions: { strict: true, target: 'es2020', module: 'commonjs', types: [], rootDir: 'src', outDir: 'out',
+                    ...compilerOptions },
         include: ['src/**/*.ts']
     }));
     // Deliberately stale disk sources must be replaced in both compiler and bundler.
@@ -65,6 +68,37 @@ test('fresh virtual sources beat stale TypeScript and outputs compare independen
     const result = await verify({ regenerated: [...files].reverse() });
     assert.deepEqual(result, { ok: true, checks: ['layout', 'typecheck', 'bundle', 'fixedpoint']
         .map(name => ({ name, ok: true })) });
+});
+
+for (const allowJs of [undefined, false]) {
+    test(`generated browser JS stays outside compiler roots with allowJs ${allowJs}`, async t => {
+        const { files, verify } = fixture(t, { allowJs });
+        files.push({ path: 'src/mermaid-preview.js', content: '// @ts-check\nmissingBrowserGlobal();\n' });
+        assert.equal((await verify()).ok, true);
+        const regenerated = files.map(file => ({ ...file }));
+        regenerated[regenerated.length - 1].content += '// changed\n';
+        failed(await verify({ regenerated }), 'fixedpoint', /Regenerated content mismatch: src\/mermaid-preview\.js/);
+        regenerated.pop();
+        failed(await verify({ regenerated }), 'fixedpoint', /Missing regenerated output: src\/mermaid-preview\.js/);
+        files.push({ ...files[files.length - 1] });
+        failed(await verify(), 'layout', /Duplicate output: src\/mermaid-preview\.js/);
+    });
+}
+
+for (const compilerOptions of [{ allowJs: true }, { checkJs: true }]) {
+    test(`generated JS roots retain diagnostics with ${JSON.stringify(compilerOptions)}`, async t => {
+        const { files, verify } = fixture(t, compilerOptions);
+        // The TS-only include and lack of imports must not hide fresh JS roots.
+        files.push({ path: 'src/mermaid-preview.js', content: '// @ts-check\nmissingBrowserGlobal();\n' });
+        failed(await verify(), 'typecheck', /src\/mermaid-preview\.js:2:\d+: TS2304/);
+        files[files.length - 1].content = 'export const ready = true;\n';
+        assert.equal((await verify()).ok, true);
+    });
+}
+
+test('explicit allowJs false does not hide conflicting checkJs diagnostics', async t => {
+    const { verify } = fixture(t, { allowJs: false, checkJs: true });
+    failed(await verify(), 'typecheck', /TS5052/);
 });
 
 for (const resolution of ['sibling file', 'directory package entry']) {

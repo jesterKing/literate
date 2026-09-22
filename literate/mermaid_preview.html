@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <link rel="stylesheet" type="text/css" href="./style.css">
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<h1>Browser Mermaid preview</h1>
+<p>The extension bundles Mermaid 12.0.0 rather than relying on another extension or
+loading renderer code from a CDN. VS Code 1.96 supplies the Electron 32 / Chromium
+128 baseline for modern runtime APIs such as <code>Object.hasOwn</code> and <code>structuredClone</code>;
+esbuild syntax transforms alone cannot provide those APIs on older hosts.
+This diagram is an ordinary fence: it renders
+in the Markdown preview, while named Mermaid fragments remain readable code.</p>
+<pre class="mermaid">
+flowchart TD
+    A[Markdown fence] --&gt; B[Escaped preview container]
+    B --&gt; C[Local Mermaid renderer]
+    C --&gt; D[SVG in the preview]
+</pre>
+<p>This chapter implements the browser preview only. Static SVG export belongs in a
+separate asynchronous adapter; the pure generator does not launch a browser.</p>
+<p>This browser-only JavaScript entry is bundled locally as an IIFE. Keeping it out
+of TypeScript avoids adding DOM libraries or Mermaid's dependency types to the
+Node extension build. Its ordinary generated output participates in generated
+file comparison; the browser bundle is a build artifact, not a woven output.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;Mermaid preview.*&gt;&gt;= src/mermaid-preview.js $</div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> mermaid <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;mermaid&#x27;</span>;
+
+<span class="literate-tag-name">&lt;&lt;Mermaid preview state&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;Mermaid preview configuration&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;Mermaid preview source tracking&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;Mermaid preview rendering&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;Mermaid preview scheduling&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;Mermaid preview startup&gt;&gt;</span>
+</code></pre>
+
+</div>
+</div><p>A weak map ties retained source to the actual container, not its source line or
+text. Replacing a Markdown preview therefore creates fresh work even for an
+identical diagram. IDs use monotonic container and attempt numbers and avoid
+existing DOM IDs, including IDs from other preview plugins.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;Mermaid preview state&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> selector = <span class="hljs-string">&#x27;pre.literate-mermaid&#x27;</span>;
+<span class="hljs-keyword">const</span> states = <span class="hljs-keyword">new</span> <span class="hljs-title class_">WeakMap</span>();
+<span class="hljs-keyword">let</span> nextContainer = <span class="hljs-number">0</span>;
+<span class="hljs-keyword">let</span> pending = <span class="hljs-literal">false</span>;
+<span class="hljs-keyword">let</span> running = <span class="hljs-literal">false</span>;
+</code></pre>
+
+</div>
+</div><p>Each render attempt gets a fresh diagram ID. Check both the SVG ID and
+Mermaid's temporary wrapper ID before using it.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;Mermaid preview state&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">diagramId</span>(<span class="hljs-params">state</span>) {
+    <span class="hljs-keyword">let</span> id;
+    <span class="hljs-keyword">do</span> {
+        id = <span class="hljs-string">`literate-mermaid-<span class="hljs-subst">${state.container}</span>-<span class="hljs-subst">${++state.attempt}</span>`</span>;
+    } <span class="hljs-keyword">while</span> (<span class="hljs-variable language_">document</span>.<span class="hljs-title function_">getElementById</span>(id) || <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">getElementById</span>(<span class="hljs-string">`d<span class="hljs-subst">${id}</span>`</span>));
+    <span class="hljs-keyword">return</span> id;
+}
+</code></pre>
+
+</div>
+</div><p>Security and resource limits are fixed by the client. No icons, external fonts,
+assets or event bindings are registered. Strict Mermaid SVG is the only HTML
+inserted. Disallowing all directives and YAML frontmatter is intentionally more
+conservative than relying on Mermaid's list of protected configuration keys:
+per-diagram settings must not enable loose rendering or disable limits. This
+also means otherwise harmless title/config frontmatter is unsupported.
+Initialize once immediately, even before DOM readiness or with no diagrams, to
+disable Mermaid's automatic generic <code>.mermaid</code> scan. Subsequent initialization
+is confined to the serial render queue.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;Mermaid preview configuration&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">theme</span>(<span class="hljs-params"></span>) {
+    <span class="hljs-keyword">const</span> classes = <span class="hljs-variable language_">document</span>.<span class="hljs-property">body</span>.<span class="hljs-property">classList</span>;
+    <span class="hljs-keyword">if</span> (classes.<span class="hljs-title function_">contains</span>(<span class="hljs-string">&#x27;vscode-high-contrast&#x27;</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;dark&#x27;</span>; }
+    <span class="hljs-keyword">if</span> (classes.<span class="hljs-title function_">contains</span>(<span class="hljs-string">&#x27;vscode-high-contrast-light&#x27;</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;default&#x27;</span>; }
+    <span class="hljs-keyword">return</span> classes.<span class="hljs-title function_">contains</span>(<span class="hljs-string">&#x27;vscode-dark&#x27;</span>) ? <span class="hljs-string">&#x27;dark&#x27;</span> : <span class="hljs-string">&#x27;default&#x27;</span>;
+}
+</code></pre>
+
+</div>
+</div><p>Only the selected theme varies between configurations. Security settings,
+resource limits and local font defaults remain fixed for every render.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;Mermaid preview configuration&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">configuration</span>(<span class="hljs-params">currentTheme</span>) {
+    <span class="hljs-keyword">return</span> {
+        <span class="hljs-attr">startOnLoad</span>: <span class="hljs-literal">false</span>,
+        <span class="hljs-attr">securityLevel</span>: <span class="hljs-string">&#x27;strict&#x27;</span>,
+        <span class="hljs-attr">suppressErrorRendering</span>: <span class="hljs-literal">true</span>,
+        <span class="hljs-attr">maxTextSize</span>: <span class="hljs-number">50000</span>,
+        <span class="hljs-attr">maxEdges</span>: <span class="hljs-number">500</span>,
+        <span class="hljs-attr">theme</span>: currentTheme,
+        <span class="hljs-attr">fontFamily</span>: <span class="hljs-string">&#x27;sans-serif&#x27;</span>,
+        <span class="hljs-attr">htmlLabels</span>: <span class="hljs-literal">false</span>,
+        <span class="hljs-attr">flowchart</span>: { <span class="hljs-attr">htmlLabels</span>: <span class="hljs-literal">false</span> },
+        <span class="hljs-attr">secure</span>: [<span class="hljs-string">&#x27;secure&#x27;</span>, <span class="hljs-string">&#x27;securityLevel&#x27;</span>, <span class="hljs-string">&#x27;startOnLoad&#x27;</span>, <span class="hljs-string">&#x27;suppressErrorRendering&#x27;</span>,
+            <span class="hljs-string">&#x27;maxTextSize&#x27;</span>, <span class="hljs-string">&#x27;maxEdges&#x27;</span>, <span class="hljs-string">&#x27;theme&#x27;</span>, <span class="hljs-string">&#x27;fontFamily&#x27;</span>, <span class="hljs-string">&#x27;htmlLabels&#x27;</span>, <span class="hljs-string">&#x27;flowchart&#x27;</span>]
+    };
+}
+
+mermaid.<span class="hljs-title function_">initialize</span>(<span class="hljs-title function_">configuration</span>(<span class="hljs-string">&#x27;default&#x27;</span>));
+</code></pre>
+
+</div>
+</div><p>Reject oversized source and diagram-level configuration before invoking
+Mermaid, rather than allowing a diagram to alter the preview policy.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;Mermaid preview configuration&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">validateSource</span>(<span class="hljs-params">source</span>) {
+    <span class="hljs-keyword">if</span> (source.<span class="hljs-property">length</span> &gt; <span class="hljs-number">50000</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Diagram exceeds the 50000 character limit.&#x27;</span>); }
+    <span class="hljs-keyword">if</span> (<span class="hljs-regexp">/%%\s*\{/</span>.<span class="hljs-title function_">test</span>(source) || <span class="hljs-regexp">/^\s*---(?:\s|$)/</span>.<span class="hljs-title function_">test</span>(source)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Mermaid directives and frontmatter are disabled in this preview.&#x27;</span>);
+    }
+}
+</code></pre>
+
+</div>
+</div><p>The last installed markup distinguishes our own SVG/error text from an in-place
+Markdown source update. Original source never comes from rendered SVG. Failed
+attempts are cached too, so repeated update events do not continually retry a
+syntax error; changing source or theme permits recovery. Classes and source-line
+attributes remain on the original pre element.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;Mermaid preview source tracking&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">stateFor</span>(<span class="hljs-params">element</span>) {
+    <span class="hljs-keyword">let</span> state = states.<span class="hljs-title function_">get</span>(element);
+    <span class="hljs-keyword">if</span> (!state) {
+        state = { <span class="hljs-attr">container</span>: ++nextContainer, <span class="hljs-attr">attempt</span>: <span class="hljs-number">0</span> };
+        states.<span class="hljs-title function_">set</span>(element, state);
+    }
+    <span class="hljs-keyword">if</span> (state.<span class="hljs-property">markup</span> !== element.<span class="hljs-property">innerHTML</span>) {
+        state.<span class="hljs-property">source</span> = element.<span class="hljs-property">textContent</span> || <span class="hljs-string">&#x27;&#x27;</span>;
+        state.<span class="hljs-property">markup</span> = element.<span class="hljs-property">innerHTML</span>;
+        state.<span class="hljs-property">completedTheme</span> = <span class="hljs-literal">undefined</span>;
+    }
+    <span class="hljs-keyword">return</span> state;
+}
+</code></pre>
+
+</div>
+</div><p>After an asynchronous render, verify that the container, its contents and the
+current theme still match the work that was started.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;Mermaid preview source tracking&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">isCurrent</span>(<span class="hljs-params">element, state, markup, currentTheme</span>) {
+    <span class="hljs-keyword">return</span> element.<span class="hljs-property">isConnected</span> &amp;&amp; element.<span class="hljs-title function_">matches</span>(selector)
+        &amp;&amp; element.<span class="hljs-property">innerHTML</span> === markup &amp;&amp; state.<span class="hljs-property">markup</span> === markup
+        &amp;&amp; <span class="hljs-title function_">theme</span>() === currentTheme;
+}
+</code></pre>
+
+</div>
+</div><p>Report failures through textContent, including the original source for
+inspection. An alert role and accessible label identify the rendering error
+without treating either the error message or source as HTML.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;Mermaid preview source tracking&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">showError</span>(<span class="hljs-params">element, source, error</span>) {
+    <span class="hljs-keyword">const</span> message = error <span class="hljs-keyword">instanceof</span> <span class="hljs-title class_">Error</span> ? error.<span class="hljs-property">message</span> : <span class="hljs-title class_">String</span>(error);
+    element.<span class="hljs-property">textContent</span> = <span class="hljs-string">`Mermaid diagram could not be rendered: <span class="hljs-subst">${message}</span>\n\n<span class="hljs-subst">${source}</span>`</span>;
+    element.<span class="hljs-title function_">setAttribute</span>(<span class="hljs-string">&#x27;role&#x27;</span>, <span class="hljs-string">&#x27;alert&#x27;</span>);
+    element.<span class="hljs-title function_">setAttribute</span>(<span class="hljs-string">&#x27;aria-label&#x27;</span>, <span class="hljs-string">&#x27;Mermaid diagram rendering error&#x27;</span>);
+}
+</code></pre>
+
+</div>
+</div><p>Every initialize/render pair runs to completion before the next initialization.
+Theme or content events during an await request another pass. A stale result is
+never installed into a detached, edited or differently themed container. We do
+not invoke bindFunctions: interactive callbacks are unnecessary for this strict
+preview. Mermaid performs its own temporary-render DOM cleanup.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;Mermaid preview rendering&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">renderElement</span>(<span class="hljs-params">element, currentTheme</span>) {
+    <span class="hljs-keyword">const</span> state = <span class="hljs-title function_">stateFor</span>(element);
+    <span class="hljs-keyword">if</span> (state.<span class="hljs-property">completedTheme</span> === currentTheme) { <span class="hljs-keyword">return</span>; }
+    <span class="hljs-keyword">const</span> markup = element.<span class="hljs-property">innerHTML</span>;
+    <span class="hljs-keyword">let</span> result;
+    <span class="hljs-keyword">let</span> failure;
+    <span class="hljs-keyword">try</span> {
+        <span class="hljs-title function_">validateSource</span>(state.<span class="hljs-property">source</span>);
+        mermaid.<span class="hljs-title function_">initialize</span>(<span class="hljs-title function_">configuration</span>(currentTheme));
+        result = <span class="hljs-keyword">await</span> mermaid.<span class="hljs-title function_">render</span>(<span class="hljs-title function_">diagramId</span>(state), state.<span class="hljs-property">source</span>);
+    } <span class="hljs-keyword">catch</span> (error) {
+        failure = error;
+    }
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title function_">isCurrent</span>(element, state, markup, currentTheme)) { <span class="hljs-keyword">return</span>; }
+    <span class="hljs-keyword">if</span> (result) {
+        element.<span class="hljs-property">innerHTML</span> = result.<span class="hljs-property">svg</span>;
+        element.<span class="hljs-title function_">removeAttribute</span>(<span class="hljs-string">&#x27;role&#x27;</span>);
+        element.<span class="hljs-title function_">removeAttribute</span>(<span class="hljs-string">&#x27;aria-label&#x27;</span>);
+    } <span class="hljs-keyword">else</span> {
+        <span class="hljs-title function_">showError</span>(element, state.<span class="hljs-property">source</span>, failure);
+    }
+    state.<span class="hljs-property">markup</span> = element.<span class="hljs-property">innerHTML</span>;
+    state.<span class="hljs-property">completedTheme</span> = currentTheme;
+}
+</code></pre>
+
+</div>
+</div><p>The queue coalesces bursts without losing updates, including those delivered
+while Mermaid is awaiting layout. The theme is sampled before each diagram,
+not once for the whole document. An unrelated body-class mutation is harmless:
+the configuration key has not changed, so completed diagrams are skipped.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;Mermaid preview scheduling&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">drain</span>(<span class="hljs-params"></span>) {
+    running = <span class="hljs-literal">true</span>;
+    <span class="hljs-keyword">try</span> {
+        <span class="hljs-keyword">while</span> (pending) {
+            pending = <span class="hljs-literal">false</span>;
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> element <span class="hljs-keyword">of</span> <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">querySelectorAll</span>(selector)) {
+                <span class="hljs-keyword">if</span> (element.<span class="hljs-property">isConnected</span>) { <span class="hljs-keyword">await</span> <span class="hljs-title function_">renderElement</span>(element, <span class="hljs-title function_">theme</span>()); }
+            }
+        }
+    } <span class="hljs-keyword">finally</span> {
+        running = <span class="hljs-literal">false</span>;
+    }
+}
+
+</code></pre>
+
+</div>
+</div><p>Every update requests a pass, but only an idle queue starts a new drain. Events
+arriving during a render are handled by the existing drain's next iteration.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;Mermaid preview scheduling&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">schedule</span>(<span class="hljs-params"></span>) {
+    pending = <span class="hljs-literal">true</span>;
+    <span class="hljs-keyword">if</span> (!running) { <span class="hljs-keyword">void</span> <span class="hljs-title function_">drain</span>(); }
+}
+</code></pre>
+
+</div>
+</div><p>VS Code dispatches its content-update event on window. Observe only body class
+changes, not Mermaid's own subtree writes. Waiting for DOMContentLoaded also
+supports scripts loaded before the body exists.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;Mermaid preview startup&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">start</span>(<span class="hljs-params"></span>) {
+    <span class="hljs-keyword">const</span> observer = <span class="hljs-keyword">new</span> <span class="hljs-title class_">MutationObserver</span>(schedule);
+    observer.<span class="hljs-title function_">observe</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">body</span>, { <span class="hljs-attr">attributes</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">attributeFilter</span>: [<span class="hljs-string">&#x27;class&#x27;</span>] });
+    <span class="hljs-variable language_">window</span>.<span class="hljs-title function_">addEventListener</span>(<span class="hljs-string">&#x27;vscode.markdown.updateContent&#x27;</span>, schedule);
+    <span class="hljs-title function_">schedule</span>();
+}
+
+<span class="hljs-keyword">if</span> (<span class="hljs-variable language_">document</span>.<span class="hljs-property">readyState</span> === <span class="hljs-string">&#x27;loading&#x27;</span>) {
+    <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">addEventListener</span>(<span class="hljs-string">&#x27;DOMContentLoaded&#x27;</span>, start, { <span class="hljs-attr">once</span>: <span class="hljs-literal">true</span> });
+} <span class="hljs-keyword">else</span> {
+    <span class="hljs-title function_">start</span>();
+}
+</code></pre>
+
+</div>
+</div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+</script>
+</body>
+</html>

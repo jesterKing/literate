@@ -69,6 +69,32 @@ The command `Literate: Process` (`literate.process`) processes all workspace
 folders. Template-only edits currently require this command. Associate
 `*.literate` files with Markdown to enable the editor providers.
 
+## Mermaid diagrams in Markdown preview
+
+This version requires **VS Code 1.96 or newer** for the bundled renderer's modern
+browser APIs. Literate bundles **Mermaid 12.0.0** locally. No Mermaid extension, account, or CDN
+is required to preview ordinary Mermaid fences:
+
+````markdown
+```mermaid
+flowchart TD
+    A[Write literate source] --> B[Preview the diagram]
+```
+````
+
+Associate `*.literate` with Markdown, then use **Markdown: Open Preview to the Side**.
+Diagrams update with the document and follow VS Code's light/dark theme. Syntax
+errors appear beside the original diagram source without stopping other diagrams.
+Named literate fragments with the Mermaid language remain code, not diagrams.
+
+The preview uses strict rendering, disables callbacks, and limits diagrams to
+50,000 characters and 500 edges. Mermaid directives and YAML frontmatter are
+currently rejected to keep rendering configuration controlled by Literate.
+Literate handles its own diagram containers; other Mermaid extensions are optional.
+
+This support is for the **VS Code preview**. Generated HTML still uses the existing
+browser/CDN rendering path; offline, embedded-SVG HTML export is the next milestone.
+
 ## Command-line development
 
 From a checkout, use Node.js 22 LTS and the pinned Yarn version through Corepack:

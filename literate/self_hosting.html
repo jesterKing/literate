@@ -146,8 +146,11 @@ and the bundled bootstrap see the same module exports.</p>
 </div>
 </div><h3>Honor configuration without emitting</h3>
 <p>Read the checkout's tsconfig, but disable all emit and incremental state. Include
-fresh generated sources even when they are absent on disk: verification must not
-silently omit the very outputs it is meant to validate.</p>
+fresh generated TypeScript sources even when they are absent on disk. Generated
+JavaScript joins the compiler roots only when the effective <code>allowJs</code> option is
+true (<code>checkJs</code> supplies its default when <code>allowJs</code> is omitted). Browser scripts
+can therefore remain outside a TypeScript-only Node project. This only limits
+compiler roots: all outputs still participate in layout and fixed-point checks.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;self-host compiler configuration&gt;&gt;= </div>
 <div class="code">
@@ -183,7 +186,9 @@ host.<span class="hljs-property">getSourceFile</span> = <span class="hljs-functi
     <span class="hljs-keyword">if</span> (text === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">if</span> (onError) { <span class="hljs-title function_">onError</span>(<span class="hljs-string">`Cannot read <span class="hljs-subst">${name}</span>`</span>); } <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
     <span class="hljs-keyword">return</span> ts.<span class="hljs-title function_">createSourceFile</span>(name, text, languageVersion, <span class="hljs-literal">true</span>);
 };
-<span class="hljs-keyword">const</span> program = ts.<span class="hljs-title function_">createProgram</span>([...<span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>([...parsed.<span class="hljs-property">fileNames</span>, ...generatedSources])], parsed.<span class="hljs-property">options</span>, host);
+<span class="hljs-keyword">const</span> allowJs = parsed.<span class="hljs-property">options</span>.<span class="hljs-property">allowJs</span> ?? parsed.<span class="hljs-property">options</span>.<span class="hljs-property">checkJs</span> ?? <span class="hljs-literal">false</span>;
+<span class="hljs-keyword">const</span> generatedRoots = generatedSources.<span class="hljs-title function_">filter</span>(<span class="hljs-function"><span class="hljs-params">name</span> =&gt;</span> allowJs || <span class="hljs-regexp">/\.[cm]?tsx?$/</span>.<span class="hljs-title function_">test</span>(name));
+<span class="hljs-keyword">const</span> program = ts.<span class="hljs-title function_">createProgram</span>([...<span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>([...parsed.<span class="hljs-property">fileNames</span>, ...generatedRoots])], parsed.<span class="hljs-property">options</span>, host);
 <span class="hljs-keyword">const</span> diagnostics = ts.<span class="hljs-title function_">getPreEmitDiagnostics</span>(program);
 <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(diagnostics.<span class="hljs-title function_">map</span>(format).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;\n&#x27;</span>)); }
 checks.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">name</span>: stage, <span class="hljs-attr">ok</span>: <span class="hljs-literal">true</span> });

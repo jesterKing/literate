@@ -13,13 +13,13 @@
 import { TextDecoder } from 'util';
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { discoveryExcludedDirectories, generateProject, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, SourceDocument, FragmentInspection } from './engine';
+import { discoveryExcludedDirectories, generateProject, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection } from './engine';
 import { collectFragmentOccurrences, planFragmentRename, FragmentOccurrence } from './symbols';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');
 import Token = require('markdown-it/lib/token');
 import MarkdownIt = require("markdown-it");
-import Renderer = require('markdown-it/lib/renderer');
+
 
 // `import` here fails so instead we require the highlight module
 // this way. Not sure why import fails. It would be great to find
@@ -27,7 +27,7 @@ import Renderer = require('markdown-it/lib/renderer');
 const hljs = require('highlight.js');
 
 import { grabberPlugin } from './grabber';
-let oldFence : Renderer.RenderRule | undefined;
+
 const FENCE = '```';
 const OPENING = '<<';
 const CLOSING = '>>';
@@ -87,8 +87,6 @@ const emptyToken : TokenUsage =
   token : undefined,
 };
 
-const FRAGMENT_RE =
-  /(?<lang>[^:]*)(?<colon>:)?.*<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*\s+\$)?(?<extraSettings>\s+.*)?/;
 const FRAGMENT_HTML_CLEANUP_RE= /(<span.class="hljs-.+?">)(.*?)(<\/span>)/g;
 const FRAGMENT_HTML_RE= /(&lt;&lt;.+?&gt;&gt;)/g;
 const CODECOMMENT_HTML_RE= /<span class="hljs-comment">.*?<\/span>/gs;
@@ -312,7 +310,6 @@ export class FragmentHoverProvider implements vscode.HoverProvider {
     return null;
   }
 }
-
 function protectFragmentTags(rendered : string) : string {
   function cleanHighlights(match : string, _: number, __: string)
   {
@@ -330,55 +327,41 @@ function removeCodeComments(rendered : string) : string {
   return rendered;
 }
 
-function renderCodeFence(tokens : Token[],
-             idx : number,
-             options : MarkdownIt.Options,
-             env : any,
-             slf : Renderer) {
-  let rendered = '';
-  if (oldFence && tokens[idx].info.indexOf("SETTINGS")<0) {
-    const previewToken = Object.assign(Object.create(Object.getPrototypeOf(tokens[idx])), tokens[idx]);
-    previewToken.content = previewToken.content.replace(/\\<</g, '<<');
+function installPreviewFences(md: MarkdownIt): void {
+  const originalFence = md.renderer.rules.fence;
+  md.renderer.rules.fence = (tokens, idx, options, env, slf) => {
+    const token = tokens[idx];
+    if (token.info.includes('SETTINGS')) { return ''; }
+    if (token.info.trim() === 'mermaid') {
+      const line = token.map ? ` data-line="${token.map[0]}"` : '';
+      return `<pre class="literate-mermaid source-line"${line}>${md.utils.escapeHtml(token.content)}</pre>\n`;
+    }
+    const header = parseFragmentHeader(token.info);
+    if (!header) {
+      return originalFence ? originalFence(tokens, idx, options, env, slf)
+        : slf.renderToken(tokens, idx, options);
+    }
+    const previewToken = Object.assign(Object.create(Object.getPrototypeOf(token)), token);
+    previewToken.content = token.content.replace(/\\<</g, '<<');
     const previewTokens = tokens.slice();
     previewTokens[idx] = previewToken;
-    rendered = oldFence(previewTokens, idx, options, env, slf);
-
-    let token = tokens[idx];
-    if (token.info) {
-      const match = token.info.match(FRAGMENT_RE);
-      if (match && match.groups) {
-        let lang = match.groups.lang.trim();
-        let name = match.groups.tagName;
-        let root = match.groups.root;
-        let add = match.groups.add;
-        let fileName = match.groups.fileName;
-        if (name) {
-          root = root || '';
-          add = add || '';
-          fileName = fileName || '';
-          fileName = fileName.trim();
-          rendered = protectFragmentTags(rendered);
-          rendered = removeCodeComments(rendered);
-          rendered =
-`<div class="codefragment">
-<div class="fragmentname">&lt;&lt;${name}&gt;&gt;${root}${add} ${fileName}</div>
-<div class="code">
-${rendered}
-</div>
-</div>`;
-        }
-      }
-      else if(token.info.endsWith('mermaid')) {
-        rendered =
-`<pre class="mermaid">
-${previewToken.content}
-</pre>`;
-      }
+    let rendered = header.language === 'mermaid'
+      ? `<pre><code class="language-mermaid">${md.utils.escapeHtml(previewToken.content)}</code></pre>\n`
+      : originalFence ? originalFence(previewTokens, idx, options, env, slf)
+        : `<pre><code>${md.utils.escapeHtml(previewToken.content)}</code></pre>\n`;
+    const name = md.utils.escapeHtml(header.name);
+    const fileName = md.utils.escapeHtml(header.remainder.match(/^(.*?)\s+\$/)?.[1].trim() || '');
+    if (header.language !== 'mermaid') {
+      rendered = removeCodeComments(protectFragmentTags(rendered));
     }
-  }
-
-  return rendered;
-};
+    return `<div class="codefragment">
+    <div class="fragmentname">&lt;&lt;${name}&gt;&gt;=${header.append ? '+' : ''} ${fileName}</div>
+    <div class="code">
+    ${rendered}
+    </div>
+    </div>`;
+  };
+}
 
 function createMarkdownItParserForLiterate() : MarkdownIt
 {
@@ -389,14 +372,13 @@ function createMarkdownItParserForLiterate() : MarkdownIt
               hljs.highlight(str, {language : lang}).value +
               '</code></pre>';
             }
-            return '<pre title="' + attrs + '">' + md.utils.escapeHtml(str) + '</pre>';
+            return '<pre title="' + md.utils.escapeHtml(attrs) + '">' + md.utils.escapeHtml(str) + '</pre>';
           }
 
         })
         .use(grabberPlugin);
 
-      oldFence = md.renderer.rules.fence;
-      md.renderer.rules.fence = renderCodeFence;
+  installPreviewFences(md);
   return md;
 }
 
@@ -1031,8 +1013,7 @@ export async function activate(context: vscode.ExtensionContext) {
   return {
     extendMarkdownIt(md: any) {
       md.use(grabberPlugin);
-      oldFence = md.renderer.rules.fence;
-      md.renderer.rules.fence = renderCodeFence;
+      installPreviewFences(md);
       return md;
     }
   };
@@ -1082,9 +1063,9 @@ function createFragmentForTag(range? : vscode.Range)
       let langId : string = 'LANGID';
       if(tokenUsage.token.type === 'fence' && tokenUsage.token.map)
       {
-        let match = tokenUsage.token.info.match(FRAGMENT_RE);
-        if(match && match.groups) {
-          langId = match.groups.lang;
+        const header = parseFragmentHeader(tokenUsage.token.info);
+        if(header) {
+          langId = header.language;
         }
       }
       let newFragment = `\n${FENCE} ${langId} : ${OPENING}${fragmentLocation.name}${CLOSING}=\n${FENCE}\n`;
@@ -1109,11 +1090,11 @@ function splitFragment(position_? : vscode.Position)
       new vscode.Range(position, position));
     if(tokenUsage.token && tokenUsage.token.type === 'fence')
     {
-      let match = tokenUsage.token.info.match(FRAGMENT_RE);
-      if(match && match.groups)
+      const header = parseFragmentHeader(tokenUsage.token.info);
+      if(header)
       {
-        let langId = match.groups.lang.trim();
-        let tagName = match.groups.tagName.trim();
+        let langId = header.language;
+        let tagName = header.name.trim();
         let textToInsert = `${FENCE}\n\n${FENCE}${langId} : ${OPENING}${tagName}${CLOSING}=+\n`;
         let workspaceEdit = new vscode.WorkspaceEdit();
         workspaceEdit.insert(

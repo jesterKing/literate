@@ -9,7 +9,7 @@
   },
   "version": "0.14.4",
   "engines": {
-    "vscode": "^1.63.2"
+    "vscode": "^1.96.0"
   },
   "categories": [
     "Programming Languages",
@@ -52,6 +52,9 @@
       ]
     },
     "markdown.markdownItPlugins": true,
+    "markdown.previewScripts": [
+      "./out/mermaid-preview.js"
+    ],
     "markdown.previewStyles": [
       "./style.css"
     ],
@@ -87,7 +90,9 @@
     "test": "yarn compile && yarn lint && node --test out/test/headless/*.test.js && node ./out/cli.js check",
     "test:extension": "yarn compile && yarn esbuild && node ./out/test/runTest.js",
     "vscode:prepublish": "npm run -S esbuild-base -- --minify",
-    "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node",
+    "build:preview": "esbuild ./src/mermaid-preview.js --bundle --outfile=out/mermaid-preview.js --format=iife --platform=browser --target=chrome128 --minify",
+    "watch:preview": "yarn build:preview --watch",
+    "esbuild-base": "yarn build:preview && esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node",
     "esbuild": "npm run -S esbuild-base -- --sourcemap",
     "esbuild-watch": "npm run -S esbuild-base -- --sourcemap --watch",
     "test-compile": "tsc -p ./"
@@ -101,7 +106,7 @@
     "@typescript-eslint/eslint-plugin": "^6.16.0",
     "@typescript-eslint/parser": "^6.16.0",
     "@vscode/test-electron": "^2.3.8",
-    "esbuild": "^0.12.15",
+    "esbuild": "0.28.2",
     "eslint": "^8.56.0",
     "glob": "^7.1.6",
     "mocha": ">8.2.1",
@@ -111,7 +116,8 @@
   },
   "dependencies": {
     "highlight.js": "^11.0.1",
-    "markdown-it": "^12.3.2"
+    "markdown-it": "^12.3.2",
+    "mermaid": "12.0.0"
   },
   "packageManager": "yarn@4.18.0"
 }
