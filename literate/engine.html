@@ -371,6 +371,21 @@ independent runtime functions. These fragments share the local scope of
 definitions and reserve destinations, then validate and expand dependencies,
 and only then construct output files. The validation barrier is before both
 source emission and HTML rendering.</p>
+<p>Diagnostics accumulate through the planning phases; inspection survives either
+outcome. Only the successful branch builds files, leaving all writes to adapters.</p>
+<pre class="mermaid">
+flowchart TD
+    Inputs[Normalize source and template inputs] --&gt; Parse[Parse accepted documents and establish order]
+    Parse --&gt; Settings[Resolve project settings and HTML template]
+    Settings --&gt; Collect[Collect definitions and appends and reserve destinations]
+    Collect --&gt; Inspect[Record fragment and template inspection]
+    Inspect --&gt; Expand[Expand all fragments and validate dependencies]
+    Expand --&gt; Barrier{Any diagnostics?}
+    Barrier --&gt;|Yes| Failure[Return diagnostics and inspection with no files]
+    Barrier --&gt;|No| Sources[Emit sources with literal template substitution]
+    Sources --&gt; HTML[Render documentation and apply HTML template]
+    HTML --&gt; Success[Normalize file line endings and return files with inspection]
+</pre>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;engine generation orchestration&gt;&gt;= </div>
 <div class="code">

@@ -58,6 +58,30 @@ create multiple source files within just one **literate** document.
 This text describes the **Literate Programming** extension as a **literate**
 program.
 
+## Two ways to generate the same program
+
+The editor and CLI are adapters around one engine. They differ in where they
+read text and how they report results, not in the fragment language they accept.
+The editor's Markdown preview is a separate presentation path: it does not write
+source files or the generated book.
+
+```mermaid
+flowchart TD
+    Author[Edit literate documents] --> Editor[VS Code adapter]
+    Author --> Saved[Save documents to disk]
+    Saved --> CLI[Command-line adapter]
+    Editor --> Buffers[Snapshot open buffers and disk]
+    Buffers --> Engine[Shared generation engine]
+    CLI --> Engine
+    Engine --> Plan[Diagnostics and planned files]
+    Plan --> Gate{Valid project and writes requested?}
+    Gate -->|Yes| Safety[Preflight all output destinations]
+    Safety --> Write[Write changed source and HTML]
+    Gate -->|No| Report[Report results without writing]
+    Editor --> Preview[Markdown preview]
+    Preview --> Diagrams[Local Mermaid rendering]
+```
+
 ## Fragment Model
 
 The tools provided by the **Literate Programming** extension are built around
@@ -72,6 +96,29 @@ out source files and rendered HTML files.
 The fragment model is defined in the `FragmentRepository` class, which will be
 described in detail after introducing a couple of classes that help the
 repository.
+
+Each workspace URI identifies a separate set of state. The diagram shows the
+relationships behind navigation: fragment information holds the unexpanded code
+and its fence tokens, while grabbed states retain the parsed documents. A
+fragment assembled from several documents can have tokens from several states;
+its `env` points to the first accepted part's document.
+
+```mermaid
+classDiagram
+    class FragmentRepository
+    class FragmentMap
+    class FragmentInformation
+    class GrabbedStateList
+    class GrabbedState
+    class Token
+    FragmentRepository "1" --> "0..*" FragmentMap : per workspace URI
+    FragmentRepository "1" --> "0..*" GrabbedStateList : per workspace URI
+    FragmentMap "1" --> "0..*" FragmentInformation : indexed by name
+    GrabbedStateList "1" --> "0..*" GrabbedState : parsed documents
+    GrabbedState "1" --> "0..*" Token : Markdown tokens
+    FragmentInformation "1" --> "1..*" Token : accepted fence parts
+    FragmentInformation "1" --> "1" GrabbedState : first part environment
+```
 
 ### FragmentMap class
 
@@ -336,6 +383,41 @@ The navigation map is deliberately unexpanded and is built from the same
 snapshot, ordered by the engine's `orderSourceDocuments`: root index first,
 linked chapters next, and every remaining document in deterministic order.
 This map is not another generator and never supplies generation diagnostics.
+
+A content-change request follows this sequence. Navigation providers use the
+same refresh path but omit the output-writing branch. The serial queue keeps a
+second request waiting until the first has finished, including its writes.
+
+```mermaid
+sequenceDiagram
+    participant VS as VS Code
+    participant Repo as Fragment repository
+    participant FS as Workspace filesystem
+    participant Engine as Shared engine
+    VS->>Repo: Process literate change
+    Note over Repo: Wait for earlier queued request
+    Repo->>FS: Discover documents and read saved inputs
+    Note over Repo: Prefer open buffers for documents and templates
+    Repo->>Engine: Generate from the snapshot
+    Engine-->>Repo: Diagnostics, inspection and planned files
+    Repo-->>VS: Update diagnostics and navigation state
+    alt Writes requested and no diagnostics
+        Repo->>FS: Preflight every output path
+        alt All destinations are safe
+            loop Each generated file
+                Repo->>FS: Compare disk bytes
+                opt Missing or changed
+                    Repo->>FS: Create parent and write output
+                end
+            end
+        else Unsafe destination or filesystem error
+            Repo-->>VS: Report failure without starting output writes
+        end
+    else Read-only refresh or invalid project
+        Note over Repo,FS: No output writes
+    end
+    Repo-->>VS: Complete request
+```
 
 ``` ts : <<fragment generation method>>=
 processLiterateFiles(

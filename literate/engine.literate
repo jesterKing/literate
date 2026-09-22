@@ -357,6 +357,23 @@ definitions and reserve destinations, then validate and expand dependencies,
 and only then construct output files. The validation barrier is before both
 source emission and HTML rendering.
 
+Diagnostics accumulate through the planning phases; inspection survives either
+outcome. Only the successful branch builds files, leaving all writes to adapters.
+
+```mermaid
+flowchart TD
+    Inputs[Normalize source and template inputs] --> Parse[Parse accepted documents and establish order]
+    Parse --> Settings[Resolve project settings and HTML template]
+    Settings --> Collect[Collect definitions and appends and reserve destinations]
+    Collect --> Inspect[Record fragment and template inspection]
+    Inspect --> Expand[Expand all fragments and validate dependencies]
+    Expand --> Barrier{Any diagnostics?}
+    Barrier -->|Yes| Failure[Return diagnostics and inspection with no files]
+    Barrier -->|No| Sources[Emit sources with literal template substitution]
+    Sources --> HTML[Render documentation and apply HTML template]
+    HTML --> Success[Normalize file line endings and return files with inspection]
+```
+
 ```ts : <<engine generation orchestration>>=
 <<engine generation inputs and settings>>
 <<engine fragment collection and output reservation>>

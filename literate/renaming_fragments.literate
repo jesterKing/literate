@@ -4,6 +4,44 @@ Rename uses the shared symbol planner, so only explicit fragment names change.
 Validation rejects ambiguous definitions, collisions and changes to root status
 without touching prose, filenames or generated output.
 
+The provider returns a proposed workspace edit; it does not apply edits or write
+generated files itself. VS Code owns applying the edit. A resulting literate
+content-change event can then trigger the ordinary generation path.
+
+```mermaid
+sequenceDiagram
+    participant User as Author
+    participant VS as VS Code
+    participant Provider as Rename provider
+    participant Repo as Fragment repository
+    participant Planner as Symbol planner
+    User->>VS: Rename a fragment
+    VS->>Provider: Prepare rename at cursor
+    Provider->>Repo: Refresh from current buffers
+    Repo-->>Provider: Exact occurrence and source snapshot
+    Provider->>Planner: Validate same-name plan
+    Planner-->>Provider: Unique valid definition
+    Provider-->>VS: Inner-name range and placeholder
+    User->>VS: Enter new name
+    VS->>Provider: Request rename edits
+    Provider->>Repo: Refresh again
+    Provider->>Planner: Plan rename from fresh sources
+    Note over Planner: Validate names, collisions and Markdown structure
+    alt Valid plan
+        Planner-->>Provider: Name-only edit ranges
+        Provider-->>VS: WorkspaceEdit
+        VS->>VS: Apply edits to source documents
+        VS->>Repo: Literate content-change events
+    else Unsafe rename
+        Planner-->>Provider: Validation error
+        Provider-->>VS: Reject rename without partial edits
+    end
+```
+
+Cancellation and positions that do not identify a defined fragment stop before
+returning edits. Those early exits are omitted here to keep the successful
+interaction and validation failure visible.
+
 ``` ts : <<rename provider class>>=
 export class LiterateRenameProvider implements vscode.RenameProvider
 {

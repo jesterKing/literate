@@ -56,6 +56,27 @@ also contain more than one top level fragment. In other words an author can
 create multiple source files within just one <strong>literate</strong> document.</p>
 <p>This text describes the <strong>Literate Programming</strong> extension as a <strong>literate</strong>
 program.</p>
+<h2>Two ways to generate the same program</h2>
+<p>The editor and CLI are adapters around one engine. They differ in where they
+read text and how they report results, not in the fragment language they accept.
+The editor's Markdown preview is a separate presentation path: it does not write
+source files or the generated book.</p>
+<pre class="mermaid">
+flowchart TD
+    Author[Edit literate documents] --&gt; Editor[VS Code adapter]
+    Author --&gt; Saved[Save documents to disk]
+    Saved --&gt; CLI[Command-line adapter]
+    Editor --&gt; Buffers[Snapshot open buffers and disk]
+    Buffers --&gt; Engine[Shared generation engine]
+    CLI --&gt; Engine
+    Engine --&gt; Plan[Diagnostics and planned files]
+    Plan --&gt; Gate{Valid project and writes requested?}
+    Gate --&gt;|Yes| Safety[Preflight all output destinations]
+    Safety --&gt; Write[Write changed source and HTML]
+    Gate --&gt;|No| Report[Report results without writing]
+    Editor --&gt; Preview[Markdown preview]
+    Preview --&gt; Diagrams[Local Mermaid rendering]
+</pre>
 <h2>Fragment Model</h2>
 <p>The tools provided by the <strong>Literate Programming</strong> extension are built around
 one repository of the project providing all necessary information around
@@ -67,6 +88,27 @@ out source files and rendered HTML files.</p>
 <p>The fragment model is defined in the <code>FragmentRepository</code> class, which will be
 described in detail after introducing a couple of classes that help the
 repository.</p>
+<p>Each workspace URI identifies a separate set of state. The diagram shows the
+relationships behind navigation: fragment information holds the unexpanded code
+and its fence tokens, while grabbed states retain the parsed documents. A
+fragment assembled from several documents can have tokens from several states;
+its <code>env</code> points to the first accepted part's document.</p>
+<pre class="mermaid">
+classDiagram
+    class FragmentRepository
+    class FragmentMap
+    class FragmentInformation
+    class GrabbedStateList
+    class GrabbedState
+    class Token
+    FragmentRepository &quot;1&quot; --&gt; &quot;0..*&quot; FragmentMap : per workspace URI
+    FragmentRepository &quot;1&quot; --&gt; &quot;0..*&quot; GrabbedStateList : per workspace URI
+    FragmentMap &quot;1&quot; --&gt; &quot;0..*&quot; FragmentInformation : indexed by name
+    GrabbedStateList &quot;1&quot; --&gt; &quot;0..*&quot; GrabbedState : parsed documents
+    GrabbedState &quot;1&quot; --&gt; &quot;0..*&quot; Token : Markdown tokens
+    FragmentInformation &quot;1&quot; --&gt; &quot;1..*&quot; Token : accepted fence parts
+    FragmentInformation &quot;1&quot; --&gt; &quot;1&quot; GrabbedState : first part environment
+</pre>
 <h3>FragmentMap class</h3>
 <p>The <code>FragmentMap</code> class holds a map of strings, which are the fragment names,
 and their associated <code>FragmentInformation</code> instances. This map is available
@@ -337,6 +379,39 @@ failure can leave earlier writes applied. Obsolete outputs are not deleted.</p>
 snapshot, ordered by the engine's <code>orderSourceDocuments</code>: root index first,
 linked chapters next, and every remaining document in deterministic order.
 This map is not another generator and never supplies generation diagnostics.</p>
+<p>A content-change request follows this sequence. Navigation providers use the
+same refresh path but omit the output-writing branch. The serial queue keeps a
+second request waiting until the first has finished, including its writes.</p>
+<pre class="mermaid">
+sequenceDiagram
+    participant VS as VS Code
+    participant Repo as Fragment repository
+    participant FS as Workspace filesystem
+    participant Engine as Shared engine
+    VS-&gt;&gt;Repo: Process literate change
+    Note over Repo: Wait for earlier queued request
+    Repo-&gt;&gt;FS: Discover documents and read saved inputs
+    Note over Repo: Prefer open buffers for documents and templates
+    Repo-&gt;&gt;Engine: Generate from the snapshot
+    Engine--&gt;&gt;Repo: Diagnostics, inspection and planned files
+    Repo--&gt;&gt;VS: Update diagnostics and navigation state
+    alt Writes requested and no diagnostics
+        Repo-&gt;&gt;FS: Preflight every output path
+        alt All destinations are safe
+            loop Each generated file
+                Repo-&gt;&gt;FS: Compare disk bytes
+                opt Missing or changed
+                    Repo-&gt;&gt;FS: Create parent and write output
+                end
+            end
+        else Unsafe destination or filesystem error
+            Repo--&gt;&gt;VS: Report failure without starting output writes
+        end
+    else Read-only refresh or invalid project
+        Note over Repo,FS: No output writes
+    end
+    Repo--&gt;&gt;VS: Complete request
+</pre>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;fragment generation method&gt;&gt;= </div>
 <div class="code">

@@ -61,7 +61,36 @@ before Markdown-it can replace it and hide the original spelling.</p>
 </code></pre>
 
 </div>
-</div><p>Validation produces fresh objects and never changes caller-owned buffers.
+</div><p>Symbol identity is the occurrence's exact name, not a separate symbol object.
+One document can contribute many occurrences of any of the four kinds. For a
+changed rename, each occurrence of the old name yields one name-only edit;
+unrelated occurrences remain part of the safety check.</p>
+<pre class="mermaid">
+classDiagram
+    class SourceDocument {
+        string path
+        string text
+    }
+    class FragmentOccurrence {
+        string name
+        string path
+        number line
+        number column
+        number endColumn
+        kind definition or append or reference or mention
+    }
+    class FragmentRenameEdit {
+        string path
+        number line
+        number startColumn
+        number endColumn
+        string newText
+    }
+    SourceDocument &quot;1&quot; --&gt; &quot;0..*&quot; FragmentOccurrence : collected from text
+    FragmentOccurrence &quot;1&quot; --&gt; &quot;0..1&quot; FragmentRenameEdit : matching old name
+    FragmentRenameEdit &quot;0..*&quot; --&gt; &quot;1&quot; SourceDocument : targets name range
+</pre>
+<p>Validation produces fresh objects and never changes caller-owned buffers.
 Neither collection nor planning consults files on disk.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;symbol document validation&gt;&gt;= </div>
@@ -414,6 +443,23 @@ This is a syntax-preservation check, not a blanket punctuation ban.</p>
 are returned in source order for adapters to apply atomically (or in reverse
 position order when manipulating strings). No replacement-string evaluation is
 performed: <code>newText</code> is always the literal requested name.</p>
+<p>The planner checks the entire recollected sequence before returning a changed
+rename. Any failed validation throws without changing caller buffers; the
+validated no-op returns before previewing edits.</p>
+<pre class="mermaid">
+flowchart TD
+    Names[Validate names and preserve root suffix] --&gt; Collect[Normalize documents and collect occurrences]
+    Collect --&gt; Base[Require exactly one old-name base definition]
+    Base --&gt; Same{Names equal?}
+    Same --&gt;|Yes| Noop[Return empty edit plan]
+    Same --&gt;|No| Target[Reject new-name backticks and collisions with any occurrence]
+    Target --&gt; Edits[Build name-only edits for all old-name occurrences]
+    Edits --&gt; Preview[Apply edits to copies in descending position order]
+    Preview --&gt; Recollect[Recollect all occurrences from preview]
+    Recollect --&gt; Safe{Ordered sequence preserved except renamed names?}
+    Safe --&gt;|No| Reject[Throw unsafe rename error]
+    Safe --&gt;|Yes| Return[Return source-order edits for adapter to apply]
+</pre>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;symbol rename planning&gt;&gt;= </div>
 <div class="code">

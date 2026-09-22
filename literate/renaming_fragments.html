@@ -11,6 +11,41 @@
 <p>Rename uses the shared symbol planner, so only explicit fragment names change.
 Validation rejects ambiguous definitions, collisions and changes to root status
 without touching prose, filenames or generated output.</p>
+<p>The provider returns a proposed workspace edit; it does not apply edits or write
+generated files itself. VS Code owns applying the edit. A resulting literate
+content-change event can then trigger the ordinary generation path.</p>
+<pre class="mermaid">
+sequenceDiagram
+    participant User as Author
+    participant VS as VS Code
+    participant Provider as Rename provider
+    participant Repo as Fragment repository
+    participant Planner as Symbol planner
+    User-&gt;&gt;VS: Rename a fragment
+    VS-&gt;&gt;Provider: Prepare rename at cursor
+    Provider-&gt;&gt;Repo: Refresh from current buffers
+    Repo--&gt;&gt;Provider: Exact occurrence and source snapshot
+    Provider-&gt;&gt;Planner: Validate same-name plan
+    Planner--&gt;&gt;Provider: Unique valid definition
+    Provider--&gt;&gt;VS: Inner-name range and placeholder
+    User-&gt;&gt;VS: Enter new name
+    VS-&gt;&gt;Provider: Request rename edits
+    Provider-&gt;&gt;Repo: Refresh again
+    Provider-&gt;&gt;Planner: Plan rename from fresh sources
+    Note over Planner: Validate names, collisions and Markdown structure
+    alt Valid plan
+        Planner--&gt;&gt;Provider: Name-only edit ranges
+        Provider--&gt;&gt;VS: WorkspaceEdit
+        VS-&gt;&gt;VS: Apply edits to source documents
+        VS-&gt;&gt;Repo: Literate content-change events
+    else Unsafe rename
+        Planner--&gt;&gt;Provider: Validation error
+        Provider--&gt;&gt;VS: Reject rename without partial edits
+    end
+</pre>
+<p>Cancellation and positions that do not identify a defined fragment stop before
+returning edits. Those early exits are omitted here to keep the successful
+interaction and validation failure visible.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;rename provider class&gt;&gt;= </div>
 <div class="code">
