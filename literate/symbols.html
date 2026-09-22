@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <link rel="stylesheet" type="text/css" href="./style.css">
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<h1>Pure fragment symbols</h1>
+<p>Editor adapters supply their current document text, including unsaved buffers.
+This module performs no I/O and imports no editor APIs. Coordinates are zero-based
+raw UTF-16 columns; occurrences cover the entire tag, while edits cover its name.
+The engine owns both lexical grammars. Markdown-it decides which fences and
+inline regions are meaningful, using the same default parser as generation.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;pure fragment symbols.*&gt;&gt;= src/symbols.ts $</div>
+<div class="code">
+<pre><code><span class="literate-tag-name">&lt;&lt;symbol contracts&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;symbol document validation&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;symbol occurrence construction&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;symbol fence collection&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;symbol inline scanner&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;symbol inline code scanner&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;symbol prose mapping&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;symbol table cell splitting&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;symbol table mapping&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;symbol table mentions&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;symbol document collection&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;symbol collection entry point&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;symbol rename validation&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;symbol rename preview&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;symbol rename safety&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;symbol rename planning&gt;&gt;</span>
+</code></pre>
+
+</div>
+</div><h2>Contracts and safe inputs</h2>
+<p>Collection retains duplicate declarations and orphan appends: an editor needs
+these even when generation rejects them. Rename requires an unambiguous base.
+Canonical paths make edits usable by adapters; portable case-insensitive duplicate
+paths are rejected instead of producing overlapping edits. NUL source is rejected
+before Markdown-it can replace it and hide the original spelling.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;symbol contracts&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> <span class="hljs-title class_">MarkdownIt</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it&#x27;</span>);
+<span class="hljs-keyword">import</span> <span class="hljs-title class_">Token</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/token&#x27;</span>);
+<span class="hljs-keyword">import</span> <span class="hljs-title class_">StateInline</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/rules_inline/state_inline&#x27;</span>);
+<span class="hljs-keyword">import</span> <span class="hljs-title class_">StateBlock</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/rules_block/state_block&#x27;</span>);
+<span class="hljs-keyword">import</span> { <span class="hljs-title class_">SourceDocument</span>, <span class="hljs-title class_">FragmentTag</span>, parseFragmentHeader, safeRelativePath, scanFragmentTags } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./engine&#x27;</span>;
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title class_">FragmentOccurrence</span> = {
+    <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">line</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">column</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">endColumn</span>: <span class="hljs-built_in">number</span>;
+    <span class="hljs-attr">kind</span>: <span class="hljs-string">&#x27;definition&#x27;</span> | <span class="hljs-string">&#x27;append&#x27;</span> | <span class="hljs-string">&#x27;reference&#x27;</span> | <span class="hljs-string">&#x27;mention&#x27;</span>;
+};
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title class_">FragmentRenameEdit</span> = {
+    <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">line</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">startColumn</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">endColumn</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">newText</span>: <span class="hljs-built_in">string</span>;
+};
+<span class="hljs-keyword">type</span> <span class="hljs-title class_">InlineTag</span> = <span class="hljs-title class_">FragmentTag</span>;
+</code></pre>
+
+</div>
+</div><p>Validation produces fresh objects and never changes caller-owned buffers.
+Neither collection nor planning consults files on disk.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;symbol document validation&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">normalizeDocuments</span>(<span class="hljs-params">documents: SourceDocument[]</span>): <span class="hljs-title class_">SourceDocument</span>[] {
+    <span class="hljs-keyword">const</span> paths = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
+    <span class="hljs-keyword">return</span> documents.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">document</span> =&gt;</span> {
+        <span class="hljs-keyword">const</span> path = <span class="hljs-title function_">safeRelativePath</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>);
+        <span class="hljs-keyword">if</span> (!path) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Invalid source path: <span class="hljs-subst">${<span class="hljs-variable language_">document</span>.path}</span>`</span>); }
+        <span class="hljs-keyword">const</span> key = path.<span class="hljs-title function_">toLowerCase</span>();
+        <span class="hljs-keyword">if</span> (paths.<span class="hljs-title function_">has</span>(key)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Duplicate source document: <span class="hljs-subst">${path}</span>`</span>); }
+        <span class="hljs-keyword">if</span> (<span class="hljs-variable language_">document</span>.<span class="hljs-property">text</span>.<span class="hljs-title function_">includes</span>(<span class="hljs-string">&#x27;\0&#x27;</span>)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`NUL source text: <span class="hljs-subst">${path}</span>`</span>); }
+        paths.<span class="hljs-title function_">add</span>(key);
+        <span class="hljs-keyword">return</span> { path, <span class="hljs-attr">text</span>: <span class="hljs-variable language_">document</span>.<span class="hljs-property">text</span> };
+    });
+}
+</code></pre>
+
+</div>
+</div><p>Every range is built from a scanner offset, never by searching for a fragment
+name. Repeated tags and names embedded in other names therefore remain distinct.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;symbol occurrence construction&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">occurrence</span>(<span class="hljs-params">tag: FragmentTag, path: <span class="hljs-built_in">string</span>, line: <span class="hljs-built_in">number</span>, offset: <span class="hljs-built_in">number</span>,
+    kind: FragmentOccurrence[<span class="hljs-string">&#x27;kind&#x27;</span>]</span>): <span class="hljs-title class_">FragmentOccurrence</span> {
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">name</span>: tag.<span class="hljs-property">name</span>, path, line, <span class="hljs-attr">column</span>: offset + tag.<span class="hljs-property">start</span>,
+        <span class="hljs-attr">endColumn</span>: offset + tag.<span class="hljs-property">end</span>, kind };
+}
+</code></pre>
+
+</div>
+</div><h2>Named fences retain raw positions</h2>
+<p>Only headers accepted by the shared grammar contribute definitions or body
+references. Filename and settings text are never scanned. The opening marker
+anchors header positions even when a language or filename repeats the name.
+Body mapping matches engine inspection: Markdown removes prefixes and may expand
+part of a tab, but the suffix beginning at a tag remains unchanged.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;symbol fence collection&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">fenceOccurrences</span>(<span class="hljs-params">token: Token, path: <span class="hljs-built_in">string</span>, lines: <span class="hljs-built_in">string</span>[]</span>): <span class="hljs-title class_">FragmentOccurrence</span>[] {
+    <span class="hljs-keyword">const</span> header = <span class="hljs-title function_">parseFragmentHeader</span>(token.<span class="hljs-property">info</span>);
+    <span class="hljs-keyword">if</span> (!header || !token.<span class="hljs-property">map</span>) { <span class="hljs-keyword">return</span> []; }
+    <span class="hljs-keyword">const</span> line = token.<span class="hljs-property">map</span>[<span class="hljs-number">0</span>];
+    <span class="hljs-keyword">const</span> infoStart = lines[line].<span class="hljs-title function_">indexOf</span>(token.<span class="hljs-property">markup</span>) + token.<span class="hljs-property">markup</span>.<span class="hljs-property">length</span>;
+    <span class="hljs-keyword">const</span> tag = { <span class="hljs-attr">name</span>: header.<span class="hljs-property">name</span>, <span class="hljs-attr">start</span>: header.<span class="hljs-property">tagStart</span>, <span class="hljs-attr">end</span>: header.<span class="hljs-property">tagEnd</span> };
+    <span class="hljs-keyword">const</span> result = [<span class="hljs-title function_">occurrence</span>(tag, path, line, infoStart, header.<span class="hljs-property">append</span> ? <span class="hljs-string">&#x27;append&#x27;</span> : <span class="hljs-string">&#x27;definition&#x27;</span>)];
+    token.<span class="hljs-property">content</span>.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;\n&#x27;</span>).<span class="hljs-title function_">forEach</span>(<span class="hljs-function">(<span class="hljs-params">body, index</span>) =&gt;</span> {
+        <span class="hljs-keyword">const</span> sourceLine = line + <span class="hljs-number">1</span> + index;
+        <span class="hljs-keyword">const</span> offset = (lines[sourceLine] || <span class="hljs-string">&#x27;&#x27;</span>).<span class="hljs-property">length</span> - body.<span class="hljs-property">length</span>;
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> reference <span class="hljs-keyword">of</span> <span class="hljs-title function_">scanFragmentTags</span>(body)) {
+            result.<span class="hljs-title function_">push</span>(<span class="hljs-title function_">occurrence</span>(reference, path, sourceLine, offset, <span class="hljs-string">&#x27;reference&#x27;</span>));
+        }
+    });
+    <span class="hljs-keyword">return</span> result;
+}
+</code></pre>
+
+</div>
+</div><h2>Prose mentions use inline parsing, not rendered text</h2>
+<p>A small inline rule records source offsets before Markdown decoding. Default
+escape handling consumes escaped openers before this rule sees them. Markdown's
+link parser skips destinations and titles, but parses labels normally. Bare
+words, entities that render as tags, and reference-link definitions are not
+mentions. Inline code is deliberately included, with escapes tested on its raw
+contents, not its whitespace-normalized rendered value. Image alt text is
+conservatively excluded: Markdown-it reparses it with a separate coordinate
+origin. This prevents returning an edit into unrelated text before the image.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;symbol inline scanner&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">mentionParser</span>(<span class="hljs-params">tags: InlineTag[], source: <span class="hljs-built_in">string</span></span>): <span class="hljs-title class_">MarkdownIt</span> {
+    <span class="hljs-keyword">const</span> md = <span class="hljs-keyword">new</span> <span class="hljs-title class_">MarkdownIt</span>();
+    md.<span class="hljs-property">inline</span>.<span class="hljs-property">ruler</span>.<span class="hljs-title function_">before</span>(<span class="hljs-string">&#x27;text&#x27;</span>, <span class="hljs-string">&#x27;fragment_mentions&#x27;</span>, <span class="hljs-function">(<span class="hljs-params">state, silent</span>) =&gt;</span> {
+        <span class="hljs-keyword">if</span> (!state.<span class="hljs-property">src</span>.<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&#x27;&lt;&lt;&#x27;</span>, state.<span class="hljs-property">pos</span>) || state.<span class="hljs-property">src</span>[state.<span class="hljs-property">pos</span> - <span class="hljs-number">1</span>] === <span class="hljs-string">&#x27;\\&#x27;</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>; }
+        <span class="hljs-keyword">const</span> tag = <span class="hljs-title function_">scanFragmentTags</span>(state.<span class="hljs-property">src</span>.<span class="hljs-title function_">slice</span>(state.<span class="hljs-property">pos</span>, state.<span class="hljs-property">posMax</span>))[<span class="hljs-number">0</span>];
+        <span class="hljs-keyword">if</span> (!tag || tag.<span class="hljs-property">start</span> !== <span class="hljs-number">0</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>; }
+        <span class="hljs-keyword">if</span> (!silent) {
+            <span class="hljs-keyword">if</span> (state.<span class="hljs-property">src</span> === source) { tags.<span class="hljs-title function_">push</span>({ ...tag, <span class="hljs-attr">start</span>: state.<span class="hljs-property">pos</span>, <span class="hljs-attr">end</span>: state.<span class="hljs-property">pos</span> + tag.<span class="hljs-property">end</span> }); }
+            state.<span class="hljs-property">pending</span> += state.<span class="hljs-property">src</span>.<span class="hljs-title function_">slice</span>(state.<span class="hljs-property">pos</span>, state.<span class="hljs-property">pos</span> + tag.<span class="hljs-property">end</span>);
+        }
+        state.<span class="hljs-property">pos</span> += tag.<span class="hljs-property">end</span>;
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+    });
+    <span class="hljs-title function_">installCodeMentions</span>(md, tags, source);
+    <span class="hljs-keyword">return</span> md;
+}
+</code></pre>
+
+</div>
+</div><p>Delegate backtick matching to Markdown-it itself so unmatched delimiters,
+multiple-backtick spans and embedded backticks keep the parser's semantics.
+Only successful code spans contribute tags; silent link lookahead contributes
+nothing. The original raw slice retains both backslashes and UTF-16 offsets.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;symbol inline code scanner&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">installCodeMentions</span>(<span class="hljs-params">md: MarkdownIt, tags: InlineTag[], source: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">backticks</span>: <span class="hljs-function">(<span class="hljs-params">state: StateInline, silent: <span class="hljs-built_in">boolean</span></span>) =&gt;</span> <span class="hljs-built_in">boolean</span> =
+        <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/rules_inline/backticks&#x27;</span>);
+    md.<span class="hljs-property">inline</span>.<span class="hljs-property">ruler</span>.<span class="hljs-title function_">at</span>(<span class="hljs-string">&#x27;backticks&#x27;</span>, <span class="hljs-function">(<span class="hljs-params">state, silent</span>) =&gt;</span> {
+        <span class="hljs-keyword">const</span> start = state.<span class="hljs-property">pos</span>, count = state.<span class="hljs-property">tokens</span>.<span class="hljs-property">length</span>;
+        <span class="hljs-keyword">const</span> accepted = <span class="hljs-title function_">backticks</span>(state, silent);
+        <span class="hljs-keyword">if</span> (accepted &amp;&amp; !silent &amp;&amp; state.<span class="hljs-property">src</span> === source &amp;&amp; state.<span class="hljs-property">tokens</span>.<span class="hljs-property">length</span> &gt; count &amp;&amp;
+            state.<span class="hljs-property">tokens</span>[state.<span class="hljs-property">tokens</span>.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>].<span class="hljs-property">type</span> === <span class="hljs-string">&#x27;code_inline&#x27;</span>) {
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> tag <span class="hljs-keyword">of</span> <span class="hljs-title function_">scanFragmentTags</span>(state.<span class="hljs-property">src</span>.<span class="hljs-title function_">slice</span>(start, state.<span class="hljs-property">pos</span>))) {
+                tags.<span class="hljs-title function_">push</span>({ ...tag, <span class="hljs-attr">start</span>: start + tag.<span class="hljs-property">start</span>, <span class="hljs-attr">end</span>: start + tag.<span class="hljs-property">end</span> });
+            }
+        }
+        <span class="hljs-keyword">return</span> accepted;
+    });
+}
+</code></pre>
+
+</div>
+</div><p>Inline token content strips heading markers and container prefixes. Align each
+complete trimmed content line with its original line, not individual names.
+This also handles closing heading markers and partially consumed leading tabs.
+If a line cannot be aligned exactly, conservatively omit its mentions.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;symbol prose mapping&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">proseOccurrences</span>(<span class="hljs-params">token: Token, path: <span class="hljs-built_in">string</span>, lines: <span class="hljs-built_in">string</span>[]</span>): <span class="hljs-title class_">FragmentOccurrence</span>[] {
+    <span class="hljs-keyword">if</span> (!token.<span class="hljs-property">map</span>) { <span class="hljs-keyword">return</span> []; }
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">tags</span>: <span class="hljs-title class_">InlineTag</span>[] = [];
+    <span class="hljs-keyword">const</span> md = <span class="hljs-title function_">mentionParser</span>(tags, token.<span class="hljs-property">content</span>);
+    md.<span class="hljs-property">inline</span>.<span class="hljs-title function_">parse</span>(token.<span class="hljs-property">content</span>, md, {}, []);
+    <span class="hljs-keyword">const</span> contentLines = token.<span class="hljs-property">content</span>.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;\n&#x27;</span>);
+    <span class="hljs-keyword">return</span> tags.<span class="hljs-title function_">flatMap</span>(<span class="hljs-function"><span class="hljs-params">tag</span> =&gt;</span> {
+        <span class="hljs-keyword">const</span> before = token.<span class="hljs-property">content</span>.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, tag.<span class="hljs-property">start</span>);
+        <span class="hljs-keyword">const</span> index = before.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;\n&#x27;</span>).<span class="hljs-property">length</span> - <span class="hljs-number">1</span>;
+        <span class="hljs-keyword">const</span> line = token.<span class="hljs-property">map</span>![<span class="hljs-number">0</span>] + index, content = contentLines[index];
+        <span class="hljs-keyword">const</span> column = lines[line].<span class="hljs-title function_">indexOf</span>(content.<span class="hljs-title function_">trim</span>());
+        <span class="hljs-keyword">if</span> (column &lt; <span class="hljs-number">0</span>) { <span class="hljs-keyword">return</span> []; }
+        <span class="hljs-keyword">const</span> prefix = content.<span class="hljs-property">length</span> - content.<span class="hljs-title function_">trimStart</span>().<span class="hljs-property">length</span>;
+        <span class="hljs-keyword">const</span> lineStart = before.<span class="hljs-title function_">lastIndexOf</span>(<span class="hljs-string">&#x27;\n&#x27;</span>) + <span class="hljs-number">1</span>;
+        <span class="hljs-keyword">return</span> [<span class="hljs-title function_">occurrence</span>(tag, path, line, column - prefix - lineStart, <span class="hljs-string">&#x27;mention&#x27;</span>)];
+    });
+}
+</code></pre>
+
+</div>
+</div><p>Table inline tokens have no map. Mirror Markdown-it's cell splitting while
+retaining a raw UTF-16 column for every surviving code unit. Its table rule
+removes the backslash immediately before a pipe (even after another backslash).
+Trim cells only after splitting, and keep repeated or empty cells positional.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;symbol table cell splitting&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">type</span> <span class="hljs-title class_">TableCell</span> = { <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">columns</span>: <span class="hljs-built_in">number</span>[] };
+<span class="hljs-keyword">type</span> <span class="hljs-title class_">TableSource</span> = <span class="hljs-title class_">TableCell</span> &amp; { <span class="hljs-attr">line</span>: <span class="hljs-built_in">number</span> };
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">tableCells</span>(<span class="hljs-params">raw: <span class="hljs-built_in">string</span>, offset: <span class="hljs-built_in">number</span></span>): <span class="hljs-title class_">TableCell</span>[] {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">cells</span>: <span class="hljs-title class_">TableCell</span>[] = [];
+    <span class="hljs-keyword">let</span> <span class="hljs-attr">cell</span>: <span class="hljs-title class_">TableCell</span> = { <span class="hljs-attr">content</span>: <span class="hljs-string">&#x27;&#x27;</span>, <span class="hljs-attr">columns</span>: [] };
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = <span class="hljs-number">0</span>; index &lt; raw.<span class="hljs-property">length</span>; index++) {
+        <span class="hljs-keyword">const</span> char = raw[index];
+        <span class="hljs-keyword">if</span> (char === <span class="hljs-string">&#x27;|&#x27;</span> &amp;&amp; raw[index - <span class="hljs-number">1</span>] !== <span class="hljs-string">&#x27;\\&#x27;</span>) {
+            cells.<span class="hljs-title function_">push</span>(cell);
+            cell = { <span class="hljs-attr">content</span>: <span class="hljs-string">&#x27;&#x27;</span>, <span class="hljs-attr">columns</span>: [] };
+            <span class="hljs-keyword">continue</span>;
+        }
+        <span class="hljs-keyword">if</span> (char === <span class="hljs-string">&#x27;|&#x27;</span>) {
+            cell.<span class="hljs-property">content</span> = cell.<span class="hljs-property">content</span>.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, -<span class="hljs-number">1</span>);
+            cell.<span class="hljs-property">columns</span>.<span class="hljs-title function_">pop</span>();
+        }
+        cell.<span class="hljs-property">content</span> += char;
+        cell.<span class="hljs-property">columns</span>.<span class="hljs-title function_">push</span>(offset + index);
+    }
+    cells.<span class="hljs-title function_">push</span>(cell);
+    <span class="hljs-keyword">if</span> (cells[<span class="hljs-number">0</span>]?.<span class="hljs-property">content</span> === <span class="hljs-string">&#x27;&#x27;</span>) { cells.<span class="hljs-title function_">shift</span>(); }
+    <span class="hljs-keyword">if</span> (cells[cells.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>]?.<span class="hljs-property">content</span> === <span class="hljs-string">&#x27;&#x27;</span>) { cells.<span class="hljs-title function_">pop</span>(); }
+    <span class="hljs-keyword">return</span> cells.<span class="hljs-title function_">map</span>(<span class="hljs-function">(<span class="hljs-params">{ content, columns }</span>) =&gt;</span> {
+        <span class="hljs-keyword">const</span> start = content.<span class="hljs-property">length</span> - content.<span class="hljs-title function_">trimStart</span>().<span class="hljs-property">length</span>;
+        <span class="hljs-keyword">return</span> { <span class="hljs-attr">content</span>: content.<span class="hljs-title function_">trim</span>(), <span class="hljs-attr">columns</span>: columns.<span class="hljs-title function_">slice</span>(start, content.<span class="hljs-title function_">trimEnd</span>().<span class="hljs-property">length</span>) };
+    });
+}
+</code></pre>
+
+</div>
+</div><p>Wrap the existing table rule rather than recognizing tables independently.
+Capture row slices while blockquote/list prefixes are still reflected in the
+block state. Line ends let us recover raw columns despite normalized newlines.
+Only emitted cells get maps: extra body cells are ignored and padded cells empty.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;symbol table mapping&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">tableParser</span>(<span class="hljs-params">sources: <span class="hljs-built_in">WeakMap</span>&lt;Token, TableSource&gt;</span>): <span class="hljs-title class_">MarkdownIt</span> {
+    <span class="hljs-keyword">const</span> md = <span class="hljs-keyword">new</span> <span class="hljs-title class_">MarkdownIt</span>();
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">table</span>: <span class="hljs-function">(<span class="hljs-params">state: StateBlock, start: <span class="hljs-built_in">number</span>, end: <span class="hljs-built_in">number</span>, silent: <span class="hljs-built_in">boolean</span></span>) =&gt;</span> <span class="hljs-built_in">boolean</span> =
+        <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/rules_block/table&#x27;</span>);
+    md.<span class="hljs-property">block</span>.<span class="hljs-property">ruler</span>.<span class="hljs-title function_">at</span>(<span class="hljs-string">&#x27;table&#x27;</span>, <span class="hljs-function">(<span class="hljs-params">state, start, end, silent</span>) =&gt;</span> {
+        <span class="hljs-keyword">const</span> count = state.<span class="hljs-property">tokens</span>.<span class="hljs-property">length</span>;
+        <span class="hljs-keyword">const</span> accepted = <span class="hljs-title function_">table</span>(state, start, end, silent);
+        <span class="hljs-keyword">if</span> (!accepted || silent) { <span class="hljs-keyword">return</span> accepted; }
+        <span class="hljs-keyword">let</span> line = start, <span class="hljs-attr">cells</span>: <span class="hljs-title class_">TableCell</span>[] = [], index = <span class="hljs-number">0</span>;
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> state.<span class="hljs-property">tokens</span>.<span class="hljs-title function_">slice</span>(count)) {
+            <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> === <span class="hljs-string">&#x27;tr_open&#x27;</span> &amp;&amp; token.<span class="hljs-property">map</span>) {
+                line = token.<span class="hljs-property">map</span>[<span class="hljs-number">0</span>];
+                <span class="hljs-keyword">const</span> begin = state.<span class="hljs-property">bMarks</span>[line] + state.<span class="hljs-property">tShift</span>[line];
+                <span class="hljs-keyword">const</span> raw = state.<span class="hljs-property">src</span>.<span class="hljs-title function_">slice</span>(begin, state.<span class="hljs-property">eMarks</span>[line]);
+                <span class="hljs-keyword">const</span> lineStart = state.<span class="hljs-property">src</span>.<span class="hljs-title function_">lastIndexOf</span>(<span class="hljs-string">&#x27;\n&#x27;</span>, state.<span class="hljs-property">eMarks</span>[line] - <span class="hljs-number">1</span>) + <span class="hljs-number">1</span>;
+                <span class="hljs-keyword">const</span> offset = begin - lineStart + raw.<span class="hljs-property">length</span> - raw.<span class="hljs-title function_">trimStart</span>().<span class="hljs-property">length</span>;
+                cells = <span class="hljs-title function_">tableCells</span>(raw.<span class="hljs-title function_">trim</span>(), offset);
+                index = <span class="hljs-number">0</span>;
+            } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> === <span class="hljs-string">&#x27;inline&#x27;</span>) {
+                <span class="hljs-keyword">const</span> cell = cells[index++];
+                <span class="hljs-keyword">if</span> (cell &amp;&amp; cell.<span class="hljs-property">content</span> === token.<span class="hljs-property">content</span>) { sources.<span class="hljs-title function_">set</span>(token, { ...cell, line }); }
+            }
+        }
+        <span class="hljs-keyword">return</span> accepted;
+    }, { <span class="hljs-attr">alt</span>: [<span class="hljs-string">&#x27;paragraph&#x27;</span>, <span class="hljs-string">&#x27;reference&#x27;</span>] });
+    <span class="hljs-keyword">return</span> md;
+}
+</code></pre>
+
+</div>
+</div><p>Parse the transformed cell for Markdown semantics, then recover each tag's raw
+slice before constructing an occurrence. This keeps link destinations, images
+and escaped tags excluded, and preserves literal spelling even when an escaped
+pipe lies inside a name. No search for a name or cell text is involved.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;symbol table mentions&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">tableOccurrences</span>(<span class="hljs-params">token: Token, source: TableSource, path: <span class="hljs-built_in">string</span>,
+    lines: <span class="hljs-built_in">string</span>[]</span>): <span class="hljs-title class_">FragmentOccurrence</span>[] {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">tags</span>: <span class="hljs-title class_">InlineTag</span>[] = [];
+    <span class="hljs-keyword">const</span> md = <span class="hljs-title function_">mentionParser</span>(tags, token.<span class="hljs-property">content</span>);
+    md.<span class="hljs-property">inline</span>.<span class="hljs-title function_">parse</span>(token.<span class="hljs-property">content</span>, md, {}, []);
+    <span class="hljs-keyword">return</span> tags.<span class="hljs-title function_">flatMap</span>(<span class="hljs-function"><span class="hljs-params">tag</span> =&gt;</span> {
+        <span class="hljs-keyword">const</span> column = source.<span class="hljs-property">columns</span>[tag.<span class="hljs-property">start</span>], endColumn = source.<span class="hljs-property">columns</span>[tag.<span class="hljs-property">end</span> - <span class="hljs-number">1</span>] + <span class="hljs-number">1</span>;
+        <span class="hljs-keyword">const</span> raw = lines[source.<span class="hljs-property">line</span>].<span class="hljs-title function_">slice</span>(column, endColumn);
+        <span class="hljs-keyword">const</span> original = <span class="hljs-title function_">scanFragmentTags</span>(raw)[<span class="hljs-number">0</span>];
+        <span class="hljs-keyword">if</span> (!original || original.<span class="hljs-property">start</span> !== <span class="hljs-number">0</span> || original.<span class="hljs-property">end</span> !== raw.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> []; }
+        <span class="hljs-keyword">return</span> [<span class="hljs-title function_">occurrence</span>(original, path, source.<span class="hljs-property">line</span>, column, <span class="hljs-string">&#x27;mention&#x27;</span>)];
+    });
+}
+</code></pre>
+
+</div>
+</div><p>HTML blocks are conservatively excluded using a second block parse with HTML
+enabled solely to identify their ranges. Normal collection still uses default
+Markdown-it. Ordinary/example fences, indented code, malformed named fences and
+SETTINGS bodies are never prose. Inline HTML is left to default Markdown-it
+semantics; this is not an HTML attribute rename tool.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;symbol document collection&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">documentOccurrences</span>(<span class="hljs-params"><span class="hljs-variable language_">document</span>: SourceDocument</span>): <span class="hljs-title class_">FragmentOccurrence</span>[] {
+    <span class="hljs-keyword">const</span> lines = <span class="hljs-variable language_">document</span>.<span class="hljs-property">text</span>.<span class="hljs-title function_">split</span>(<span class="hljs-regexp">/\r\n|\r|\n/</span>);
+    <span class="hljs-keyword">const</span> tables = <span class="hljs-keyword">new</span> <span class="hljs-title class_">WeakMap</span>&lt;<span class="hljs-title class_">Token</span>, <span class="hljs-title class_">TableSource</span>&gt;();
+    <span class="hljs-keyword">const</span> tokens = <span class="hljs-title function_">tableParser</span>(tables).<span class="hljs-title function_">parse</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">text</span>, {});
+    <span class="hljs-keyword">const</span> html = <span class="hljs-keyword">new</span> <span class="hljs-title class_">MarkdownIt</span>({ <span class="hljs-attr">html</span>: <span class="hljs-literal">true</span> }).<span class="hljs-title function_">parse</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">text</span>, {})
+        .<span class="hljs-title function_">filter</span>(<span class="hljs-function"><span class="hljs-params">token</span> =&gt;</span> token.<span class="hljs-property">type</span> === <span class="hljs-string">&#x27;html_block&#x27;</span> &amp;&amp; token.<span class="hljs-property">map</span>).<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">token</span> =&gt;</span> token.<span class="hljs-property">map</span>!);
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">result</span>: <span class="hljs-title class_">FragmentOccurrence</span>[] = [];
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> tokens) {
+        <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> === <span class="hljs-string">&#x27;fence&#x27;</span>) { result.<span class="hljs-title function_">push</span>(...<span class="hljs-title function_">fenceOccurrences</span>(token, <span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>, lines)); }
+        <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> === <span class="hljs-string">&#x27;inline&#x27;</span>) {
+            <span class="hljs-keyword">const</span> source = tables.<span class="hljs-title function_">get</span>(token);
+            <span class="hljs-keyword">const</span> mentions = source ? <span class="hljs-title function_">tableOccurrences</span>(token, source, <span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>, lines) :
+                <span class="hljs-title function_">proseOccurrences</span>(token, <span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>, lines);
+            result.<span class="hljs-title function_">push</span>(...mentions.<span class="hljs-title function_">filter</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span> !html.<span class="hljs-title function_">some</span>(<span class="hljs-function">(<span class="hljs-params">[start, end]</span>) =&gt;</span> item.<span class="hljs-property">line</span> &gt;= start &amp;&amp; item.<span class="hljs-property">line</span> &lt; end)));
+        }
+    }
+    <span class="hljs-keyword">return</span> result.<span class="hljs-title function_">sort</span>(<span class="hljs-function">(<span class="hljs-params">a, b</span>) =&gt;</span> a.<span class="hljs-property">line</span> - b.<span class="hljs-property">line</span> || a.<span class="hljs-property">column</span> - b.<span class="hljs-property">column</span>);
+}
+</code></pre>
+
+</div>
+</div><p>Results follow caller document order and source order within each document.
+Missing fragment references remain available for editor create commands.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;symbol collection entry point&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">collectFragmentOccurrences</span>(<span class="hljs-params">documents: SourceDocument[]</span>): <span class="hljs-title class_">FragmentOccurrence</span>[] {
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_">normalizeDocuments</span>(documents).<span class="hljs-title function_">flatMap</span>(documentOccurrences);
+}
+</code></pre>
+
+</div>
+</div><h2>Rename is an atomic plan</h2>
+<p>Both names must be nonblank, trimmed, single-line names without chevrons or
+control characters. Quotes, dollar signs and other literal text are allowed.
+A changed name must not contain backticks: these invalidate backtick fence info
+strings and can change inline-code boundaries. This conservative policy also
+applies to tilde-fenced definitions. Existing backtick names can be renamed away
+or kept by a validated no-op; collection and the shared grammar remain literal.
+The root suffix is semantic: renaming cannot add or remove <code>.*</code>, and a root
+must have a nonblank name before that suffix. Rejecting a
+collision with <em>any</em> known occurrence prevents capturing unresolved references
+or prose mentions as well as existing definitions and append-only declarations.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;symbol rename validation&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">validateRenameName</span>(<span class="hljs-params">name: <span class="hljs-built_in">string</span>, label: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">const</span> stem = name.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;.*&#x27;</span>) ? name.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, -<span class="hljs-number">2</span>) : name;
+    <span class="hljs-keyword">if</span> (!stem.<span class="hljs-title function_">trim</span>() || name !== name.<span class="hljs-title function_">trim</span>() || <span class="hljs-regexp">/[&lt;&gt;\x00-\x1f\x7f-\x9f\u2028\u2029]/</span>.<span class="hljs-title function_">test</span>(name)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Invalid <span class="hljs-subst">${label}</span> fragment name: expected a nonempty trimmed name without chevrons or controls`</span>);
+    }
+}
+</code></pre>
+
+</div>
+</div><p>Preview edits only in fresh, normalized documents. Apply each document's edits
+in descending position order so earlier raw UTF-16 coordinates remain valid.
+Captured line separators preserve CRLF, CR and mixed endings exactly; neither
+caller buffers nor the returned source-order edit plan are mutated.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;symbol rename preview&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">previewRename</span>(<span class="hljs-params">documents: SourceDocument[], edits: FragmentRenameEdit[]</span>): <span class="hljs-title class_">SourceDocument</span>[] {
+    <span class="hljs-keyword">return</span> documents.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">document</span> =&gt;</span> {
+        <span class="hljs-keyword">const</span> parts = <span class="hljs-variable language_">document</span>.<span class="hljs-property">text</span>.<span class="hljs-title function_">split</span>(<span class="hljs-regexp">/(\r\n|\r|\n)/</span>);
+        <span class="hljs-keyword">const</span> descending = edits.<span class="hljs-title function_">filter</span>(<span class="hljs-function"><span class="hljs-params">edit</span> =&gt;</span> edit.<span class="hljs-property">path</span> === <span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>)
+            .<span class="hljs-title function_">sort</span>(<span class="hljs-function">(<span class="hljs-params">a, b</span>) =&gt;</span> b.<span class="hljs-property">line</span> - a.<span class="hljs-property">line</span> || b.<span class="hljs-property">startColumn</span> - a.<span class="hljs-property">startColumn</span>);
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> edit <span class="hljs-keyword">of</span> descending) {
+            <span class="hljs-keyword">const</span> index = edit.<span class="hljs-property">line</span> * <span class="hljs-number">2</span>, line = parts[index];
+            parts[index] = line.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, edit.<span class="hljs-property">startColumn</span>) + edit.<span class="hljs-property">newText</span> + line.<span class="hljs-title function_">slice</span>(edit.<span class="hljs-property">endColumn</span>);
+        }
+        <span class="hljs-keyword">return</span> { <span class="hljs-attr">path</span>: <span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>, <span class="hljs-attr">text</span>: parts.<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;&#x27;</span>) };
+    });
+}
+</code></pre>
+
+</div>
+</div><p>Names can change Markdown structure outside a tag, notably by introducing table
+separators. Recollect the preview and require the entire ordered occurrence
+sequence to survive, including unrelated symbols. Only the old name may change;
+paths, lines and kinds must match. Columns may shift as names grow or shrink.
+This is a syntax-preservation check, not a blanket punctuation ban.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;symbol rename safety&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">validateRenameSyntax</span>(<span class="hljs-params">documents: SourceDocument[], edits: FragmentRenameEdit[],
+    occurrences: FragmentOccurrence[], oldName: <span class="hljs-built_in">string</span>, newName: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">const</span> actual = <span class="hljs-title function_">collectFragmentOccurrences</span>(<span class="hljs-title function_">previewRename</span>(documents, edits));
+    <span class="hljs-keyword">const</span> unchanged = actual.<span class="hljs-property">length</span> === occurrences.<span class="hljs-property">length</span> &amp;&amp; occurrences.<span class="hljs-title function_">every</span>(<span class="hljs-function">(<span class="hljs-params">before, index</span>) =&gt;</span> {
+        <span class="hljs-keyword">const</span> after = actual[index];
+        <span class="hljs-keyword">return</span> after.<span class="hljs-property">path</span> === before.<span class="hljs-property">path</span> &amp;&amp; after.<span class="hljs-property">line</span> === before.<span class="hljs-property">line</span> &amp;&amp; after.<span class="hljs-property">kind</span> === before.<span class="hljs-property">kind</span> &amp;&amp;
+            after.<span class="hljs-property">name</span> === (before.<span class="hljs-property">name</span> === oldName ? newName : before.<span class="hljs-property">name</span>);
+    });
+    <span class="hljs-keyword">if</span> (!unchanged) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Unsafe fragment rename: Markdown syntax changes the fragment occurrence sequence&#x27;</span>);
+    }
+}
+</code></pre>
+
+</div>
+</div><p>A no-op still validates documents, names and the unique base definition. Edits
+are returned in source order for adapters to apply atomically (or in reverse
+position order when manipulating strings). No replacement-string evaluation is
+performed: <code>newText</code> is always the literal requested name.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;symbol rename planning&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">planFragmentRename</span>(<span class="hljs-params">documents: SourceDocument[], oldName: <span class="hljs-built_in">string</span>, newName: <span class="hljs-built_in">string</span></span>): <span class="hljs-title class_">FragmentRenameEdit</span>[] {
+    <span class="hljs-title function_">validateRenameName</span>(oldName, <span class="hljs-string">&#x27;old&#x27;</span>);
+    <span class="hljs-title function_">validateRenameName</span>(newName, <span class="hljs-string">&#x27;new&#x27;</span>);
+    <span class="hljs-keyword">if</span> (oldName.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;.*&#x27;</span>) !== newName.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;.*&#x27;</span>)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Fragment rename must preserve the root suffix .*&#x27;</span>);
+    }
+    <span class="hljs-keyword">const</span> normalized = <span class="hljs-title function_">normalizeDocuments</span>(documents);
+    <span class="hljs-keyword">const</span> occurrences = <span class="hljs-title function_">collectFragmentOccurrences</span>(normalized);
+    <span class="hljs-keyword">const</span> definitions = occurrences.<span class="hljs-title function_">filter</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span> item.<span class="hljs-property">name</span> === oldName &amp;&amp; item.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;definition&#x27;</span>);
+    <span class="hljs-keyword">if</span> (definitions.<span class="hljs-property">length</span> !== <span class="hljs-number">1</span>) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Expected exactly one base definition for <span class="hljs-subst">${oldName}</span>; found <span class="hljs-subst">${definitions.length}</span>`</span>);
+    }
+    <span class="hljs-keyword">if</span> (oldName === newName) { <span class="hljs-keyword">return</span> []; }
+    <span class="hljs-keyword">if</span> (newName.<span class="hljs-title function_">includes</span>(<span class="hljs-string">&#x27;`&#x27;</span>)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Invalid new fragment name: backticks are unsafe in fence headers and inline code&#x27;</span>);
+    }
+    <span class="hljs-keyword">if</span> (occurrences.<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span> item.<span class="hljs-property">name</span> === newName)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Fragment name collision: <span class="hljs-subst">${newName}</span> already occurs in the project`</span>);
+    }
+    <span class="hljs-keyword">const</span> edits = occurrences.<span class="hljs-title function_">filter</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span> item.<span class="hljs-property">name</span> === oldName).<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span> ({
+        <span class="hljs-attr">path</span>: item.<span class="hljs-property">path</span>, <span class="hljs-attr">line</span>: item.<span class="hljs-property">line</span>, <span class="hljs-attr">startColumn</span>: item.<span class="hljs-property">column</span> + <span class="hljs-number">2</span>,
+        <span class="hljs-attr">endColumn</span>: item.<span class="hljs-property">endColumn</span> - <span class="hljs-number">2</span>, <span class="hljs-attr">newText</span>: newName
+    }));
+    <span class="hljs-title function_">validateRenameSyntax</span>(normalized, edits, occurrences, oldName, newName);
+    <span class="hljs-keyword">return</span> edits;
+}
+</code></pre>
+
+</div>
+</div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+</script>
+</body>
+</html>

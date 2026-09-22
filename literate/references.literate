@@ -23,33 +23,35 @@ constructor(
 
 The actual implementation of the provider takes a document, a position and an
 option whether to include the declaration in the list of references or not. The
-cancellation token remains unused for now.
+cancellation token is checked before and after refreshing the read-only symbol
+snapshot, and before returning locations.
 
 ```  ts  : <<imlement reference provider>>=
 public async provideReferences(
     document : vscode.TextDocument,
     position : vscode.Position,
-    __: { includeDeclaration : boolean},
-    _ : vscode.CancellationToken
+    context: { includeDeclaration : boolean},
+    token : vscode.CancellationToken
 )
 {
+    if(token.isCancellationRequested) { return null; }
+    const workspaceFolder = determineWorkspaceFolder(document);
+    if(!workspaceFolder) { return null; }
+    await this.repository.processLiterateFiles(document);
+    if(token.isCancellationRequested) { return null; }
     const fragmentLocation = this.repository.getFragmentTagLocation(
         document,
         document.lineAt(position),
         position
     );
 
-    const workspaceFolder = determineWorkspaceFolder(document);
-
-    if(workspaceFolder)
-    {
-        return await this.repository.getReferenceLocations(
-            workspaceFolder,
-            fragmentLocation.name
-        );
-    }
-
-    return null;
+    if(!fragmentLocation.valid) { return null; }
+    const locations = await this.repository.getReferenceLocations(
+        workspaceFolder,
+        fragmentLocation.name,
+        context.includeDeclaration
+    );
+    return token.isCancellationRequested ? null : locations;
 
 }
 ```

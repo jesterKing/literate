@@ -29,6 +29,8 @@ shared contracts and helpers for both generation and its adapters.</p>
 <div class="code">
 <pre><code><span class="literate-tag-name">&lt;&lt;engine interfaces and dependencies&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;engine path and source validation&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;engine shared fragment scanning&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;engine shared header parsing&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;engine document ordering&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;engine template dependency discovery&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;engine literal template substitution&gt;&gt;</span>
@@ -167,6 +169,53 @@ computed from the original text, including its original line endings.</p>
     };
 }
 
+</code></pre>
+
+</div>
+</div><h2>Shared lexical contracts for editor symbols</h2>
+<p>The scanner returns whole-tag UTF-16 ranges, excluding reference operators.
+Escaped openers are consumed by the same regex as real tags, so generation and
+editor tools cannot disagree about whether a tag is a dependency. Operators
+remain available to generation for diagnostics, without entering rename ranges.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine shared fragment scanning&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">FragmentTag</span> { <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">start</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">end</span>: <span class="hljs-built_in">number</span>; modifier?: <span class="hljs-built_in">string</span>; }
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">scanFragmentTags</span>(<span class="hljs-params">text: <span class="hljs-built_in">string</span></span>): <span class="hljs-title class_">FragmentTag</span>[] {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">tags</span>: <span class="hljs-title class_">FragmentTag</span>[] = [];
+    <span class="hljs-keyword">const</span> pattern = <span class="hljs-regexp">/\\<span class="literate-tag-name">&lt;&lt;|&lt;&lt;([^&lt;&gt;\r\n]+)&gt;&gt;</span>(=\+?|\+)?/g</span>;
+    <span class="hljs-keyword">let</span> <span class="hljs-attr">match</span>: <span class="hljs-title class_">RegExpExecArray</span> | <span class="hljs-literal">null</span>;
+    <span class="hljs-keyword">while</span> ((match = pattern.<span class="hljs-title function_">exec</span>(text))) {
+        <span class="hljs-keyword">if</span> (match[<span class="hljs-number">1</span>] === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">continue</span>; }
+        tags.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">name</span>: match[<span class="hljs-number">1</span>], <span class="hljs-attr">start</span>: match.<span class="hljs-property">index</span>,
+            <span class="hljs-attr">end</span>: match.<span class="hljs-property">index</span> + match[<span class="hljs-number">1</span>].<span class="hljs-property">length</span> + <span class="hljs-number">4</span>, <span class="hljs-attr">modifier</span>: match[<span class="hljs-number">2</span>] });
+    }
+    <span class="hljs-keyword">return</span> tags;
+}
+</code></pre>
+
+</div>
+</div><p>Header offsets are relative to the supplied info string, not the fence marker.
+The anchored engine grammar remains the single source of truth; locate its
+tag after the optional language rather than searching for a possibly repeated
+name in the language or filename. Blank names are not declarations.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine shared header parsing&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">FragmentHeader</span> {
+    <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">language</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">append</span>: <span class="hljs-built_in">boolean</span>; <span class="hljs-attr">remainder</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">tagStart</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">tagEnd</span>: <span class="hljs-built_in">number</span>;
+}
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">parseFragmentHeader</span>(<span class="hljs-params">info: <span class="hljs-built_in">string</span></span>): <span class="hljs-title class_">FragmentHeader</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">const</span> match = fragmentHeader.<span class="hljs-title function_">exec</span>(info);
+    <span class="hljs-keyword">if</span> (!match || !match[<span class="hljs-number">2</span>].<span class="hljs-title function_">trim</span>()) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">const</span> afterLanguage = match[<span class="hljs-number">1</span>] ? info.<span class="hljs-title function_">indexOf</span>(match[<span class="hljs-number">1</span>]) + match[<span class="hljs-number">1</span>].<span class="hljs-property">length</span> : <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">const</span> tagStart = info.<span class="hljs-title function_">indexOf</span>(<span class="hljs-string">&#x27;&lt;&lt;&#x27;</span>, afterLanguage);
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">name</span>: match[<span class="hljs-number">2</span>], <span class="hljs-attr">language</span>: match[<span class="hljs-number">1</span>] || <span class="hljs-string">&#x27;&#x27;</span>, <span class="hljs-attr">append</span>: !!match[<span class="hljs-number">3</span>], <span class="hljs-attr">remainder</span>: match[<span class="hljs-number">4</span>],
+        tagStart, <span class="hljs-attr">tagEnd</span>: tagStart + match[<span class="hljs-number">2</span>].<span class="hljs-property">length</span> + <span class="hljs-number">4</span> };
+}
 </code></pre>
 
 </div>
@@ -551,16 +600,18 @@ controls indentation when inserting multiline dependencies.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;engine dependency expansion and validation barrier&gt;&gt;= </div>
 <div class="code">
-<pre><code>    <span class="hljs-keyword">const</span> replaceReferences = (<span class="hljs-attr">part</span>: <span class="hljs-title class_">Part</span>, <span class="hljs-attr">replace</span>: <span class="hljs-function">(<span class="hljs-params">name: <span class="hljs-built_in">string</span>, modifier: <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>, at: Location, prefix: <span class="hljs-built_in">string</span></span>) =&gt;</span> <span class="hljs-built_in">string</span>): <span class="hljs-function"><span class="hljs-params">string</span> =&gt;</span>
-        part.<span class="hljs-property">content</span>.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\\<span class="literate-tag-name">&lt;&lt;|&lt;&lt;([^&lt;&gt;\r\n]+)&gt;&gt;</span>(=\+?|\+)?/g</span>,
-            <span class="hljs-function">(<span class="hljs-params">whole: <span class="hljs-built_in">string</span>, name: <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>, modifier: <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>, offset: <span class="hljs-built_in">number</span></span>) =&gt;</span> {
-                <span class="hljs-keyword">if</span> (name === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> whole; }
-                <span class="hljs-keyword">const</span> before = part.<span class="hljs-property">content</span>.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, offset);
-                <span class="hljs-keyword">const</span> prefix = before.<span class="hljs-title function_">slice</span>(before.<span class="hljs-title function_">lastIndexOf</span>(<span class="hljs-string">&#x27;\n&#x27;</span>) + <span class="hljs-number">1</span>);
-                <span class="hljs-keyword">const</span> line = before.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;\n&#x27;</span>).<span class="hljs-property">length</span> - <span class="hljs-number">1</span>;
-                <span class="hljs-keyword">const</span> at = { <span class="hljs-attr">path</span>: part.<span class="hljs-property">location</span>.<span class="hljs-property">path</span>, <span class="hljs-attr">line</span>: part.<span class="hljs-property">location</span>.<span class="hljs-property">line</span> + line, <span class="hljs-attr">column</span>: prefix.<span class="hljs-property">length</span> + part.<span class="hljs-property">columns</span>[line] };
-                <span class="hljs-keyword">return</span> <span class="hljs-title function_">replace</span>(name, modifier, at, prefix);
-            });
+<pre><code>    <span class="hljs-keyword">const</span> replaceReferences = (<span class="hljs-attr">part</span>: <span class="hljs-title class_">Part</span>, <span class="hljs-attr">replace</span>: <span class="hljs-function">(<span class="hljs-params">name: <span class="hljs-built_in">string</span>, modifier: <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>, at: Location, prefix: <span class="hljs-built_in">string</span></span>) =&gt;</span> <span class="hljs-built_in">string</span>): <span class="hljs-function"><span class="hljs-params">string</span> =&gt;</span> {
+        <span class="hljs-keyword">let</span> result = <span class="hljs-string">&#x27;&#x27;</span>, cursor = <span class="hljs-number">0</span>;
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> tag <span class="hljs-keyword">of</span> <span class="hljs-title function_">scanFragmentTags</span>(part.<span class="hljs-property">content</span>)) {
+            <span class="hljs-keyword">const</span> before = part.<span class="hljs-property">content</span>.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, tag.<span class="hljs-property">start</span>);
+            <span class="hljs-keyword">const</span> prefix = before.<span class="hljs-title function_">slice</span>(before.<span class="hljs-title function_">lastIndexOf</span>(<span class="hljs-string">&#x27;\n&#x27;</span>) + <span class="hljs-number">1</span>);
+            <span class="hljs-keyword">const</span> line = before.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;\n&#x27;</span>).<span class="hljs-property">length</span> - <span class="hljs-number">1</span>;
+            <span class="hljs-keyword">const</span> at = { <span class="hljs-attr">path</span>: part.<span class="hljs-property">location</span>.<span class="hljs-property">path</span>, <span class="hljs-attr">line</span>: part.<span class="hljs-property">location</span>.<span class="hljs-property">line</span> + line, <span class="hljs-attr">column</span>: prefix.<span class="hljs-property">length</span> + part.<span class="hljs-property">columns</span>[line] };
+            result += part.<span class="hljs-property">content</span>.<span class="hljs-title function_">slice</span>(cursor, tag.<span class="hljs-property">start</span>) + <span class="hljs-title function_">replace</span>(tag.<span class="hljs-property">name</span>, tag.<span class="hljs-property">modifier</span>, at, prefix);
+            cursor = tag.<span class="hljs-property">end</span> + (tag.<span class="hljs-property">modifier</span>?.<span class="hljs-property">length</span> || <span class="hljs-number">0</span>);
+        }
+        <span class="hljs-keyword">return</span> result + part.<span class="hljs-property">content</span>.<span class="hljs-title function_">slice</span>(cursor);
+    };
 </code></pre>
 
 </div>

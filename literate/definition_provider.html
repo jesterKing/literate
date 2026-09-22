@@ -36,35 +36,37 @@ this as a parameter property.</p>
 </code></pre>
 
 </div>
-</div><p>The provider method takes a text document and a position. The cancellation token
-is unused.</p>
+</div><p>The provider refreshes a read-only snapshot before lookup and honors cancellation.
+Definition locations use the same exact tag ranges as references and hover.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;definiton provider implementation&gt;&gt;= </div>
 <div class="code">
-<pre><code><span class="hljs-keyword">public</span> provideDefinition
+<pre><code><span class="hljs-keyword">public</span> <span class="hljs-keyword">async</span> provideDefinition
     (
         <span class="hljs-variable language_">document</span> : vscode.<span class="hljs-property">TextDocument</span>,
         position : vscode.<span class="hljs-property">Position</span>,
-        _ : vscode.<span class="hljs-property">CancellationToken</span>
+        token : vscode.<span class="hljs-property">CancellationToken</span>
     )
 {
+    <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">const</span> workspaceFolder = <span class="hljs-title function_">determineWorkspaceFolder</span>(<span class="hljs-variable language_">document</span>);
+    <span class="hljs-keyword">if</span>(!workspaceFolder) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">await</span> <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">processLiterateFiles</span>(<span class="hljs-variable language_">document</span>);
+    <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
     <span class="hljs-keyword">const</span> fragmentLocation = <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">getFragmentTagLocation</span>(
         <span class="hljs-variable language_">document</span>,
         <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">lineAt</span>(position),
         position
     );
-    <span class="hljs-keyword">if</span>(fragmentLocation &amp;&amp; fragmentLocation.<span class="hljs-property">fragment</span>)
-    {
-        <span class="hljs-keyword">let</span> map = fragmentLocation.<span class="hljs-property">fragment</span>.<span class="hljs-property">tokens</span>[<span class="hljs-number">0</span>].<span class="hljs-property">map</span>;
-        <span class="hljs-keyword">if</span>(map) {
-            <span class="hljs-keyword">let</span> definitionPosition = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Position</span>(map[<span class="hljs-number">0</span>], <span class="hljs-number">0</span>);
-            <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Location</span>(
-                fragmentLocation.<span class="hljs-property">fragment</span>.<span class="hljs-property">env</span>.<span class="hljs-property">literateUri</span>,
-                definitionPosition
-            );
-        }
-    }
-    <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>;
+    <span class="hljs-keyword">if</span>(!fragmentLocation.<span class="hljs-property">valid</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">const</span> definition = <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">getFragmentOccurrences</span>(workspaceFolder).<span class="hljs-title function_">find</span>(
+        <span class="hljs-function"><span class="hljs-params">occurrence</span> =&gt;</span> occurrence.<span class="hljs-property">name</span> === fragmentLocation.<span class="hljs-property">name</span> &amp;&amp; occurrence.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;definition&#x27;</span>
+    );
+    <span class="hljs-keyword">if</span>(!definition || token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Location</span>(
+        vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">joinPath</span>(workspaceFolder.<span class="hljs-property">uri</span>, definition.<span class="hljs-property">path</span>),
+        <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(definition.<span class="hljs-property">line</span>, definition.<span class="hljs-property">column</span>, definition.<span class="hljs-property">line</span>, definition.<span class="hljs-property">endColumn</span>)
+    );
 }
 </code></pre>
 

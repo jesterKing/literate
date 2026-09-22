@@ -49,6 +49,8 @@ The class `FragmentNodeProvider` implements a `TreeDataProvider` with
 ``` ts : <<fragment tree provider>>=
 export class FragmentNodeProvider implements vscode.TreeDataProvider<FragmentNode>
 {
+  constructor(private readonly repository : FragmentRepository = theOneRepository) {}
+
   <<fragment node provider members>>
   <<fragment node provider API>>
 }
@@ -221,7 +223,7 @@ As a reminder the fragments map has the fragment name as key and the
 corresponding `FragmentInformation` as the value to that key.
 
 ``` ts : <<get fragment family for offspring search>>=
-const fragments = theOneRepository.getFragments(fldr).map;
+const fragments = this.repository.getFragments(fldr).map;
 ```
 
 ## TODO: build proper fragment hierarchy from fragments map
@@ -237,34 +239,26 @@ fragment occurance under that shown.
 
 When we have found the fragment the passed in element represents we can find the
 child fragment names, that is the fragment names used in this fragment. All
-matches against `FRAGMENT_USE_IN_CODE_RE` are found and for each case a
-corresponding `FragmentNode` is created to function as a child to our parent
-element.
+unescaped tags are found with the shared `scanFragmentTags` scanner. Each child
+uses its own fragment information so clicking it opens the child definition,
+not the parent. Unresolved children have no navigation command.
 
 ``` ts : <<create fragment node for fragment parent>>=
 let fragmentInfo = fragments.get(fragmentName) || undefined;
 if (fragmentInfo) {
-  const casesToReplace = [...fragmentInfo.code.matchAll(FRAGMENT_USE_IN_CODE_RE)];
-  for (let match of casesToReplace) {
-    if(!match || !match.groups)
-    {
-      continue;
-    }
-    let tag = match[0];
-    let ident = match.groups.ident;
-    let tagName = match.groups.tagName;
-    let root = match.groups.root;
-    let add = match.groups.add;
+  for (const tag of scanFragmentTags(fragmentInfo.code)) {
+    const tagName = tag.name;
+    const childInfo = fragments.get(tagName) || undefined;
     arr.push(
       new FragmentNode(
         tagName,
-                new vscode.MarkdownString(`$(symbol-file) ${fragmentInfo.literateFileName}`, true),
+        new vscode.MarkdownString(`$(symbol-file) ${childInfo ? childInfo.literateFileName : 'Unresolved fragment'}`, true),
         fragmentName,
         vscode.TreeItemCollapsibleState.Collapsed,
         folderName,
         element.label,
         element.workspaceFolder,
-        fragmentInfo
+        childInfo
       )
     );
   }

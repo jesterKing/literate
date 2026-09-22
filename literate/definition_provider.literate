@@ -25,34 +25,36 @@ constructor(
 ) {}
 ```
 
-The provider method takes a text document and a position. The cancellation token
-is unused.
+The provider refreshes a read-only snapshot before lookup and honors cancellation.
+Definition locations use the same exact tag ranges as references and hover.
 
 ```  ts  : <<definiton provider implementation>>=
-public provideDefinition
+public async provideDefinition
     (
         document : vscode.TextDocument,
         position : vscode.Position,
-        _ : vscode.CancellationToken
+        token : vscode.CancellationToken
     )
 {
+    if(token.isCancellationRequested) { return null; }
+    const workspaceFolder = determineWorkspaceFolder(document);
+    if(!workspaceFolder) { return null; }
+    await this.repository.processLiterateFiles(document);
+    if(token.isCancellationRequested) { return null; }
     const fragmentLocation = this.repository.getFragmentTagLocation(
         document,
         document.lineAt(position),
         position
     );
-    if(fragmentLocation && fragmentLocation.fragment)
-    {
-        let map = fragmentLocation.fragment.tokens[0].map;
-        if(map) {
-            let definitionPosition = new vscode.Position(map[0], 0);
-            return new vscode.Location(
-                fragmentLocation.fragment.env.literateUri,
-                definitionPosition
-            );
-        }
-    }
-    return null;
+    if(!fragmentLocation.valid) { return null; }
+    const definition = this.repository.getFragmentOccurrences(workspaceFolder).find(
+        occurrence => occurrence.name === fragmentLocation.name && occurrence.kind === 'definition'
+    );
+    if(!definition || token.isCancellationRequested) { return null; }
+    return new vscode.Location(
+        vscode.Uri.joinPath(workspaceFolder.uri, definition.path),
+        new vscode.Range(definition.line, definition.column, definition.line, definition.endColumn)
+    );
 }
 ```
 

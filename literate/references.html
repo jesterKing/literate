@@ -35,34 +35,36 @@ constructor. This is defined as a parameter property.</p>
 </div>
 </div><p>The actual implementation of the provider takes a document, a position and an
 option whether to include the declaration in the list of references or not. The
-cancellation token remains unused for now.</p>
+cancellation token is checked before and after refreshing the read-only symbol
+snapshot, and before returning locations.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;imlement reference provider&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">public</span> <span class="hljs-keyword">async</span> <span class="hljs-title function_">provideReferences</span>(<span class="hljs-params">
     <span class="hljs-variable language_">document</span> : vscode.TextDocument,
     position : vscode.Position,
-    __: { includeDeclaration : <span class="hljs-built_in">boolean</span>},
-    _ : vscode.CancellationToken
+    context: { includeDeclaration : <span class="hljs-built_in">boolean</span>},
+    token : vscode.CancellationToken
 </span>)
 {
+    <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">const</span> workspaceFolder = <span class="hljs-title function_">determineWorkspaceFolder</span>(<span class="hljs-variable language_">document</span>);
+    <span class="hljs-keyword">if</span>(!workspaceFolder) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">await</span> <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">processLiterateFiles</span>(<span class="hljs-variable language_">document</span>);
+    <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
     <span class="hljs-keyword">const</span> fragmentLocation = <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">getFragmentTagLocation</span>(
         <span class="hljs-variable language_">document</span>,
         <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">lineAt</span>(position),
         position
     );
 
-    <span class="hljs-keyword">const</span> workspaceFolder = <span class="hljs-title function_">determineWorkspaceFolder</span>(<span class="hljs-variable language_">document</span>);
-
-    <span class="hljs-keyword">if</span>(workspaceFolder)
-    {
-        <span class="hljs-keyword">return</span> <span class="hljs-keyword">await</span> <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">getReferenceLocations</span>(
-            workspaceFolder,
-            fragmentLocation.<span class="hljs-property">name</span>
-        );
-    }
-
-    <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>;
+    <span class="hljs-keyword">if</span>(!fragmentLocation.<span class="hljs-property">valid</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">const</span> locations = <span class="hljs-keyword">await</span> <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">getReferenceLocations</span>(
+        workspaceFolder,
+        fragmentLocation.<span class="hljs-property">name</span>,
+        context.<span class="hljs-property">includeDeclaration</span>
+    );
+    <span class="hljs-keyword">return</span> token.<span class="hljs-property">isCancellationRequested</span> ? <span class="hljs-literal">null</span> : locations;
 
 }
 </code></pre>

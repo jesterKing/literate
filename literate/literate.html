@@ -163,6 +163,8 @@ above.These we introduce right before defining the repository class.</p>
       grabbedState.<span class="hljs-title function_">dispose</span>();
     }
     <span class="hljs-variable language_">this</span>.<span class="hljs-property">grabbedStateForWorkspaceFolders</span>.<span class="hljs-title function_">clear</span>();
+        <span class="hljs-variable language_">this</span>.<span class="hljs-property">sourceDocuments</span>.<span class="hljs-title function_">clear</span>();
+        <span class="hljs-variable language_">this</span>.<span class="hljs-property">occurrences</span>.<span class="hljs-title function_">clear</span>();
   }
 }
 </code></pre>
@@ -176,13 +178,15 @@ properly. We'll need an instance of a properly configured <em>MarkdownIt</em> pa
 <div class="code">
 <pre><code><span class="hljs-keyword">private</span> md : <span class="hljs-title class_">MarkdownIt</span>;
 <span class="hljs-keyword">private</span> <span class="hljs-attr">processingQueue</span>: <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; = <span class="hljs-title class_">Promise</span>.<span class="hljs-title function_">resolve</span>();
+<span class="hljs-keyword">private</span> sourceDocuments = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">SourceDocument</span>[]&gt;();
+<span class="hljs-keyword">private</span> occurrences = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">FragmentOccurrence</span>[]&gt;();
 </code></pre>
 
 </div>
 </div><p>The <em>MarkdownIt</em> parser will handle the actual tokenizing and parsing of the
 <strong>literate</strong> files.</p>
 <p>Since we work with a multi-root workspace we'll create a map of maps. The keys
-for this top-level map will be the workspace folder names. The actual
+for this top-level map are full workspace URIs, not ambiguous display names. The actual
 <code>FragmentMap</code>s will be the values to each workspace folder.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;fragment repository member variables&gt;&gt;=+ </div>
@@ -193,8 +197,7 @@ for this top-level map will be the workspace folder names. The actual
 </div>
 </div><p>For our parsing functionality we need an <code>Array&lt;GrabbedState&gt;</code>, which we have
 encapsulated in the class <code>GrabbedStateList</code> and is available through the <code>list</code>
-property. Each <code>GrabbedStateList</code> is saved to the map of workspace folder name
-and list key-value pair.</p>
+property. Each <code>GrabbedStateList</code> is keyed by the full workspace URI.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;fragment repository member variables&gt;&gt;=+ </div>
 <div class="code">
@@ -292,8 +295,11 @@ workspace folder.</p>
       }
       <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> removedWorkspaceFolder <span class="hljs-keyword">of</span> e.<span class="hljs-property">removed</span>)
       {
-        <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentsForWorkspaceFolders</span>.<span class="hljs-title function_">delete</span>(removedWorkspaceFolder.<span class="hljs-property">name</span>);
-        <span class="hljs-variable language_">this</span>.<span class="hljs-property">grabbedStateForWorkspaceFolders</span>.<span class="hljs-title function_">delete</span>(removedWorkspaceFolder.<span class="hljs-property">name</span>);
+        <span class="hljs-keyword">const</span> key = removedWorkspaceFolder.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>();
+        <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentsForWorkspaceFolders</span>.<span class="hljs-title function_">delete</span>(key);
+        <span class="hljs-variable language_">this</span>.<span class="hljs-property">grabbedStateForWorkspaceFolders</span>.<span class="hljs-title function_">delete</span>(key);
+        <span class="hljs-variable language_">this</span>.<span class="hljs-property">sourceDocuments</span>.<span class="hljs-title function_">delete</span>(key);
+        <span class="hljs-variable language_">this</span>.<span class="hljs-property">occurrences</span>.<span class="hljs-title function_">delete</span>(key);
       }
     }
   )
@@ -390,11 +396,16 @@ This map is not another generator and never supplies generation diagnostics.</p>
       }
       <span class="hljs-keyword">const</span> states = <span class="hljs-keyword">new</span> <span class="hljs-title class_">GrabbedStateList</span>();
       <span class="hljs-keyword">const</span> fragments = <span class="hljs-keyword">new</span> <span class="hljs-title class_">FragmentMap</span>();
-      <span class="hljs-variable language_">this</span>.<span class="hljs-property">grabbedStateForWorkspaceFolders</span>.<span class="hljs-title function_">set</span>(workspaceFolder.<span class="hljs-property">name</span>, states);
-      <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentsForWorkspaceFolders</span>.<span class="hljs-title function_">set</span>(workspaceFolder.<span class="hljs-property">name</span>, fragments);
+      <span class="hljs-keyword">const</span> key = workspaceFolder.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>();
+      <span class="hljs-variable language_">this</span>.<span class="hljs-property">grabbedStateForWorkspaceFolders</span>.<span class="hljs-title function_">set</span>(key, states);
+      <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentsForWorkspaceFolders</span>.<span class="hljs-title function_">set</span>(key, fragments);
+      <span class="hljs-variable language_">this</span>.<span class="hljs-property">sourceDocuments</span>.<span class="hljs-title function_">set</span>(key, []);
+      <span class="hljs-variable language_">this</span>.<span class="hljs-property">occurrences</span>.<span class="hljs-title function_">set</span>(key, []);
       <span class="hljs-keyword">let</span> <span class="hljs-attr">ordered</span>: <span class="hljs-title class_">SourceDocument</span>[];
       <span class="hljs-keyword">try</span> {
         ordered = <span class="hljs-title function_">orderSourceDocuments</span>(documents);
+                <span class="hljs-variable language_">this</span>.<span class="hljs-property">occurrences</span>.<span class="hljs-title function_">set</span>(key, <span class="hljs-title function_">collectFragmentOccurrences</span>(ordered));
+                <span class="hljs-variable language_">this</span>.<span class="hljs-property">sourceDocuments</span>.<span class="hljs-title function_">set</span>(key, ordered);
       } <span class="hljs-keyword">catch</span> (_) {
         <span class="hljs-keyword">continue</span>;
       }
@@ -407,7 +418,7 @@ This map is not another generator and never supplies generation diagnostics.</p>
         <span class="hljs-variable language_">this</span>.<span class="hljs-property">md</span>.<span class="hljs-title function_">parse</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">text</span>, env);
         states.<span class="hljs-property">list</span>.<span class="hljs-title function_">push</span>(env);
       }
-      fragments.<span class="hljs-property">map</span> = <span class="hljs-title function_">handleFragments</span>(states.<span class="hljs-property">list</span>);
+      fragments.<span class="hljs-property">map</span> = <span class="hljs-title function_">handleFragments</span>(states.<span class="hljs-property">list</span>, result.<span class="hljs-property">inspection</span>.<span class="hljs-property">fragments</span>);
       <span class="hljs-keyword">if</span> (!writeFiles || result.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) { <span class="hljs-keyword">continue</span>; }
       <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> result.<span class="hljs-property">files</span>) {
         <span class="hljs-keyword">const</span> uri = vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">joinPath</span>(workspaceFolder.<span class="hljs-property">uri</span>, file.<span class="hljs-property">path</span>);
@@ -444,18 +455,7 @@ the projects have been properly processed, though, this function returns the
 <div class="code">
 <pre><code><span class="hljs-title function_">getFragments</span>(workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span>) : <span class="hljs-title class_">FragmentMap</span>
 {
-<span class="hljs-keyword">let</span> fragmentMap : <span class="hljs-title class_">FragmentMap</span> = <span class="hljs-keyword">new</span> <span class="hljs-title class_">FragmentMap</span>();
-<span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentsForWorkspaceFolders</span>.<span class="hljs-title function_">forEach</span>(
-  <span class="hljs-function">(<span class="hljs-params">value, key, _</span>) =&gt;</span>
-  {
-    <span class="hljs-keyword">if</span>(key === workspaceFolder.<span class="hljs-property">name</span>)
-    {
-      fragmentMap = value;
-      }
-    }
-  );
-
-  <span class="hljs-keyword">return</span> fragmentMap;
+  <span class="hljs-keyword">return</span> <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentsForWorkspaceFolders</span>.<span class="hljs-title function_">get</span>(workspaceFolder.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>()) || <span class="hljs-keyword">new</span> <span class="hljs-title class_">FragmentMap</span>();
 }
 </code></pre>
 
@@ -463,52 +463,30 @@ the projects have been properly processed, though, this function returns the
 </div><h4>Getting fragment on line for position</h4>
 <p>This method checks to see if for the given text line and position a fragment
 usage or mention can be found.</p>
-<p>First we find matches on the current line against <code>FRAGMENT_USE_IN_CODE_RE</code>. In
-all matches we check which of them is at the given position. We do that by
-searching for the index of the match tag name, including the double chevron
-bracketing.</p>
-<p>The range for the <code>FragmentLocation</code> will be created from the found index and
-run the length of the tag name including the double enclosing chevrons. An
-attempt to find the corresponding fragment is made, but if no such fragment
-exists the <code>FragmentLocation</code> will be created with the fragment set to
-<code>undefined</code>. The <code>root</code> and <code>add</code> parts are also given to the fragment location,
-even if they were not matched. This information can be used elsewhere to
-determine what kind of fragment was found at the given position.</p>
+<p>The shared symbol collector supplies exact positions in the original document.
+Lookup uses the repository instance and the full workspace URI, so repeated tags
+and equally named workspace folders remain independent.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;method to get fragment on line for position&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-title function_">getFragmentTagLocation</span>(
-  <span class="hljs-variable language_">document</span> : vscode.<span class="hljs-property">TextDocument</span>,
-  currentLine : vscode.<span class="hljs-property">TextLine</span>,
-  position : vscode.<span class="hljs-property">Position</span>
-) : <span class="hljs-title class_">FragmentLocation</span>
-{
-  <span class="hljs-keyword">const</span> workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span> | <span class="hljs-literal">undefined</span> = <span class="hljs-title function_">determineWorkspaceFolder</span>(<span class="hljs-variable language_">document</span>);
-  <span class="hljs-keyword">const</span> matchesOnLine = [...currentLine.<span class="hljs-property">text</span>.<span class="hljs-title function_">matchAll</span>(<span class="hljs-variable constant_">FRAGMENT_USE_IN_CODE_RE</span>)];
-  <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> match <span class="hljs-keyword">of</span> matchesOnLine)
-  {
-    <span class="hljs-keyword">if</span>(!match || !match.<span class="hljs-property">groups</span>) {
-      <span class="hljs-keyword">continue</span>;
-    }
-    <span class="hljs-keyword">const</span> tagName = <span class="hljs-string">`<span class="hljs-subst">${OPENING}</span><span class="hljs-subst">${match.groups.tagName}</span><span class="hljs-subst">${CLOSING}</span>`</span>;
-    <span class="hljs-keyword">const</span> foundIndex = currentLine.<span class="hljs-property">text</span>.<span class="hljs-title function_">indexOf</span>(tagName);
-    <span class="hljs-keyword">if</span>(foundIndex&gt;-<span class="hljs-number">1</span>) {
-      <span class="hljs-keyword">if</span>(foundIndex &lt;= position.<span class="hljs-property">character</span> &amp;&amp; position.<span class="hljs-property">character</span> &lt;= foundIndex + tagName.<span class="hljs-property">length</span>)
-      {
-        <span class="hljs-keyword">const</span> startPosition = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Position</span>(currentLine.<span class="hljs-property">lineNumber</span>, foundIndex);
-        <span class="hljs-keyword">const</span> endPosition = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Position</span>(currentLine.<span class="hljs-property">lineNumber</span>, foundIndex + tagName.<span class="hljs-property">length</span>);
-        <span class="hljs-keyword">let</span> range : vscode.<span class="hljs-property">Range</span> = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(startPosition, endPosition);
-        <span class="hljs-keyword">let</span> fragment : <span class="hljs-title class_">FragmentInformation</span> | <span class="hljs-literal">undefined</span>;
-        <span class="hljs-keyword">if</span>(workspaceFolder) {
-          <span class="hljs-keyword">const</span> fragments = theOneRepository.<span class="hljs-title function_">getFragments</span>(workspaceFolder).<span class="hljs-property">map</span>;
-          fragment = fragments.<span class="hljs-title function_">get</span>(match.<span class="hljs-property">groups</span>.<span class="hljs-property">tagName</span>) || <span class="hljs-literal">undefined</span>;
-        }
-        <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">FragmentLocation</span>(match.<span class="hljs-property">groups</span>.<span class="hljs-property">tagName</span>, <span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>, range, fragment, match.<span class="hljs-property">groups</span>.<span class="hljs-property">root</span>, match.<span class="hljs-property">groups</span>.<span class="hljs-property">add</span>);
-      }
-    }
-  }
-
-  <span class="hljs-keyword">return</span> unsetFragmentLocation;
+  <span class="hljs-attr">document</span>: vscode.<span class="hljs-property">TextDocument</span>,
+  <span class="hljs-attr">currentLine</span>: vscode.<span class="hljs-property">TextLine</span>,
+  <span class="hljs-attr">position</span>: vscode.<span class="hljs-property">Position</span>
+): <span class="hljs-title class_">FragmentLocation</span> {
+  <span class="hljs-keyword">const</span> folder = <span class="hljs-title function_">determineWorkspaceFolder</span>(<span class="hljs-variable language_">document</span>);
+  <span class="hljs-keyword">if</span> (!folder) { <span class="hljs-keyword">return</span> unsetFragmentLocation; }
+  <span class="hljs-keyword">const</span> documentPath = path.<span class="hljs-property">posix</span>.<span class="hljs-title function_">relative</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>, <span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>);
+  <span class="hljs-keyword">const</span> occurrence = <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">getFragmentOccurrences</span>(folder).<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span>
+    item.<span class="hljs-property">path</span> === documentPath &amp;&amp; item.<span class="hljs-property">line</span> === currentLine.<span class="hljs-property">lineNumber</span> &amp;&amp;
+    item.<span class="hljs-property">column</span> &lt;= position.<span class="hljs-property">character</span> &amp;&amp; position.<span class="hljs-property">character</span> &lt; item.<span class="hljs-property">endColumn</span>);
+  <span class="hljs-keyword">if</span> (!occurrence) { <span class="hljs-keyword">return</span> unsetFragmentLocation; }
+  <span class="hljs-keyword">const</span> range = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(occurrence.<span class="hljs-property">line</span>, occurrence.<span class="hljs-property">column</span>,
+    occurrence.<span class="hljs-property">line</span>, occurrence.<span class="hljs-property">endColumn</span>);
+  <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">FragmentLocation</span>(occurrence.<span class="hljs-property">name</span>, <span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>, range,
+    <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">getFragments</span>(folder).<span class="hljs-property">map</span>.<span class="hljs-title function_">get</span>(occurrence.<span class="hljs-property">name</span>),
+    occurrence.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;definition&#x27;</span> || occurrence.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;append&#x27;</span> ? <span class="hljs-string">&#x27;=&#x27;</span> : <span class="hljs-literal">undefined</span>,
+    occurrence.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;append&#x27;</span> ? <span class="hljs-string">&#x27;+&#x27;</span> : <span class="hljs-literal">undefined</span>);
 }
 </code></pre>
 
@@ -538,7 +516,7 @@ is at the given range.</p>
   </span>)
   {
     <span class="hljs-variable language_">this</span>.<span class="hljs-property">valid</span> = uri.<span class="hljs-property">fsPath</span>.<span class="hljs-title function_">indexOf</span>(<span class="hljs-string">&#x27;not_valid_for_literate&#x27;</span>)===-<span class="hljs-number">1</span>;
-    <span class="hljs-keyword">if</span>(name.<span class="hljs-title function_">startsWith</span>(<span class="hljs-variable constant_">OPENING</span>)) {
+    <span class="hljs-keyword">if</span>(<span class="hljs-variable language_">this</span>.<span class="hljs-property">valid</span> &amp;&amp; name.<span class="hljs-property">length</span> &gt; <span class="hljs-number">0</span>) {
       <span class="hljs-variable language_">this</span>.<span class="hljs-property">rangeExclusive</span> = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(
         range.<span class="hljs-property">start</span>.<span class="hljs-property">line</span>, range.<span class="hljs-property">start</span>.<span class="hljs-property">character</span> + <span class="hljs-number">2</span>,
         range.<span class="hljs-property">end</span>.<span class="hljs-property">line</span>, range.<span class="hljs-property">end</span>.<span class="hljs-property">character</span> - <span class="hljs-number">2</span>
@@ -661,18 +639,7 @@ TBD: we can probably get rid of this interface and just use a <code>Token</code>
 <div class="code">
 <pre><code><span class="hljs-title function_">getWorkspaceState</span>(workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span>) : <span class="hljs-title class_">GrabbedStateList</span>
 {
-  <span class="hljs-keyword">let</span> grabbedState : <span class="hljs-title class_">GrabbedStateList</span> = <span class="hljs-keyword">new</span> <span class="hljs-title class_">GrabbedStateList</span>();
-  <span class="hljs-variable language_">this</span>.<span class="hljs-property">grabbedStateForWorkspaceFolders</span>.<span class="hljs-title function_">forEach</span>(
-    <span class="hljs-function">(<span class="hljs-params">value, key, _</span>) =&gt;</span>
-    {
-      <span class="hljs-keyword">if</span>(key === workspaceFolder.<span class="hljs-property">name</span>)
-      {
-        grabbedState = value;
-        }
-      }
-    );
-
-  <span class="hljs-keyword">return</span> grabbedState;
+  <span class="hljs-keyword">return</span> <span class="hljs-variable language_">this</span>.<span class="hljs-property">grabbedStateForWorkspaceFolders</span>.<span class="hljs-title function_">get</span>(workspaceFolder.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>()) || <span class="hljs-keyword">new</span> <span class="hljs-title class_">GrabbedStateList</span>();
 }
 </code></pre>
 
@@ -702,125 +669,44 @@ TBD: we can probably get rid of this interface and just use a <code>Token</code>
 
 </div>
 </div><h4>Get all reference locations</h4>
-<p>Finding all references for a fragment, that is fragment usage or fragment
-mention in a <strong>literate</strong> project will go over all tokens of a workspace. For
-each reference a <code>vscode.Location</code> is returned.</p>
-<p>The <code>getReferenceLocations</code> method takes a workspace folder and a fragment name,
-and will return an array of <code>vscode.Location</code>.</p>
+<p>References and explicit prose mentions come from the same snapshot used for
+navigation and rename. Declaration inclusion is a caller choice and includes
+append headers as well as the base definition.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;method to get all reference locations&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-title function_">getReferenceLocations</span>(
-  workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span>,
-  fragmentName : <span class="hljs-built_in">string</span>
-) : vscode.<span class="hljs-property">Location</span>[]
-{
+  <span class="hljs-attr">workspaceFolder</span>: vscode.<span class="hljs-property">WorkspaceFolder</span>,
+  <span class="hljs-attr">fragmentName</span>: <span class="hljs-built_in">string</span>,
+  includeDeclaration = <span class="hljs-literal">false</span>
+): vscode.<span class="hljs-property">Location</span>[] {
+  <span class="hljs-keyword">return</span> <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">getFragmentOccurrences</span>(workspaceFolder)
+    .<span class="hljs-title function_">filter</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span> item.<span class="hljs-property">name</span> === fragmentName &amp;&amp;
+      (includeDeclaration || item.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;reference&#x27;</span> || item.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;mention&#x27;</span>))
+    .<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span> <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Location</span>(vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">joinPath</span>(workspaceFolder.<span class="hljs-property">uri</span>, item.<span class="hljs-property">path</span>),
+      <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(item.<span class="hljs-property">line</span>, item.<span class="hljs-property">column</span>, item.<span class="hljs-property">line</span>, item.<span class="hljs-property">endColumn</span>)));
+}
 </code></pre>
 
 </div>
-</div><p>We start with an empty list of locations, which we will fill for each reference
-hit we determine in the given <strong>literate</strong> project. For the workspace folder we
-get the latest grabbed state.</p>
-<p>We then will proceed to iterate through all grabbed states. Remember that each
-grabbed state corresponds to a <strong>literate</strong> document. From that grabbed state we
-will iterate over each token, and we'll be interested only in the tokens that
-have a valid <code>map</code> property.</p>
+</div><p>The rename planner consumes original source text rather than rendered tokens.
+These read-only snapshots include unsaved buffers, refreshed before a provider
+answers an editor request.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;method to get all reference locations&gt;&gt;=+ </div>
 <div class="code">
-<pre><code>  <span class="hljs-keyword">const</span> fragmentTag = <span class="hljs-variable constant_">OPENING</span>+fragmentName+<span class="hljs-variable constant_">CLOSING</span>;
-  <span class="hljs-keyword">let</span> locations = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Array</span>&lt;vscode.<span class="hljs-property">Location</span>&gt;();
-  <span class="hljs-keyword">let</span> grabbedStateList = <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">getWorkspaceState</span>(workspaceFolder).<span class="hljs-property">list</span>;
-
-  <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> grabbedState <span class="hljs-keyword">of</span> grabbedStateList)
-  {
-    <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> grabbedState.<span class="hljs-property">gstate</span>.<span class="hljs-property">tokens</span>)
-    {
-      <span class="hljs-keyword">if</span>(token.<span class="hljs-property">map</span>)
-      {
+<pre><code><span class="hljs-title function_">getSourceDocuments</span>(<span class="hljs-attr">folder</span>: vscode.<span class="hljs-property">WorkspaceFolder</span>): <span class="hljs-title class_">SourceDocument</span>[] {
+  <span class="hljs-keyword">return</span> <span class="hljs-variable language_">this</span>.<span class="hljs-property">sourceDocuments</span>.<span class="hljs-title function_">get</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>()) || [];
+}
 </code></pre>
 
 </div>
-</div><p>When we have a token that could contain a reference we'll see if there is any
-occurrence of the fragment tag, otherwise the content has no reference.</p>
+</div><p>Occurrence ranges retain UTF-16 columns, matching VS Code's position model.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;method to get all reference locations&gt;&gt;=+ </div>
 <div class="code">
-<pre><code>        <span class="hljs-keyword">if</span>(token.<span class="hljs-property">content</span>.<span class="hljs-title function_">indexOf</span>(fragmentTag) &gt; -<span class="hljs-number">1</span>)
-        {
-</code></pre>
-
-</div>
-</div><p>With a hit in the entire content of the token we need to figure out each
-reference, which we do by splitting the token content into lines if there are
-any new line characters, then for each line look at each hit.</p>
-<p>If our token is a <code>fence</code> we initialize <code>idx</code> to 1, otherwise to 0.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;method to get all reference locations&gt;&gt;=+ </div>
-<div class="code">
-<pre><code>          <span class="hljs-keyword">const</span> lines = token.<span class="hljs-property">content</span>.<span class="hljs-title function_">split</span>(<span class="hljs-string">&quot;\n&quot;</span>);
-          <span class="hljs-keyword">let</span> idx = token.<span class="hljs-property">type</span> === <span class="hljs-string">&#x27;fence&#x27;</span> ? <span class="hljs-number">1</span> : <span class="hljs-number">0</span>;
-          <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> line <span class="hljs-keyword">of</span> lines) {
-            <span class="hljs-keyword">let</span> offset = line.<span class="hljs-title function_">indexOf</span>(fragmentTag);
-            <span class="hljs-keyword">while</span>(offset&gt;-<span class="hljs-number">1</span>) {
-</code></pre>
-
-</div>
-</div><p>When offset is larger than -1 we know we have a hit, so we can create a new
-range using the <code>token.map[0]</code> and the <code>idx</code>. The range will include the entire
-fragment tag, with the opening and closing double chevrons.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;method to get all reference locations&gt;&gt;=+ </div>
-<div class="code">
-<pre><code>              <span class="hljs-keyword">let</span> range = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(
-                token.<span class="hljs-property">map</span>[<span class="hljs-number">0</span>] + idx,
-                offset,
-                token.<span class="hljs-property">map</span>[<span class="hljs-number">0</span>] + idx,
-                offset + fragmentTag.<span class="hljs-property">length</span>
-              );
-</code></pre>
-
-</div>
-</div><p>The location then is created with the uri of the <strong>literate</strong> file that contains
-this token, and the rnge we just set up.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;method to get all reference locations&gt;&gt;=+ </div>
-<div class="code">
-<pre><code>              <span class="hljs-keyword">let</span> location = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Location</span>(grabbedState.<span class="hljs-property">literateUri</span>, range);
-              locations.<span class="hljs-title function_">push</span>(location);
-</code></pre>
-
-</div>
-</div><p>We chech for the next occurrance of the fragment tag by looking enough
-characters past the current offset. That way we'll ensure we get to all the
-references if there are multiple on one line.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;method to get all reference locations&gt;&gt;=+ </div>
-<div class="code">
-<pre><code>              offset = line.<span class="hljs-title function_">indexOf</span>(fragmentTag, offset + <span class="hljs-number">5</span>);
-            }
-</code></pre>
-
-</div>
-</div><p>Update <code>idx</code> for each pass while going through the lines array.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;method to get all reference locations&gt;&gt;=+ </div>
-<div class="code">
-<pre><code>            idx++;
-          }
-        }
-      }
-    }
-  }
-</code></pre>
-
-</div>
-</div><p>Return the <code>locations</code> array. If there were hits the <code>locations</code> array will have
-entries, if there were no hits the array will be empty.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;method to get all reference locations&gt;&gt;=+ </div>
-<div class="code">
-<pre><code>  <span class="hljs-keyword">return</span> locations;
+<pre><code><span class="hljs-title function_">getFragmentOccurrences</span>(<span class="hljs-attr">folder</span>: vscode.<span class="hljs-property">WorkspaceFolder</span>): <span class="hljs-title class_">FragmentOccurrence</span>[] {
+  <span class="hljs-keyword">return</span> <span class="hljs-variable language_">this</span>.<span class="hljs-property">occurrences</span>.<span class="hljs-title function_">get</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>()) || [];
 }
 </code></pre>
 
@@ -917,94 +803,44 @@ necessary to have a look at how fragments work.</p>
 of explaining.</p>
 <p>There are four types of fragment tags, three of which either create or modify a
 fragment, and one that expresses fragment usage.</p>
-<p>For the detection of fragments a couple of regular expressions are used. These
-are explained in more detail below.</p>
-<h3>Fragment use in code</h3>
-<p>Lets start by looking at the form for fragment tag use.</p>
-<p>Fragments can be used in code blocks by using their tag double opening and
-closing chevrons around the fragment name <code>&lt;&lt;fragment name&gt;&gt;</code>. To detect usage
-of fragments in code we use <code>FRAGMENT_USE_IN_CODE_RE</code>.</p>
+<p>Generation and editor symbols use the shared engine grammar and tag scanner.
+The legacy expression below is retained only for live Markdown preview decoration;
+it does not decide which fragments can be generated, navigated or renamed.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;fragment regular expressions&gt;&gt;= </div>
-<div class="code">
-<pre><code>
-<span class="hljs-keyword">const</span> <span class="hljs-variable constant_">FRAGMENT_USE_IN_CODE_RE</span> =
-  <span class="hljs-regexp">/(?&lt;indent&gt;[ \t]*)<span class="literate-tag-name">&lt;&lt;(?&lt;tagName&gt;.+)&gt;&gt;</span>(?&lt;root&gt;=)?(?&lt;add&gt;\+)?/g</span>;
-</code></pre>
-
-</div>
-</div><p>The regular expression captures four groups. A match will give us 5 or more
-results, the whole string matched and the captured groups. There may be some
-additional parts after that, but those we will discard. The whole string matched
-is called the <code>tag</code>. The first group is called <code>indent</code>, which will be used to
-indent the whole fragment code when it gets extrapolated into the final code.
-The second group is called <code>tagName</code>, which is the fragment name. The third
-group is called <code>root</code> and the final group is called <code>add</code>. For fragment use we
-essentially need only the second group <code>tagName</code>, with the <code>indent</code> still
-serving a function. The other groups are in the regular expression so we can
-identify incorrect use of fragments in code: creating or adding to fragments
-inside code blocks is not valid.</p>
-<p>The application of <code>FRAGMENT_USE_IN_CODE_RE</code> is explained in more detail in the
-section on code realization.</p>
-<h3>Creating and modifying fragments</h3>
-<p>There is the tag used to create a new fragment, which is always in conjunction
-with the opening code fence tag. This means either a triple backtick or triple
-tilde followed by the programming language identifier for the following code
-block. The actual fragment tag is placed as first option right after the colon
-following the language specifier.</p>
-<div class="codefragment">
-<div class="fragmentname">&lt;&lt;fragment regular expressions&gt;&gt;=+ </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">const</span> <span class="hljs-variable constant_">FRAGMENT_RE</span> =
   <span class="hljs-regexp">/(?&lt;lang&gt;[^:]*)(?&lt;colon&gt;:)?.*<span class="literate-tag-name">&lt;&lt;(?&lt;tagName&gt;.+)&gt;&gt;</span>(?&lt;root&gt;=)?(?&lt;add&gt;\+)?\s*(?&lt;fileName&gt;.*\s+\$)?(?&lt;extraSettings&gt;\s+.*)?/</span>;
 </code></pre>
 
 </div>
-</div><p>Most of the groups correspond to the ones defined by <code>FRAGMENT_USE_IN_CODE_RE</code>
-with a few additions. Most notably there is the group catching the language
-specifier, the group to catch the filename and the group to catch extra
-settings, called <code>lang</code>, <code>fileName</code> and <code>extraSettings</code> respectively.</p>
-<p>The filename group has to end in whitespace and a dollar sign.</p>
-<p>Also the colon is separated out into a group. That will allow for checking if a
-tag declaration is properly formed. When the colon is missing it is possible to
-detect this and emit a diagnostic accordingly.</p>
-<p>So to create a new tag the info line for the code fence could look like
-<code>py : &lt;&lt;a fragment name&gt;&gt;=</code>.</p>
-<p>To add to a fragment a <code>+</code> is added, so it could look like
-<code>py : &lt;&lt;a fragment name&gt;&gt;=+</code>. Having a fragment without <code>=</code> or <code>=+</code> on the code
-fence info line is an error.</p>
-<h2>Gathering editor fragments</h2>
-<p><code>handleFragments</code> only collects unexpanded code and tokens for editor providers.
-It has no writer callback, expansion switch, template I/O or diagnostics. Invalid
-or incomplete declarations can still be navigated while typing; the engine is
-solely responsible for deciding whether the project is valid for generation.
-Appended parts follow the shared engine order, even when the first part is empty.
-Template metadata is not needed by these providers and remains unset.</p>
+</div><h2>Gathering editor fragments</h2>
+<p>The engine inspection identifies accepted definitions in deterministic order.
+We attach the corresponding Markdown tokens for existing editor commands without
+parsing declarations a second time. Unrelated generation errors need not prevent
+navigation or a valid rename.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;handle fragments&gt;&gt;= </div>
 <div class="code">
-<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">handleFragments</span>(<span class="hljs-params">envList: <span class="hljs-built_in">Array</span>&lt;GrabbedState&gt;</span>): <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">FragmentInformation</span>&gt; {
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">handleFragments</span>(<span class="hljs-params">
+  envList: GrabbedState[], inspected: FragmentInspection[]
+</span>): <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">FragmentInformation</span>&gt; {
   <span class="hljs-keyword">const</span> fragments = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">FragmentInformation</span>&gt;();
-  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> env <span class="hljs-keyword">of</span> envList) {
-    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> env.<span class="hljs-property">gstate</span>.<span class="hljs-property">tokens</span>) {
-      <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> !== <span class="hljs-string">&#x27;fence&#x27;</span>) { <span class="hljs-keyword">continue</span>; }
-      <span class="hljs-keyword">const</span> match = token.<span class="hljs-property">info</span>.<span class="hljs-title function_">match</span>(<span class="hljs-variable constant_">FRAGMENT_RE</span>);
-      <span class="hljs-keyword">if</span> (!match || !match.<span class="hljs-property">groups</span> || !match.<span class="hljs-property">groups</span>.<span class="hljs-property">root</span>) { <span class="hljs-keyword">continue</span>; }
-      <span class="hljs-keyword">const</span> { <span class="hljs-attr">tagName</span>: name, lang, add, fileName } = match.<span class="hljs-property">groups</span>;
-      <span class="hljs-keyword">if</span> (add) {
-        <span class="hljs-keyword">const</span> fragment = fragments.<span class="hljs-title function_">get</span>(name);
-        <span class="hljs-keyword">if</span> (fragment) {
-          fragment.<span class="hljs-property">code</span> += token.<span class="hljs-property">content</span>;
-          fragment.<span class="hljs-property">tokens</span>.<span class="hljs-title function_">push</span>(token);
-        }
-      } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (!fragments.<span class="hljs-title function_">has</span>(name)) {
-        fragments.<span class="hljs-title function_">set</span>(name, {
-          <span class="hljs-attr">lang</span>: lang.<span class="hljs-title function_">trim</span>(), <span class="hljs-attr">literateFileName</span>: env.<span class="hljs-property">literateFileName</span>,
-          <span class="hljs-attr">sourceFileName</span>: fileName ? fileName.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\s+\$/</span>, <span class="hljs-string">&#x27;&#x27;</span>).<span class="hljs-title function_">trim</span>() : <span class="hljs-string">&#x27;&#x27;</span>,
-          <span class="hljs-attr">templateFileName</span>: <span class="hljs-literal">undefined</span>, <span class="hljs-attr">code</span>: token.<span class="hljs-property">content</span>, <span class="hljs-attr">tokens</span>: [token], env
-        });
-      }
-    }
+  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> entry <span class="hljs-keyword">of</span> inspected) {
+    <span class="hljs-keyword">const</span> parts = entry.<span class="hljs-property">definitions</span>.<span class="hljs-title function_">flatMap</span>(<span class="hljs-function"><span class="hljs-params">definition</span> =&gt;</span> {
+      <span class="hljs-keyword">const</span> env = envList.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span> item.<span class="hljs-property">literateFileName</span> === definition.<span class="hljs-property">path</span>);
+      <span class="hljs-keyword">const</span> token = env?.<span class="hljs-property">gstate</span>.<span class="hljs-property">tokens</span>.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span>
+        item.<span class="hljs-property">type</span> === <span class="hljs-string">&#x27;fence&#x27;</span> &amp;&amp; item.<span class="hljs-property">map</span>?.[<span class="hljs-number">0</span>] === definition.<span class="hljs-property">line</span>);
+      <span class="hljs-keyword">return</span> env &amp;&amp; token ? [{ env, token }] : [];
+    });
+    <span class="hljs-keyword">if</span> (!parts.<span class="hljs-property">length</span>) { <span class="hljs-keyword">continue</span>; }
+    <span class="hljs-keyword">const</span> env = parts[<span class="hljs-number">0</span>].<span class="hljs-property">env</span>;
+    fragments.<span class="hljs-title function_">set</span>(entry.<span class="hljs-property">name</span>, {
+      <span class="hljs-attr">lang</span>: entry.<span class="hljs-property">language</span>, <span class="hljs-attr">literateFileName</span>: env.<span class="hljs-property">literateFileName</span>,
+      <span class="hljs-attr">sourceFileName</span>: entry.<span class="hljs-property">output</span> || <span class="hljs-string">&#x27;&#x27;</span>, <span class="hljs-attr">templateFileName</span>: <span class="hljs-literal">undefined</span>,
+      <span class="hljs-attr">code</span>: parts.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> part.<span class="hljs-property">token</span>.<span class="hljs-property">content</span>).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;&#x27;</span>),
+      <span class="hljs-attr">tokens</span>: parts.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> part.<span class="hljs-property">token</span>), env
+    });
   }
   <span class="hljs-keyword">return</span> fragments;
 }
@@ -1658,7 +1494,8 @@ just an empty-bodied implementation for it.</p>
 <pre><code><span class="hljs-keyword">import</span> { <span class="hljs-title class_">TextDecoder</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;util&#x27;</span>;
 <span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> vscode <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;vscode&#x27;</span>;
 <span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> path <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;path&#x27;</span>;
-<span class="hljs-keyword">import</span> { discoveryExcludedDirectories, generateProject, orderSourceDocuments, templateReferences, <span class="hljs-title class_">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./engine&#x27;</span>;
+<span class="hljs-keyword">import</span> { discoveryExcludedDirectories, generateProject, orderSourceDocuments, templateReferences, scanFragmentTags, <span class="hljs-title class_">SourceDocument</span>, <span class="hljs-title class_">FragmentInspection</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./engine&#x27;</span>;
+<span class="hljs-keyword">import</span> { collectFragmentOccurrences, planFragmentRename, <span class="hljs-title class_">FragmentOccurrence</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./symbols&#x27;</span>;
 
 <span class="hljs-keyword">import</span> <span class="hljs-title class_">StateCore</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/rules_core/state_core&#x27;</span>);
 <span class="hljs-keyword">import</span> <span class="hljs-title class_">Token</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/token&#x27;</span>);

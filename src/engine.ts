@@ -68,6 +68,32 @@ function sourceNulDiagnostic(document: SourceDocument): GenerationDiagnostic | u
     };
 }
 
+export interface FragmentTag { name: string; start: number; end: number; modifier?: string; }
+
+export function scanFragmentTags(text: string): FragmentTag[] {
+    const tags: FragmentTag[] = [];
+    const pattern = /\\<<|<<([^<>\r\n]+)>>(=\+?|\+)?/g;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text))) {
+        if (match[1] === undefined) { continue; }
+        tags.push({ name: match[1], start: match.index,
+            end: match.index + match[1].length + 4, modifier: match[2] });
+    }
+    return tags;
+}
+export interface FragmentHeader {
+    name: string; language: string; append: boolean; remainder: string;
+    tagStart: number; tagEnd: number;
+}
+
+export function parseFragmentHeader(info: string): FragmentHeader | undefined {
+    const match = fragmentHeader.exec(info);
+    if (!match || !match[2].trim()) { return undefined; }
+    const afterLanguage = match[1] ? info.indexOf(match[1]) + match[1].length : 0;
+    const tagStart = info.indexOf('<<', afterLanguage);
+    return { name: match[2], language: match[1] || '', append: !!match[3], remainder: match[4],
+        tagStart, tagEnd: tagStart + match[2].length + 4 };
+}
 /** Index first, then linked documents, then remaining paths sorted; preserves input objects. */
 export function orderSourceDocuments(documents: SourceDocument[]): SourceDocument[] {
     const paths = new Map<string, number>();
@@ -292,16 +318,18 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
             fragments.set(header.name, { header, parts: [part], location });
         }
     }
-    const replaceReferences = (part: Part, replace: (name: string, modifier: string | undefined, at: Location, prefix: string) => string): string =>
-        part.content.replace(/\\<<|<<([^<>\r\n]+)>>(=\+?|\+)?/g,
-            (whole: string, name: string | undefined, modifier: string | undefined, offset: number) => {
-                if (name === undefined) { return whole; }
-                const before = part.content.slice(0, offset);
-                const prefix = before.slice(before.lastIndexOf('\n') + 1);
-                const line = before.split('\n').length - 1;
-                const at = { path: part.location.path, line: part.location.line + line, column: prefix.length + part.columns[line] };
-                return replace(name, modifier, at, prefix);
-            });
+    const replaceReferences = (part: Part, replace: (name: string, modifier: string | undefined, at: Location, prefix: string) => string): string => {
+        let result = '', cursor = 0;
+        for (const tag of scanFragmentTags(part.content)) {
+            const before = part.content.slice(0, tag.start);
+            const prefix = before.slice(before.lastIndexOf('\n') + 1);
+            const line = before.split('\n').length - 1;
+            const at = { path: part.location.path, line: part.location.line + line, column: prefix.length + part.columns[line] };
+            result += part.content.slice(cursor, tag.start) + replace(tag.name, tag.modifier, at, prefix);
+            cursor = tag.end + (tag.modifier?.length || 0);
+        }
+        return result + part.content.slice(cursor);
+    };
     inspection.templates = Array.from(referencedTemplates).sort();
     for (const { header, parts } of fragments.values()) {
         const entry: FragmentInspection = {

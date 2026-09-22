@@ -169,6 +169,8 @@ export class FragmentRepository {
       grabbedState.dispose();
     }
     this.grabbedStateForWorkspaceFolders.clear();
+        this.sourceDocuments.clear();
+        this.occurrences.clear();
   }
 }
 ```
@@ -181,13 +183,15 @@ properly. We'll need an instance of a properly configured *MarkdownIt* parser.
 ``` ts : <<fragment repository member variables>>=
 private md : MarkdownIt;
 private processingQueue: Promise<void> = Promise.resolve();
+private sourceDocuments = new Map<string, SourceDocument[]>();
+private occurrences = new Map<string, FragmentOccurrence[]>();
 ```
 
 The *MarkdownIt* parser will handle the actual tokenizing and parsing of the
 **literate** files.
 
 Since we work with a multi-root workspace we'll create a map of maps. The keys
-for this top-level map will be the workspace folder names. The actual
+for this top-level map are full workspace URIs, not ambiguous display names. The actual
 `FragmentMap`s will be the values to each workspace folder.
 
 ``` ts : <<fragment repository member variables>>=+
@@ -196,8 +200,7 @@ readonly fragmentsForWorkspaceFolders : Map<string, FragmentMap>;
 
 For our parsing functionality we need an `Array<GrabbedState>`, which we have
 encapsulated in the class `GrabbedStateList` and is available through the `list`
-property. Each `GrabbedStateList` is saved to the map of workspace folder name
-and list key-value pair.
+property. Each `GrabbedStateList` is keyed by the full workspace URI.
 
 ``` ts : <<fragment repository member variables>>=+
 readonly grabbedStateForWorkspaceFolders : Map<string, GrabbedStateList>;
@@ -288,8 +291,11 @@ context.subscriptions.push(
       }
       for(const removedWorkspaceFolder of e.removed)
       {
-        this.fragmentsForWorkspaceFolders.delete(removedWorkspaceFolder.name);
-        this.grabbedStateForWorkspaceFolders.delete(removedWorkspaceFolder.name);
+        const key = removedWorkspaceFolder.uri.toString();
+        this.fragmentsForWorkspaceFolders.delete(key);
+        this.grabbedStateForWorkspaceFolders.delete(key);
+        this.sourceDocuments.delete(key);
+        this.occurrences.delete(key);
       }
     }
   )
@@ -388,11 +394,16 @@ processLiterateFiles(
       }
       const states = new GrabbedStateList();
       const fragments = new FragmentMap();
-      this.grabbedStateForWorkspaceFolders.set(workspaceFolder.name, states);
-      this.fragmentsForWorkspaceFolders.set(workspaceFolder.name, fragments);
+      const key = workspaceFolder.uri.toString();
+      this.grabbedStateForWorkspaceFolders.set(key, states);
+      this.fragmentsForWorkspaceFolders.set(key, fragments);
+      this.sourceDocuments.set(key, []);
+      this.occurrences.set(key, []);
       let ordered: SourceDocument[];
       try {
         ordered = orderSourceDocuments(documents);
+                this.occurrences.set(key, collectFragmentOccurrences(ordered));
+                this.sourceDocuments.set(key, ordered);
       } catch (_) {
         continue;
       }
@@ -405,7 +416,7 @@ processLiterateFiles(
         this.md.parse(document.text, env);
         states.list.push(env);
       }
-      fragments.map = handleFragments(states.list);
+      fragments.map = handleFragments(states.list, result.inspection.fragments);
       if (!writeFiles || result.diagnostics.length) { continue; }
       for (const file of result.files) {
         const uri = vscode.Uri.joinPath(workspaceFolder.uri, file.path);
@@ -441,18 +452,7 @@ the projects have been properly processed, though, this function returns the
 ``` ts : <<method to get fragments from repository>>=
 getFragments(workspaceFolder : vscode.WorkspaceFolder) : FragmentMap
 {
-let fragmentMap : FragmentMap = new FragmentMap();
-this.fragmentsForWorkspaceFolders.forEach(
-  (value, key, _) =>
-  {
-    if(key === workspaceFolder.name)
-    {
-      fragmentMap = value;
-      }
-    }
-  );
-
-  return fragmentMap;
+  return this.fragmentsForWorkspaceFolders.get(workspaceFolder.uri.toString()) || new FragmentMap();
 }
 ```
 
@@ -461,52 +461,29 @@ this.fragmentsForWorkspaceFolders.forEach(
 This method checks to see if for the given text line and position a fragment
 usage or mention can be found.
 
-First we find matches on the current line against `FRAGMENT_USE_IN_CODE_RE`. In
-all matches we check which of them is at the given position. We do that by
-searching for the index of the match tag name, including the double chevron
-bracketing.
-
-The range for the `FragmentLocation` will be created from the found index and
-run the length of the tag name including the double enclosing chevrons. An
-attempt to find the corresponding fragment is made, but if no such fragment
-exists the `FragmentLocation` will be created with the fragment set to
-`undefined`. The `root` and `add` parts are also given to the fragment location,
-even if they were not matched. This information can be used elsewhere to
-determine what kind of fragment was found at the given position.
+The shared symbol collector supplies exact positions in the original document.
+Lookup uses the repository instance and the full workspace URI, so repeated tags
+and equally named workspace folders remain independent.
 
 ``` ts : <<method to get fragment on line for position>>=
 getFragmentTagLocation(
-  document : vscode.TextDocument,
-  currentLine : vscode.TextLine,
-  position : vscode.Position
-) : FragmentLocation
-{
-  const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
-  const matchesOnLine = [...currentLine.text.matchAll(FRAGMENT_USE_IN_CODE_RE)];
-  for(const match of matchesOnLine)
-  {
-    if(!match || !match.groups) {
-      continue;
-    }
-    const tagName = `${OPENING}${match.groups.tagName}${CLOSING}`;
-    const foundIndex = currentLine.text.indexOf(tagName);
-    if(foundIndex>-1) {
-      if(foundIndex <= position.character && position.character <= foundIndex + tagName.length)
-      {
-        const startPosition = new vscode.Position(currentLine.lineNumber, foundIndex);
-        const endPosition = new vscode.Position(currentLine.lineNumber, foundIndex + tagName.length);
-        let range : vscode.Range = new vscode.Range(startPosition, endPosition);
-        let fragment : FragmentInformation | undefined;
-        if(workspaceFolder) {
-          const fragments = theOneRepository.getFragments(workspaceFolder).map;
-          fragment = fragments.get(match.groups.tagName) || undefined;
-        }
-        return new FragmentLocation(match.groups.tagName, document.uri, range, fragment, match.groups.root, match.groups.add);
-      }
-    }
-  }
-
-  return unsetFragmentLocation;
+  document: vscode.TextDocument,
+  currentLine: vscode.TextLine,
+  position: vscode.Position
+): FragmentLocation {
+  const folder = determineWorkspaceFolder(document);
+  if (!folder) { return unsetFragmentLocation; }
+  const documentPath = path.posix.relative(folder.uri.path, document.uri.path);
+  const occurrence = this.getFragmentOccurrences(folder).find(item =>
+    item.path === documentPath && item.line === currentLine.lineNumber &&
+    item.column <= position.character && position.character < item.endColumn);
+  if (!occurrence) { return unsetFragmentLocation; }
+  const range = new vscode.Range(occurrence.line, occurrence.column,
+    occurrence.line, occurrence.endColumn);
+  return new FragmentLocation(occurrence.name, document.uri, range,
+    this.getFragments(folder).map.get(occurrence.name),
+    occurrence.kind === 'definition' || occurrence.kind === 'append' ? '=' : undefined,
+    occurrence.kind === 'append' ? '+' : undefined);
 }
 ```
 
@@ -536,7 +513,7 @@ export class FragmentLocation
   )
   {
     this.valid = uri.fsPath.indexOf('not_valid_for_literate')===-1;
-    if(name.startsWith(OPENING)) {
+    if(this.valid && name.length > 0) {
       this.rangeExclusive = new vscode.Range(
         range.start.line, range.start.character + 2,
         range.end.line, range.end.character - 2
@@ -644,18 +621,7 @@ const emptyToken : TokenUsage =
 ``` ts : <<method to get state for workspace>>=
 getWorkspaceState(workspaceFolder : vscode.WorkspaceFolder) : GrabbedStateList
 {
-  let grabbedState : GrabbedStateList = new GrabbedStateList();
-  this.grabbedStateForWorkspaceFolders.forEach(
-    (value, key, _) =>
-    {
-      if(key === workspaceFolder.name)
-      {
-        grabbedState = value;
-        }
-      }
-    );
-
-  return grabbedState;
+  return this.grabbedStateForWorkspaceFolders.get(workspaceFolder.uri.toString()) || new GrabbedStateList();
 }
 ```
 
@@ -683,111 +649,39 @@ getDocumentState(document: vscode.TextDocument) : GrabbedState
 
 #### Get all reference locations
 
-Finding all references for a fragment, that is fragment usage or fragment
-mention in a **literate** project will go over all tokens of a workspace. For
-each reference a `vscode.Location` is returned.
-
-The `getReferenceLocations` method takes a workspace folder and a fragment name,
-and will return an array of `vscode.Location`.
+References and explicit prose mentions come from the same snapshot used for
+navigation and rename. Declaration inclusion is a caller choice and includes
+append headers as well as the base definition.
 
 ``` ts : <<method to get all reference locations>>=
 getReferenceLocations(
-  workspaceFolder : vscode.WorkspaceFolder,
-  fragmentName : string
-) : vscode.Location[]
-{
+  workspaceFolder: vscode.WorkspaceFolder,
+  fragmentName: string,
+  includeDeclaration = false
+): vscode.Location[] {
+  return this.getFragmentOccurrences(workspaceFolder)
+    .filter(item => item.name === fragmentName &&
+      (includeDeclaration || item.kind === 'reference' || item.kind === 'mention'))
+    .map(item => new vscode.Location(vscode.Uri.joinPath(workspaceFolder.uri, item.path),
+      new vscode.Range(item.line, item.column, item.line, item.endColumn)));
+}
 ```
 
-We start with an empty list of locations, which we will fill for each reference
-hit we determine in the given **literate** project. For the workspace folder we
-get the latest grabbed state.
-
-We then will proceed to iterate through all grabbed states. Remember that each
-grabbed state corresponds to a **literate** document. From that grabbed state we
-will iterate over each token, and we'll be interested only in the tokens that
-have a valid `map` property.
+The rename planner consumes original source text rather than rendered tokens.
+These read-only snapshots include unsaved buffers, refreshed before a provider
+answers an editor request.
 
 ``` ts : <<method to get all reference locations>>=+
-  const fragmentTag = OPENING+fragmentName+CLOSING;
-  let locations = new Array<vscode.Location>();
-  let grabbedStateList = this.getWorkspaceState(workspaceFolder).list;
-
-  for(const grabbedState of grabbedStateList)
-  {
-    for(const token of grabbedState.gstate.tokens)
-    {
-      if(token.map)
-      {
+getSourceDocuments(folder: vscode.WorkspaceFolder): SourceDocument[] {
+  return this.sourceDocuments.get(folder.uri.toString()) || [];
+}
 ```
 
-When we have a token that could contain a reference we'll see if there is any
-occurrence of the fragment tag, otherwise the content has no reference.
+Occurrence ranges retain UTF-16 columns, matching VS Code's position model.
 
 ``` ts : <<method to get all reference locations>>=+
-        if(token.content.indexOf(fragmentTag) > -1)
-        {
-```
-
-With a hit in the entire content of the token we need to figure out each
-reference, which we do by splitting the token content into lines if there are
-any new line characters, then for each line look at each hit.
-
-If our token is a `fence` we initialize `idx` to 1, otherwise to 0.
-
-``` ts : <<method to get all reference locations>>=+
-          const lines = token.content.split("\n");
-          let idx = token.type === 'fence' ? 1 : 0;
-          for(const line of lines) {
-            let offset = line.indexOf(fragmentTag);
-            while(offset>-1) {
-```
-
-When offset is larger than -1 we know we have a hit, so we can create a new
-range using the `token.map[0]` and the `idx`. The range will include the entire
-fragment tag, with the opening and closing double chevrons.
-
-``` ts : <<method to get all reference locations>>=+
-              let range = new vscode.Range(
-                token.map[0] + idx,
-                offset,
-                token.map[0] + idx,
-                offset + fragmentTag.length
-              );
-```
-
-The location then is created with the uri of the **literate** file that contains
-this token, and the rnge we just set up.
-
-``` ts : <<method to get all reference locations>>=+
-              let location = new vscode.Location(grabbedState.literateUri, range);
-              locations.push(location);
-```
-
-We chech for the next occurrance of the fragment tag by looking enough
-characters past the current offset. That way we'll ensure we get to all the
-references if there are multiple on one line.
-
-``` ts : <<method to get all reference locations>>=+
-              offset = line.indexOf(fragmentTag, offset + 5);
-            }
-```
-
-Update `idx` for each pass while going through the lines array.
-
-``` ts : <<method to get all reference locations>>=+
-            idx++;
-          }
-        }
-      }
-    }
-  }
-```
-
-Return the `locations` array. If there were hits the `locations` array will have
-entries, if there were no hits the array will be empty.
-
-``` ts : <<method to get all reference locations>>=+
-  return locations;
+getFragmentOccurrences(folder: vscode.WorkspaceFolder): FragmentOccurrence[] {
+  return this.occurrences.get(folder.uri.toString()) || [];
 }
 ```
 
@@ -887,101 +781,42 @@ of explaining.
 There are four types of fragment tags, three of which either create or modify a
 fragment, and one that expresses fragment usage.
 
-For the detection of fragments a couple of regular expressions are used. These
-are explained in more detail below.
-
-### Fragment use in code
-
-Lets start by looking at the form for fragment tag use.
-
-Fragments can be used in code blocks by using their tag double opening and
-closing chevrons around the fragment name `<<fragment name>>`. To detect usage
-of fragments in code we use `FRAGMENT_USE_IN_CODE_RE`.
+Generation and editor symbols use the shared engine grammar and tag scanner.
+The legacy expression below is retained only for live Markdown preview decoration;
+it does not decide which fragments can be generated, navigated or renamed.
 
 ``` ts : <<fragment regular expressions>>=
-//let HTML_ENCODED_FRAGMENT_TAG_RE = /(&lt;&lt.*?&gt;&gt;)/g;
-const FRAGMENT_USE_IN_CODE_RE =
-  /(?<indent>[ \t]*)\<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?/g;
-```
-
-The regular expression captures four groups. A match will give us 5 or more
-results, the whole string matched and the captured groups. There may be some
-additional parts after that, but those we will discard. The whole string matched
-is called the `tag`. The first group is called `indent`, which will be used to
-indent the whole fragment code when it gets extrapolated into the final code.
-The second group is called `tagName`, which is the fragment name. The third
-group is called `root` and the final group is called `add`. For fragment use we
-essentially need only the second group `tagName`, with the `indent` still
-serving a function. The other groups are in the regular expression so we can
-identify incorrect use of fragments in code: creating or adding to fragments
-inside code blocks is not valid.
-
-The application of `FRAGMENT_USE_IN_CODE_RE` is explained in more detail in the
-section on code realization.
-
-### Creating and modifying fragments
-
-There is the tag used to create a new fragment, which is always in conjunction
-with the opening code fence tag. This means either a triple backtick or triple
-tilde followed by the programming language identifier for the following code
-block. The actual fragment tag is placed as first option right after the colon
-following the language specifier.
-
-``` ts : <<fragment regular expressions>>=+
 const FRAGMENT_RE =
   /(?<lang>[^:]*)(?<colon>:)?.*\<<(?<tagName>.+)>>(?<root>=)?(?<add>\+)?\s*(?<fileName>.*\s+\$)?(?<extraSettings>\s+.*)?/;
 ```
 
-Most of the groups correspond to the ones defined by `FRAGMENT_USE_IN_CODE_RE`
-with a few additions. Most notably there is the group catching the language
-specifier, the group to catch the filename and the group to catch extra
-settings, called `lang`, `fileName` and `extraSettings` respectively.
-
-The filename group has to end in whitespace and a dollar sign.
-
-Also the colon is separated out into a group. That will allow for checking if a
-tag declaration is properly formed. When the colon is missing it is possible to
-detect this and emit a diagnostic accordingly.
-
-So to create a new tag the info line for the code fence could look like
-`py : <<a fragment name>>=`.
-
-To add to a fragment a `+` is added, so it could look like
-`py : <<a fragment name>>=+`. Having a fragment without `=` or `=+` on the code
-fence info line is an error.
-
 ## Gathering editor fragments
 
-`handleFragments` only collects unexpanded code and tokens for editor providers.
-It has no writer callback, expansion switch, template I/O or diagnostics. Invalid
-or incomplete declarations can still be navigated while typing; the engine is
-solely responsible for deciding whether the project is valid for generation.
-Appended parts follow the shared engine order, even when the first part is empty.
-Template metadata is not needed by these providers and remains unset.
+The engine inspection identifies accepted definitions in deterministic order.
+We attach the corresponding Markdown tokens for existing editor commands without
+parsing declarations a second time. Unrelated generation errors need not prevent
+navigation or a valid rename.
 
 ```ts : <<handle fragments>>=
-function handleFragments(envList: Array<GrabbedState>): Map<string, FragmentInformation> {
+function handleFragments(
+  envList: GrabbedState[], inspected: FragmentInspection[]
+): Map<string, FragmentInformation> {
   const fragments = new Map<string, FragmentInformation>();
-  for (const env of envList) {
-    for (const token of env.gstate.tokens) {
-      if (token.type !== 'fence') { continue; }
-      const match = token.info.match(FRAGMENT_RE);
-      if (!match || !match.groups || !match.groups.root) { continue; }
-      const { tagName: name, lang, add, fileName } = match.groups;
-      if (add) {
-        const fragment = fragments.get(name);
-        if (fragment) {
-          fragment.code += token.content;
-          fragment.tokens.push(token);
-        }
-      } else if (!fragments.has(name)) {
-        fragments.set(name, {
-          lang: lang.trim(), literateFileName: env.literateFileName,
-          sourceFileName: fileName ? fileName.replace(/\s+\$/, '').trim() : '',
-          templateFileName: undefined, code: token.content, tokens: [token], env
-        });
-      }
-    }
+  for (const entry of inspected) {
+    const parts = entry.definitions.flatMap(definition => {
+      const env = envList.find(item => item.literateFileName === definition.path);
+      const token = env?.gstate.tokens.find(item =>
+        item.type === 'fence' && item.map?.[0] === definition.line);
+      return env && token ? [{ env, token }] : [];
+    });
+    if (!parts.length) { continue; }
+    const env = parts[0].env;
+    fragments.set(entry.name, {
+      lang: entry.language, literateFileName: env.literateFileName,
+      sourceFileName: entry.output || '', templateFileName: undefined,
+      code: parts.map(part => part.token.content).join(''),
+      tokens: parts.map(part => part.token), env
+    });
   }
   return fragments;
 }
@@ -1625,7 +1460,8 @@ export function deactivate() {}
 import { TextDecoder } from 'util';
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { discoveryExcludedDirectories, generateProject, orderSourceDocuments, templateReferences, SourceDocument } from './engine';
+import { discoveryExcludedDirectories, generateProject, orderSourceDocuments, templateReferences, scanFragmentTags, SourceDocument, FragmentInspection } from './engine';
+import { collectFragmentOccurrences, planFragmentRename, FragmentOccurrence } from './symbols';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');
 import Token = require('markdown-it/lib/token');

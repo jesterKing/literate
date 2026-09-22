@@ -58,6 +58,8 @@ the data can be visualized in the <code>fragmentExplorer</code> custom view.</p>
 <div class="code">
 <pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">FragmentNodeProvider</span> <span class="hljs-keyword">implements</span> vscode.<span class="hljs-property">TreeDataProvider</span>&lt;<span class="hljs-title class_">FragmentNode</span>&gt;
 {
+  <span class="hljs-title function_">constructor</span>(<span class="hljs-params"><span class="hljs-keyword">private</span> <span class="hljs-keyword">readonly</span> repository : FragmentRepository = theOneRepository</span>) {}
+
   <span class="literate-tag-name">&lt;&lt;fragment node provider members&gt;&gt;</span>
   <span class="literate-tag-name">&lt;&lt;fragment node provider API&gt;&gt;</span>
 }
@@ -251,7 +253,7 @@ corresponding <code>FragmentInformation</code> as the value to that key.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;get fragment family for offspring search&gt;&gt;= </div>
 <div class="code">
-<pre><code><span class="hljs-keyword">const</span> fragments = theOneRepository.<span class="hljs-title function_">getFragments</span>(fldr).<span class="hljs-property">map</span>;
+<pre><code><span class="hljs-keyword">const</span> fragments = <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">getFragments</span>(fldr).<span class="hljs-property">map</span>;
 </code></pre>
 
 </div>
@@ -264,35 +266,27 @@ fragment occurance under that shown.</p>
 <h2>Fragment used in other fragment</h2>
 <p>When we have found the fragment the passed in element represents we can find the
 child fragment names, that is the fragment names used in this fragment. All
-matches against <code>FRAGMENT_USE_IN_CODE_RE</code> are found and for each case a
-corresponding <code>FragmentNode</code> is created to function as a child to our parent
-element.</p>
+unescaped tags are found with the shared <code>scanFragmentTags</code> scanner. Each child
+uses its own fragment information so clicking it opens the child definition,
+not the parent. Unresolved children have no navigation command.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;create fragment node for fragment parent&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">let</span> fragmentInfo = fragments.<span class="hljs-title function_">get</span>(fragmentName) || <span class="hljs-literal">undefined</span>;
 <span class="hljs-keyword">if</span> (fragmentInfo) {
-  <span class="hljs-keyword">const</span> casesToReplace = [...fragmentInfo.<span class="hljs-property">code</span>.<span class="hljs-title function_">matchAll</span>(<span class="hljs-variable constant_">FRAGMENT_USE_IN_CODE_RE</span>)];
-  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> match <span class="hljs-keyword">of</span> casesToReplace) {
-    <span class="hljs-keyword">if</span>(!match || !match.<span class="hljs-property">groups</span>)
-    {
-      <span class="hljs-keyword">continue</span>;
-    }
-    <span class="hljs-keyword">let</span> tag = match[<span class="hljs-number">0</span>];
-    <span class="hljs-keyword">let</span> ident = match.<span class="hljs-property">groups</span>.<span class="hljs-property">ident</span>;
-    <span class="hljs-keyword">let</span> tagName = match.<span class="hljs-property">groups</span>.<span class="hljs-property">tagName</span>;
-    <span class="hljs-keyword">let</span> root = match.<span class="hljs-property">groups</span>.<span class="hljs-property">root</span>;
-    <span class="hljs-keyword">let</span> add = match.<span class="hljs-property">groups</span>.<span class="hljs-property">add</span>;
+  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> tag <span class="hljs-keyword">of</span> <span class="hljs-title function_">scanFragmentTags</span>(fragmentInfo.<span class="hljs-property">code</span>)) {
+    <span class="hljs-keyword">const</span> tagName = tag.<span class="hljs-property">name</span>;
+    <span class="hljs-keyword">const</span> childInfo = fragments.<span class="hljs-title function_">get</span>(tagName) || <span class="hljs-literal">undefined</span>;
     arr.<span class="hljs-title function_">push</span>(
       <span class="hljs-keyword">new</span> <span class="hljs-title class_">FragmentNode</span>(
         tagName,
-                <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">MarkdownString</span>(<span class="hljs-string">`$(symbol-file) <span class="hljs-subst">${fragmentInfo.literateFileName}</span>`</span>, <span class="hljs-literal">true</span>),
+        <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">MarkdownString</span>(<span class="hljs-string">`$(symbol-file) <span class="hljs-subst">${childInfo ? childInfo.literateFileName : <span class="hljs-string">&#x27;Unresolved fragment&#x27;</span>}</span>`</span>, <span class="hljs-literal">true</span>),
         fragmentName,
         vscode.<span class="hljs-property">TreeItemCollapsibleState</span>.<span class="hljs-property">Collapsed</span>,
         folderName,
         element.<span class="hljs-property">label</span>,
         element.<span class="hljs-property">workspaceFolder</span>,
-        fragmentInfo
+        childInfo
       )
     );
   }

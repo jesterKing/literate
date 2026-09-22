@@ -28,18 +28,22 @@ inspection can be easier done.</p>
 </div>
 </div><p>The <code>FragmentHoverProvider</code> implements <code>provideHover</code>. This will create the
 <code>Hover</code> item if under the current cursor position there is a fragment, including
-its opening and closing double chevrons.</p>
+its opening and closing double chevrons. Refresh is read-only and includes
+unsaved buffers; cancelled requests return no hover.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;hover provider method&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">public</span> <span class="hljs-keyword">async</span> <span class="hljs-title function_">provideHover</span>(<span class="hljs-params">
   <span class="hljs-variable language_">document</span> : vscode.TextDocument,
   position : vscode.Position,
-  _: vscode.CancellationToken
+  token: vscode.CancellationToken
 </span>)
 {
-  <span class="literate-tag-name">&lt;&lt;get current line&gt;&gt;</span>
+  <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
   <span class="literate-tag-name">&lt;&lt;find workspace folder for hover detection&gt;&gt;</span>
+  <span class="hljs-keyword">await</span> <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentRepository</span>.<span class="hljs-title function_">processLiterateFiles</span>(<span class="hljs-variable language_">document</span>);
+  <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+  <span class="literate-tag-name">&lt;&lt;get current line&gt;&gt;</span>
   <span class="literate-tag-name">&lt;&lt;create hover item for fragment&gt;&gt;</span>
   <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>;
 }
@@ -80,7 +84,7 @@ code of the fragment as a <code>MarkdownString</code> in a code fence.</p>
 <div class="fragmentname">&lt;&lt;create hover item for fragment&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">let</span> fragmentLocation = <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentRepository</span>.<span class="hljs-title function_">getFragmentTagLocation</span>(<span class="hljs-variable language_">document</span>, currentLine, position);
-<span class="hljs-keyword">if</span>(fragmentLocation.<span class="hljs-property">fragment</span> &amp;&amp; !fragmentLocation.<span class="hljs-property">root</span>)
+<span class="hljs-keyword">if</span>(fragmentLocation.<span class="hljs-property">valid</span> &amp;&amp; fragmentLocation.<span class="hljs-property">fragment</span> &amp;&amp; !fragmentLocation.<span class="hljs-property">root</span>)
 {
   <span class="hljs-keyword">let</span> fragment = fragmentLocation.<span class="hljs-property">fragment</span>;
   <span class="hljs-keyword">let</span> range = fragmentLocation.<span class="hljs-property">range</span>;
