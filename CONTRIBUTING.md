@@ -14,19 +14,28 @@ yarn esbuild
 ## Edit the book, then generate
 
 The authoritative implementations are in `literate/*.literate`.
-`src/extension.ts`, `src/grabber.ts`, `src/engine.ts`, and `src/cli.ts` are generated;
+`src/extension.ts`, `src/grabber.ts`, `src/engine.ts`, `src/cli.ts`, and
+`src/self-hosting.ts` are generated;
 commit them together with their literate sources and rendered HTML.
-Tests and configuration remain ordinary files.
+Tests and configuration remain ordinary files. Interleave prose with focused
+fragments: at most one function per fragment where practical, splitting larger
+functions into named steps. Explain intent and constraints rather than narrating
+every statement.
 
+- `yarn build:cli`: bootstrap from generated CLI sources without compiling the extension.
+- `yarn literate inspect [root] --json`: locate fragment definitions, references, and outputs.
 - `yarn literate generate [root]`: build the CLI, validate, and write changed outputs.
 - `yarn literate check [root]`: build the CLI and check outputs without writing.
-- `yarn generate` / `yarn check:generated`: convenience aliases.
+- `yarn literate self-check [root]`: check current outputs, type-check fresh sources,
+  and verify a rebuilt engine reproduces the output. Trusted self-hosting projects only.
+- `yarn generate` / `yarn check:generated` / `yarn check:self`: convenience aliases.
+- All commands support `--json` for structured results and errors.
 - `yarn test`: compile, lint, run headless regression tests, and check generated files.
 - `yarn test:extension`: build and run the existing VS Code host test runner
   (may download VS Code and requires a display).
 
-When changing the generator, generate first, then run `yarn literate check` to
-rebuild the new generator and verify that it reproduces its own output. Review
+When changing the generator, generate first, then run `yarn literate self-check`
+to explicitly verify the fresh sources and the engine's generation fixed point. Review
 all generated diffs. Prose-only changes should not change generated TypeScript.
 
 The full workflow and limitations are documented in

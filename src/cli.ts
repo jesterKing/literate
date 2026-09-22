@@ -7,7 +7,30 @@ export interface CliIO {
     stderr(message: string): void;
 }
 
-const usage = 'Usage: node out/cli.js generate|check [root]\n       node out/cli.js --help\n';
+type Generation = ReturnType<typeof generateProject>;
+type OutputStatus = 'current' | 'missing' | 'stale' | 'written';
+interface CliResponse {
+    schemaVersion: 1;
+    command: string;
+    ok: boolean;
+    root?: string;
+    diagnostics: Generation['diagnostics'];
+    errors: string[];
+    outputs: { path: string; status: OutputStatus }[];
+    inspection?: Generation['inspection'];
+    selfHosting?: { ok: boolean; checks: { name: string; ok: boolean; message?: string }[] };
+    usage?: string;
+}
+
+const commands = ['generate', 'check', 'inspect', 'self-check'];
+const usage = 'Usage: node out/cli.js generate|check|inspect|self-check [root] [--json]\n       node out/cli.js <command> --help [--json]\n       node out/cli.js --help [--json]\n';
+const descriptions: Record<string, string> = Object.fromEntries([
+    ['generate', 'Write missing or changed generated files.'],
+    ['check', 'Report missing or stale generated files without writing.'],
+    ['inspect', 'Report documents, templates, and fragment definitions and dependencies without reading outputs or writing.'],
+    ['self-check', 'Verify this repository’s trusted self-hosting code without generating files; all outputs must already be current.']
+]);
+
 const excluded = new Set(discoveryExcludedDirectories);
 const defaultIO: CliIO = {
     stdout: message => { process.stdout.write(message); },
@@ -24,7 +47,6 @@ function relative(value: string): string {
     return normalized;
 }
 
-/** Reject links and non-directory ancestors, including links that stay inside root. */
 async function inspect(root: string, value: string): Promise<boolean> {
     const parts = relative(value).split('/');
     let current = root;
@@ -67,36 +89,77 @@ async function discover(root: string): Promise<SourceDocument[]> {
     return documents;
 }
 
-
 export async function run(args: string[], io: CliIO = defaultIO): Promise<number> {
-    if (args.length === 1 && ['help', '--help', '-h'].includes(args[0])) {
-        io.stdout(usage);
-        return 0;
+    const json = args.includes('--json');
+    const positional: string[] = [];
+    const flags = new Set<string>();
+    const response: CliResponse = {
+        schemaVersion: 1, command: 'help', ok: false, diagnostics: [], errors: [], outputs: []
+    };
+    const finish = (code: number): number => {
+        response.ok = code === 0;
+        if (json) { io.stdout(JSON.stringify(response) + '\n'); }
+        return code;
+    };
+    for (const arg of args) {
+        if (arg.startsWith('-')) {
+            const flag = arg === '-h' ? '--help' : arg;
+            if (!['--help', '--json'].includes(flag)) { response.errors.push(`Unknown flag: ${arg}`); }
+            else if (flags.has(flag)) { response.errors.push(`Duplicate flag: ${arg}`); }
+            flags.add(flag);
+        } else { positional.push(arg); }
     }
-    if (args.length < 1 || args.length > 2 || !['generate', 'check'].includes(args[0]) ||
-        (args.length === 2 && (!args[1] || args[1].startsWith('-')))) {
-        io.stderr(usage);
-        return 2;
+    const command = positional[0];
+    response.command = command || 'help';
+    const helpCommand = command === 'help';
+    const help = helpCommand || flags.has('--help');
+    const topic = helpCommand ? positional[1] : command;
+    if (command && !helpCommand && !commands.includes(command)) {
+        response.errors.push(`Unknown command: ${command}`);
+    }
+    if ((!command && !help) || positional.some(arg => !arg) || positional.length > 2 ||
+        (helpCommand && flags.has('--help')) || (helpCommand && topic && !commands.includes(topic))) {
+        response.errors.push('Invalid arguments');
+    }
+    if (response.errors.length) {
+        if (!json) { io.stderr(response.errors.join('\n') + '\n' + usage); }
+        return finish(2);
+    }
+    if (help) {
+        response.command = 'help';
+        response.usage = topic
+            ? `Usage: node out/cli.js ${topic} [root] [--json]\n${descriptions[topic]}\n`
+            : usage;
+        if (!json) { io.stdout(response.usage); }
+        return finish(0);
     }
     try {
-
-        const root = await fs.realpath(path.resolve(args[1] || process.cwd()));
+        const root = await fs.realpath(path.resolve(positional[1] || process.cwd()));
+        response.root = root;
         if (!(await fs.stat(root)).isDirectory()) { throw new Error('Root is not a directory'); }
         const documents = await discover(root);
+        if (!documents.length) { throw new Error('No literate documents found'); }
         const templates: Record<string, string> = Object.create(null);
         for (const reference of templateReferences(documents)) {
-
             if (await inspect(root, reference)) {
                 templates[reference] = await fs.readFile(path.join(root, reference), 'utf8');
             }
         }
         const result = generateProject(documents, templates);
-        if (result.diagnostics.length) {
-            for (const diagnostic of result.diagnostics) {
-                io.stderr(`${diagnostic.path}:${diagnostic.line + 1}:${diagnostic.column + 1}: ${diagnostic.message}\n`);
-            }
-            return 1;
+        response.diagnostics = result.diagnostics;
+        if (command === 'inspect') {
+            response.inspection = result.inspection;
+            if (!json) { io.stdout(JSON.stringify(result.inspection, null, 2) + '\n'); }
         }
+        if (result.diagnostics.length) {
+            if (!json) {
+                for (const diagnostic of result.diagnostics) {
+                    io.stderr(`${diagnostic.path}:${diagnostic.line + 1}:${diagnostic.column + 1}: ${diagnostic.message}\n`);
+                }
+            }
+            return finish(1);
+        }
+        if (command === 'inspect') { return finish(0); }
         const files = result.files.map(file => ({ path: relative(file.path), content: file.content }));
         const targets = new Set<string>();
         for (const file of files) {
@@ -110,18 +173,32 @@ export async function run(args: string[], io: CliIO = defaultIO): Promise<number
                 if (targets.has(parent)) { throw new Error(`Output is also a parent directory: ${parent}`); }
             }
         }
-        const changes: { path: string; content: string; status: string }[] = [];
-
+        const changes: { path: string; content: string; output: CliResponse['outputs'][number] }[] = [];
         for (const file of files) {
             const exists = await inspect(root, file.path);
             const content = Buffer.from(file.content, 'utf8');
-            if (!exists || !(await fs.readFile(path.join(root, file.path))).equals(content)) {
-                changes.push({ ...file, status: exists ? 'stale' : 'missing' });
-            }
+            const status: OutputStatus = !exists ? 'missing'
+                : (await fs.readFile(path.join(root, file.path))).equals(content) ? 'current' : 'stale';
+            const output = { path: file.path, status };
+            response.outputs.push(output);
+            if (status !== 'current') { changes.push({ ...file, output }); }
         }
-        if (args[0] === 'check') {
-            for (const change of changes) { io.stdout(`${change.status}: ${change.path}\n`); }
-            return changes.length ? 1 : 0;
+        if (command === 'check' || command === 'self-check') {
+            if (!json) {
+                for (const change of changes) { io.stdout(`${change.output.status}: ${change.path}\n`); }
+            }
+            if (changes.length) { return finish(1); }
+            if (command === 'self-check') {
+                const { verifySelfHosting } = await import('./self-hosting');
+                response.selfHosting = await verifySelfHosting(root, documents, templates, files);
+                if (!json) {
+                    for (const check of response.selfHosting.checks) {
+                        io.stdout(`${check.ok ? 'ok' : 'failed'}: ${check.name}${check.message ? ': ' + check.message : ''}\n`);
+                    }
+                }
+                return finish(response.selfHosting.ok ? 0 : 1);
+            }
+            return finish(0);
         }
         for (const change of changes) {
             await inspect(root, change.path);
@@ -129,13 +206,15 @@ export async function run(args: string[], io: CliIO = defaultIO): Promise<number
             await fs.mkdir(path.dirname(target), { recursive: true });
             await inspect(root, change.path);
             await fs.writeFile(target, change.content, 'utf8');
-            io.stdout(`generated: ${change.path}\n`);
+            change.output.status = 'written';
+            if (!json) { io.stdout(`generated: ${change.path}\n`); }
         }
-        return 0;
+        return finish(0);
     } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        io.stderr(`literate: ${message.replace(/[\r\n]+/g, ' ')}\n`);
-        return 1;
+        const message = (error instanceof Error ? error.message : String(error)).replace(/[\r\n]+/g, ' ');
+        response.errors.push(message);
+        if (!json) { io.stderr(`literate: ${message}\n`); }
+        return finish(1);
     }
 }
 

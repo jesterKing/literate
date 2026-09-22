@@ -5,6 +5,20 @@ import hljs from 'highlight.js';
 export interface SourceDocument { path: string; text: string; }
 export interface GenerationDiagnostic { path: string; line: number; column: number; message: string; }
 export interface GeneratedFile { path: string; content: string; }
+export interface ProjectInspection { documents: string[]; templates: string[]; fragments: FragmentInspection[]; }
+export interface FragmentInspection {
+    name: string;
+    language: string;
+    output?: string;
+    template?: string;
+    definitions: { path: string; line: number; column: number }[];
+    references: { name: string; path: string; line: number; column: number }[];
+}
+export interface GenerationResult {
+    files: GeneratedFile[];
+    diagnostics: GenerationDiagnostic[];
+    inspection: ProjectInspection;
+}
 
 export const discoveryExcludedDirectories: readonly string[] = Object.freeze([
     '.git', 'node_modules', 'out', 'dist', '.yarn', '.vscode-test'
@@ -12,7 +26,7 @@ export const discoveryExcludedDirectories: readonly string[] = Object.freeze([
 
 interface Location { path: string; line: number; column: number; }
 interface Header { name: string; language: string; append: boolean; output?: string; template?: string; }
-interface Part { content: string; location: Location; }
+interface Part { content: string; location: Location; definition: Location; columns: number[]; }
 interface Fragment { header: Header; parts: Part[]; location: Location; }
 
 /** Canonical workspace-relative POSIX path; never permits escaping the workspace. */
@@ -145,9 +159,7 @@ const defaultTemplate = `<!DOCTYPE html>
 </html>`;
 
 /** Pure, atomic generation. Diagnostic positions are zero-based. */
-export function generateProject(documents: SourceDocument[], templates: Record<string, string> = {}): {
-    files: GeneratedFile[]; diagnostics: GenerationDiagnostic[];
-} {
+export function generateProject(documents: SourceDocument[], templates: Record<string, string> = {}): GenerationResult {
     const diagnostics: GenerationDiagnostic[] = [];
     const files: GeneratedFile[] = [];
     const report = (location: Location, message: string): void => {
@@ -180,9 +192,12 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
     const tokens = new Map<string, Token[]>();
     for (const document of sources.values()) { tokens.set(document.path, md.parse(document.text, {})); }
     const order = orderSourceDocuments(Array.from(sources.values())).map(document => document.path);
+    const inspection: ProjectInspection = { documents: order, templates: [], fragments: [] };
+    const referencedTemplates = new Set<string>();
     const loadTemplate = (value: string, location: Location): string | undefined => {
         const path = safeRelativePath(value);
         if (!path) { report(location, `Invalid template path: ${value}`); return undefined; }
+        referencedTemplates.add(path);
         if (!templateMap.has(path)) { report(location, `Missing template: ${path}`); return undefined; }
         return templateMap.get(path);
     };
@@ -222,10 +237,12 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
         return path;
     };
     for (const path of order) {
+        const sourceLines = sources.get(path)!.text.split(/\r\n|\r|\n/);
         reserve(path.replace(/\.literate$/, '.html'), { path, line: 0, column: 0 });
         for (const token of tokens.get(path) || []) {
             if (token.type !== 'fence' || token.info.trim() === 'SETTINGS' || !token.info.includes('<<')) { continue; }
-            const location = { path, line: token.map?.[0] || 0, column: 0 };
+            const line = token.map?.[0] || 0;
+            const location = { path, line, column: Math.max(0, sourceLines[line].indexOf(token.markup)) };
             const match = fragmentHeader.exec(token.info);
             if (!match) { report(location, 'Invalid fragment header (expected language colon and <<name>>= or =+)'); continue; }
             const header: Header = { language: match[1] || '', name: match[2], append: !!match[3] };
@@ -243,7 +260,17 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
                 else { header.template = template[1].trim(); }
             }
             headers.set(token, header);
-            const part = { content: token.content, location: { ...location, line: location.line + 1 } };
+            if (header.template !== undefined) {
+                const templatePath = safeRelativePath(header.template);
+                if (templatePath) { referencedTemplates.add(templatePath); }
+            }
+            const part: Part = {
+                content: token.content, location: { path, line: location.line + 1, column: 0 }, definition: location,
+                columns: token.content.split('\n').map((bodyLine, index) => {
+                    const original = sourceLines[location.line + 1 + index] || '';
+                    return original.length - bodyLine.length;
+                })
+            };
             if (header.append) {
                 if (header.output !== undefined || header.template !== undefined) { report(location, 'Append fragments cannot specify output or template'); }
                 const fragment = fragments.get(header.name);
@@ -265,6 +292,38 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
             fragments.set(header.name, { header, parts: [part], location });
         }
     }
+    const replaceReferences = (part: Part, replace: (name: string, modifier: string | undefined, at: Location, prefix: string) => string): string =>
+        part.content.replace(/\\<<|<<([^<>\r\n]+)>>(=\+?|\+)?/g,
+            (whole: string, name: string | undefined, modifier: string | undefined, offset: number) => {
+                if (name === undefined) { return whole; }
+                const before = part.content.slice(0, offset);
+                const prefix = before.slice(before.lastIndexOf('\n') + 1);
+                const line = before.split('\n').length - 1;
+                const at = { path: part.location.path, line: part.location.line + line, column: prefix.length + part.columns[line] };
+                return replace(name, modifier, at, prefix);
+            });
+    inspection.templates = Array.from(referencedTemplates).sort();
+    for (const { header, parts } of fragments.values()) {
+        const entry: FragmentInspection = {
+            name: header.name, language: header.language,
+            definitions: parts.map(part => ({ ...part.definition })), references: []
+        };
+        if (header.output !== undefined) {
+            const output = safeRelativePath(header.output);
+            if (output) { entry.output = output; }
+        }
+        if (header.template !== undefined) {
+            const template = safeRelativePath(header.template);
+            if (template) { entry.template = template; }
+        }
+        for (const part of parts) {
+            replaceReferences(part, (name, _modifier, at) => {
+                entry.references.push({ name, ...at });
+                return '';
+            });
+        }
+        inspection.fragments.push(entry);
+    }
     const expanded = new Map<string, string>();
     const visiting: string[] = [];
     const expand = (name: string, location: Location): string => {
@@ -273,28 +332,19 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
         if (!fragment) { report(location, `Missing fragment: ${name}`); return ''; }
         if (visiting.includes(name)) { report(location, `Fragment cycle: ${visiting.concat(name).join(' -> ')}`); return ''; }
         visiting.push(name);
-        const content = fragment.parts.map(part => {
-
-            return part.content.replace(/\\<<|<<([^<>\r\n]+)>>(=\+?|\+)?/g,
-                (whole: string, reference: string | undefined, modifier: string | undefined, offset: number) => {
-                    if (reference === undefined) { return whole; }
-                    const before = part.content.slice(0, offset);
-                    const lineStart = before.lastIndexOf('\n') + 1;
-                    const prefix = before.slice(lineStart);
-                    const at = { path: part.location.path, line: part.location.line + before.split('\n').length - 1, column: prefix.length };
-                    if (modifier) { report(at, `Invalid definition operator on reference: ${reference}`); }
-                    const replacement = expand(reference, at).replace(/\n$/, '');
-                    const indent = /^[ \t]*$/.test(prefix) ? prefix : (/[ \t]*$/.exec(prefix)?.[0] || '');
-                    return replacement.replace(/\n/g, () => '\n' + indent);
-                });
-        }).join('');
+        const content = fragment.parts.map(part => replaceReferences(part, (reference, modifier, at, prefix) => {
+            if (modifier) { report(at, `Invalid definition operator on reference: ${reference}`); }
+            const replacement = expand(reference, at).replace(/\n$/, '');
+            const indent = /^[ \t]*$/.test(prefix) ? prefix : (/[ \t]*$/.exec(prefix)?.[0] || '');
+            return replacement.replace(/\n/g, () => '\n' + indent);
+        })).join('');
         visiting.pop();
         expanded.set(name, content);
         return content;
     };
 
     for (const fragment of fragments.values()) { expand(fragment.header.name, fragment.location); }
-    if (diagnostics.length) { return { files: [], diagnostics }; }
+    if (diagnostics.length) { return { files: [], diagnostics, inspection }; }
     for (const fragment of fragments.values()) {
         if (!fragment.header.output) { continue; }
         const code = expanded.get(fragment.header.name)!.replace(/\\<</g, () => '<<');
@@ -325,5 +375,5 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
         files.push({ path: safeRelativePath(path.replace(/\.literate$/, '.html'))!, content: substitute(htmlTemplate, { content, authors: metaAuthors }) });
     }
     for (const file of files) { file.content = file.content.replace(/\r\n|\r/g, '\n'); }
-    return { files, diagnostics };
+    return { files, diagnostics, inspection };
 }

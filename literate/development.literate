@@ -11,11 +11,13 @@ if necessary, then install the locked dependencies:
 
 ```sh
 yarn install --immutable
-yarn compile
+yarn build:cli
 ```
 
-The checked-in generated TypeScript is the bootstrap: compilation produces the
-CLI in `out/cli.js` without first needing to run the extension. No global
+The checked-in generated TypeScript is the bootstrap: `build:cli` bundles only
+the CLI's local modules into `out/cli.js`, using installed packages at runtime.
+It does not type-check or compile
+the extension, so an extension error does not prevent generation. No global
 TypeScript compiler or published Literate extension is required. `.gitattributes`
 keeps text checkouts in LF form, matching the engine's deterministic output even
 on Windows. Output names follow a portable path policy: case-only collisions,
@@ -26,8 +28,8 @@ Windows device names, and ambiguous trailing dots or spaces are rejected.
 The shared engine is explained in [Headless generation engine](engine.html), the
 filesystem adapter in [Command-line generation](cli.html), and the editor adapter
 in [Literate Programming](literate.html). Change those `.literate` chapters, not
-`src/engine.ts`, `src/cli.ts`, or `src/extension.ts` directly. The grabber is also
-generated. Tests, package configuration, templates, and styles remain ordinary
+`src/engine.ts`, `src/cli.ts`, `src/self-hosting.ts`, or `src/extension.ts`
+directly. The grabber is also generated. Tests, package configuration, templates, and styles remain ordinary
 source files.
 
 ```sh
@@ -36,8 +38,7 @@ yarn test
 yarn esbuild
 ```
 
-`yarn literate` compiles the currently checked-in/generated TypeScript before
-running the CLI. `generate` writes source and HTML only when their bytes change.
+`yarn literate` bundles the currently checked-in/generated CLI before running it. `generate` writes source and HTML only when their bytes change.
 `yarn test` compiles the new implementation, lints it, runs headless regression
 tests, and checks that generation agrees with all the files on disk.
 `yarn esbuild` bundles the extension's actual entry point, `out/main.js`.
@@ -73,17 +74,45 @@ source and its documentation:
 
 ```sh
 yarn literate generate
-yarn literate check
+yarn literate self-check
 yarn test
 ```
+
+`self-check` requires current outputs, type-checks freshly generated TypeScript
+through an in-memory overlay, then builds and runs a fresh engine in a temporary
+child process. Its output paths and bytes must match the current generation plan.
+It does not write project files or silently repair stale outputs. This is an
+explicit engine fixed-point check, not a replacement for CLI runtime tests.
+Use it only on trusted code; the child is not a security sandbox.
 
 If the new generator deliberately changes formatting, the check will report the
 old output. Run `yarn literate generate` again, review the differences, then repeat
 the check. Keep generated TypeScript committed so the next checkout can bootstrap.
 
+If newly generated CLI code fails to build, keep using a known-working executable
+with `node out/cli.js generate` to regenerate after fixing the literate source.
+Do not repair generated TypeScript by hand. Keep a separate known-good CLI bundle
+before risky generator syntax changes; `out/cli.js` can also be overwritten by
+compilation, so it is not a permanent backup.
+
 For syntax changes, retain compatibility long enough to generate the new parser
 before migrating the book. During this initial extraction the generated engine
 was bootstrapped once; subsequent changes use the same literate-first workflow.
+
+## Inspection for authors and tools
+
+```sh
+yarn literate inspect --json
+yarn literate check --json
+yarn literate self-check --json
+```
+
+Inspection lists ordered input documents, referenced templates, and each fragment's
+output, definitions, and dependencies. Locations refer to the literate sources,
+not generated files. JSON responses use schema version 1 and zero-based positions;
+usage errors and I/O failures are also structured. Inspection and checks never
+write project output. The `yarn literate` wrapper does rebuild `out/cli.js`; invoke
+`node out/cli.js` directly when the whole invocation must avoid project writes.
 
 ## Safe generation while editing
 

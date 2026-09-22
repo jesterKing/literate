@@ -78,9 +78,11 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "literate": "yarn compile && node ./out/cli.js",
+    "build:cli": "esbuild ./src/cli.ts --bundle --outfile=out/cli.js --external:typescript --external:esbuild --external:markdown-it --external:highlight.js --format=cjs --platform=node --log-level=error",
+    "literate": "yarn build:cli && node ./out/cli.js",
     "generate": "yarn literate generate",
     "check:generated": "yarn literate check",
+    "check:self": "yarn literate self-check",
     "lint": "eslint src --ext ts",
     "test": "yarn compile && yarn lint && node --test out/test/headless/*.test.js && node ./out/cli.js check",
     "test:extension": "yarn compile && yarn esbuild && node ./out/test/runTest.js",

@@ -15,7 +15,12 @@ successful result. This chapter is authoritative for <code>src/engine.ts</code>.
 <p><code>generateProject(documents, templates = {})</code> returns generated files and
 source-position diagnostics. Its central guarantee is atomic planning: <strong>any
 diagnostic makes the entire file list empty</strong>, including documentation HTML.
-A valid plan contains both tangled source and rendered documentation.</p>
+A valid plan contains both tangled source and rendered documentation.
+<code>GenerationResult.inspection</code> also returns partial parser metadata on diagnostics:
+ordered accepted documents, sorted normalized referenced templates (even missing
+ones), and fragments in encounter order. Definitions include append fences;
+references exclude escaped tags and use original part offsets, not expanded text.
+All inspection coordinates are zero-based JavaScript string positions.</p>
 <p>The root fragment assembles the implementation in dependency order. The final
 fragment describes the generation phases; the preceding fragments provide
 shared contracts and helpers for both generation and its adapters.</p>
@@ -55,14 +60,45 @@ test-runtime directories.</p>
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">SourceDocument</span> { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">text</span>: <span class="hljs-built_in">string</span>; }
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">GenerationDiagnostic</span> { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">line</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">column</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>; }
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">GeneratedFile</span> { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span>; }
+</code></pre>
 
-<span class="hljs-keyword">export</span> <span class="hljs-keyword">const</span> <span class="hljs-attr">discoveryExcludedDirectories</span>: <span class="hljs-keyword">readonly</span> <span class="hljs-built_in">string</span>[] = <span class="hljs-title class_">Object</span>.<span class="hljs-title function_">freeze</span>([
+</div>
+</div><p>Inspection describes accepted parser state, even when validation prevents output.
+Fragments follow encounter order; each definition and append retains its own
+location, and references describe occurrences rather than deduplicated edges.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine interfaces and dependencies&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">ProjectInspection</span> { <span class="hljs-attr">documents</span>: <span class="hljs-built_in">string</span>[]; <span class="hljs-attr">templates</span>: <span class="hljs-built_in">string</span>[]; <span class="hljs-attr">fragments</span>: <span class="hljs-title class_">FragmentInspection</span>[]; }
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">FragmentInspection</span> {
+    <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">language</span>: <span class="hljs-built_in">string</span>;
+    output?: <span class="hljs-built_in">string</span>;
+    template?: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">definitions</span>: { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">line</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">column</span>: <span class="hljs-built_in">number</span> }[];
+    <span class="hljs-attr">references</span>: { <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">line</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">column</span>: <span class="hljs-built_in">number</span> }[];
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">GenerationResult</span> {
+    <span class="hljs-attr">files</span>: <span class="hljs-title class_">GeneratedFile</span>[];
+    <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">GenerationDiagnostic</span>[];
+    <span class="hljs-attr">inspection</span>: <span class="hljs-title class_">ProjectInspection</span>;
+}
+
+</code></pre>
+
+</div>
+</div><p>Internal parts pair Markdown-normalized code with original source coordinates.
+Adapters also share the directory exclusions used during source discovery.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine interfaces and dependencies&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">const</span> <span class="hljs-attr">discoveryExcludedDirectories</span>: <span class="hljs-keyword">readonly</span> <span class="hljs-built_in">string</span>[] = <span class="hljs-title class_">Object</span>.<span class="hljs-title function_">freeze</span>([
     <span class="hljs-string">&#x27;.git&#x27;</span>, <span class="hljs-string">&#x27;node_modules&#x27;</span>, <span class="hljs-string">&#x27;out&#x27;</span>, <span class="hljs-string">&#x27;dist&#x27;</span>, <span class="hljs-string">&#x27;.yarn&#x27;</span>, <span class="hljs-string">&#x27;.vscode-test&#x27;</span>
 ]);
 
 <span class="hljs-keyword">interface</span> <span class="hljs-title class_">Location</span> { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">line</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">column</span>: <span class="hljs-built_in">number</span>; }
 <span class="hljs-keyword">interface</span> <span class="hljs-title class_">Header</span> { <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">language</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">append</span>: <span class="hljs-built_in">boolean</span>; output?: <span class="hljs-built_in">string</span>; template?: <span class="hljs-built_in">string</span>; }
-<span class="hljs-keyword">interface</span> <span class="hljs-title class_">Part</span> { <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">location</span>: <span class="hljs-title class_">Location</span>; }
+<span class="hljs-keyword">interface</span> <span class="hljs-title class_">Part</span> { <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">location</span>: <span class="hljs-title class_">Location</span>; <span class="hljs-attr">definition</span>: <span class="hljs-title class_">Location</span>; <span class="hljs-attr">columns</span>: <span class="hljs-built_in">number</span>[]; }
 <span class="hljs-keyword">interface</span> <span class="hljs-title class_">Fragment</span> { <span class="hljs-attr">header</span>: <span class="hljs-title class_">Header</span>; <span class="hljs-attr">parts</span>: <span class="hljs-title class_">Part</span>[]; <span class="hljs-attr">location</span>: <span class="hljs-title class_">Location</span>; }
 
 </code></pre>
@@ -306,9 +342,7 @@ template references must resolve in the supplied template map.</p>
 <div class="fragmentname">&lt;&lt;engine generation inputs and settings&gt;&gt;= </div>
 <div class="code">
 <pre><code>
-<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">generateProject</span>(<span class="hljs-params">documents: SourceDocument[], templates: Record&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; = {}</span>): {
-    <span class="hljs-attr">files</span>: <span class="hljs-title class_">GeneratedFile</span>[]; <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">GenerationDiagnostic</span>[];
-} {
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">generateProject</span>(<span class="hljs-params">documents: SourceDocument[], templates: Record&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; = {}</span>): <span class="hljs-title class_">GenerationResult</span> {
     <span class="hljs-keyword">const</span> <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">GenerationDiagnostic</span>[] = [];
     <span class="hljs-keyword">const</span> <span class="hljs-attr">files</span>: <span class="hljs-title class_">GeneratedFile</span>[] = [];
     <span class="hljs-keyword">const</span> report = (<span class="hljs-attr">location</span>: <span class="hljs-title class_">Location</span>, <span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>): <span class="hljs-function"><span class="hljs-params">void</span> =&gt;</span> {
@@ -338,12 +372,25 @@ template references must resolve in the supplied template map.</p>
         templateKeys.<span class="hljs-title function_">add</span>(<span class="hljs-title function_">pathKey</span>(path));
         templateMap.<span class="hljs-title function_">set</span>(path, templates[key]);
     }
-    <span class="hljs-keyword">const</span> tokens = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">Token</span>[]&gt;();
+</code></pre>
+
+</div>
+</div><p>With accepted inputs normalized, parse them once and establish the shared document
+order. Template loading also records dependencies for inspection, including a
+valid template path whose contents are missing. Only the root index controls
+project-level HTML settings.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine generation inputs and settings&gt;&gt;=+ </div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">const</span> tokens = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">Token</span>[]&gt;();
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> <span class="hljs-variable language_">document</span> <span class="hljs-keyword">of</span> sources.<span class="hljs-title function_">values</span>()) { tokens.<span class="hljs-title function_">set</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>, md.<span class="hljs-title function_">parse</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">text</span>, {})); }
     <span class="hljs-keyword">const</span> order = <span class="hljs-title function_">orderSourceDocuments</span>(<span class="hljs-title class_">Array</span>.<span class="hljs-title function_">from</span>(sources.<span class="hljs-title function_">values</span>())).<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">document</span> =&gt;</span> <span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>);
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">inspection</span>: <span class="hljs-title class_">ProjectInspection</span> = { <span class="hljs-attr">documents</span>: order, <span class="hljs-attr">templates</span>: [], <span class="hljs-attr">fragments</span>: [] };
+    <span class="hljs-keyword">const</span> referencedTemplates = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
     <span class="hljs-keyword">const</span> loadTemplate = (<span class="hljs-attr">value</span>: <span class="hljs-built_in">string</span>, <span class="hljs-attr">location</span>: <span class="hljs-title class_">Location</span>): <span class="hljs-built_in">string</span> | <span class="hljs-function"><span class="hljs-params">undefined</span> =&gt;</span> {
         <span class="hljs-keyword">const</span> path = <span class="hljs-title function_">safeRelativePath</span>(value);
         <span class="hljs-keyword">if</span> (!path) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Invalid template path: <span class="hljs-subst">${value}</span>`</span>); <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+        referencedTemplates.<span class="hljs-title function_">add</span>(path);
         <span class="hljs-keyword">if</span> (!templateMap.<span class="hljs-title function_">has</span>(path)) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Missing template: <span class="hljs-subst">${path}</span>`</span>); <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
         <span class="hljs-keyword">return</span> templateMap.<span class="hljs-title function_">get</span>(path);
     };
@@ -399,11 +446,22 @@ collisions are found before any output is returned.</p>
         outputs.<span class="hljs-title function_">add</span>(key);
         <span class="hljs-keyword">return</span> path;
     };
-    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> path <span class="hljs-keyword">of</span> order) {
+</code></pre>
+
+</div>
+</div><p>Walk fences in project order and retain their original opening positions. Header
+parsing establishes the fragment identity and settings before its body is added;
+this lets inspection and diagnostics refer to the same declaration.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine fragment collection and output reservation&gt;&gt;=+ </div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> path <span class="hljs-keyword">of</span> order) {
+        <span class="hljs-keyword">const</span> sourceLines = sources.<span class="hljs-title function_">get</span>(path)!.<span class="hljs-property">text</span>.<span class="hljs-title function_">split</span>(<span class="hljs-regexp">/\r\n|\r|\n/</span>);
         <span class="hljs-title function_">reserve</span>(path.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\.literate$/</span>, <span class="hljs-string">&#x27;.html&#x27;</span>), { path, <span class="hljs-attr">line</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span> });
         <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> tokens.<span class="hljs-title function_">get</span>(path) || []) {
             <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> !== <span class="hljs-string">&#x27;fence&#x27;</span> || token.<span class="hljs-property">info</span>.<span class="hljs-title function_">trim</span>() === <span class="hljs-string">&#x27;SETTINGS&#x27;</span> || !token.<span class="hljs-property">info</span>.<span class="hljs-title function_">includes</span>(<span class="hljs-string">&#x27;&lt;&lt;&#x27;</span>)) { <span class="hljs-keyword">continue</span>; }
-            <span class="hljs-keyword">const</span> location = { path, <span class="hljs-attr">line</span>: token.<span class="hljs-property">map</span>?.[<span class="hljs-number">0</span>] || <span class="hljs-number">0</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span> };
+            <span class="hljs-keyword">const</span> line = token.<span class="hljs-property">map</span>?.[<span class="hljs-number">0</span>] || <span class="hljs-number">0</span>;
+            <span class="hljs-keyword">const</span> location = { path, line, <span class="hljs-attr">column</span>: <span class="hljs-title class_">Math</span>.<span class="hljs-title function_">max</span>(<span class="hljs-number">0</span>, sourceLines[line].<span class="hljs-title function_">indexOf</span>(token.<span class="hljs-property">markup</span>)) };
             <span class="hljs-keyword">const</span> match = fragmentHeader.<span class="hljs-title function_">exec</span>(token.<span class="hljs-property">info</span>);
             <span class="hljs-keyword">if</span> (!match) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">&#x27;Invalid fragment header (expected language colon and <span class="literate-tag-name">&lt;&lt;name&gt;&gt;</span>= or =+)&#x27;</span>); <span class="hljs-keyword">continue</span>; }
             <span class="hljs-keyword">const</span> <span class="hljs-attr">header</span>: <span class="hljs-title class_">Header</span> = { <span class="hljs-attr">language</span>: match[<span class="hljs-number">1</span>] || <span class="hljs-string">&#x27;&#x27;</span>, <span class="hljs-attr">name</span>: match[<span class="hljs-number">2</span>], <span class="hljs-attr">append</span>: !!match[<span class="hljs-number">3</span>] };
@@ -421,7 +479,28 @@ collisions are found before any output is returned.</p>
                 <span class="hljs-keyword">else</span> { header.<span class="hljs-property">template</span> = template[<span class="hljs-number">1</span>].<span class="hljs-title function_">trim</span>(); }
             }
             headers.<span class="hljs-title function_">set</span>(token, header);
-            <span class="hljs-keyword">const</span> part = { <span class="hljs-attr">content</span>: token.<span class="hljs-property">content</span>, <span class="hljs-attr">location</span>: { ...location, <span class="hljs-attr">line</span>: location.<span class="hljs-property">line</span> + <span class="hljs-number">1</span> } };
+            <span class="hljs-keyword">if</span> (header.<span class="hljs-property">template</span> !== <span class="hljs-literal">undefined</span>) {
+                <span class="hljs-keyword">const</span> templatePath = <span class="hljs-title function_">safeRelativePath</span>(header.<span class="hljs-property">template</span>);
+                <span class="hljs-keyword">if</span> (templatePath) { referencedTemplates.<span class="hljs-title function_">add</span>(templatePath); }
+            }
+</code></pre>
+
+</div>
+</div><p>Markdown removes container prefixes and fence indentation from code lines, and
+may replace a partially consumed tab with spaces. The difference in line lengths
+maps reference offsets back to original JavaScript string columns, even in that
+tab case: the suffix starting at a reference is unchanged. Keep the opening fence
+location separately so appends appear as definitions in their own documents.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine fragment collection and output reservation&gt;&gt;=+ </div>
+<div class="code">
+<pre><code>            <span class="hljs-keyword">const</span> <span class="hljs-attr">part</span>: <span class="hljs-title class_">Part</span> = {
+                <span class="hljs-attr">content</span>: token.<span class="hljs-property">content</span>, <span class="hljs-attr">location</span>: { path, <span class="hljs-attr">line</span>: location.<span class="hljs-property">line</span> + <span class="hljs-number">1</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span> }, <span class="hljs-attr">definition</span>: location,
+                <span class="hljs-attr">columns</span>: token.<span class="hljs-property">content</span>.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;\n&#x27;</span>).<span class="hljs-title function_">map</span>(<span class="hljs-function">(<span class="hljs-params">bodyLine, index</span>) =&gt;</span> {
+                    <span class="hljs-keyword">const</span> original = sourceLines[location.<span class="hljs-property">line</span> + <span class="hljs-number">1</span> + index] || <span class="hljs-string">&#x27;&#x27;</span>;
+                    <span class="hljs-keyword">return</span> original.<span class="hljs-property">length</span> - bodyLine.<span class="hljs-property">length</span>;
+                })
+            };
             <span class="hljs-keyword">if</span> (header.<span class="hljs-property">append</span>) {
                 <span class="hljs-keyword">if</span> (header.<span class="hljs-property">output</span> !== <span class="hljs-literal">undefined</span> || header.<span class="hljs-property">template</span> !== <span class="hljs-literal">undefined</span>) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">&#x27;Append fragments cannot specify output or template&#x27;</span>); }
                 <span class="hljs-keyword">const</span> fragment = fragments.<span class="hljs-title function_">get</span>(header.<span class="hljs-property">name</span>);
@@ -465,8 +544,63 @@ referenced fragment. The assembly fences in this chapter use that same rule to
 preserve the generated file's original whitespace and final newline exactly.</p>
 <p>The last statement in this phase enforces the atomic-plan guarantee: any
 recorded diagnostic returns an empty file list before emission can begin.</p>
+<p>Both inspection and expansion use this scanner. It skips escaped openers and
+computes positions from the original part, never from replacement text. The
+normalized prefix remains separate from the source column: only that prefix
+controls indentation when inserting multiline dependencies.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;engine dependency expansion and validation barrier&gt;&gt;= </div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">const</span> replaceReferences = (<span class="hljs-attr">part</span>: <span class="hljs-title class_">Part</span>, <span class="hljs-attr">replace</span>: <span class="hljs-function">(<span class="hljs-params">name: <span class="hljs-built_in">string</span>, modifier: <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>, at: Location, prefix: <span class="hljs-built_in">string</span></span>) =&gt;</span> <span class="hljs-built_in">string</span>): <span class="hljs-function"><span class="hljs-params">string</span> =&gt;</span>
+        part.<span class="hljs-property">content</span>.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\\<span class="literate-tag-name">&lt;&lt;|&lt;&lt;([^&lt;&gt;\r\n]+)&gt;&gt;</span>(=\+?|\+)?/g</span>,
+            <span class="hljs-function">(<span class="hljs-params">whole: <span class="hljs-built_in">string</span>, name: <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>, modifier: <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>, offset: <span class="hljs-built_in">number</span></span>) =&gt;</span> {
+                <span class="hljs-keyword">if</span> (name === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> whole; }
+                <span class="hljs-keyword">const</span> before = part.<span class="hljs-property">content</span>.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, offset);
+                <span class="hljs-keyword">const</span> prefix = before.<span class="hljs-title function_">slice</span>(before.<span class="hljs-title function_">lastIndexOf</span>(<span class="hljs-string">&#x27;\n&#x27;</span>) + <span class="hljs-number">1</span>);
+                <span class="hljs-keyword">const</span> line = before.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;\n&#x27;</span>).<span class="hljs-property">length</span> - <span class="hljs-number">1</span>;
+                <span class="hljs-keyword">const</span> at = { <span class="hljs-attr">path</span>: part.<span class="hljs-property">location</span>.<span class="hljs-property">path</span>, <span class="hljs-attr">line</span>: part.<span class="hljs-property">location</span>.<span class="hljs-property">line</span> + line, <span class="hljs-attr">column</span>: prefix.<span class="hljs-property">length</span> + part.<span class="hljs-property">columns</span>[line] };
+                <span class="hljs-keyword">return</span> <span class="hljs-title function_">replace</span>(name, modifier, at, prefix);
+            });
+</code></pre>
+
+</div>
+</div><p>Snapshot the collected definitions before dependency validation. Missing template
+contents do not erase their normalized paths, and repeated references remain
+separate occurrences. Only accepted fragment parts contribute definitions and
+references; rejected duplicate definitions and orphan appends do not.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine dependency expansion and validation barrier&gt;&gt;=+ </div>
+<div class="code">
+<pre><code>    inspection.<span class="hljs-property">templates</span> = <span class="hljs-title class_">Array</span>.<span class="hljs-title function_">from</span>(referencedTemplates).<span class="hljs-title function_">sort</span>();
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> { header, parts } <span class="hljs-keyword">of</span> fragments.<span class="hljs-title function_">values</span>()) {
+        <span class="hljs-keyword">const</span> <span class="hljs-attr">entry</span>: <span class="hljs-title class_">FragmentInspection</span> = {
+            <span class="hljs-attr">name</span>: header.<span class="hljs-property">name</span>, <span class="hljs-attr">language</span>: header.<span class="hljs-property">language</span>,
+            <span class="hljs-attr">definitions</span>: parts.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> ({ ...part.<span class="hljs-property">definition</span> })), <span class="hljs-attr">references</span>: []
+        };
+        <span class="hljs-keyword">if</span> (header.<span class="hljs-property">output</span> !== <span class="hljs-literal">undefined</span>) {
+            <span class="hljs-keyword">const</span> output = <span class="hljs-title function_">safeRelativePath</span>(header.<span class="hljs-property">output</span>);
+            <span class="hljs-keyword">if</span> (output) { entry.<span class="hljs-property">output</span> = output; }
+        }
+        <span class="hljs-keyword">if</span> (header.<span class="hljs-property">template</span> !== <span class="hljs-literal">undefined</span>) {
+            <span class="hljs-keyword">const</span> template = <span class="hljs-title function_">safeRelativePath</span>(header.<span class="hljs-property">template</span>);
+            <span class="hljs-keyword">if</span> (template) { entry.<span class="hljs-property">template</span> = template; }
+        }
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> part <span class="hljs-keyword">of</span> parts) {
+            <span class="hljs-title function_">replaceReferences</span>(part, <span class="hljs-function">(<span class="hljs-params">name, _modifier, at</span>) =&gt;</span> {
+                entry.<span class="hljs-property">references</span>.<span class="hljs-title function_">push</span>({ name, ...at });
+                <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;&#x27;</span>;
+            });
+        }
+        inspection.<span class="hljs-property">fragments</span>.<span class="hljs-title function_">push</span>(entry);
+    }
+</code></pre>
+
+</div>
+</div><p>Expansion consumes the same occurrences with a different callback, reporting
+invalid reference operators and recursively resolving dependencies. Inspection
+therefore survives missing references and cycles without requiring valid output.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine dependency expansion and validation barrier&gt;&gt;=+ </div>
 <div class="code">
 <pre><code>    <span class="hljs-keyword">const</span> expanded = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;();
     <span class="hljs-keyword">const</span> <span class="hljs-attr">visiting</span>: <span class="hljs-built_in">string</span>[] = [];
@@ -476,28 +610,19 @@ recorded diagnostic returns an empty file list before emission can begin.</p>
         <span class="hljs-keyword">if</span> (!fragment) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Missing fragment: <span class="hljs-subst">${name}</span>`</span>); <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;&#x27;</span>; }
         <span class="hljs-keyword">if</span> (visiting.<span class="hljs-title function_">includes</span>(name)) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Fragment cycle: <span class="hljs-subst">${visiting.concat(name).join(<span class="hljs-string">&#x27; -&gt; &#x27;</span>)}</span>`</span>); <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;&#x27;</span>; }
         visiting.<span class="hljs-title function_">push</span>(name);
-        <span class="hljs-keyword">const</span> content = fragment.<span class="hljs-property">parts</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> {
-
-            <span class="hljs-keyword">return</span> part.<span class="hljs-property">content</span>.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\\<span class="literate-tag-name">&lt;&lt;|&lt;&lt;([^&lt;&gt;\r\n]+)&gt;&gt;</span>(=\+?|\+)?/g</span>,
-                <span class="hljs-function">(<span class="hljs-params">whole: <span class="hljs-built_in">string</span>, reference: <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>, modifier: <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>, offset: <span class="hljs-built_in">number</span></span>) =&gt;</span> {
-                    <span class="hljs-keyword">if</span> (reference === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> whole; }
-                    <span class="hljs-keyword">const</span> before = part.<span class="hljs-property">content</span>.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, offset);
-                    <span class="hljs-keyword">const</span> lineStart = before.<span class="hljs-title function_">lastIndexOf</span>(<span class="hljs-string">&#x27;\n&#x27;</span>) + <span class="hljs-number">1</span>;
-                    <span class="hljs-keyword">const</span> prefix = before.<span class="hljs-title function_">slice</span>(lineStart);
-                    <span class="hljs-keyword">const</span> at = { <span class="hljs-attr">path</span>: part.<span class="hljs-property">location</span>.<span class="hljs-property">path</span>, <span class="hljs-attr">line</span>: part.<span class="hljs-property">location</span>.<span class="hljs-property">line</span> + before.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;\n&#x27;</span>).<span class="hljs-property">length</span> - <span class="hljs-number">1</span>, <span class="hljs-attr">column</span>: prefix.<span class="hljs-property">length</span> };
-                    <span class="hljs-keyword">if</span> (modifier) { <span class="hljs-title function_">report</span>(at, <span class="hljs-string">`Invalid definition operator on reference: <span class="hljs-subst">${reference}</span>`</span>); }
-                    <span class="hljs-keyword">const</span> replacement = <span class="hljs-title function_">expand</span>(reference, at).<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\n$/</span>, <span class="hljs-string">&#x27;&#x27;</span>);
-                    <span class="hljs-keyword">const</span> indent = <span class="hljs-regexp">/^[ \t]*$/</span>.<span class="hljs-title function_">test</span>(prefix) ? prefix : (<span class="hljs-regexp">/[ \t]*$/</span>.<span class="hljs-title function_">exec</span>(prefix)?.[<span class="hljs-number">0</span>] || <span class="hljs-string">&#x27;&#x27;</span>);
-                    <span class="hljs-keyword">return</span> replacement.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\n/g</span>, <span class="hljs-function">() =&gt;</span> <span class="hljs-string">&#x27;\n&#x27;</span> + indent);
-                });
-        }).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;&#x27;</span>);
+        <span class="hljs-keyword">const</span> content = fragment.<span class="hljs-property">parts</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> <span class="hljs-title function_">replaceReferences</span>(part, <span class="hljs-function">(<span class="hljs-params">reference, modifier, at, prefix</span>) =&gt;</span> {
+            <span class="hljs-keyword">if</span> (modifier) { <span class="hljs-title function_">report</span>(at, <span class="hljs-string">`Invalid definition operator on reference: <span class="hljs-subst">${reference}</span>`</span>); }
+            <span class="hljs-keyword">const</span> replacement = <span class="hljs-title function_">expand</span>(reference, at).<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\n$/</span>, <span class="hljs-string">&#x27;&#x27;</span>);
+            <span class="hljs-keyword">const</span> indent = <span class="hljs-regexp">/^[ \t]*$/</span>.<span class="hljs-title function_">test</span>(prefix) ? prefix : (<span class="hljs-regexp">/[ \t]*$/</span>.<span class="hljs-title function_">exec</span>(prefix)?.[<span class="hljs-number">0</span>] || <span class="hljs-string">&#x27;&#x27;</span>);
+            <span class="hljs-keyword">return</span> replacement.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\n/g</span>, <span class="hljs-function">() =&gt;</span> <span class="hljs-string">&#x27;\n&#x27;</span> + indent);
+        })).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;&#x27;</span>);
         visiting.<span class="hljs-title function_">pop</span>();
         expanded.<span class="hljs-title function_">set</span>(name, content);
         <span class="hljs-keyword">return</span> content;
     };
 
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> fragment <span class="hljs-keyword">of</span> fragments.<span class="hljs-title function_">values</span>()) { <span class="hljs-title function_">expand</span>(fragment.<span class="hljs-property">header</span>.<span class="hljs-property">name</span>, fragment.<span class="hljs-property">location</span>); }
-    <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">files</span>: [], diagnostics }; }
+    <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">files</span>: [], diagnostics, inspection }; }
 </code></pre>
 
 </div>
@@ -547,7 +672,7 @@ hosts without adding or removing a final newline.</p>
         files.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">path</span>: <span class="hljs-title function_">safeRelativePath</span>(path.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\.literate$/</span>, <span class="hljs-string">&#x27;.html&#x27;</span>))!, <span class="hljs-attr">content</span>: <span class="hljs-title function_">substitute</span>(htmlTemplate, { content, <span class="hljs-attr">authors</span>: metaAuthors }) });
     }
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> files) { file.<span class="hljs-property">content</span> = file.<span class="hljs-property">content</span>.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\r\n|\r/g</span>, <span class="hljs-string">&#x27;\n&#x27;</span>); }
-    <span class="hljs-keyword">return</span> { files, diagnostics };
+    <span class="hljs-keyword">return</span> { files, diagnostics, inspection };
 }
 </code></pre>
 

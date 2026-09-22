@@ -1,0 +1,327 @@
+# Self-host verification
+
+This chapter is authoritative for `src/self-hosting.ts`. `verifySelfHosting(root,
+documents, templates, files)` returns `{ ok, checks }`, with named checks and
+optional failure messages. It requires this repository's generated `src/engine.ts`
+and `src/cli.ts` layout, not a generated verifier in fixture projects. An optional
+fifth `{ timeoutMs }` argument overrides the child timeout (default 10000 ms).
+
+Verification reads the original tsconfig and existing sources (including tests),
+overlays fresh generated files, and type-checks without emitting. It bundles the
+fresh engine and compares its regenerated output paths and contents exactly,
+independent of array order. Generator diagnostics fail verification. This proves
+an engine fixed point and CLI type correctness, **not rebuilt CLI runtime
+correctness**; CLI behavior is tested separately. No project scripts are run and
+no project files are written. Temporary files are removed even on failure.
+
+Use only with a **trusted checkout**: the child executes project-authored code.
+Its temporary working directory reduces accidental writes but is not a sandbox;
+malicious code can still access the project and the host. The engine never imports
+this module; callers can load it lazily for self-checks.
+
+The root assembly separates the public contract from the verification lifecycle.
+The stages below are policy boundaries: each earns a named check before the next
+stage may run. Fragments group those decisions rather than annotate individual lines.
+
+```typescript: <<self-host verification.*>>= src/self-hosting.ts $
+<<self-host imports and result>>
+<<self-host verification lifecycle>>
+```
+
+## Public contract
+
+Only engine types cross this boundary; loading the verifier does not load an
+engine implementation. Every failure is attributed to the current stage.
+
+```typescript: <<self-host imports and result>>=
+import * as fs from 'fs/promises';
+import * as os from 'os';
+import * as path from 'path';
+import { execFile } from 'child_process';
+import type { SourceDocument, GeneratedFile } from './engine';
+
+export interface SelfHostingResult {
+    ok: boolean;
+    checks: { name: string; ok: boolean; message?: string }[];
+}
+
+```
+
+## Stage ordering and cleanup
+
+Stop at the first failed policy. Cleanup belongs to the lifecycle, not just the
+success path, and a cleanup failure must also make the final result unsuccessful.
+
+```typescript: <<self-host verification lifecycle>>=
+export async function verifySelfHosting(
+    root: string, documents: SourceDocument[], templates: Record<string, string>, files: GeneratedFile[],
+    options: { timeoutMs?: number } = {}
+): Promise<SelfHostingResult> {
+    const checks: SelfHostingResult['checks'] = [];
+    let stage = 'layout';
+    let temporary: string | undefined;
+    const message = (error: unknown): string => error instanceof Error ? error.message : String(error);
+    try {
+        <<self-host validate layout>>
+        <<self-host typecheck fresh sources>>
+        <<self-host bundle fresh engine>>
+        <<self-host execute and compare>>
+    } catch (error) {
+        checks.push({ name: stage, ok: false, message: message(error) });
+    } finally {
+        if (temporary) {
+            try { await fs.rm(temporary, { recursive: true, force: true }); }
+            catch (error) { checks.push({ name: 'cleanup', ok: false, message: message(error) }); }
+        }
+    }
+    return { ok: checks.every(check => check.ok), checks };
+}
+```
+
+## Layout: establish the overlay boundary
+
+Reject escaping and duplicate destinations before reading configuration. Both
+engine and CLI must be fresh outputs; other generated sources may exist only in
+memory. Record their ancestor directories so module resolution can see them.
+
+```typescript: <<self-host validate layout>>=
+root = path.resolve(root);
+const overlay = new Map<string, string>();
+const directories = new Set<string>();
+for (const file of files) {
+    const absolute = path.resolve(root, file.path);
+    const relative = path.relative(root, absolute);
+    if (!relative || relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) {
+        throw new Error(`Output outside project: ${file.path}`);
+    }
+    if (overlay.has(absolute)) { throw new Error(`Duplicate output: ${file.path}`); }
+    overlay.set(absolute, file.content);
+    for (let directory = path.dirname(absolute); directory !== root; directory = path.dirname(directory)) {
+        directories.add(directory);
+    }
+}
+for (const required of ['src/engine.ts', 'src/cli.ts']) {
+    if (!overlay.has(path.join(root, required))) { throw new Error(`Missing generated ${required}`); }
+}
+const timeout = options.timeoutMs ?? 10000;
+if (!Number.isFinite(timeout) || timeout <= 0) { throw new Error('timeoutMs must be positive and finite'); }
+checks.push({ name: stage, ok: true });
+```
+
+## Type-check: fresh outputs over existing project sources
+
+The disk remains the fallback for handwritten sources and dependencies. Overlay
+reads take precedence so stale generated TypeScript cannot influence the result.
+Diagnostics retain project-relative locations for actionable failure messages.
+Load compiler tooling lazily through CommonJS so both the TypeScript-compiled CLI
+and the bundled bootstrap see the same module exports.
+
+```typescript: <<self-host typecheck fresh sources>>=
+stage = 'typecheck';
+const ts: typeof import('typescript') = require('typescript');
+const readFile = (name: string): string | undefined => overlay.get(path.resolve(name)) ?? ts.sys.readFile(name);
+const fileExists = (name: string): boolean => overlay.has(path.resolve(name)) || ts.sys.fileExists(name);
+const directoryExists = (name: string): boolean => directories.has(path.resolve(name)) || ts.sys.directoryExists(name);
+const format = (diagnostic: import('typescript').Diagnostic): string => {
+    let location = '';
+    if (diagnostic.file && diagnostic.start !== undefined) {
+        const position = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
+        location = `${path.relative(root, diagnostic.file.fileName)}:${position.line + 1}:${position.character + 1}: `;
+    }
+    return `${location}TS${diagnostic.code}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ')}`;
+};
+<<self-host compiler configuration>>
+<<self-host compiler program>>
+```
+
+### Honor configuration without emitting
+
+Read the checkout's tsconfig, but disable all emit and incremental state. Include
+fresh generated sources even when they are absent on disk: verification must not
+silently omit the very outputs it is meant to validate.
+
+```typescript: <<self-host compiler configuration>>=
+const configPath = path.join(root, 'tsconfig.json');
+const config = ts.readConfigFile(configPath, ts.sys.readFile);
+if (config.error) { throw new Error(format(config.error)); }
+const generatedSources = [...overlay.keys()].filter(name => /\.[cm]?[jt]sx?$/.test(name));
+const parsed = ts.parseJsonConfigFileContent(config.config, {
+    ...ts.sys, readFile, fileExists,
+    readDirectory: (directory, extensions, excludes, includes, depth) => [...new Set([
+        ...ts.sys.readDirectory(directory, extensions, excludes, includes, depth),
+        ...generatedSources.filter(name => name.startsWith(path.resolve(directory) + path.sep)
+            && (!extensions || extensions.some(extension => name.endsWith(extension))))
+    ])]
+}, root, { noEmit: true, incremental: false, composite: false }, configPath);
+if (parsed.errors.length) { throw new Error(parsed.errors.map(format).join('\n')); }
+```
+
+### Resolve a single virtual program
+
+The compiler host and root file list share the same overlay. Existing included
+sources, including tests, still participate; verification is not an isolated
+syntax check of the generated engine. No program emit is ever requested.
+
+```typescript: <<self-host compiler program>>=
+const host = ts.createCompilerHost(parsed.options);
+host.readFile = readFile;
+host.fileExists = fileExists;
+host.directoryExists = directoryExists;
+host.getSourceFile = (name, languageVersion, onError) => {
+    const text = readFile(name);
+    if (text === undefined) { if (onError) { onError(`Cannot read ${name}`); } return undefined; }
+    return ts.createSourceFile(name, text, languageVersion, true);
+};
+const program = ts.createProgram([...new Set([...parsed.fileNames, ...generatedSources])], parsed.options, host);
+const diagnostics = ts.getPreEmitDiagnostics(program);
+if (diagnostics.length) { throw new Error(diagnostics.map(format).join('\n')); }
+checks.push({ name: stage, ok: true });
+```
+
+## Bundle: execute the freshly checked engine
+
+Bundling uses the same overlay rather than stale emitted JavaScript. Relative
+imports may name TypeScript directly, omit an extension, or use JavaScript
+extensions that resolve to TypeScript. Package imports keep esbuild's resolver.
+
+```typescript: <<self-host bundle fresh engine>>=
+stage = 'bundle';
+const esbuild: typeof import('esbuild') = require('esbuild');
+const bundle = await esbuild.build({
+    absWorkingDir: root, entryPoints: [path.join(root, 'src/engine.ts')],
+    bundle: true, platform: 'node', format: 'cjs', write: false,
+    tsconfig: configPath, logLevel: 'silent',
+    plugins: [{ name: 'fresh-generated', setup(build) {
+        <<self-host resolve relative modules>>
+        build.onLoad({ filter: /\.[cm]?[jt]sx?$/ }, args => {
+            const contents = overlay.get(args.path);
+            if (contents === undefined) { return undefined; }
+            const loader = args.path.endsWith('.tsx') ? 'tsx' : args.path.endsWith('.jsx') ? 'jsx'
+                : /\.[cm]?ts$/.test(args.path) ? 'ts' : 'js';
+            return { contents, loader, resolveDir: path.dirname(args.path) };
+        });
+    } }]
+});
+if (!bundle.outputFiles || bundle.outputFiles.length !== 1) { throw new Error('Expected one engine bundle'); }
+checks.push({ name: stage, ok: true });
+```
+
+### Preserve normal import precedence
+
+A generated directory entry must not hide an existing sibling file. Consider
+both disk files and virtual files at each resolution step, using esbuild's normal
+extension order. Only then try a directory index. Directories with package
+metadata retain esbuild's native package resolution rather than bypassing `main`
+or `exports`. The load hook changes contents only after a file has been selected.
+
+```typescript: <<self-host resolve relative modules>>=
+build.onResolve({ filter: /.*/ }, args => {
+    if (!path.isAbsolute(args.path) && !args.path.startsWith('.')) { return undefined; }
+    const base = path.resolve(args.resolveDir || root, args.path);
+    const extensions = ['.tsx', '.ts', '.jsx', '.js', '.css', '.json'];
+    const candidates = [base, ...extensions.map(extension => base + extension)];
+    if (/\.jsx?$/.test(base)) {
+        candidates.push(base.replace(/\.js$/, '.ts').replace(/\.jsx$/, '.tsx'));
+        if (base.endsWith('.js')) { candidates.push(base.slice(0, -3) + '.tsx'); }
+    }
+    const exists = (candidate: string): boolean => overlay.has(candidate) || ts.sys.fileExists(candidate);
+    const file = candidates.find(exists);
+    if (file) { return { path: file }; }
+    if (exists(path.join(base, 'package.json'))) { return undefined; }
+    const index = extensions.map(extension => path.join(base, 'index' + extension)).find(exists);
+    return index ? { path: index } : undefined;
+});
+```
+
+## Fixed point: bound execution outside the checkout
+
+Only the temporary directory receives writes. A separate Node process bounds
+engine execution, including a synchronous infinite loop; a promise timeout in
+this process could not interrupt such a loop. The child receives the original
+documents and templates through stdin, avoiding command-line quoting and limits.
+
+```typescript: <<self-host execute and compare>>=
+stage = 'fixedpoint';
+<<self-host prepare child>>
+<<self-host run bounded child>>
+<<self-host validate regenerated result>>
+<<self-host compare output set>>
+checks.push({ name: stage, ok: true });
+```
+
+### Prepare an isolated working directory
+
+The runner accepts synchronous or asynchronous generators. Exceptions become
+child failures rather than plausible empty generation results. This working
+directory is housekeeping, not a security boundary for untrusted project code.
+
+```typescript: <<self-host prepare child>>=
+temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'literate-self-host-'));
+await fs.writeFile(path.join(temporary, 'engine.cjs'), bundle.outputFiles[0].contents);
+await fs.writeFile(path.join(temporary, 'runner.cjs'), [
+    "const fs = require('fs');",
+    "const { generateProject } = require('./engine.cjs');",
+    "const { documents, templates } = JSON.parse(fs.readFileSync(0, 'utf8'));",
+    'Promise.resolve().then(() => generateProject(documents, templates)).then(result => {',
+    'process.stdout.write(JSON.stringify(result));',
+    '}).catch(error => { console.error(error); process.exitCode = 1; });'
+].join('\n'));
+```
+
+### Terminate a stuck generator
+
+The timeout covers the child process, not the preceding compiler or bundler.
+SIGKILL prevents a stuck engine from ignoring termination. Early stdin closure
+is reported through execFile's completion callback rather than an unhandled event.
+
+```typescript: <<self-host run bounded child>>=
+const stdout = await new Promise<string>((resolve, reject) => {
+    const child = execFile(process.execPath, [path.join(temporary!, 'runner.cjs')], {
+        cwd: temporary, timeout, killSignal: 'SIGKILL', maxBuffer: 64 * 1024 * 1024, encoding: 'utf8'
+    }, (error, output, stderr) => {
+        if (error) { reject(new Error(error.killed ? `Engine child timed out or was killed (${timeout} ms limit)`
+            : `Engine child failed: ${stderr.trim() || error.message}`)); }
+        else { resolve(output); }
+    });
+    child.stdin!.on('error', () => { /* execFile reports early child exits. */ });
+    child.stdin!.end(JSON.stringify({ documents, templates }));
+});
+```
+
+### Reject diagnostics and malformed protocol data
+
+Valid JSON alone is insufficient. Any generator diagnostic fails the fixed-point
+claim, and each output must have a unique string path and string content before
+comparison can begin. Parse errors are reported by the enclosing stage boundary.
+
+```typescript: <<self-host validate regenerated result>>=
+const regenerated = JSON.parse(stdout);
+if (!regenerated || !Array.isArray(regenerated.files) || !Array.isArray(regenerated.diagnostics)) {
+    throw new Error('Invalid engine result: expected files and diagnostics arrays');
+}
+if (regenerated.diagnostics.length) {
+    throw new Error(`Regenerated engine diagnostics: ${JSON.stringify(regenerated.diagnostics)}`);
+}
+const actual = new Map<string, string>();
+for (const file of regenerated.files) {
+    if (!file || typeof file.path !== 'string' || typeof file.content !== 'string' || actual.has(file.path)) {
+        throw new Error('Invalid or duplicate regenerated output');
+    }
+    actual.set(file.path, file.content);
+}
+```
+
+### Compare exact paths and contents, independent of order
+
+Removing matched entries distinguishes missing, changed, and extra outputs.
+No normalization masks a changed generation contract: both paths and contents
+must match exactly, while array ordering is immaterial.
+
+```typescript: <<self-host compare output set>>=
+for (const file of files) {
+    if (!actual.has(file.path)) { throw new Error(`Missing regenerated output: ${file.path}`); }
+    if (actual.get(file.path) !== file.content) { throw new Error(`Regenerated content mismatch: ${file.path}`); }
+    actual.delete(file.path);
+}
+if (actual.size) { throw new Error(`Unexpected regenerated output: ${[...actual.keys()].sort()[0]}`); }
+```

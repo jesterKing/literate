@@ -1,90 +1,139 @@
 # Command-line generation
 
-This chapter is the authoritative source of `src/cli.ts`. The checked-in TypeScript
-file bootstraps the CLI; subsequent generation must reproduce it byte for byte.
-The CLI is a filesystem adapter for `generateProject`, not a second generator.
-
-## Usage and exit status
-
-Run `yarn literate generate [root]` or `yarn literate check [root]` from this
-checkout. The package command compiles the CLI first. Alternatively, compile with
-`yarn compile`, then invoke the executable directly:
-
-```sh
-node out/cli.js generate [root]
-node out/cli.js check [root]
-node out/cli.js --help
-```
-
-The optional root defaults to the current working directory. `help` and `-h` also
-show usage. Success exits 0, generation/IO errors or a stale check exit 1, and
-invalid arguments exit 2. Diagnostics use one-based line and column positions.
-`run(args, io?)` is exported for callers that supply stdout/stderr callbacks.
-
-`yarn generate` and `yarn check:generated` are convenience aliases. Both build
-the CLI before running it; extension bundling alone does not build the CLI.
-
-## Filesystem and generation contract
-
-Discover `.literate` files recursively in deterministic order, skipping symbolic
-links and directories named `.git`, `node_modules`, `out`, `dist`, `.yarn`, or
-`.vscode-test`. Resolve the explicitly selected root to its real directory.
-Paths beneath that root are normalized and validated by `safeRelativePath`.
-
-Read only templates returned by the engine’s `templateReferences(documents)`.
-The engine discovers index `SETTINGS` template assignments and fragment-header
-template settings, preserving equals signs in values and semicolons in filenames.
-The CLI does not parse Markdown or duplicate the engine’s dependency scanner.
-Invalid template paths and NUL source text make this API throw; the CLI’s error
-handler reports the error and returns exit 1 without writes. Missing templates
-are reported by `generateProject` with source locations.
-
-Any engine diagnostic prevents all writes. Before any output write or directory
-creation, validate every target, reject duplicate and ancestor-conflicting
-outputs, and compare existing bytes. Reject symbolic links at any template or
-output path component, even links pointing inside the root. Reject non-directory
-ancestors and non-regular-file targets (including output directories).
-
-`generate` creates parents and writes only missing or changed files. `check`
-creates and writes nothing and lists each `missing:` or `stale:` output, including
-rendered HTML. Unreferenced templates and unrelated files are never loaded as
-inputs. IO failures are concise errors. Preflight is not a transactional commit:
-an IO failure during writing can leave earlier writes in place. The root must not
-be concurrently modified; repeated link checks reduce accidental races but do
-not provide protection against a hostile process replacing directories during IO.
-
-## CLI implementation
-
-Literal fragment openers in this source fence are escaped for engine round-trip.
+This chapter is authoritative for `src/cli.ts`. The CLI adapts files and terminal
+output to the shared engine; it does not implement a second fragment language.
+Its entry point assembles a command from argument parsing, project loading,
+validation, and an explicit read-only or writing operation.
 
 ```typescript: <<cli.*>>= src/cli.ts $
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { discoveryExcludedDirectories, generateProject, safeRelativePath, templateReferences, SourceDocument } from './engine';
+<<cli imports>>
+<<cli output contract>>
+<<cli usage>>
+<<cli default IO>>
+<<cli missing file predicate>>
+<<cli relative path validation>>
+<<cli filesystem inspection>>
+<<cli document discovery>>
+<<cli command lifecycle>>
+<<cli executable entry point>>
+```
 
+## Commands and their boundaries
+
+Run `yarn literate <command>` to build the CLI independently of the extension and
+execute it. To reuse a known-working build while editing generated code, invoke
+`node out/cli.js <command>` directly.
+
+- `inspect` identifies documents, templates, fragment declarations, and references.
+  It uses the engine's parser metadata, including partial metadata on invalid input.
+- `generate` validates the whole project before writing changed source and HTML.
+- `check` compares the generation plan with disk without writing.
+- `self-check` additionally type-checks fresh generated sources and rebuilds the
+  engine to verify a fixed point. It executes this repository's trusted code;
+  it is not a sandbox or a command for arbitrary untrusted projects.
+
+All commands accept an optional project root and `--json`. `--help`, `-h`, and
+`help <command>` explain usage. Success exits 0; invalid input, I/O failures,
+stale checks, and failed verification exit 1; usage errors exit 2. An empty
+project fails rather than passing vacuously.
+
+```typescript: <<cli usage>>=
+const commands = ['generate', 'check', 'inspect', 'self-check'];
+const usage = 'Usage: node out/cli.js generate|check|inspect|self-check [root] [--json]\n       node out/cli.js <command> --help [--json]\n       node out/cli.js --help [--json]\n';
+const descriptions: Record<string, string> = Object.fromEntries([
+    ['generate', 'Write missing or changed generated files.'],
+    ['check', 'Report missing or stale generated files without writing.'],
+    ['inspect', 'Report documents, templates, and fragment definitions and dependencies without reading outputs or writing.'],
+    ['self-check', 'Verify this repository’s trusted self-hosting code without generating files; all outputs must already be current.']
+]);
+
+```
+
+## A machine-readable result
+
+JSON mode emits exactly one object to stdout, including on usage and I/O errors.
+Human progress and error messages are suppressed in that mode. `schemaVersion`
+provides a compatibility boundary for scripts and AI tools. Diagnostic and
+inspection coordinates are zero-based; human diagnostic messages add one to both.
+Output statuses describe disk comparison, or a completed write—not a promise that
+an attempted write succeeded. Inspection does not read or preflight output paths.
+
+```typescript: <<cli output contract>>=
 export interface CliIO {
     stdout(message: string): void;
     stderr(message: string): void;
 }
 
-const usage = 'Usage: node out/cli.js generate|check [root]\n       node out/cli.js --help\n';
+type Generation = ReturnType<typeof generateProject>;
+type OutputStatus = 'current' | 'missing' | 'stale' | 'written';
+interface CliResponse {
+    schemaVersion: 1;
+    command: string;
+    ok: boolean;
+    root?: string;
+    diagnostics: Generation['diagnostics'];
+    errors: string[];
+    outputs: { path: string; status: OutputStatus }[];
+    inspection?: Generation['inspection'];
+    selfHosting?: { ok: boolean; checks: { name: string; ok: boolean; message?: string }[] };
+    usage?: string;
+}
+
+```
+
+The engine owns discovery exclusions and template syntax. The self-hosting
+verifier is deliberately absent from these imports: ordinary commands do not
+load compiler tooling until verification is requested.
+
+```typescript: <<cli imports>>=
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { discoveryExcludedDirectories, generateProject, safeRelativePath, templateReferences, SourceDocument } from './engine';
+
+```
+
+An injectable output boundary lets tests capture exactly what callers receive.
+The executable uses the process streams without adding logging of its own.
+
+```typescript: <<cli default IO>>=
 const excluded = new Set(discoveryExcludedDirectories);
 const defaultIO: CliIO = {
     stdout: message => { process.stdout.write(message); },
     stderr: message => { process.stderr.write(message); }
 };
 
+```
+
+## Filesystem preflight
+
+A missing file is expected during generation. Other failures, including access
+errors, must propagate rather than being mistaken for absent output.
+
+```typescript: <<cli missing file predicate>>=
 function missing(error: unknown): boolean {
     return (error as NodeJS.ErrnoException).code === 'ENOENT';
 }
 
+```
+
+All adapter paths pass through the engine's portable path policy before reaching
+the filesystem. This also normalizes paths before collision checks.
+
+```typescript: <<cli relative path validation>>=
 function relative(value: string): string {
     const normalized = safeRelativePath(value);
     if (!normalized) { throw new Error(`Invalid relative path: ${value}`); }
     return normalized;
 }
 
-/** Reject links and non-directory ancestors, including links that stay inside root. */
+```
+
+Lexical validation cannot detect symlinks. Walk each existing component and reject
+links, non-directory ancestors, and non-file targets, even when a link stays
+inside the project. A missing ancestor means the target is absent; it is not
+created until all targets have passed preflight.
+
+```typescript: <<cli filesystem inspection>>=
 async function inspect(root: string, value: string): Promise<boolean> {
     const parts = relative(value).split('/');
     let current = root;
@@ -106,6 +155,16 @@ async function inspect(root: string, value: string): Promise<boolean> {
     return true;
 }
 
+```
+
+## Discover saved inputs
+
+Directory enumeration is sorted, skips symlinks, and shares exclusions with the
+editor. The engine will apply index ordering later. The CLI reads disk, not
+unsaved editor buffers, so CLI and editor generation must not run concurrently
+against the same project.
+
+```typescript: <<cli document discovery>>=
 async function discover(root: string): Promise<SourceDocument[]> {
     const documents: SourceDocument[] = [];
     const visit = async (directory: string): Promise<void> => {
@@ -127,78 +186,244 @@ async function discover(root: string): Promise<SourceDocument[]> {
     return documents;
 }
 
+```
 
+## The command lifecycle
+
+The orchestration keeps the write boundary visible. Argument errors and help
+return before reading the project; inspection returns before touching output
+paths; checking returns before the writing stage. A single completion function
+sets the exit status and emits a JSON response exactly once.
+
+```typescript: <<cli command lifecycle>>=
 export async function run(args: string[], io: CliIO = defaultIO): Promise<number> {
-    if (args.length === 1 && ['help', '--help', '-h'].includes(args[0])) {
-        io.stdout(usage);
-        return 0;
-    }
-    if (args.length < 1 || args.length > 2 || !['generate', 'check'].includes(args[0]) ||
-        (args.length === 2 && (!args[1] || args[1].startsWith('-')))) {
-        io.stderr(usage);
-        return 2;
-    }
+    <<cli response setup>>
+    <<cli argument parsing>>
+    <<cli argument validation and help>>
     try {
-
-        const root = await fs.realpath(path.resolve(args[1] || process.cwd()));
-        if (!(await fs.stat(root)).isDirectory()) { throw new Error('Root is not a directory'); }
-        const documents = await discover(root);
-        const templates: Record<string, string> = Object.create(null);
-        for (const reference of templateReferences(documents)) {
-
-            if (await inspect(root, reference)) {
-                templates[reference] = await fs.readFile(path.join(root, reference), 'utf8');
-            }
-        }
-        const result = generateProject(documents, templates);
-        if (result.diagnostics.length) {
-            for (const diagnostic of result.diagnostics) {
-                io.stderr(`${diagnostic.path}:${diagnostic.line + 1}:${diagnostic.column + 1}: ${diagnostic.message}\n`);
-            }
-            return 1;
-        }
-        const files = result.files.map(file => ({ path: relative(file.path), content: file.content }));
-        const targets = new Set<string>();
-        for (const file of files) {
-            if (targets.has(file.path)) { throw new Error(`Duplicate output: ${file.path}`); }
-            targets.add(file.path);
-        }
-        for (const target of targets) {
-            const parts = target.split('/');
-            for (let index = 1; index < parts.length; index++) {
-                const parent = parts.slice(0, index).join('/');
-                if (targets.has(parent)) { throw new Error(`Output is also a parent directory: ${parent}`); }
-            }
-        }
-        const changes: { path: string; content: string; status: string }[] = [];
-
-        for (const file of files) {
-            const exists = await inspect(root, file.path);
-            const content = Buffer.from(file.content, 'utf8');
-            if (!exists || !(await fs.readFile(path.join(root, file.path))).equals(content)) {
-                changes.push({ ...file, status: exists ? 'stale' : 'missing' });
-            }
-        }
-        if (args[0] === 'check') {
-            for (const change of changes) { io.stdout(`${change.status}: ${change.path}\n`); }
-            return changes.length ? 1 : 0;
-        }
-        for (const change of changes) {
-            await inspect(root, change.path);
-            const target = path.join(root, change.path);
-            await fs.mkdir(path.dirname(target), { recursive: true });
-            await inspect(root, change.path);
-            await fs.writeFile(target, change.content, 'utf8');
-            io.stdout(`generated: ${change.path}\n`);
-        }
-        return 0;
+        <<cli load project>>
+        <<cli validate and inspect project>>
+        <<cli validate output destinations>>
+        <<cli compare output bytes>>
+        <<cli read-only checks>>
+        <<cli write changed outputs>>
     } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        io.stderr(`literate: ${message.replace(/[\r\n]+/g, ' ')}\n`);
-        return 1;
+        const message = (error instanceof Error ? error.message : String(error)).replace(/[\r\n]+/g, ' ');
+        response.errors.push(message);
+        if (!json) { io.stderr(`literate: ${message}\n`); }
+        return finish(1);
     }
 }
 
+```
+
+### Prepare one result
+
+Detect JSON mode before validating flags so malformed invocations still have a
+structured error response. Arrays are always present; command-specific metadata
+is added only after that stage runs.
+
+```typescript: <<cli response setup>>=
+const json = args.includes('--json');
+const positional: string[] = [];
+const flags = new Set<string>();
+const response: CliResponse = {
+    schemaVersion: 1, command: 'help', ok: false, diagnostics: [], errors: [], outputs: []
+};
+const finish = (code: number): number => {
+    response.ok = code === 0;
+    if (json) { io.stdout(JSON.stringify(response) + '\n'); }
+    return code;
+};
+```
+
+### Parse arguments without guessing
+
+Flags may precede or follow the command and root. Normalize the help alias before
+checking duplicates. Unknown flags and extra positional arguments are errors,
+rather than silently changing which project is processed.
+
+```typescript: <<cli argument parsing>>=
+for (const arg of args) {
+    if (arg.startsWith('-')) {
+        const flag = arg === '-h' ? '--help' : arg;
+        if (!['--help', '--json'].includes(flag)) { response.errors.push(`Unknown flag: ${arg}`); }
+        else if (flags.has(flag)) { response.errors.push(`Duplicate flag: ${arg}`); }
+        flags.add(flag);
+    } else { positional.push(arg); }
+}
+const command = positional[0];
+response.command = command || 'help';
+const helpCommand = command === 'help';
+const help = helpCommand || flags.has('--help');
+const topic = helpCommand ? positional[1] : command;
+```
+
+### Resolve help before filesystem access
+
+Help is successful even outside a project. Usage errors have exit code 2, keeping
+them distinct from valid commands whose project fails validation.
+
+```typescript: <<cli argument validation and help>>=
+if (command && !helpCommand && !commands.includes(command)) {
+    response.errors.push(`Unknown command: ${command}`);
+}
+if ((!command && !help) || positional.some(arg => !arg) || positional.length > 2 ||
+    (helpCommand && flags.has('--help')) || (helpCommand && topic && !commands.includes(topic))) {
+    response.errors.push('Invalid arguments');
+}
+if (response.errors.length) {
+    if (!json) { io.stderr(response.errors.join('\n') + '\n' + usage); }
+    return finish(2);
+}
+if (help) {
+    response.command = 'help';
+    response.usage = topic
+        ? `Usage: node out/cli.js ${topic} [root] [--json]\n${descriptions[topic]}\n`
+        : usage;
+    if (!json) { io.stdout(response.usage); }
+    return finish(0);
+}
+```
+
+### Load only declared templates
+
+Resolve the selected root once, then discover saved documents. Missing templates
+are left to the engine for positioned diagnostics. Invalid paths and I/O errors
+are caught by the lifecycle and prevent writes.
+
+```typescript: <<cli load project>>=
+const root = await fs.realpath(path.resolve(positional[1] || process.cwd()));
+response.root = root;
+if (!(await fs.stat(root)).isDirectory()) { throw new Error('Root is not a directory'); }
+const documents = await discover(root);
+if (!documents.length) { throw new Error('No literate documents found'); }
+const templates: Record<string, string> = Object.create(null);
+for (const reference of templateReferences(documents)) {
+    if (await inspect(root, reference)) {
+        templates[reference] = await fs.readFile(path.join(root, reference), 'utf8');
+    }
+}
+```
+
+### Validate once, inspect the same model
+
+Inspection reports parser metadata even when expansion fails, helping an author
+locate incomplete definitions. It does not use a separate regex-based scanner.
+Other commands stop on any diagnostic before examining or writing output files.
+
+```typescript: <<cli validate and inspect project>>=
+const result = generateProject(documents, templates);
+response.diagnostics = result.diagnostics;
+if (command === 'inspect') {
+    response.inspection = result.inspection;
+    if (!json) { io.stdout(JSON.stringify(result.inspection, null, 2) + '\n'); }
+}
+if (result.diagnostics.length) {
+    if (!json) {
+        for (const diagnostic of result.diagnostics) {
+            io.stderr(`${diagnostic.path}:${diagnostic.line + 1}:${diagnostic.column + 1}: ${diagnostic.message}\n`);
+        }
+    }
+    return finish(1);
+}
+if (command === 'inspect') { return finish(0); }
+```
+
+### Validate the complete destination set
+
+A file cannot also be a directory containing another output. Retain this adapter
+check in addition to engine validation so preflight remains explicit before any
+filesystem mutation.
+
+```typescript: <<cli validate output destinations>>=
+const files = result.files.map(file => ({ path: relative(file.path), content: file.content }));
+const targets = new Set<string>();
+for (const file of files) {
+    if (targets.has(file.path)) { throw new Error(`Duplicate output: ${file.path}`); }
+    targets.add(file.path);
+}
+for (const target of targets) {
+    const parts = target.split('/');
+    for (let index = 1; index < parts.length; index++) {
+        const parent = parts.slice(0, index).join('/');
+        if (targets.has(parent)) { throw new Error(`Output is also a parent directory: ${parent}`); }
+    }
+}
+```
+
+### Compare before creating anything
+
+Every target passes filesystem inspection before the first write or directory
+creation. Compare bytes rather than timestamps. Keep a reference to each status
+entry so a completed write can change only that entry to `written`.
+
+```typescript: <<cli compare output bytes>>=
+const changes: { path: string; content: string; output: CliResponse['outputs'][number] }[] = [];
+for (const file of files) {
+    const exists = await inspect(root, file.path);
+    const content = Buffer.from(file.content, 'utf8');
+    const status: OutputStatus = !exists ? 'missing'
+        : (await fs.readFile(path.join(root, file.path))).equals(content) ? 'current' : 'stale';
+    const output = { path: file.path, status };
+    response.outputs.push(output);
+    if (status !== 'current') { changes.push({ ...file, output }); }
+}
+```
+
+### Read-only verification
+
+Both checks reject stale output. Self-host verification is loaded only after that
+check passes, and its named stages are retained in JSON or printed for a human.
+It type-checks fresh sources and executes a rebuilt engine in a child process;
+it does not claim to test the rebuilt CLI's runtime behavior.
+
+```typescript: <<cli read-only checks>>=
+if (command === 'check' || command === 'self-check') {
+    if (!json) {
+        for (const change of changes) { io.stdout(`${change.output.status}: ${change.path}\n`); }
+    }
+    if (changes.length) { return finish(1); }
+    if (command === 'self-check') {
+        const { verifySelfHosting } = await import('./self-hosting');
+        response.selfHosting = await verifySelfHosting(root, documents, templates, files);
+        if (!json) {
+            for (const check of response.selfHosting.checks) {
+                io.stdout(`${check.ok ? 'ok' : 'failed'}: ${check.name}${check.message ? ': ' + check.message : ''}\n`);
+            }
+        }
+        return finish(response.selfHosting.ok ? 0 : 1);
+    }
+    return finish(0);
+}
+```
+
+### Write changed outputs
+
+Writes are sequential and awaited. Recheck targets around directory creation,
+but do not promise a filesystem transaction or protection from concurrent hostile
+filesystem changes. An I/O failure may leave earlier files written; the response
+retains those completed statuses. Obsolete outputs are not deleted automatically.
+
+```typescript: <<cli write changed outputs>>=
+for (const change of changes) {
+    await inspect(root, change.path);
+    const target = path.join(root, change.path);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await inspect(root, change.path);
+    await fs.writeFile(target, change.content, 'utf8');
+    change.output.status = 'written';
+    if (!json) { io.stdout(`generated: ${change.path}\n`); }
+}
+return finish(0);
+```
+
+## Executable boundary
+
+Importing the CLI is side-effect free. Running it as the main module delegates
+all work to `run` and exposes its status to the shell.
+
+```typescript: <<cli executable entry point>>=
 if (require.main === module) {
     void run(process.argv.slice(2)).then(code => { process.exitCode = code; });
 }

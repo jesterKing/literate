@@ -8,80 +8,153 @@
 </head>
 <body>
 <h1>Command-line generation</h1>
-<p>This chapter is the authoritative source of <code>src/cli.ts</code>. The checked-in TypeScript
-file bootstraps the CLI; subsequent generation must reproduce it byte for byte.
-The CLI is a filesystem adapter for <code>generateProject</code>, not a second generator.</p>
-<h2>Usage and exit status</h2>
-<p>Run <code>yarn literate generate [root]</code> or <code>yarn literate check [root]</code> from this
-checkout. The package command compiles the CLI first. Alternatively, compile with
-<code>yarn compile</code>, then invoke the executable directly:</p>
-<pre><code>node out/cli.js generate [root]
-node out/cli.js check [root]
-node out/cli.js --<span class="hljs-built_in">help</span>
-</code></pre>
-<p>The optional root defaults to the current working directory. <code>help</code> and <code>-h</code> also
-show usage. Success exits 0, generation/IO errors or a stale check exit 1, and
-invalid arguments exit 2. Diagnostics use one-based line and column positions.
-<code>run(args, io?)</code> is exported for callers that supply stdout/stderr callbacks.</p>
-<p><code>yarn generate</code> and <code>yarn check:generated</code> are convenience aliases. Both build
-the CLI before running it; extension bundling alone does not build the CLI.</p>
-<h2>Filesystem and generation contract</h2>
-<p>Discover <code>.literate</code> files recursively in deterministic order, skipping symbolic
-links and directories named <code>.git</code>, <code>node_modules</code>, <code>out</code>, <code>dist</code>, <code>.yarn</code>, or
-<code>.vscode-test</code>. Resolve the explicitly selected root to its real directory.
-Paths beneath that root are normalized and validated by <code>safeRelativePath</code>.</p>
-<p>Read only templates returned by the engine’s <code>templateReferences(documents)</code>.
-The engine discovers index <code>SETTINGS</code> template assignments and fragment-header
-template settings, preserving equals signs in values and semicolons in filenames.
-The CLI does not parse Markdown or duplicate the engine’s dependency scanner.
-Invalid template paths and NUL source text make this API throw; the CLI’s error
-handler reports the error and returns exit 1 without writes. Missing templates
-are reported by <code>generateProject</code> with source locations.</p>
-<p>Any engine diagnostic prevents all writes. Before any output write or directory
-creation, validate every target, reject duplicate and ancestor-conflicting
-outputs, and compare existing bytes. Reject symbolic links at any template or
-output path component, even links pointing inside the root. Reject non-directory
-ancestors and non-regular-file targets (including output directories).</p>
-<p><code>generate</code> creates parents and writes only missing or changed files. <code>check</code>
-creates and writes nothing and lists each <code>missing:</code> or <code>stale:</code> output, including
-rendered HTML. Unreferenced templates and unrelated files are never loaded as
-inputs. IO failures are concise errors. Preflight is not a transactional commit:
-an IO failure during writing can leave earlier writes in place. The root must not
-be concurrently modified; repeated link checks reduce accidental races but do
-not provide protection against a hostile process replacing directories during IO.</p>
-<h2>CLI implementation</h2>
-<p>Literal fragment openers in this source fence are escaped for engine round-trip.</p>
+<p>This chapter is authoritative for <code>src/cli.ts</code>. The CLI adapts files and terminal
+output to the shared engine; it does not implement a second fragment language.
+Its entry point assembles a command from argument parsing, project loading,
+validation, and an explicit read-only or writing operation.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;cli.*&gt;&gt;= src/cli.ts $</div>
+<div class="code">
+<pre><code><span class="literate-tag-name">&lt;&lt;cli imports&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;cli output contract&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;cli usage&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;cli default IO&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;cli missing file predicate&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;cli relative path validation&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;cli filesystem inspection&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;cli document discovery&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;cli command lifecycle&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;cli executable entry point&gt;&gt;</span>
+</code></pre>
+
+</div>
+</div><h2>Commands and their boundaries</h2>
+<p>Run <code>yarn literate &lt;command&gt;</code> to build the CLI independently of the extension and
+execute it. To reuse a known-working build while editing generated code, invoke
+<code>node out/cli.js &lt;command&gt;</code> directly.</p>
+<ul>
+<li><code>inspect</code> identifies documents, templates, fragment declarations, and references.
+It uses the engine's parser metadata, including partial metadata on invalid input.</li>
+<li><code>generate</code> validates the whole project before writing changed source and HTML.</li>
+<li><code>check</code> compares the generation plan with disk without writing.</li>
+<li><code>self-check</code> additionally type-checks fresh generated sources and rebuilds the
+engine to verify a fixed point. It executes this repository's trusted code;
+it is not a sandbox or a command for arbitrary untrusted projects.</li>
+</ul>
+<p>All commands accept an optional project root and <code>--json</code>. <code>--help</code>, <code>-h</code>, and
+<code>help &lt;command&gt;</code> explain usage. Success exits 0; invalid input, I/O failures,
+stale checks, and failed verification exit 1; usage errors exit 2. An empty
+project fails rather than passing vacuously.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli usage&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> commands = [<span class="hljs-string">&#x27;generate&#x27;</span>, <span class="hljs-string">&#x27;check&#x27;</span>, <span class="hljs-string">&#x27;inspect&#x27;</span>, <span class="hljs-string">&#x27;self-check&#x27;</span>];
+<span class="hljs-keyword">const</span> usage = <span class="hljs-string">&#x27;Usage: node out/cli.js generate|check|inspect|self-check [root] [--json]\n       node out/cli.js &lt;command&gt; --help [--json]\n       node out/cli.js --help [--json]\n&#x27;</span>;
+<span class="hljs-keyword">const</span> <span class="hljs-attr">descriptions</span>: <span class="hljs-title class_">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; = <span class="hljs-title class_">Object</span>.<span class="hljs-title function_">fromEntries</span>([
+    [<span class="hljs-string">&#x27;generate&#x27;</span>, <span class="hljs-string">&#x27;Write missing or changed generated files.&#x27;</span>],
+    [<span class="hljs-string">&#x27;check&#x27;</span>, <span class="hljs-string">&#x27;Report missing or stale generated files without writing.&#x27;</span>],
+    [<span class="hljs-string">&#x27;inspect&#x27;</span>, <span class="hljs-string">&#x27;Report documents, templates, and fragment definitions and dependencies without reading outputs or writing.&#x27;</span>],
+    [<span class="hljs-string">&#x27;self-check&#x27;</span>, <span class="hljs-string">&#x27;Verify this repository’s trusted self-hosting code without generating files; all outputs must already be current.&#x27;</span>]
+]);
+
+</code></pre>
+
+</div>
+</div><h2>A machine-readable result</h2>
+<p>JSON mode emits exactly one object to stdout, including on usage and I/O errors.
+Human progress and error messages are suppressed in that mode. <code>schemaVersion</code>
+provides a compatibility boundary for scripts and AI tools. Diagnostic and
+inspection coordinates are zero-based; human diagnostic messages add one to both.
+Output statuses describe disk comparison, or a completed write—not a promise that
+an attempted write succeeded. Inspection does not read or preflight output paths.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli output contract&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">CliIO</span> {
+    <span class="hljs-title function_">stdout</span>(<span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span>;
+    <span class="hljs-title function_">stderr</span>(<span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span>;
+}
+
+<span class="hljs-keyword">type</span> <span class="hljs-title class_">Generation</span> = <span class="hljs-title class_">ReturnType</span>&lt;<span class="hljs-keyword">typeof</span> generateProject&gt;;
+<span class="hljs-keyword">type</span> <span class="hljs-title class_">OutputStatus</span> = <span class="hljs-string">&#x27;current&#x27;</span> | <span class="hljs-string">&#x27;missing&#x27;</span> | <span class="hljs-string">&#x27;stale&#x27;</span> | <span class="hljs-string">&#x27;written&#x27;</span>;
+<span class="hljs-keyword">interface</span> <span class="hljs-title class_">CliResponse</span> {
+    <span class="hljs-attr">schemaVersion</span>: <span class="hljs-number">1</span>;
+    <span class="hljs-attr">command</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">ok</span>: <span class="hljs-built_in">boolean</span>;
+    root?: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">Generation</span>[<span class="hljs-string">&#x27;diagnostics&#x27;</span>];
+    <span class="hljs-attr">errors</span>: <span class="hljs-built_in">string</span>[];
+    <span class="hljs-attr">outputs</span>: { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">status</span>: <span class="hljs-title class_">OutputStatus</span> }[];
+    inspection?: <span class="hljs-title class_">Generation</span>[<span class="hljs-string">&#x27;inspection&#x27;</span>];
+    selfHosting?: { <span class="hljs-attr">ok</span>: <span class="hljs-built_in">boolean</span>; <span class="hljs-attr">checks</span>: { <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">ok</span>: <span class="hljs-built_in">boolean</span>; message?: <span class="hljs-built_in">string</span> }[] };
+    usage?: <span class="hljs-built_in">string</span>;
+}
+
+</code></pre>
+
+</div>
+</div><p>The engine owns discovery exclusions and template syntax. The self-hosting
+verifier is deliberately absent from these imports: ordinary commands do not
+load compiler tooling until verification is requested.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli imports&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> fs <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;fs/promises&#x27;</span>;
 <span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> path <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;path&#x27;</span>;
 <span class="hljs-keyword">import</span> { discoveryExcludedDirectories, generateProject, safeRelativePath, templateReferences, <span class="hljs-title class_">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./engine&#x27;</span>;
 
-<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">CliIO</span> {
-    <span class="hljs-title function_">stdout</span>(<span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span>;
-    <span class="hljs-title function_">stderr</span>(<span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span>;
-}
+</code></pre>
 
-<span class="hljs-keyword">const</span> usage = <span class="hljs-string">&#x27;Usage: node out/cli.js generate|check [root]\n       node out/cli.js --help\n&#x27;</span>;
-<span class="hljs-keyword">const</span> excluded = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>(discoveryExcludedDirectories);
+</div>
+</div><p>An injectable output boundary lets tests capture exactly what callers receive.
+The executable uses the process streams without adding logging of its own.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli default IO&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> excluded = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>(discoveryExcludedDirectories);
 <span class="hljs-keyword">const</span> <span class="hljs-attr">defaultIO</span>: <span class="hljs-title class_">CliIO</span> = {
     <span class="hljs-attr">stdout</span>: <span class="hljs-function"><span class="hljs-params">message</span> =&gt;</span> { process.<span class="hljs-property">stdout</span>.<span class="hljs-title function_">write</span>(message); },
     <span class="hljs-attr">stderr</span>: <span class="hljs-function"><span class="hljs-params">message</span> =&gt;</span> { process.<span class="hljs-property">stderr</span>.<span class="hljs-title function_">write</span>(message); }
 };
 
-<span class="hljs-keyword">function</span> <span class="hljs-title function_">missing</span>(<span class="hljs-params">error: <span class="hljs-built_in">unknown</span></span>): <span class="hljs-built_in">boolean</span> {
+</code></pre>
+
+</div>
+</div><h2>Filesystem preflight</h2>
+<p>A missing file is expected during generation. Other failures, including access
+errors, must propagate rather than being mistaken for absent output.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli missing file predicate&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">missing</span>(<span class="hljs-params">error: <span class="hljs-built_in">unknown</span></span>): <span class="hljs-built_in">boolean</span> {
     <span class="hljs-keyword">return</span> (error <span class="hljs-keyword">as</span> <span class="hljs-title class_">NodeJS</span>.<span class="hljs-property">ErrnoException</span>).<span class="hljs-property">code</span> === <span class="hljs-string">&#x27;ENOENT&#x27;</span>;
 }
 
-<span class="hljs-keyword">function</span> <span class="hljs-title function_">relative</span>(<span class="hljs-params">value: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> {
+</code></pre>
+
+</div>
+</div><p>All adapter paths pass through the engine's portable path policy before reaching
+the filesystem. This also normalizes paths before collision checks.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli relative path validation&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">relative</span>(<span class="hljs-params">value: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> {
     <span class="hljs-keyword">const</span> normalized = <span class="hljs-title function_">safeRelativePath</span>(value);
     <span class="hljs-keyword">if</span> (!normalized) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Invalid relative path: <span class="hljs-subst">${value}</span>`</span>); }
     <span class="hljs-keyword">return</span> normalized;
 }
 
+</code></pre>
 
-<span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">inspect</span>(<span class="hljs-params">root: <span class="hljs-built_in">string</span>, value: <span class="hljs-built_in">string</span></span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">boolean</span>&gt; {
+</div>
+</div><p>Lexical validation cannot detect symlinks. Walk each existing component and reject
+links, non-directory ancestors, and non-file targets, even when a link stays
+inside the project. A missing ancestor means the target is absent; it is not
+created until all targets have passed preflight.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli filesystem inspection&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">inspect</span>(<span class="hljs-params">root: <span class="hljs-built_in">string</span>, value: <span class="hljs-built_in">string</span></span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">boolean</span>&gt; {
     <span class="hljs-keyword">const</span> parts = <span class="hljs-title function_">relative</span>(value).<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;/&#x27;</span>);
     <span class="hljs-keyword">let</span> current = root;
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = <span class="hljs-number">0</span>; index &lt; parts.<span class="hljs-property">length</span>; index++) {
@@ -102,7 +175,18 @@ not provide protection against a hostile process replacing directories during IO
     <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
 }
 
-<span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">discover</span>(<span class="hljs-params">root: <span class="hljs-built_in">string</span></span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-title class_">SourceDocument</span>[]&gt; {
+</code></pre>
+
+</div>
+</div><h2>Discover saved inputs</h2>
+<p>Directory enumeration is sorted, skips symlinks, and shares exclusions with the
+editor. The engine will apply index ordering later. The CLI reads disk, not
+unsaved editor buffers, so CLI and editor generation must not run concurrently
+against the same project.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli document discovery&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">discover</span>(<span class="hljs-params">root: <span class="hljs-built_in">string</span></span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-title class_">SourceDocument</span>[]&gt; {
     <span class="hljs-keyword">const</span> <span class="hljs-attr">documents</span>: <span class="hljs-title class_">SourceDocument</span>[] = [];
     <span class="hljs-keyword">const</span> visit = <span class="hljs-keyword">async</span> (<span class="hljs-attr">directory</span>: <span class="hljs-built_in">string</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; =&gt; {
         <span class="hljs-keyword">const</span> entries = <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">readdir</span>(path.<span class="hljs-title function_">join</span>(root, directory), { <span class="hljs-attr">withFileTypes</span>: <span class="hljs-literal">true</span> });
@@ -123,79 +207,256 @@ not provide protection against a hostile process replacing directories during IO
     <span class="hljs-keyword">return</span> documents;
 }
 
+</code></pre>
 
-<span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">run</span>(<span class="hljs-params">args: <span class="hljs-built_in">string</span>[], io: CliIO = defaultIO</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">number</span>&gt; {
-    <span class="hljs-keyword">if</span> (args.<span class="hljs-property">length</span> === <span class="hljs-number">1</span> &amp;&amp; [<span class="hljs-string">&#x27;help&#x27;</span>, <span class="hljs-string">&#x27;--help&#x27;</span>, <span class="hljs-string">&#x27;-h&#x27;</span>].<span class="hljs-title function_">includes</span>(args[<span class="hljs-number">0</span>])) {
-        io.<span class="hljs-title function_">stdout</span>(usage);
-        <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
-    }
-    <span class="hljs-keyword">if</span> (args.<span class="hljs-property">length</span> &lt; <span class="hljs-number">1</span> || args.<span class="hljs-property">length</span> &gt; <span class="hljs-number">2</span> || ![<span class="hljs-string">&#x27;generate&#x27;</span>, <span class="hljs-string">&#x27;check&#x27;</span>].<span class="hljs-title function_">includes</span>(args[<span class="hljs-number">0</span>]) ||
-        (args.<span class="hljs-property">length</span> === <span class="hljs-number">2</span> &amp;&amp; (!args[<span class="hljs-number">1</span>] || args[<span class="hljs-number">1</span>].<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&#x27;-&#x27;</span>)))) {
-        io.<span class="hljs-title function_">stderr</span>(usage);
-        <span class="hljs-keyword">return</span> <span class="hljs-number">2</span>;
-    }
+</div>
+</div><h2>The command lifecycle</h2>
+<p>The orchestration keeps the write boundary visible. Argument errors and help
+return before reading the project; inspection returns before touching output
+paths; checking returns before the writing stage. A single completion function
+sets the exit status and emits a JSON response exactly once.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli command lifecycle&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">run</span>(<span class="hljs-params">args: <span class="hljs-built_in">string</span>[], io: CliIO = defaultIO</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">number</span>&gt; {
+    <span class="literate-tag-name">&lt;&lt;cli response setup&gt;&gt;</span>
+    <span class="literate-tag-name">&lt;&lt;cli argument parsing&gt;&gt;</span>
+    <span class="literate-tag-name">&lt;&lt;cli argument validation and help&gt;&gt;</span>
     <span class="hljs-keyword">try</span> {
-
-        <span class="hljs-keyword">const</span> root = <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">realpath</span>(path.<span class="hljs-title function_">resolve</span>(args[<span class="hljs-number">1</span>] || process.<span class="hljs-title function_">cwd</span>()));
-        <span class="hljs-keyword">if</span> (!(<span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">stat</span>(root)).<span class="hljs-title function_">isDirectory</span>()) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Root is not a directory&#x27;</span>); }
-        <span class="hljs-keyword">const</span> documents = <span class="hljs-keyword">await</span> <span class="hljs-title function_">discover</span>(root);
-        <span class="hljs-keyword">const</span> <span class="hljs-attr">templates</span>: <span class="hljs-title class_">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; = <span class="hljs-title class_">Object</span>.<span class="hljs-title function_">create</span>(<span class="hljs-literal">null</span>);
-        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> reference <span class="hljs-keyword">of</span> <span class="hljs-title function_">templateReferences</span>(documents)) {
-
-            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, reference)) {
-                templates[reference] = <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">readFile</span>(path.<span class="hljs-title function_">join</span>(root, reference), <span class="hljs-string">&#x27;utf8&#x27;</span>);
-            }
-        }
-        <span class="hljs-keyword">const</span> result = <span class="hljs-title function_">generateProject</span>(documents, templates);
-        <span class="hljs-keyword">if</span> (result.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) {
-            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> diagnostic <span class="hljs-keyword">of</span> result.<span class="hljs-property">diagnostics</span>) {
-                io.<span class="hljs-title function_">stderr</span>(<span class="hljs-string">`<span class="hljs-subst">${diagnostic.path}</span>:<span class="hljs-subst">${diagnostic.line + <span class="hljs-number">1</span>}</span>:<span class="hljs-subst">${diagnostic.column + <span class="hljs-number">1</span>}</span>: <span class="hljs-subst">${diagnostic.message}</span>\n`</span>);
-            }
-            <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
-        }
-        <span class="hljs-keyword">const</span> files = result.<span class="hljs-property">files</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">file</span> =&gt;</span> ({ <span class="hljs-attr">path</span>: <span class="hljs-title function_">relative</span>(file.<span class="hljs-property">path</span>), <span class="hljs-attr">content</span>: file.<span class="hljs-property">content</span> }));
-        <span class="hljs-keyword">const</span> targets = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
-        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> files) {
-            <span class="hljs-keyword">if</span> (targets.<span class="hljs-title function_">has</span>(file.<span class="hljs-property">path</span>)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Duplicate output: <span class="hljs-subst">${file.path}</span>`</span>); }
-            targets.<span class="hljs-title function_">add</span>(file.<span class="hljs-property">path</span>);
-        }
-        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> target <span class="hljs-keyword">of</span> targets) {
-            <span class="hljs-keyword">const</span> parts = target.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;/&#x27;</span>);
-            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = <span class="hljs-number">1</span>; index &lt; parts.<span class="hljs-property">length</span>; index++) {
-                <span class="hljs-keyword">const</span> parent = parts.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, index).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;/&#x27;</span>);
-                <span class="hljs-keyword">if</span> (targets.<span class="hljs-title function_">has</span>(parent)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Output is also a parent directory: <span class="hljs-subst">${parent}</span>`</span>); }
-            }
-        }
-        <span class="hljs-keyword">const</span> <span class="hljs-attr">changes</span>: { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">status</span>: <span class="hljs-built_in">string</span> }[] = [];
-
-        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> files) {
-            <span class="hljs-keyword">const</span> exists = <span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, file.<span class="hljs-property">path</span>);
-            <span class="hljs-keyword">const</span> content = <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(file.<span class="hljs-property">content</span>, <span class="hljs-string">&#x27;utf8&#x27;</span>);
-            <span class="hljs-keyword">if</span> (!exists || !(<span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">readFile</span>(path.<span class="hljs-title function_">join</span>(root, file.<span class="hljs-property">path</span>))).<span class="hljs-title function_">equals</span>(content)) {
-                changes.<span class="hljs-title function_">push</span>({ ...file, <span class="hljs-attr">status</span>: exists ? <span class="hljs-string">&#x27;stale&#x27;</span> : <span class="hljs-string">&#x27;missing&#x27;</span> });
-            }
-        }
-        <span class="hljs-keyword">if</span> (args[<span class="hljs-number">0</span>] === <span class="hljs-string">&#x27;check&#x27;</span>) {
-            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> change <span class="hljs-keyword">of</span> changes) { io.<span class="hljs-title function_">stdout</span>(<span class="hljs-string">`<span class="hljs-subst">${change.status}</span>: <span class="hljs-subst">${change.path}</span>\n`</span>); }
-            <span class="hljs-keyword">return</span> changes.<span class="hljs-property">length</span> ? <span class="hljs-number">1</span> : <span class="hljs-number">0</span>;
-        }
-        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> change <span class="hljs-keyword">of</span> changes) {
-            <span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, change.<span class="hljs-property">path</span>);
-            <span class="hljs-keyword">const</span> target = path.<span class="hljs-title function_">join</span>(root, change.<span class="hljs-property">path</span>);
-            <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">mkdir</span>(path.<span class="hljs-title function_">dirname</span>(target), { <span class="hljs-attr">recursive</span>: <span class="hljs-literal">true</span> });
-            <span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, change.<span class="hljs-property">path</span>);
-            <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">writeFile</span>(target, change.<span class="hljs-property">content</span>, <span class="hljs-string">&#x27;utf8&#x27;</span>);
-            io.<span class="hljs-title function_">stdout</span>(<span class="hljs-string">`generated: <span class="hljs-subst">${change.path}</span>\n`</span>);
-        }
-        <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+        <span class="literate-tag-name">&lt;&lt;cli load project&gt;&gt;</span>
+        <span class="literate-tag-name">&lt;&lt;cli validate and inspect project&gt;&gt;</span>
+        <span class="literate-tag-name">&lt;&lt;cli validate output destinations&gt;&gt;</span>
+        <span class="literate-tag-name">&lt;&lt;cli compare output bytes&gt;&gt;</span>
+        <span class="literate-tag-name">&lt;&lt;cli read-only checks&gt;&gt;</span>
+        <span class="literate-tag-name">&lt;&lt;cli write changed outputs&gt;&gt;</span>
     } <span class="hljs-keyword">catch</span> (error) {
-        <span class="hljs-keyword">const</span> message = error <span class="hljs-keyword">instanceof</span> <span class="hljs-title class_">Error</span> ? error.<span class="hljs-property">message</span> : <span class="hljs-title class_">String</span>(error);
-        io.<span class="hljs-title function_">stderr</span>(<span class="hljs-string">`literate: <span class="hljs-subst">${message.replace(/[\r\n]+/g, <span class="hljs-string">&#x27; &#x27;</span>)}</span>\n`</span>);
-        <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+        <span class="hljs-keyword">const</span> message = (error <span class="hljs-keyword">instanceof</span> <span class="hljs-title class_">Error</span> ? error.<span class="hljs-property">message</span> : <span class="hljs-title class_">String</span>(error)).<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/[\r\n]+/g</span>, <span class="hljs-string">&#x27; &#x27;</span>);
+        response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(message);
+        <span class="hljs-keyword">if</span> (!json) { io.<span class="hljs-title function_">stderr</span>(<span class="hljs-string">`literate: <span class="hljs-subst">${message}</span>\n`</span>); }
+        <span class="hljs-keyword">return</span> <span class="hljs-title function_">finish</span>(<span class="hljs-number">1</span>);
     }
 }
 
-<span class="hljs-keyword">if</span> (<span class="hljs-built_in">require</span>.<span class="hljs-property">main</span> === <span class="hljs-variable language_">module</span>) {
+</code></pre>
+
+</div>
+</div><h3>Prepare one result</h3>
+<p>Detect JSON mode before validating flags so malformed invocations still have a
+structured error response. Arrays are always present; command-specific metadata
+is added only after that stage runs.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli response setup&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> json = args.<span class="hljs-title function_">includes</span>(<span class="hljs-string">&#x27;--json&#x27;</span>);
+<span class="hljs-keyword">const</span> <span class="hljs-attr">positional</span>: <span class="hljs-built_in">string</span>[] = [];
+<span class="hljs-keyword">const</span> flags = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
+<span class="hljs-keyword">const</span> <span class="hljs-attr">response</span>: <span class="hljs-title class_">CliResponse</span> = {
+    <span class="hljs-attr">schemaVersion</span>: <span class="hljs-number">1</span>, <span class="hljs-attr">command</span>: <span class="hljs-string">&#x27;help&#x27;</span>, <span class="hljs-attr">ok</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">diagnostics</span>: [], <span class="hljs-attr">errors</span>: [], <span class="hljs-attr">outputs</span>: []
+};
+<span class="hljs-keyword">const</span> finish = (<span class="hljs-attr">code</span>: <span class="hljs-built_in">number</span>): <span class="hljs-function"><span class="hljs-params">number</span> =&gt;</span> {
+    response.<span class="hljs-property">ok</span> = code === <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">if</span> (json) { io.<span class="hljs-title function_">stdout</span>(<span class="hljs-title class_">JSON</span>.<span class="hljs-title function_">stringify</span>(response) + <span class="hljs-string">&#x27;\n&#x27;</span>); }
+    <span class="hljs-keyword">return</span> code;
+};
+</code></pre>
+
+</div>
+</div><h3>Parse arguments without guessing</h3>
+<p>Flags may precede or follow the command and root. Normalize the help alias before
+checking duplicates. Unknown flags and extra positional arguments are errors,
+rather than silently changing which project is processed.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli argument parsing&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> arg <span class="hljs-keyword">of</span> args) {
+    <span class="hljs-keyword">if</span> (arg.<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&#x27;-&#x27;</span>)) {
+        <span class="hljs-keyword">const</span> flag = arg === <span class="hljs-string">&#x27;-h&#x27;</span> ? <span class="hljs-string">&#x27;--help&#x27;</span> : arg;
+        <span class="hljs-keyword">if</span> (![<span class="hljs-string">&#x27;--help&#x27;</span>, <span class="hljs-string">&#x27;--json&#x27;</span>].<span class="hljs-title function_">includes</span>(flag)) { response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">`Unknown flag: <span class="hljs-subst">${arg}</span>`</span>); }
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (flags.<span class="hljs-title function_">has</span>(flag)) { response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">`Duplicate flag: <span class="hljs-subst">${arg}</span>`</span>); }
+        flags.<span class="hljs-title function_">add</span>(flag);
+    } <span class="hljs-keyword">else</span> { positional.<span class="hljs-title function_">push</span>(arg); }
+}
+<span class="hljs-keyword">const</span> command = positional[<span class="hljs-number">0</span>];
+response.<span class="hljs-property">command</span> = command || <span class="hljs-string">&#x27;help&#x27;</span>;
+<span class="hljs-keyword">const</span> helpCommand = command === <span class="hljs-string">&#x27;help&#x27;</span>;
+<span class="hljs-keyword">const</span> help = helpCommand || flags.<span class="hljs-title function_">has</span>(<span class="hljs-string">&#x27;--help&#x27;</span>);
+<span class="hljs-keyword">const</span> topic = helpCommand ? positional[<span class="hljs-number">1</span>] : command;
+</code></pre>
+
+</div>
+</div><h3>Resolve help before filesystem access</h3>
+<p>Help is successful even outside a project. Usage errors have exit code 2, keeping
+them distinct from valid commands whose project fails validation.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli argument validation and help&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">if</span> (command &amp;&amp; !helpCommand &amp;&amp; !commands.<span class="hljs-title function_">includes</span>(command)) {
+    response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">`Unknown command: <span class="hljs-subst">${command}</span>`</span>);
+}
+<span class="hljs-keyword">if</span> ((!command &amp;&amp; !help) || positional.<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">arg</span> =&gt;</span> !arg) || positional.<span class="hljs-property">length</span> &gt; <span class="hljs-number">2</span> ||
+    (helpCommand &amp;&amp; flags.<span class="hljs-title function_">has</span>(<span class="hljs-string">&#x27;--help&#x27;</span>)) || (helpCommand &amp;&amp; topic &amp;&amp; !commands.<span class="hljs-title function_">includes</span>(topic))) {
+    response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">&#x27;Invalid arguments&#x27;</span>);
+}
+<span class="hljs-keyword">if</span> (response.<span class="hljs-property">errors</span>.<span class="hljs-property">length</span>) {
+    <span class="hljs-keyword">if</span> (!json) { io.<span class="hljs-title function_">stderr</span>(response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;\n&#x27;</span>) + <span class="hljs-string">&#x27;\n&#x27;</span> + usage); }
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_">finish</span>(<span class="hljs-number">2</span>);
+}
+<span class="hljs-keyword">if</span> (help) {
+    response.<span class="hljs-property">command</span> = <span class="hljs-string">&#x27;help&#x27;</span>;
+    response.<span class="hljs-property">usage</span> = topic
+        ? <span class="hljs-string">`Usage: node out/cli.js <span class="hljs-subst">${topic}</span> [root] [--json]\n<span class="hljs-subst">${descriptions[topic]}</span>\n`</span>
+        : usage;
+    <span class="hljs-keyword">if</span> (!json) { io.<span class="hljs-title function_">stdout</span>(response.<span class="hljs-property">usage</span>); }
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_">finish</span>(<span class="hljs-number">0</span>);
+}
+</code></pre>
+
+</div>
+</div><h3>Load only declared templates</h3>
+<p>Resolve the selected root once, then discover saved documents. Missing templates
+are left to the engine for positioned diagnostics. Invalid paths and I/O errors
+are caught by the lifecycle and prevent writes.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli load project&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> root = <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">realpath</span>(path.<span class="hljs-title function_">resolve</span>(positional[<span class="hljs-number">1</span>] || process.<span class="hljs-title function_">cwd</span>()));
+response.<span class="hljs-property">root</span> = root;
+<span class="hljs-keyword">if</span> (!(<span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">stat</span>(root)).<span class="hljs-title function_">isDirectory</span>()) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Root is not a directory&#x27;</span>); }
+<span class="hljs-keyword">const</span> documents = <span class="hljs-keyword">await</span> <span class="hljs-title function_">discover</span>(root);
+<span class="hljs-keyword">if</span> (!documents.<span class="hljs-property">length</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;No literate documents found&#x27;</span>); }
+<span class="hljs-keyword">const</span> <span class="hljs-attr">templates</span>: <span class="hljs-title class_">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; = <span class="hljs-title class_">Object</span>.<span class="hljs-title function_">create</span>(<span class="hljs-literal">null</span>);
+<span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> reference <span class="hljs-keyword">of</span> <span class="hljs-title function_">templateReferences</span>(documents)) {
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, reference)) {
+        templates[reference] = <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">readFile</span>(path.<span class="hljs-title function_">join</span>(root, reference), <span class="hljs-string">&#x27;utf8&#x27;</span>);
+    }
+}
+</code></pre>
+
+</div>
+</div><h3>Validate once, inspect the same model</h3>
+<p>Inspection reports parser metadata even when expansion fails, helping an author
+locate incomplete definitions. It does not use a separate regex-based scanner.
+Other commands stop on any diagnostic before examining or writing output files.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli validate and inspect project&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> result = <span class="hljs-title function_">generateProject</span>(documents, templates);
+response.<span class="hljs-property">diagnostics</span> = result.<span class="hljs-property">diagnostics</span>;
+<span class="hljs-keyword">if</span> (command === <span class="hljs-string">&#x27;inspect&#x27;</span>) {
+    response.<span class="hljs-property">inspection</span> = result.<span class="hljs-property">inspection</span>;
+    <span class="hljs-keyword">if</span> (!json) { io.<span class="hljs-title function_">stdout</span>(<span class="hljs-title class_">JSON</span>.<span class="hljs-title function_">stringify</span>(result.<span class="hljs-property">inspection</span>, <span class="hljs-literal">null</span>, <span class="hljs-number">2</span>) + <span class="hljs-string">&#x27;\n&#x27;</span>); }
+}
+<span class="hljs-keyword">if</span> (result.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) {
+    <span class="hljs-keyword">if</span> (!json) {
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> diagnostic <span class="hljs-keyword">of</span> result.<span class="hljs-property">diagnostics</span>) {
+            io.<span class="hljs-title function_">stderr</span>(<span class="hljs-string">`<span class="hljs-subst">${diagnostic.path}</span>:<span class="hljs-subst">${diagnostic.line + <span class="hljs-number">1</span>}</span>:<span class="hljs-subst">${diagnostic.column + <span class="hljs-number">1</span>}</span>: <span class="hljs-subst">${diagnostic.message}</span>\n`</span>);
+        }
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_">finish</span>(<span class="hljs-number">1</span>);
+}
+<span class="hljs-keyword">if</span> (command === <span class="hljs-string">&#x27;inspect&#x27;</span>) { <span class="hljs-keyword">return</span> <span class="hljs-title function_">finish</span>(<span class="hljs-number">0</span>); }
+</code></pre>
+
+</div>
+</div><h3>Validate the complete destination set</h3>
+<p>A file cannot also be a directory containing another output. Retain this adapter
+check in addition to engine validation so preflight remains explicit before any
+filesystem mutation.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli validate output destinations&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> files = result.<span class="hljs-property">files</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">file</span> =&gt;</span> ({ <span class="hljs-attr">path</span>: <span class="hljs-title function_">relative</span>(file.<span class="hljs-property">path</span>), <span class="hljs-attr">content</span>: file.<span class="hljs-property">content</span> }));
+<span class="hljs-keyword">const</span> targets = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
+<span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> files) {
+    <span class="hljs-keyword">if</span> (targets.<span class="hljs-title function_">has</span>(file.<span class="hljs-property">path</span>)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Duplicate output: <span class="hljs-subst">${file.path}</span>`</span>); }
+    targets.<span class="hljs-title function_">add</span>(file.<span class="hljs-property">path</span>);
+}
+<span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> target <span class="hljs-keyword">of</span> targets) {
+    <span class="hljs-keyword">const</span> parts = target.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;/&#x27;</span>);
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = <span class="hljs-number">1</span>; index &lt; parts.<span class="hljs-property">length</span>; index++) {
+        <span class="hljs-keyword">const</span> parent = parts.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, index).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;/&#x27;</span>);
+        <span class="hljs-keyword">if</span> (targets.<span class="hljs-title function_">has</span>(parent)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Output is also a parent directory: <span class="hljs-subst">${parent}</span>`</span>); }
+    }
+}
+</code></pre>
+
+</div>
+</div><h3>Compare before creating anything</h3>
+<p>Every target passes filesystem inspection before the first write or directory
+creation. Compare bytes rather than timestamps. Keep a reference to each status
+entry so a completed write can change only that entry to <code>written</code>.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli compare output bytes&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> <span class="hljs-attr">changes</span>: { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">output</span>: <span class="hljs-title class_">CliResponse</span>[<span class="hljs-string">&#x27;outputs&#x27;</span>][<span class="hljs-built_in">number</span>] }[] = [];
+<span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> files) {
+    <span class="hljs-keyword">const</span> exists = <span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, file.<span class="hljs-property">path</span>);
+    <span class="hljs-keyword">const</span> content = <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(file.<span class="hljs-property">content</span>, <span class="hljs-string">&#x27;utf8&#x27;</span>);
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">status</span>: <span class="hljs-title class_">OutputStatus</span> = !exists ? <span class="hljs-string">&#x27;missing&#x27;</span>
+        : (<span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">readFile</span>(path.<span class="hljs-title function_">join</span>(root, file.<span class="hljs-property">path</span>))).<span class="hljs-title function_">equals</span>(content) ? <span class="hljs-string">&#x27;current&#x27;</span> : <span class="hljs-string">&#x27;stale&#x27;</span>;
+    <span class="hljs-keyword">const</span> output = { <span class="hljs-attr">path</span>: file.<span class="hljs-property">path</span>, status };
+    response.<span class="hljs-property">outputs</span>.<span class="hljs-title function_">push</span>(output);
+    <span class="hljs-keyword">if</span> (status !== <span class="hljs-string">&#x27;current&#x27;</span>) { changes.<span class="hljs-title function_">push</span>({ ...file, output }); }
+}
+</code></pre>
+
+</div>
+</div><h3>Read-only verification</h3>
+<p>Both checks reject stale output. Self-host verification is loaded only after that
+check passes, and its named stages are retained in JSON or printed for a human.
+It type-checks fresh sources and executes a rebuilt engine in a child process;
+it does not claim to test the rebuilt CLI's runtime behavior.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli read-only checks&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">if</span> (command === <span class="hljs-string">&#x27;check&#x27;</span> || command === <span class="hljs-string">&#x27;self-check&#x27;</span>) {
+    <span class="hljs-keyword">if</span> (!json) {
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> change <span class="hljs-keyword">of</span> changes) { io.<span class="hljs-title function_">stdout</span>(<span class="hljs-string">`<span class="hljs-subst">${change.output.status}</span>: <span class="hljs-subst">${change.path}</span>\n`</span>); }
+    }
+    <span class="hljs-keyword">if</span> (changes.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> <span class="hljs-title function_">finish</span>(<span class="hljs-number">1</span>); }
+    <span class="hljs-keyword">if</span> (command === <span class="hljs-string">&#x27;self-check&#x27;</span>) {
+        <span class="hljs-keyword">const</span> { verifySelfHosting } = <span class="hljs-keyword">await</span> <span class="hljs-keyword">import</span>(<span class="hljs-string">&#x27;./self-hosting&#x27;</span>);
+        response.<span class="hljs-property">selfHosting</span> = <span class="hljs-keyword">await</span> <span class="hljs-title function_">verifySelfHosting</span>(root, documents, templates, files);
+        <span class="hljs-keyword">if</span> (!json) {
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> check <span class="hljs-keyword">of</span> response.<span class="hljs-property">selfHosting</span>.<span class="hljs-property">checks</span>) {
+                io.<span class="hljs-title function_">stdout</span>(<span class="hljs-string">`<span class="hljs-subst">${check.ok ? <span class="hljs-string">&#x27;ok&#x27;</span> : <span class="hljs-string">&#x27;failed&#x27;</span>}</span>: <span class="hljs-subst">${check.name}</span><span class="hljs-subst">${check.message ? <span class="hljs-string">&#x27;: &#x27;</span> + check.message : <span class="hljs-string">&#x27;&#x27;</span>}</span>\n`</span>);
+            }
+        }
+        <span class="hljs-keyword">return</span> <span class="hljs-title function_">finish</span>(response.<span class="hljs-property">selfHosting</span>.<span class="hljs-property">ok</span> ? <span class="hljs-number">0</span> : <span class="hljs-number">1</span>);
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_">finish</span>(<span class="hljs-number">0</span>);
+}
+</code></pre>
+
+</div>
+</div><h3>Write changed outputs</h3>
+<p>Writes are sequential and awaited. Recheck targets around directory creation,
+but do not promise a filesystem transaction or protection from concurrent hostile
+filesystem changes. An I/O failure may leave earlier files written; the response
+retains those completed statuses. Obsolete outputs are not deleted automatically.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli write changed outputs&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> change <span class="hljs-keyword">of</span> changes) {
+    <span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, change.<span class="hljs-property">path</span>);
+    <span class="hljs-keyword">const</span> target = path.<span class="hljs-title function_">join</span>(root, change.<span class="hljs-property">path</span>);
+    <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">mkdir</span>(path.<span class="hljs-title function_">dirname</span>(target), { <span class="hljs-attr">recursive</span>: <span class="hljs-literal">true</span> });
+    <span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, change.<span class="hljs-property">path</span>);
+    <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">writeFile</span>(target, change.<span class="hljs-property">content</span>, <span class="hljs-string">&#x27;utf8&#x27;</span>);
+    change.<span class="hljs-property">output</span>.<span class="hljs-property">status</span> = <span class="hljs-string">&#x27;written&#x27;</span>;
+    <span class="hljs-keyword">if</span> (!json) { io.<span class="hljs-title function_">stdout</span>(<span class="hljs-string">`generated: <span class="hljs-subst">${change.path}</span>\n`</span>); }
+}
+<span class="hljs-keyword">return</span> <span class="hljs-title function_">finish</span>(<span class="hljs-number">0</span>);
+</code></pre>
+
+</div>
+</div><h2>Executable boundary</h2>
+<p>Importing the CLI is side-effect free. Running it as the main module delegates
+all work to <code>run</code> and exposes its status to the shell.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli executable entry point&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">if</span> (<span class="hljs-built_in">require</span>.<span class="hljs-property">main</span> === <span class="hljs-variable language_">module</span>) {
     <span class="hljs-built_in">void</span> <span class="hljs-title function_">run</span>(process.<span class="hljs-property">argv</span>.<span class="hljs-title function_">slice</span>(<span class="hljs-number">2</span>)).<span class="hljs-title function_">then</span>(<span class="hljs-function"><span class="hljs-params">code</span> =&gt;</span> { process.<span class="hljs-property">exitCode</span> = code; });
 }
 </code></pre>
