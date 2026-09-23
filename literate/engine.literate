@@ -26,6 +26,7 @@ shared contracts and helpers for both generation and its adapters.
 <<engine shared header parsing>>
 <<engine document ordering>>
 <<engine template dependency discovery>>
+<<engine project theme resolution>>
 <<engine literal template substitution>>
 <<engine default HTML template>>
 <<engine generation orchestration>>
@@ -51,6 +52,7 @@ test-runtime directories.
 import MarkdownIt = require('markdown-it');
 import Token = require('markdown-it/lib/token');
 import hljs from 'highlight.js';
+import { defaultThemeName, getTheme, themeCss, mermaidTheme } from './themes';
 
 export interface SourceDocument { path: string; text: string; }
 export interface GenerationDiagnostic { path: string; line: number; column: number; message: string; }
@@ -305,10 +307,43 @@ export function templateReferences(documents: SourceDocument[]): string[] {
 
 ```
 
+## Resolve the project theme without filesystem access
+
+Only SETTINGS fences in the normalized root `index.literate` select a theme.
+Omission uses `rosepine-dawn`; repeated settings keep the last valid value, but
+all invalid values (including empty ones) remain diagnostics. Generation uses
+this same exported query once, so preview and generation share the policy.
+
+```ts : <<engine project theme resolution>>=
+export function resolveProjectTheme(documents: SourceDocument[]): { name: string; diagnostics: GenerationDiagnostic[] } {
+    let name = defaultThemeName;
+    const diagnostics: GenerationDiagnostic[] = [];
+    const document = documents.find(value => safeRelativePath(value.path) === 'index.literate');
+    if (!document) { return { name, diagnostics }; }
+    const nul = sourceNulDiagnostic(document);
+    if (nul) { return { name, diagnostics: [nul] }; }
+    for (const token of new MarkdownIt().parse(document.text, {})) {
+        if (token.type !== 'fence' || token.info.trim() !== 'SETTINGS') { continue; }
+        token.content.split('\n').forEach((line: string, index: number) => {
+            const match = /^\s*theme\s*=(.*)$/.exec(line);
+            if (!match) { return; }
+            const value = match[1].trim();
+            if (getTheme(value)) { name = value; }
+            else {
+                diagnostics.push({ path: 'index.literate', line: (token.map?.[0] || 0) + index + 1,
+                    column: 0, message: `Unknown theme: ${value}` });
+            }
+        });
+    }
+    return { name, diagnostics };
+}
+
+```
+
 ## Templates are literal, single-pass substitutions
 
 Source templates recognize `[CODE]`; HTML templates recognize `[CONTENT]` and
-`[AUTHORS]`. A callback replaces every matching original placeholder literally.
+`[AUTHORS]` and `[THEME]`. A callback replaces every matching original placeholder literally.
 Inserted text is never scanned again, so dollar replacement sequences and
 placeholders inside generated code, author metadata, or rendered prose cannot
 trigger a second substitution. Unknown placeholders remain untouched.
@@ -316,7 +351,7 @@ trigger a second substitution. Unknown placeholders remain untouched.
 ```ts : <<engine literal template substitution>>=
 /** Replacement values are literal and are never scanned for more placeholders. */
 function substitute(template: string, values: Record<string, string>): string {
-    return template.replace(/\[(CODE|CONTENT|AUTHORS)\]/g, (match, key: string) =>
+    return template.replace(/\[(CODE|CONTENT|AUTHORS|THEME)\]/g, (match, key: string) =>
         Object.prototype.hasOwnProperty.call(values, key.toLowerCase()) ? values[key.toLowerCase()] : match);
 }
 
@@ -325,26 +360,35 @@ function substitute(template: string, values: Record<string, string>): string {
 ### The compatible default HTML page
 
 Without an explicit HTML template, documentation keeps the extension's default
-page structure, local stylesheet, author metadata slot, and Mermaid module.
+page structure, embedded scoped theme sheet, author metadata slot, and Mermaid
+10 module. Palette configuration is serialized with script-sensitive characters
+escaped; no setting text is interpolated into JavaScript. Mermaid remains a
+client-side renderer, initialized explicitly with strict security.
 An explicitly requested but missing template is an error, not a reason to
 silently use this default.
 
 ```ts : <<engine default HTML template>>=
-const defaultTemplate = `<!DOCTYPE html>
+function defaultTemplate(themeName: string): string {
+    const configuration = JSON.stringify({ ...mermaidTheme(getTheme(themeName)!), startOnLoad: true, securityLevel: 'strict' })
+        .replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026')
+        .replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+    return `<!DOCTYPE html>
 <html>
 <head>
   <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
   <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
-  <link rel="stylesheet" type="text/css" href="./style.css">
+  [THEME]
   [AUTHORS]
 </head>
 <body>
 [CONTENT]
 <script type="module">
   import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize(${configuration});
 </script>
 </body>
 </html>`;
+}
 
 ```
 
@@ -441,8 +485,10 @@ project-level HTML settings.
         if (!templateMap.has(path)) { report(location, `Missing template: ${path}`); return undefined; }
         return templateMap.get(path);
     };
+    const projectTheme = resolveProjectTheme(Array.from(sources.values()));
+    diagnostics.push(...projectTheme.diagnostics);
     let authors = '';
-    let htmlTemplate = defaultTemplate;
+    let htmlTemplate = defaultTemplate(projectTheme.name);
     for (const token of tokens.get('index.literate') || []) {
         if (token.type !== 'fence' || token.info.trim() !== 'SETTINGS') { continue; }
         token.content.split('\n').forEach((line: string, index: number) => {
@@ -733,7 +779,10 @@ fences without removing comments from generated source. Named fences retain
 the `codefragment`, `fragmentname`, `code`, and `literate-tag-name` styling hooks.
 Labels and author metadata are HTML escaped. Mermaid receives escaped raw code
 rather than syntax-highlighted markup. Finally the HTML template receives the
-rendered content and author metadata in one literal substitution pass. Before
+rendered content, author metadata, and scoped stylesheet in one literal
+substitution pass. Each page wraps its rendered body in a `literate-document`
+div carrying the selected `data-literate-theme`. Legacy templates without a
+`[THEME]` slot receive the sheet prepended to each `[CONTENT]` replacement. Before
 returning, every final source and HTML file is normalized to LF line endings,
 including text supplied by templates. This produces deterministic bytes across
 hosts without adding or removing a final newline.
@@ -764,9 +813,12 @@ hosts without adding or removing a final newline.
         return `<div class="codefragment">\n<div class="fragmentname">${label}</div>\n<div class="code">\n${block}\n</div>\n</div>`;
     };
     const metaAuthors = authors.split(';').map(author => `<meta name="author" content="${escape(author)}">`).join('');
+    const theme = `<style>${themeCss(getTheme(projectTheme.name)!)}</style>`;
     for (const path of order) {
-        const content = md.renderer.render(tokens.get(path)!, md.options, {});
-        files.push({ path: safeRelativePath(path.replace(/\.literate$/, '.html'))!, content: substitute(htmlTemplate, { content, authors: metaAuthors }) });
+        const rendered = md.renderer.render(tokens.get(path)!, md.options, {});
+        const wrapper = `<div class="literate-document" data-literate-theme="${escape(projectTheme.name)}">${rendered}</div>`;
+        const content = htmlTemplate.includes('[THEME]') ? wrapper : theme + wrapper;
+        files.push({ path: safeRelativePath(path.replace(/\.literate$/, '.html'))!, content: substitute(htmlTemplate, { content, authors: metaAuthors, theme }) });
     }
     for (const file of files) { file.content = file.content.replace(/\r\n|\r/g, '\n'); }
     return { files, diagnostics, inspection };

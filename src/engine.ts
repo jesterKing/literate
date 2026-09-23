@@ -1,6 +1,7 @@
 import MarkdownIt = require('markdown-it');
 import Token = require('markdown-it/lib/token');
 import hljs from 'highlight.js';
+import { defaultThemeName, getTheme, themeCss, mermaidTheme } from './themes';
 
 export interface SourceDocument { path: string; text: string; }
 export interface GenerationDiagnostic { path: string; line: number; column: number; message: string; }
@@ -162,27 +163,56 @@ export function templateReferences(documents: SourceDocument[]): string[] {
     return Array.from(references).sort();
 }
 
+export function resolveProjectTheme(documents: SourceDocument[]): { name: string; diagnostics: GenerationDiagnostic[] } {
+    let name = defaultThemeName;
+    const diagnostics: GenerationDiagnostic[] = [];
+    const document = documents.find(value => safeRelativePath(value.path) === 'index.literate');
+    if (!document) { return { name, diagnostics }; }
+    const nul = sourceNulDiagnostic(document);
+    if (nul) { return { name, diagnostics: [nul] }; }
+    for (const token of new MarkdownIt().parse(document.text, {})) {
+        if (token.type !== 'fence' || token.info.trim() !== 'SETTINGS') { continue; }
+        token.content.split('\n').forEach((line: string, index: number) => {
+            const match = /^\s*theme\s*=(.*)$/.exec(line);
+            if (!match) { return; }
+            const value = match[1].trim();
+            if (getTheme(value)) { name = value; }
+            else {
+                diagnostics.push({ path: 'index.literate', line: (token.map?.[0] || 0) + index + 1,
+                    column: 0, message: `Unknown theme: ${value}` });
+            }
+        });
+    }
+    return { name, diagnostics };
+}
+
 /** Replacement values are literal and are never scanned for more placeholders. */
 function substitute(template: string, values: Record<string, string>): string {
-    return template.replace(/\[(CODE|CONTENT|AUTHORS)\]/g, (match, key: string) =>
+    return template.replace(/\[(CODE|CONTENT|AUTHORS|THEME)\]/g, (match, key: string) =>
         Object.prototype.hasOwnProperty.call(values, key.toLowerCase()) ? values[key.toLowerCase()] : match);
 }
 
-const defaultTemplate = `<!DOCTYPE html>
+function defaultTemplate(themeName: string): string {
+    const configuration = JSON.stringify({ ...mermaidTheme(getTheme(themeName)!), startOnLoad: true, securityLevel: 'strict' })
+        .replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026')
+        .replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+    return `<!DOCTYPE html>
 <html>
 <head>
   <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
   <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
-  <link rel="stylesheet" type="text/css" href="./style.css">
+  [THEME]
   [AUTHORS]
 </head>
 <body>
 [CONTENT]
 <script type="module">
   import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize(${configuration});
 </script>
 </body>
 </html>`;
+}
 
 /** Pure, atomic generation. Diagnostic positions are zero-based. */
 export function generateProject(documents: SourceDocument[], templates: Record<string, string> = {}): GenerationResult {
@@ -227,8 +257,10 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
         if (!templateMap.has(path)) { report(location, `Missing template: ${path}`); return undefined; }
         return templateMap.get(path);
     };
+    const projectTheme = resolveProjectTheme(Array.from(sources.values()));
+    diagnostics.push(...projectTheme.diagnostics);
     let authors = '';
-    let htmlTemplate = defaultTemplate;
+    let htmlTemplate = defaultTemplate(projectTheme.name);
     for (const token of tokens.get('index.literate') || []) {
         if (token.type !== 'fence' || token.info.trim() !== 'SETTINGS') { continue; }
         token.content.split('\n').forEach((line: string, index: number) => {
@@ -432,9 +464,12 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
         return `<div class="codefragment">\n<div class="fragmentname">${label}</div>\n<div class="code">\n${block}\n</div>\n</div>`;
     };
     const metaAuthors = authors.split(';').map(author => `<meta name="author" content="${escape(author)}">`).join('');
+    const theme = `<style>${themeCss(getTheme(projectTheme.name)!)}</style>`;
     for (const path of order) {
-        const content = md.renderer.render(tokens.get(path)!, md.options, {});
-        files.push({ path: safeRelativePath(path.replace(/\.literate$/, '.html'))!, content: substitute(htmlTemplate, { content, authors: metaAuthors }) });
+        const rendered = md.renderer.render(tokens.get(path)!, md.options, {});
+        const wrapper = `<div class="literate-document" data-literate-theme="${escape(projectTheme.name)}">${rendered}</div>`;
+        const content = htmlTemplate.includes('[THEME]') ? wrapper : theme + wrapper;
+        files.push({ path: safeRelativePath(path.replace(/\.literate$/, '.html'))!, content: substitute(htmlTemplate, { content, authors: metaAuthors, theme }) });
     }
     for (const file of files) { file.content = file.content.replace(/\r\n|\r/g, '\n'); }
     return { files, diagnostics, inspection };

@@ -1,0 +1,269 @@
+export interface LiterateTheme {
+    name: string;
+    dark: boolean;
+    colors: {
+        background: string; surface: string; surfaceRaised: string;
+        text: string; muted: string; border: string; accent: string;
+        information: string; warning: string; danger: string;
+        purple: string; cyan: string; yellow: string;
+    };
+}
+
+export const defaultThemeName = 'rosepine-dawn';
+
+const colorKeys: readonly (keyof LiterateTheme['colors'])[] = [
+    'background', 'surface', 'surfaceRaised', 'text', 'muted', 'border',
+    'accent', 'information', 'warning', 'danger', 'purple', 'cyan', 'yellow'
+];
+const paletteRows = [
+    'hermonica #0a0d10 #11161b #161d23 #edf2f4 #85919c #29323b #5ee6b0 #67a8ff #ffad66 #ff6c74 #8b68a8 #568291 #728249',
+    'aquarium #20202A #25252f #2a2a34 #ced4df #5a5a64 #484852 #b1dba4 #CDDBF9 #E8CCA7 #ebb9b9 #f6bbe7 #b8dceb #E6DFB8',
+    'ashes #1c2023 #24282b #272b2e #c7ccd1 #565a5d #44484b #aec795 #95aec7 #c7ae95 #c79595 #ae95c7 #9eb7d0 #c7c795',
+    'ayu_dark #0B0E14 #14171d #1c1f25 #ced4df #54575d #33363c #AAD84C #36A3D9 #ffa455 #F07178 #c79bf4 #95E6CB #E7C547',
+    'ayu_light #fafafa #efefef #ebebeb #26292f #a0a0a0 #cdcdcd #6CBF43 #399EE6 #FA8D3E #E65050 #9F40FF #95E6CB #E6BA7E',
+    'bearded-arc #1c2433 #232b3a #262e3d #ABB7C1 #626a79 #444c5b #3CEC85 #69C3FF #FF955C #FF738A #bd93ff #22ECDB #EACD61',
+    'blossom_light #e6dfdc #d9d2cf #d0c9c6 #695d57 #a09996 #b9b2af #6c805c #5f7d9b #cc836c #b28069 #a685a6 #75998e #a9a29f',
+    'catppuccin #1E1D2D #252434 #2d2c3c #D9E0EE #605f6f #474656 #ABE9B3 #89B4FA #F8BD96 #F38BA8 #d0a9e5 #89DCEB #FAE3B0',
+    'chadracula-evondev #141423 #1c1c31 #23233d #F8F8F2 #6060a4 #414171 #50FA7B #2CCCFF #FFB86C #FF5555 #BD93F9 #2CCCFF #F1FA8C',
+    'chadracula #282A36 #2d303e #373844 #F8F8F2 #73747e #5e5f69 #50fa7b #a1b1e3 #FFB86C #ff7070 #BD93F9 #8BE9FD #F1FA8C',
+    'chadtain #1a2026 #20262c #242a30 #b0b0b0 #565c62 #42484e #8aac8b #6b8bab #C9938A #ac8a8c #a39ec4 #9aafe6 #c4c19e',
+    'chocolate #252221 #2b2827 #2f2c2b #cdc0ad #6b6867 #4d4a49 #8ca589 #7d92a2 #d08b65 #c65f5f #998396 #829e9b #d9b27c',
+    'dark_horizon #0e0e0e #181818 #1c1c1c #FFFFFF #525252 #363636 #AAD84C #25B0BC #FFA500 #db627e #da70d6 #6BE4E6 #fdb830',
+    'decay #171B20 #1e2227 #262a2f #dee1e6 #5a5e63 #41454a #78DBA9 #86aaec #e9a180 #e26c7c #c68aee #98d3ee #ecd3a0',
+    'doomchad #282c34 #2e323a #32363e #bbc2cf #676b73 #494d55 #98be65 #51afef #ea9558 #ff6b5a #dc8ef3 #46D9FF #ECBE7B',
+    'everblush #141b1e #1a2124 #1e2528 #dadada #50575a #3c4346 #8ccf7e #67b0e8 #fcb163 #e57474 #c47fd5 #6cbfbf #e5c76b',
+    'everforest #2b3339 #323a40 #363e44 #D3C6AA #656d73 #4e565c #83c092 #7393b3 #e69875 #e67e80 #ecafcc #95d1c9 #dbbc7f',
+    'everforest_light #fff9e8 #F0EAD9 #E0DAC9 #272f35 #857F6E #B3AD9C #5da111 #3a94c5 #F7954F #c85552 #b67996 #89bfdc #dfa000',
+    'falcon #020222 #1A1A3A #161636 #F8F8FF #5c5c7c #393959 #9BCCBF #6699cc #f99157 #FF761A #99A4BC #BFDAFF #FFC552',
+    'flex-light #FFFCF0 #f2efe4 #ebe8dd #2a2929 #94928b #b8b5ad #879A39 #4385BE #DA702C #D14D41 #8B7EC8 #3AA99F #D0A215',
+    'flexoki-light #FFFCF0 #f2efe4 #ebe8dd #2a2929 #94928b #b8b5ad #66800B #205EA6 #BC5215 #AF3029 #8265c0 #24837B #AD8301',
+    'flexoki #100F0F #1c1b1b #292626 #CECDC3 #6a6363 #393636 #879A39 #4385BE #DA702C #D14D41 #8B7EC8 #3AA99F #D0A215',
+    'gatekeeper #101010 #181818 #1e1e1e #cccdd1 #4d4d4d #363636 #00e756 #29adff #ffa300 #ff1a67 #a79ac0 #29adff #fff024',
+    'github_dark #24292E #2e3338 #33383d #d3dbe3 #6a6f74 #4c5156 #56d364 #79c0ff #ffab70 #ff7f8d #d2a8ff #56d4dd #ffdf5d',
+    'github_light #ffffff #edeff1 #eaecee #24292e #a6a8aa #c7c9cb #18654B #0D7FDD #d15704 #DE2C2E #8263EB #0598bc #dbab09',
+    'gruvbox #282828 #2e2e2e #353535 #ebdbb2 #656565 #4b4b4b #b8bb26 #458588 #e78a4e #fb4934 #b4bbc8 #82b3a8 #d79921',
+    'gruvbox_light #F2E5BC #e3d6ad #e5d8af #504945 #a2956c #c0b38a #79740e #458588 #b57614 #d65d0e #8f3f71 #82b3a8 #d79921',
+    'gruvchad #1e2122 #242728 #282b2c #c7b89d #606364 #484b4c #89b482 #6d8dad #e78a4e #ec6b64 #9385b4 #82b3a8 #d6b676',
+    'jabuti #292A37 #2e2f3e #343545 #d9e0ee #67698a #50526b #3FDAA4 #78a9ff #efb993 #ec6a88 #be95ff #6be6e6 #e1c697',
+    'jellybeans #151515 #1c1c1c #252525 #e8e8d3 #525252 #424242 #99ad6a #8197bf #e78a4e #cf6a4c #ea94ea #8fbfdc #fad07a',
+    'kanagawa #1F1F28 #25252e #272730 #DCD7BA #5c5c65 #43434c #98BB6C #7FB4CA #fa9b61 #d8616b #a48ec7 #A3D4D5 #FF9E3B',
+    'material-darker #212121 #292929 #303030 #eeffff #6B6B6B #4A4A4A #c3e88d #82aaff #f78c6c #f07178 #c792ea #89ddff #ffcb6b',
+    'material-lighter #fafafa #EBEBEB #EBEBEB #435862 #B3B3B3 #C4C4C4 #91b859 #6182b8 #f76d47 #e53935 #7c4dff #39adb5 #F59717',
+    'melange #2A2520 #342f2a #39342f #ECE1D7 #75706b #57524d #86A3A3 #9AACCE #E49B5D #B65C60 #c47fd5 #bbcdef #e3b865',
+    'mito-laser #201947 #271e56 #2e2466 #eee8d5 #6d5dc6 #423494 #859900 #268bd2 #c85106 #ff047d #7E74CC #37dcf6 #b58900',
+    'monekai #272822 #2F302A #363731 #f5f4f1 #64655F #4D4E48 #96c367 #51afef #d39467 #e36d76 #c885d7 #41afef #e6c181',
+    'monochrome #101010 #202020 #242424 #D8DEE9 #677777 #424242 #c9d36a #8abae1 #efb6a0 #ec8989 #e1bee9 #9aafe6 #ffe6b5',
+    'mountain #0f0f0f #181818 #191919 #F0f0f0 #535353 #373737 #8aac8b #9691b3 #9d9a7b #ac8a8c #C49EC4 #9EC3C4 #ACA98A',
+    'nano-light #FFFfff #ECEFF1 #ebebeb #37474F #848484 #c4c4c4 #66BB6A #42A5F5 #FF6F00 #EF5350 #673AB7 #26C6DA #d0b22b',
+    'nightfox #192330 #202a37 #252f3c #cdcecf #646e7b #495360 #8ebaa4 #719cd6 #fe9373 #c94f6d #baa1e2 #8be5e7 #dbc074',
+    'nightlamp #18191f #202127 #27282e #e0d6bd #55565c #3d3e44 #8aa387 #5a6986 #cd9672 #a67476 #b8aad9 #90a0a0 #ccb89c',
+    'nightowl #011627 #091e2f #112637 #d6deeb #495e6f #2c4152 #29E68E #82aaff #FFAD60 #f78c6c #c792ea #aad2ff #ffcb8b',
+    'nord #2E3440 #343a46 #373d49 #abb2bf #646a76 #4b515d #A3BE8C #7797b7 #e39a83 #BF616A #B48EAD #9aafe6 #EBCB8B',
+    'oceanic-light #d8dee9 #cbd1dc #cbd1dc #26292f #9197a2 #adb3be #5b9c90 #526f93 #f99157 #b40b11 #896a98 #0b8ec6 #fdb830',
+    'oceanic-next #1B2B34 #21313a #25353e #D8DEE9 #5f6f78 #43535c #99C794 #6699CC #F99157 #EC5F67 #C594C5 #62B3B2 #FAC863',
+    'one_light #fafafa #EAEAEB #dadadb #54555b #a2a2a3 #b7b7b8 #50a14f #4078f2 #FF6A00 #d84a3d #a28dcd #0b8ec6 #c18401',
+    'onedark #1e222a #252931 #282c34 #abb2bf #6f737b #42464e #98c379 #61afef #fca2aa #e06c75 #de98fd #a3b8ef #e7c787',
+    'onenord #2a303c #2f3541 #343a46 #D8DEE9 #606672 #4d535f #A3BE8C #7797b7 #e39a83 #d57780 #aab1be #9aafe6 #EBCB8B',
+    'onenord_light #D8DEE9 #c9cfda #c7cdd8 #2a303c #8b919c #a9afba #75905e #3f5f7f #b46b54 #a3454e #9c87c7 #6181a1 #c18401',
+    'oxocarbon #161616 #202020 #2a2a2a #f2f4f8 #5f5f5f #464646 #42be65 #33b1ff #F8BD96 #ee5396 #d0a9e5 #3ddbd9 #FAE3B0',
+    'palenight #292D3E #2f3344 #333748 #ffffff #6d7182 #515566 #c3e88d #82aaff #ffa282 #f07178 #c792ea #89ddff #ffcb6b',
+    'pasteldark #131a21 #1a2128 #1e252c #b5bcc9 #545b62 #363d44 #9fe8c3 #99aee5 #EDA685 #ef8891 #c2a2e3 #b5c3ea #fbdf90',
+    'pastelbeans #151515 #1c1c1c #252525 #e8e8d3 #525252 #424242 #d1f1a9 #bbdaff #ffb964 #ff9da4 #ebbbff #BBFFFF #f5d595',
+    'penumbra_dark #303338 #3a3d42 #3d4045 #FFFDFB #7d8085 #5c5f64 #4EB67F #8C96EC #CE9042 #CA7081 #ac78bd #00B3C2 #c1ad4b',
+    'penumbra_light #FFF7ED #f0e8de #F2E6D4 #3E4044 #b0a89e #cec6bc #3ea57b #6E8DD5 #BA823A #ca7081 #ac78bd #00A0BA #92963a',
+    'poimandres #1b1e28 #222633 #2b3040 #E4F0FB #657096 #48506a #5FB3A1 #89DDFF #91B4D5 #D0679D #A6ACCD #92e0ff #FFFAC2',
+    'radium #101317 #191d22 #212428 #d4d4d5 #525559 #3e4145 #37d99e #7ab0df #f0a988 #f87070 #c397d8 #50cad2 #ffe59e',
+    'rosepine-dawn #faf4ed #EDE1D6 #EADCCF #575279 #908B9D #b0acb9 #286983 #56949f #ea9d34 #b4637a #907aa9 #d7827e #ea9d34',
+    'rosepine #191724 #1f1d2a #262431 #e0def4 #5d5b68 #3f3d4a #ABE9B3 #8bbec7 #f6c177 #eb6f92 #c4a7e7 #a3d6df #f6c177',
+    'rxyhn #061115 #0d181c #131e22 #D9D7D6 #4f5a5e #313c40 #78B892 #6791C9 #E89982 #DF5B61 #C488EC #67AFC1 #ecd28b',
+    'solarized_dark #002b36 #06313c #0a3540 #abb2bf #446f7a #28535e #859900 #268bd2 #cb4b16 #dc322f #6c71c4 #2aa198 #b58900',
+    'solarized_osaka #011219 #02202D #022736 #9eabac #586E75 #405055 #849900 #268bd3 #C84C16 #db302d #29a298 #2aa198 #b28500',
+    'sweetpastel #1B1F23 #22262a #25292d #FFDEDE #5d6165 #43474b #B4E3AD #A3CBE7 #F1C192 #e5a3a1 #CEACE8 #C9D4FF #ECE3B1',
+    'tokyodark #11121D #171823 #1d1e29 #A0A8CD #545560 #474853 #98c379 #7199ee #f6955b #ee6d85 #a485dd #38a89d #d7a65f',
+    'tokyonight #1a1b26 #1f2336 #24283b #c0caf5 #545c7e #40486a #9ece6a #7aa2f7 #ff9e64 #f7768e #bb9af7 #7dcfff #e0af68',
+    'tomorrow_night #1d1f21 #232527 #2d2f31 #C5C8C2 #676e7b #434547 #a4b595 #6f8dab #DE935F #cc6666 #b4bbc8 #70c0b1 #d7bd8d',
+    'tundra #111827 #1a2130 #1e2534 #FFFFFF #5f6675 #3e4554 #B5E8B0 #A5B4FC #FBC19D #FCA5A5 #BDB0E4 #BAE6FD #E8D4B0',
+    'vscode_dark #1E1E1E #252525 #282828 #dee1e6 #626262 #444444 #B5CEA8 #569CD6 #d3967d #D16969 #c68aee #9CDCFE #D7BA7D',
+    'wombat #222222 #292929 #333333 #e4e0d7 #646464 #4b4b4b #AEE474 #88B8F6 #FFCC66 #FF8F7E #dc8cff #90fdf8 #efdeab',
+    'yoru #0c0e0f #141617 #161819 #edeff0 #505253 #343637 #78B892 #6791C9 #E89982 #DF5B61 #c58cec #67AFC1 #ecd28b',
+];
+function luminance(hex: string): number {
+    const channels = [1, 3, 5].map(offset => {
+        const channel = parseInt(hex.slice(offset, offset + 2), 16) / 255;
+        return channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
+    });
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+}
+
+export const themes: readonly LiterateTheme[] = Object.freeze(paletteRows.map(row => {
+    const [name, ...values] = row.split(' ');
+    const colors = {} as LiterateTheme['colors'];
+    colorKeys.forEach((key, index) => { colors[key] = values[index]; });
+    return Object.freeze({ name, dark: luminance(colors.background) < luminance(colors.text),
+        colors: Object.freeze(colors) });
+}));
+
+const themesByName = new Map(themes.map(theme => [theme.name, theme]));
+
+export function getTheme(name: string): LiterateTheme | undefined {
+    return themesByName.get(name);
+}
+function checkedColors(theme: LiterateTheme): LiterateTheme['colors'] {
+    const colors = {} as LiterateTheme['colors'];
+    for (const key of colorKeys) {
+        const value = theme.colors[key];
+        if (typeof value !== 'string' || value.length !== 7 || !/^#[0-9a-fA-F]{6}$/.test(value)) {
+            throw new Error(`Invalid theme color: ${key}`);
+        }
+        colors[key] = value;
+    }
+    return colors;
+}
+
+export function themeVariables(theme: LiterateTheme): string {
+    const colors = checkedColors(theme);
+    return colorKeys.map(key => {
+        const property = key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
+        return `--literate-${property}: ${colors[key]};`;
+    }).join('\n');
+}
+export function mermaidTheme(theme: LiterateTheme) {
+    const c = checkedColors(theme);
+    return {
+        theme: 'base' as const,
+        themeVariables: {
+            darkMode: theme.dark === true,
+            background: c.background, textColor: c.text,
+            fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            fontSize: '16px',
+            primaryColor: c.surface, primaryTextColor: c.text, primaryBorderColor: c.accent,
+            secondaryColor: c.surfaceRaised, secondaryTextColor: c.text, secondaryBorderColor: c.information,
+            tertiaryColor: c.background, tertiaryTextColor: c.text, tertiaryBorderColor: c.border,
+            lineColor: c.information, mainBkg: c.surface, nodeBorder: c.accent,
+            nodeTextColor: c.text, clusterBkg: c.surfaceRaised, clusterBorder: c.border,
+            titleColor: c.text, edgeLabelBackground: c.background,
+            actorBkg: c.surface, actorBorder: c.accent, actorTextColor: c.text,
+            actorLineColor: c.border, signalColor: c.information, signalTextColor: c.text,
+            labelBoxBkgColor: c.surfaceRaised, labelBoxBorderColor: c.border,
+            labelTextColor: c.text, loopTextColor: c.text,
+            noteBkgColor: c.surfaceRaised, noteTextColor: c.text, noteBorderColor: c.warning,
+            activationBkgColor: c.surfaceRaised, activationBorderColor: c.accent,
+            sequenceNumberColor: c.background,
+            classText: c.text, attributeBackgroundColorOdd: c.surface,
+            attributeBackgroundColorEven: c.surfaceRaised,
+            relationColor: c.information, relationLabelColor: c.text,
+            relationLabelBackground: c.background,
+            pie1: c.accent, pie2: c.information, pie3: c.warning, pie4: c.danger,
+            pie5: c.purple, pie6: c.cyan, pie7: c.yellow, pie8: c.muted,
+            pie9: c.accent, pie10: c.information, pie11: c.purple, pie12: c.cyan,
+            pieTitleTextColor: c.text, pieSectionTextColor: c.background,
+            pieLegendTextColor: c.text, pieStrokeColor: c.background,
+            pieOuterStrokeColor: c.border
+        }
+    };
+}
+const upstreamThemeNotice = `nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.`;
+export function themeCss(theme: LiterateTheme): string {
+    return `.literate-document {
+${themeVariables(theme)}
+    display: block;
+    box-sizing: border-box;
+    color-scheme: ${theme.dark === true ? 'dark' : 'light'};
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+${upstreamThemeNotice}
+*/
+`;
+}

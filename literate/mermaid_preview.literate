@@ -24,6 +24,7 @@ file comparison; the browser bundle is a build artifact, not a woven output.
 
 ```js : <<Mermaid preview.*>>= ./src/mermaid-preview.js $
 import mermaid from 'mermaid';
+import { getTheme, defaultThemeName, themeCss, mermaidTheme } from './themes';
 
 <<Mermaid preview state>>
 <<Mermaid preview configuration>>
@@ -71,12 +72,26 @@ is confined to the serial render queue.
 
 ```js : <<Mermaid preview configuration>>=
 function theme() {
-    const classes = document.body.classList;
-    if (classes.contains('vscode-high-contrast')) { return 'dark'; }
-    if (classes.contains('vscode-high-contrast-light')) { return 'default'; }
-    return classes.contains('vscode-dark') ? 'dark' : 'default';
+    const wrapper = document.querySelector('.literate-document');
+    return getTheme(wrapper?.getAttribute('data-literate-theme'))?.name || defaultThemeName;
+}
+
+function applyTheme() {
+    let sheet = document.getElementById('literate-theme-style');
+    if (!sheet) {
+        sheet = document.createElement('style');
+        sheet.id = 'literate-theme-style';
+        document.head.appendChild(sheet);
+    }
+    const css = themeCss(getTheme(theme()));
+    if (sheet.textContent !== css) { sheet.textContent = css; }
 }
 ```
+
+The wrapper's catalogue name selects both the scoped document stylesheet and
+Mermaid palette, independently of VS Code's theme. Missing or invalid names use
+Rose Pine Dawn. Only trusted catalogue CSS is installed, with no body styling;
+the single stylesheet is applied even when the document contains no diagrams.
 
 Only the selected theme varies between configurations. Security settings,
 resource limits and local font defaults remain fixed for every render.
@@ -89,16 +104,16 @@ function configuration(currentTheme) {
         suppressErrorRendering: true,
         maxTextSize: 50000,
         maxEdges: 500,
-        theme: currentTheme,
+        ...mermaidTheme(getTheme(currentTheme)),
         fontFamily: 'sans-serif',
         htmlLabels: false,
         flowchart: { htmlLabels: false },
         secure: ['secure', 'securityLevel', 'startOnLoad', 'suppressErrorRendering',
-            'maxTextSize', 'maxEdges', 'theme', 'fontFamily', 'htmlLabels', 'flowchart']
+            'maxTextSize', 'maxEdges', 'theme', 'themeVariables', 'fontFamily', 'htmlLabels', 'flowchart']
     };
 }
 
-mermaid.initialize(configuration('default'));
+mermaid.initialize(configuration(defaultThemeName));
 ```
 
 Reject oversized source and diagram-level configuration before invoking
@@ -194,8 +209,8 @@ async function renderElement(element, currentTheme) {
 
 The queue coalesces bursts without losing updates, including those delivered
 while Mermaid is awaiting layout. The theme is sampled before each diagram,
-not once for the whole document. An unrelated body-class mutation is harmless:
-the configuration key has not changed, so completed diagrams are skipped.
+not once for the whole document. The configuration key is the resolved catalogue
+name, so even two palettes with the same light/dark mode trigger a fresh render.
 
 ```js : <<Mermaid preview scheduling>>=
 async function drain() {
@@ -219,19 +234,23 @@ arriving during a render are handled by the existing drain's next iteration.
 
 ```js : <<Mermaid preview scheduling>>=+
 function schedule() {
+    applyTheme();
     pending = true;
     if (!running) { void drain(); }
 }
 ```
 
-VS Code dispatches its content-update event on window. Observe only body class
-changes, not Mermaid's own subtree writes. Waiting for DOMContentLoaded also
-supports scripts loaded before the body exists.
+VS Code dispatches its content-update event on window, including replacement
+documents. Observe theme attributes in the body subtree, not body classes or
+Mermaid's own SVG writes. Waiting for DOMContentLoaded also supports scripts
+loaded before the body exists.
 
 ```js : <<Mermaid preview startup>>=
 function start() {
     const observer = new MutationObserver(schedule);
-    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    observer.observe(document.body, {
+        attributes: true, subtree: true, attributeFilter: ['data-literate-theme']
+    });
     window.addEventListener('vscode.markdown.updateContent', schedule);
     schedule();
 }

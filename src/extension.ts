@@ -13,8 +13,9 @@
 import { TextDecoder } from 'util';
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { discoveryExcludedDirectories, generateProject, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection } from './engine';
+import { discoveryExcludedDirectories, generateProject, resolveProjectTheme, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection } from './engine';
 import { collectFragmentOccurrences, planFragmentRename, FragmentOccurrence } from './symbols';
+import { defaultThemeName } from './themes';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');
 import Token = require('markdown-it/lib/token');
@@ -327,6 +328,20 @@ function removeCodeComments(rendered : string) : string {
   return rendered;
 }
 
+function previewThemeName(documents: SourceDocument[]): string {
+  const theme = resolveProjectTheme(documents);
+  return theme.diagnostics.length ? defaultThemeName : theme.name;
+}
+
+function installPreviewDocument(md: MarkdownIt, repository: FragmentRepository): void {
+  const originalRender = md.renderer.render;
+  md.renderer.render = function (tokens, options, env) {
+    const body = originalRender.call(this, tokens, options, env);
+    const theme = repository.getPreviewTheme(env?.currentDocument);
+    return `<div class="literate-document" data-literate-theme="${md.utils.escapeHtml(theme)}">${body}</div>`;
+  };
+}
+
 function installPreviewFences(md: MarkdownIt): void {
   const originalFence = md.renderer.rules.fence;
   md.renderer.rules.fence = (tokens, idx, options, env, slf) => {
@@ -484,6 +499,7 @@ export class FragmentRepository {
   private md : MarkdownIt;
   private processingQueue: Promise<void> = Promise.resolve();
   private sourceDocuments = new Map<string, SourceDocument[]>();
+  private previewThemes = new Map<string, string>();
   private occurrences = new Map<string, FragmentOccurrence[]>();
   readonly fragmentsForWorkspaceFolders : Map<string, FragmentMap>;
   readonly grabbedStateForWorkspaceFolders : Map<string, GrabbedStateList>;
@@ -522,11 +538,21 @@ export class FragmentRepository {
             this.fragmentsForWorkspaceFolders.delete(key);
             this.grabbedStateForWorkspaceFolders.delete(key);
             this.sourceDocuments.delete(key);
+            this.previewThemes.delete(key);
             this.occurrences.delete(key);
           }
         }
       )
     );
+  }
+  getPreviewTheme(document?: vscode.Uri): string {
+    const folder = document && vscode.workspace.getWorkspaceFolder(document);
+    if (!folder) { return defaultThemeName; }
+    const index = vscode.Uri.joinPath(folder.uri, 'index.literate').toString();
+    const openIndex = vscode.workspace.textDocuments.find(doc => !doc.isClosed && doc.uri.toString() === index);
+    return openIndex
+      ? previewThemeName([{ path: 'index.literate', text: openIndex.getText() }])
+      : this.previewThemes.get(folder.uri.toString()) ?? defaultThemeName;
   }
   processLiterateFiles(
     trigger : vscode.WorkspaceFolder | vscode.TextDocument | undefined,
@@ -544,6 +570,13 @@ export class FragmentRepository {
             path: path.posix.relative(workspaceFolder.uri.path, uri.path),
             text: await getFileContent(uri)
           });
+        }
+        const themeKey = workspaceFolder.uri.toString();
+        const theme = previewThemeName(documents);
+        const previousTheme = this.previewThemes.get(themeKey) ?? defaultThemeName;
+        this.previewThemes.set(themeKey, theme);
+        if (theme !== previousTheme) {
+          void vscode.commands.executeCommand('markdown.preview.refresh').then(undefined, () => undefined);
         }
         const templates: Record<string, string> = Object.create(null);
         let references: string[] = [];
@@ -772,6 +805,7 @@ export class FragmentRepository {
     }
     this.grabbedStateForWorkspaceFolders.clear();
         this.sourceDocuments.clear();
+        this.previewThemes.clear();
         this.occurrences.clear();
   }
 }
@@ -1014,6 +1048,7 @@ export async function activate(context: vscode.ExtensionContext) {
     extendMarkdownIt(md: any) {
       md.use(grabberPlugin);
       installPreviewFences(md);
+      installPreviewDocument(md, theOneRepository);
       return md;
     }
   };

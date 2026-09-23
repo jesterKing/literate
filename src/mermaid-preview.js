@@ -1,4 +1,5 @@
 import mermaid from 'mermaid';
+import { getTheme, defaultThemeName, themeCss, mermaidTheme } from './themes';
 
 const selector = 'pre.literate-mermaid';
 const states = new WeakMap();
@@ -13,10 +14,19 @@ function diagramId(state) {
     return id;
 }
 function theme() {
-    const classes = document.body.classList;
-    if (classes.contains('vscode-high-contrast')) { return 'dark'; }
-    if (classes.contains('vscode-high-contrast-light')) { return 'default'; }
-    return classes.contains('vscode-dark') ? 'dark' : 'default';
+    const wrapper = document.querySelector('.literate-document');
+    return getTheme(wrapper?.getAttribute('data-literate-theme'))?.name || defaultThemeName;
+}
+
+function applyTheme() {
+    let sheet = document.getElementById('literate-theme-style');
+    if (!sheet) {
+        sheet = document.createElement('style');
+        sheet.id = 'literate-theme-style';
+        document.head.appendChild(sheet);
+    }
+    const css = themeCss(getTheme(theme()));
+    if (sheet.textContent !== css) { sheet.textContent = css; }
 }
 function configuration(currentTheme) {
     return {
@@ -25,16 +35,16 @@ function configuration(currentTheme) {
         suppressErrorRendering: true,
         maxTextSize: 50000,
         maxEdges: 500,
-        theme: currentTheme,
+        ...mermaidTheme(getTheme(currentTheme)),
         fontFamily: 'sans-serif',
         htmlLabels: false,
         flowchart: { htmlLabels: false },
         secure: ['secure', 'securityLevel', 'startOnLoad', 'suppressErrorRendering',
-            'maxTextSize', 'maxEdges', 'theme', 'fontFamily', 'htmlLabels', 'flowchart']
+            'maxTextSize', 'maxEdges', 'theme', 'themeVariables', 'fontFamily', 'htmlLabels', 'flowchart']
     };
 }
 
-mermaid.initialize(configuration('default'));
+mermaid.initialize(configuration(defaultThemeName));
 function validateSource(source) {
     if (source.length > 50000) { throw new Error('Diagram exceeds the 50000 character limit.'); }
     if (/%%\s*\{/.test(source) || /^\s*---(?:\s|$)/.test(source)) {
@@ -104,12 +114,15 @@ async function drain() {
 }
 
 function schedule() {
+    applyTheme();
     pending = true;
     if (!running) { void drain(); }
 }
 function start() {
     const observer = new MutationObserver(schedule);
-    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    observer.observe(document.body, {
+        attributes: true, subtree: true, attributeFilter: ['data-literate-theme']
+    });
     window.addEventListener('vscode.markdown.updateContent', schedule);
     schedule();
 }

@@ -15,7 +15,7 @@ yarn esbuild
 
 The authoritative implementations are in `literate/*.literate`.
 `src/extension.ts`, `src/grabber.ts`, `src/engine.ts`, `src/cli.ts`,
-`src/self-hosting.ts`, `src/symbols.ts`, and `src/mermaid-preview.js` are generated;
+`src/self-hosting.ts`, `src/symbols.ts`, `src/themes.ts`, and `src/mermaid-preview.js` are generated;
 commit them together with their literate sources and rendered HTML.
 Tests and configuration remain ordinary files. Interleave prose with focused
 fragments: at most one function per fragment where practical, splitting larger

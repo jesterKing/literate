@@ -6,27 +6,32 @@ import * as vm from 'node:vm';
 import * as esbuild from 'esbuild';
 import { generateProject } from '../../engine';
 
-function clientSource(): string {
-    const filename = 'literate/mermaid_preview.literate';
+function chapterSource(filename: string, output: string): string {
     const result = generateProject([{ path: filename,
         text: fs.readFileSync(path.resolve(__dirname, '../../..', filename), 'utf8') }]);
     assert.deepEqual(result.diagnostics, []);
-    const client = result.files.find(file => file.path === 'src/mermaid-preview.js');
-    assert.ok(client, 'the authoritative source must emit the browser JS entry');
+    const client = result.files.find(file => file.path === output);
+    assert.ok(client, `the authoritative source must emit ${output}`);
     return client.content;
 }
 
 function bundle(stub: boolean) {
     return esbuild.build({
-        stdin: { contents: clientSource(), loader: 'js',
+        stdin: { contents: chapterSource('literate/mermaid_preview.literate', 'src/mermaid-preview.js'), loader: 'js',
             resolveDir: path.resolve(__dirname, '../../..'), sourcefile: 'mermaid-preview.js' },
         bundle: true, write: false, platform: 'browser', format: 'iife',
-        plugins: stub ? [{ name: 'mermaid-stub', setup(build) {
+        // Resolve the catalogue in memory: this test must not require generated files.
+        plugins: [{ name: 'theme-catalogue', setup(build) {
+            build.onResolve({ filter: /^\.\/themes$/ }, () => ({ path: 'themes', namespace: 'catalogue' }));
+            build.onLoad({ filter: /.*/, namespace: 'catalogue' }, () => ({
+                contents: chapterSource('literate/themes.literate', 'src/themes.ts'), loader: 'ts'
+            }));
+        } }, ...(stub ? [{ name: 'mermaid-stub', setup(build: esbuild.PluginBuild) {
             build.onResolve({ filter: /^mermaid$/ }, () => ({ path: 'mermaid', namespace: 'stub' }));
             build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
                 contents: 'export default globalThis.mermaidStub;', loader: 'js'
             }));
-        } }] : []
+        } }] : [])]
     });
 }
 
@@ -56,13 +61,14 @@ class Container {
     removeAttribute(name: string) { this.attributes.delete(name); }
 }
 
-type Configuration = { theme: string; [key: string]: unknown };
+type Configuration = { theme: string; themeVariables: { background: string; textColor: string };
+    [key: string]: unknown };
 type Render = { id: string; source: string; config: Configuration;
     resolve(value: { svg: string; bindFunctions?: () => void }): void; reject(error: unknown): void };
 const tick = () => new Promise<void>(resolve => setImmediate(resolve));
 const bundledClient = bundle(true);
 
-async function fixture(sources: string[], loading = false) {
+async function fixture(sources: string[], loading = false, initialTheme: string | null = 'rosepine-dawn') {
     const elements = sources.map(source => new Container(source));
     const events = new Map<string, () => void>();
     const renders: Render[] = [];
@@ -73,9 +79,25 @@ async function fixture(sources: string[], loading = false) {
     let config: Configuration;
     let active = false;
     const body = { classList: { contains: (name: string) => classes.has(name) } };
+    const styles: { id: string; textContent: string }[] = [];
+    let wrapper = initialTheme === null ? null : {
+        getAttribute: (name: string) => {
+            assert.equal(name, 'data-literate-theme');
+            return initialTheme;
+        }
+    };
     const document = {
         body, readyState: loading ? 'loading' : 'complete',
-        getElementById: (id: string) => occupied.has(id) ? {} : null,
+        head: { appendChild: (sheet: typeof styles[number]) => styles.push(sheet) },
+        createElement: (tag: string) => {
+            assert.equal(tag, 'style');
+            return { id: '', textContent: '' };
+        },
+        getElementById: (id: string) => styles.find(sheet => sheet.id === id) || (occupied.has(id) ? {} : null),
+        querySelector: (selector: string) => {
+            assert.equal(selector, '.literate-document');
+            return wrapper;
+        },
         querySelectorAll: (selector: string) => elements.filter(element => element.matches(selector)),
         addEventListener: (name: string, listener: () => void) => { events.set(name, listener); }
     };
@@ -99,7 +121,9 @@ async function fixture(sources: string[], loading = false) {
         constructor(callback: () => void) { notify = callback; }
         observe(target: unknown, options: unknown) {
             assert.equal(target, body);
-            assert.equal(JSON.stringify(options), JSON.stringify({ attributes: true, attributeFilter: ['class'] }));
+            assert.equal(JSON.stringify(options), JSON.stringify({
+                attributes: true, subtree: true, attributeFilter: ['data-literate-theme']
+            }));
         }
     }
     vm.runInNewContext((await bundledClient).outputFiles[0].text, {
@@ -108,9 +132,13 @@ async function fixture(sources: string[], loading = false) {
         // eslint-disable-next-line @typescript-eslint/naming-convention
         MutationObserver: Observer, mermaidStub, Error
     });
-    return { elements, events, renders, configs, occupied,
+    return { elements, events, renders, configs, occupied, styles,
         update: () => events.get('vscode.markdown.updateContent')!(),
-        theme(name: string) { classes.clear(); classes.add(name); notify(); },
+        theme(name: string) { initialTheme = name; notify(); },
+        vscodeTheme(name: string) { classes.clear(); classes.add(name); },
+        replaceWrapper(name: string | null) {
+            wrapper = name === null ? null : { getAttribute: () => name };
+        },
         async finish(index: number, svg = '<svg role="img"></svg>') {
             renders[index].resolve({ svg, bindFunctions: () => assert.fail('must not bind callbacks') });
             await tick();
@@ -128,6 +156,46 @@ test('auto-start is disabled before DOM readiness even without Literate diagrams
     assert.equal(f.renders.length, 0);
 });
 
+test('documents without diagrams get one scoped stylesheet on startup and updates', async () => {
+    const f = await fixture([], true, 'github_light');
+    assert.equal(f.styles.length, 0);
+    f.events.get('DOMContentLoaded')!();
+    assert.equal(f.styles.length, 1);
+    const sheet = f.styles[0];
+    assert.equal(sheet.id, 'literate-theme-style');
+    assert.ok(sheet.textContent.includes('--literate-background: #ffffff;'));
+    // Every selector, including each comma-separated selector, stays in the wrapper.
+    for (const match of sheet.textContent.matchAll(/([^{}]+)\{/g)) {
+        if (match[1].trim().startsWith('@media')) { continue; }
+        for (const selector of match[1].split(',')) {
+            assert.ok(selector.trim().startsWith('.literate-document'), selector);
+        }
+    }
+    f.theme('rosepine');
+    assert.ok(sheet.textContent.includes('--literate-background: #191724;'));
+    f.replaceWrapper('rosepine-dawn');
+    f.update();
+    assert.ok(sheet.textContent.includes('--literate-background: #faf4ed;'));
+    assert.equal(f.styles.length, 1);
+    assert.equal(f.styles[0], sheet);
+    assert.equal(f.renders.length, 0);
+});
+
+for (const name of [null, '', 'not-a-theme', '__proto__', '</style><script>bad</script>']) {
+    test(`missing or invalid wrapper theme falls back to Rose Pine Dawn: ${name}`, async () => {
+        const f = await fixture(['graph TD; A-->B'], false, name);
+        assert.equal(f.renders[0].config.theme, 'base');
+        assert.equal(f.renders[0].config.themeVariables.background, '#faf4ed');
+        assert.ok(f.styles[0].textContent.includes('--literate-background: #faf4ed;'));
+        assert.ok(!f.styles[0].textContent.includes('<script>'));
+        await f.finish(0);
+        f.replaceWrapper('another-invalid-name');
+        f.update();
+        await tick();
+        assert.equal(f.renders.length, 1, 'fallback shares the canonical name render key');
+    });
+}
+
 test('browser IIFE starts after DOM readiness, preserves metadata and skips completed content', async () => {
     const f = await fixture(['graph TD\nA["<escaped> & text"]'], true);
     assert.equal(f.renders.length, 0);
@@ -137,7 +205,7 @@ test('browser IIFE starts after DOM readiness, preserves metadata and skips comp
     assert.equal(f.renders[0].source, 'graph TD\nA["<escaped> & text"]');
     await f.finish(0);
     f.update();
-    f.theme('vscode-light');
+    f.theme('rosepine-dawn');
     await tick();
     assert.equal(f.renders.length, 1);
     assert.equal(f.elements[0].attributes.get('class'), 'literate-mermaid source-line');
@@ -155,18 +223,19 @@ test('browser IIFE starts after DOM readiness, preserves metadata and skips comp
 
 test('theme changes during rendering serialize work and discard stale SVG', async () => {
     const f = await fixture(['graph TD; A-->B', 'graph TD; C-->D']);
-    f.theme('vscode-dark');
+    f.theme('rosepine');
     f.update();
     f.update();
     assert.equal(f.configs.length, 2);
     await f.finish(0, '<svg>stale light</svg>');
     assert.deepEqual(f.elements[0].htmlWrites, []);
-    assert.equal(f.renders[1].config.theme, 'dark');
+    assert.equal(f.renders[1].config.theme, 'base');
+    assert.equal(f.renders[1].config.themeVariables.background, '#191724');
     await f.finish(1);
     assert.equal(f.renders[2].source, 'graph TD; A-->B');
-    assert.equal(f.renders[2].config.theme, 'dark');
+    assert.equal(f.renders[2].config.themeVariables.background, '#191724');
     await f.finish(2);
-    f.theme('vscode-light');
+    f.theme('rosepine-dawn');
     await f.finish(3);
     await f.finish(4);
     assert.equal(f.renders[3].source, 'graph TD; A-->B');
@@ -174,15 +243,36 @@ test('theme changes during rendering serialize work and discard stale SVG', asyn
     assert.equal(new Set(f.renders.map(render => render.id)).size, 5);
 });
 
-test('high contrast maps to dark and high contrast light restores the light configuration', async () => {
+test('VS Code themes do not override the document palette', async () => {
     const f = await fixture(['graph TD; A-->B']);
     await f.finish(0);
-    f.theme('vscode-high-contrast');
-    assert.equal(f.renders[1].config.theme, 'dark');
-    await f.finish(1);
-    f.theme('vscode-high-contrast-light');
-    assert.equal(f.renders[2].config.theme, 'default');
-    await f.finish(2);
+    const css = f.styles[0].textContent;
+    for (const name of ['vscode-dark', 'vscode-high-contrast', 'vscode-high-contrast-light', 'vscode-light']) {
+        f.vscodeTheme(name);
+        f.update();
+        await tick();
+        assert.equal(f.renders.length, 1);
+        assert.equal(f.styles[0].textContent, css);
+    }
+    assert.equal(f.renders[0].config.theme, 'base');
+    assert.equal(f.renders[0].config.themeVariables.background, '#faf4ed');
+    assert.equal(f.renders[0].config.themeVariables.textColor, '#575279');
+});
+
+test('distinct light palettes re-render retained source and replace SVG', async () => {
+    const source = 'graph TD; A-->B';
+    const f = await fixture([source]);
+    await f.finish(0, '<svg>dawn</svg>');
+    f.theme('github_light');
+    assert.equal(f.renders[1].source, source);
+    assert.equal(f.renders[1].config.theme, 'base');
+    assert.equal(f.renders[1].config.themeVariables.background, '#ffffff');
+    assert.ok(f.styles[0].textContent.includes('--literate-background: #ffffff;'));
+    await f.finish(1, '<svg>github</svg>');
+    assert.deepEqual(f.elements[0].htmlWrites, ['<svg>dawn</svg>', '<svg>github</svg>']);
+    f.theme('github_light');
+    await tick();
+    assert.equal(f.renders.length, 2);
 });
 
 test('replacement DOM and in-place source edits render again without touching generic Mermaid blocks', async () => {
@@ -190,6 +280,7 @@ test('replacement DOM and in-place source edits render again without touching ge
     const old = f.elements[0];
     old.isConnected = false;
     f.elements[0] = new Container('graph TD; A-->B');
+    f.replaceWrapper('github_light');
     const generic = new Container('unrelated');
     generic.attributes.set('class', 'mermaid');
     f.elements.push(generic);
@@ -197,6 +288,9 @@ test('replacement DOM and in-place source edits render again without touching ge
     await f.finish(0);
     assert.deepEqual(old.htmlWrites, []);
     assert.equal(f.renders[1].source, 'graph TD; A-->B');
+    assert.equal(f.renders[1].config.themeVariables.background, '#ffffff');
+    assert.ok(f.styles[0].textContent.includes('--literate-background: #ffffff;'));
+    assert.equal(f.styles.length, 1);
     await f.finish(1);
     f.elements[0].textContent = 'graph TD; X-->Y';
     f.update();
@@ -224,7 +318,7 @@ test('errors are accessible plain text, retain source, skip repeats and recover'
     f.update();
     await tick();
     assert.equal(f.renders.length, 2);
-    f.theme('vscode-dark');
+    f.theme('rosepine');
     assert.equal(f.renders[2].source, source);
     await f.finish(2);
     await f.finish(3);

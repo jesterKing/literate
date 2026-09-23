@@ -217,6 +217,7 @@ export class FragmentRepository {
     }
     this.grabbedStateForWorkspaceFolders.clear();
         this.sourceDocuments.clear();
+        this.previewThemes.clear();
         this.occurrences.clear();
   }
 }
@@ -231,6 +232,7 @@ properly. We'll need an instance of a properly configured *MarkdownIt* parser.
 private md : MarkdownIt;
 private processingQueue: Promise<void> = Promise.resolve();
 private sourceDocuments = new Map<string, SourceDocument[]>();
+private previewThemes = new Map<string, string>();
 private occurrences = new Map<string, FragmentOccurrence[]>();
 ```
 
@@ -342,6 +344,7 @@ context.subscriptions.push(
         this.fragmentsForWorkspaceFolders.delete(key);
         this.grabbedStateForWorkspaceFolders.delete(key);
         this.sourceDocuments.delete(key);
+        this.previewThemes.delete(key);
         this.occurrences.delete(key);
       }
     }
@@ -420,6 +423,22 @@ sequenceDiagram
 ```
 
 ``` ts : <<fragment generation method>>=
+getPreviewTheme(document?: vscode.Uri): string {
+  const folder = document && vscode.workspace.getWorkspaceFolder(document);
+  if (!folder) { return defaultThemeName; }
+  const index = vscode.Uri.joinPath(folder.uri, 'index.literate').toString();
+  const openIndex = vscode.workspace.textDocuments.find(doc => !doc.isClosed && doc.uri.toString() === index);
+  return openIndex
+    ? previewThemeName([{ path: 'index.literate', text: openIndex.getText() }])
+    : this.previewThemes.get(folder.uri.toString()) ?? defaultThemeName;
+}
+```
+
+Processing refreshes the cached theme alongside the document snapshot. A changed
+selection requests a preview refresh without waiting on rendering, so the serial
+processing queue cannot deadlock with a preview request.
+
+``` ts : <<fragment generation method>>=+
 processLiterateFiles(
   trigger : vscode.WorkspaceFolder | vscode.TextDocument | undefined,
   writeFiles = false
@@ -436,6 +455,13 @@ processLiterateFiles(
           path: path.posix.relative(workspaceFolder.uri.path, uri.path),
           text: await getFileContent(uri)
         });
+      }
+      const themeKey = workspaceFolder.uri.toString();
+      const theme = previewThemeName(documents);
+      const previousTheme = this.previewThemes.get(themeKey) ?? defaultThemeName;
+      this.previewThemes.set(themeKey, theme);
+      if (theme !== previousTheme) {
+        void vscode.commands.executeCommand('markdown.preview.refresh').then(undefined, () => undefined);
       }
       const templates: Record<string, string> = Object.create(null);
       let references: string[] = [];
@@ -1048,9 +1074,37 @@ to the bundled browser client through `pre.literate-mermaid`. The client reads
 `textContent` and owns rendering and error handling; source-line metadata keeps
 VS Code preview navigation working.
 
+Only the preview parser wraps `renderer.render`, not `parse` or `renderInline`.
+VS Code supplies `env.currentDocument` as a URI at render time, even when it
+reuses cached tokens (see its `markdown-language-features/src/markdownEngine.ts`).
+The wrapper selects the owning workspace's root index theme, preferring an open
+buffer over the repository snapshot. Local chapter settings and standalone
+Markdown settings never override the project theme. Invalid theme settings use
+the shared default; diagnostics remain the generation engine's responsibility.
+The browser client supplies scoped CSS from the wrapper attribute.
+
+Repository processing caches the effective theme through `workspace.fs`, so
+remote workspaces need no synchronous filesystem fallback. A changed effective
+theme requests a preview refresh; unchanged processing does not. Activation
+awaits the initial repository snapshot before exposing the preview plugin.
+
 ```ts : <<renderCodeFence rule>>=
 <<fragment tag protector>>
 <<remove comments from HTML>>
+
+function previewThemeName(documents: SourceDocument[]): string {
+  const theme = resolveProjectTheme(documents);
+  return theme.diagnostics.length ? defaultThemeName : theme.name;
+}
+
+function installPreviewDocument(md: MarkdownIt, repository: FragmentRepository): void {
+  const originalRender = md.renderer.render;
+  md.renderer.render = function (tokens, options, env) {
+    const body = originalRender.call(this, tokens, options, env);
+    const theme = repository.getPreviewTheme(env?.currentDocument);
+    return `<div class="literate-document" data-literate-theme="${md.utils.escapeHtml(theme)}">${body}</div>`;
+  };
+}
 
 function installPreviewFences(md: MarkdownIt): void {
   const originalFence = md.renderer.rules.fence;
@@ -1592,8 +1646,9 @@ export function deactivate() {}
 import { TextDecoder } from 'util';
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { discoveryExcludedDirectories, generateProject, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection } from './engine';
+import { discoveryExcludedDirectories, generateProject, resolveProjectTheme, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection } from './engine';
 import { collectFragmentOccurrences, planFragmentRename, FragmentOccurrence } from './symbols';
+import { defaultThemeName } from './themes';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');
 import Token = require('markdown-it/lib/token');
@@ -1684,6 +1739,7 @@ what our HTML rendering does.
     extendMarkdownIt(md: any) {
       md.use(grabberPlugin);
       installPreviewFences(md);
+      installPreviewDocument(md, theOneRepository);
       return md;
     }
   };

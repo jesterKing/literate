@@ -227,6 +227,7 @@ export function fixture(workspaceUri = 'file:///project') {
     };
     const providers = new Map<string, unknown>();
     const commands = new Map<string, (...args: unknown[]) => unknown>();
+    const executedCommands: string[] = [];
     const register = (kind: string) => (_selector: unknown, provider: unknown) => {
         providers.set(kind, provider); return disposable();
     };
@@ -242,9 +243,15 @@ export function fixture(workspaceUri = 'file:///project') {
             registerReferenceProvider: register('references'), registerHoverProvider: register('hover'),
             registerRenameProvider: register('rename'), registerCodeActionsProvider: register('codeActions')
         },
-        commands: { registerCommand(name: string, callback: (...args: unknown[]) => unknown) {
-            commands.set(name, callback); return disposable();
-        } },
+        commands: {
+            registerCommand(name: string, callback: (...args: unknown[]) => unknown) {
+                commands.set(name, callback); return disposable();
+            },
+            async executeCommand(name: string, ...args: unknown[]) {
+                executedCommands.push(name);
+                return commands.get(name)?.(...args);
+            }
+        },
         window: {
             showErrorMessage: (message: string) => { errors.push(message); },
             showInformationMessage: () => undefined, setStatusBarMessage: disposable,
@@ -290,6 +297,6 @@ export function fixture(workspaceUri = 'file:///project') {
     const process = (writeFiles?: boolean) => repository.processLiterateFiles(
         folder as unknown as vscode.WorkspaceFolder, writeFiles);
     return { folder, other, disk, types, statErrors, stats, listings, diagnostics, reads, writes, directories, errors, controls,
-        workspace, repository, extension, mock, providers, commands, document, open, uri, put, change, process,
+        workspace, repository, extension, mock, providers, commands, executedCommands, document, open, uri, put, change, process,
         get docs() { return workspace.textDocuments; }, discoveries: () => discoveries };
 }

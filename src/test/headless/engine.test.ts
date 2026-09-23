@@ -2,7 +2,8 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import assert = require('node:assert/strict');
 import { test } from 'node:test';
-import { discoveryExcludedDirectories, generateProject, safeRelativePath, SourceDocument } from '../../engine';
+import { discoveryExcludedDirectories, generateProject, resolveProjectTheme, safeRelativePath, SourceDocument } from '../../engine';
+import { defaultThemeName, getTheme, mermaidTheme, themeCss, themes } from '../../themes';
 
 function fence(header: string, content = ''): string {
     return '```' + header + '\n' + content + (content && !content.endsWith('\n') ? '\n' : '') + '```\n';
@@ -168,8 +169,83 @@ test('HTML templates replace repeated placeholders literally in a single pass', 
         'page.template': '[AUTHORS]|[CONTENT]|[AUTHORS]|[CONTENT]|[CODE]',
     })[0].content;
     const authors = '<meta name="author" content="Alice [CONTENT] [AUTHORS] $&amp; $$">';
-    const content = '<p>Prose [AUTHORS] [CONTENT] $&amp; $$</p>\n';
+    const content = '<style>' + themeCss(getTheme(defaultThemeName)!) + '</style>'
+        + '<div class="literate-document" data-literate-theme="rosepine-dawn">'
+        + '<p>Prose [AUTHORS] [CONTENT] $&amp; $$</p>\n</div>';
     assert.equal(html, authors + '|' + content + '|' + authors + '|' + content + '|[CODE]');
+});
+
+test('theme query defaults and reads only the normalized root SETTINGS', () => {
+    assert.deepEqual(resolveProjectTheme([]), { name: 'rosepine-dawn', diagnostics: [] });
+    assert.deepEqual(resolveProjectTheme([
+        document(fence('SETTINGS', 'theme=unknown'), 'nested/index.literate'),
+        document(fence('SETTINGS', 'theme='), 'chapter.literate'),
+        document('theme=unknown\n' + fence('text', 'theme=unknown')
+            + fence('SETTINGS', 'ignored=unknown\n theme = rosepine '), './nested/../index.literate'),
+    ]), { name: 'rosepine', diagnostics: [] });
+    assert.deepEqual(resolveProjectTheme([document(fence('SETTINGS', 'unknown=value'))]),
+        { name: 'rosepine-dawn', diagnostics: [] });
+    assert.equal(resolveProjectTheme([document(fence('SETTINGS', 'theme=rosepine')
+        + fence('SETTINGS', 'theme=rosepine-dawn'))]).name, 'rosepine-dawn');
+});
+
+test('invalid themes retain exact diagnostic lines, suppress outputs, and preserve inspection', () => {
+    const text = '# Project\n\n' + fence('SETTINGS', 'theme=rosepine\ntheme=\ntheme=not-a-theme')
+        + fence('SETTINGS', 'theme=rosepine-dawn\ntheme=Rosepine-Dawn') + root('unchanged');
+    const expected = [
+        { line: 4, message: 'Unknown theme: ' },
+        { line: 5, message: 'Unknown theme: not-a-theme' },
+        { line: 9, message: 'Unknown theme: Rosepine-Dawn' },
+    ].map(value => ({ path: 'index.literate', column: 0, ...value }));
+    for (const ending of ['\n', '\r\n', '\r']) {
+        const docs = [document(text.replace(/\n/g, ending), './index.literate')];
+        assert.deepEqual(resolveProjectTheme(docs), { name: 'rosepine-dawn', diagnostics: expected });
+        const result = generateProject(docs);
+        assert.deepEqual(result.diagnostics, expected, 'theme diagnostics appear only once');
+        assert.deepEqual(result.files, []);
+        assert.deepEqual(result.inspection.documents, ['index.literate']);
+        assert.equal(result.inspection.fragments[0].name, 'main.*');
+    }
+});
+
+test('every canonical theme embeds its CSS and strict Mermaid configuration project-wide', () => {
+    for (const theme of themes) {
+        const files = successful([
+            document(fence('SETTINGS', 'theme=' + theme.name) + root('unchanged')),
+            document('# Chapter\n' + fence('mermaid', 'graph TD\n A-->B'), 'nested/chapter.literate'),
+        ]);
+        assert.equal(files.find(file => file.path === 'result.txt')!.content, 'unchanged\n');
+        for (const file of files.filter(value => value.path.endsWith('.html'))) {
+            assert.ok(file.content.includes('<style>' + themeCss(theme) + '</style>'));
+            assert.ok(file.content.includes('<div class="literate-document" data-literate-theme="' + theme.name + '">'));
+            assert.ok(!file.content.includes('href="./style.css"'));
+            assert.match(file.content, /mermaid@10\/dist\/mermaid\.esm\.min\.mjs/);
+            const configuration = /mermaid\.initialize\(([^\n]+)\);/.exec(file.content)![1];
+            assert.deepEqual(JSON.parse(configuration), { ...mermaidTheme(theme), startOnLoad: true, securityLevel: 'strict' });
+            assert.ok(!/[<>&\u2028\u2029]/.test(configuration));
+        }
+        assert.match(files.find(file => file.path === 'nested/chapter.html')!.content, /<pre class="mermaid">/);
+    }
+});
+
+test('default HTML is self-contained and invalid theme text cannot inject script', () => {
+    const html = successful([document('# Default')])[0].content;
+    assert.ok(html.includes('<style>' + themeCss(getTheme(defaultThemeName)!) + '</style>'));
+    assert.match(html, /data-literate-theme="rosepine-dawn"/);
+    rejected([document(fence('SETTINGS', 'theme=</script><script>alert(1)</script>') + root('safe'))], /Unknown theme/);
+});
+
+test('explicit THEME slots replace literally and do not duplicate the sheet in CONTENT', () => {
+    const text = fence('SETTINGS', 'template=page.template\nauthors=[THEME]') + 'Prose [THEME]\n';
+    const sheet = '<style>' + themeCss(getTheme(defaultThemeName)!) + '</style>';
+    const content = '<div class="literate-document" data-literate-theme="rosepine-dawn"><p>Prose [THEME]</p>\n</div>';
+    const html = successful([document(text)], {
+        'page.template': '[THEME]|[CONTENT]|[THEME]|[CONTENT]|[AUTHORS]|[CODE]',
+    })[0].content;
+    assert.equal(html, sheet + '|' + content + '|' + sheet + '|' + content
+        + '|<meta name="author" content="[THEME]">|[CODE]');
+    assert.equal(output(fence('text: <<main.*>>= result.txt $ template=source.template', '[THEME]'),
+        { 'source.template': '[THEME]|[CODE]|[THEME]' }), '[THEME]|[THEME]\n|[THEME]');
 });
 
 test('root index links define order, followed by sorted remaining documents, independent of input order', () => {

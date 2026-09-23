@@ -11,9 +11,9 @@ change. Markdown preview supplies an editor preview. A headless CLI uses the sam
 generation engine, so VS Code is not required to regenerate or check a project.
 Invalid projects produce diagnostics without replacing generated files.
 
-Note: enabling this extension will inject the literate style CSS developed for
-this extension. Disable this extension in workspaces where you don't want the
-style to influence Markdown document previews.
+Markdown previews receive Literate's document-scoped theme. The extension no
+longer injects the legacy global `style.css`; the surrounding editor UI retains
+its own theme.
 
 ## Features
 
@@ -31,11 +31,14 @@ sorted path order; the index controls ordering, not exclusion.
 
 The `index.literate` can contain a fence with `SETTINGS` on its info line. This
 fence will be hidden from HTML, but hosts settings for controlling some aspects
-of processing. Key=value pairs are given each on their own line. Currently two
-keys are recognized: `template` and `authors`. The `template` should point to an
+of processing. Key=value pairs are given each on their own line. The recognized
+keys are `template`, `authors`, and `theme`. The `template` should point to an
 existing file containing an HTML template. The string `[CONTENT]` will be
 replaced with the rendered HTML from the literate document. The string
 `[AUTHORS]` will be replaced with `<meta />` tags for author information.
+`[THEME]` inserts the selected theme's complete `<style>` element; put it in the
+HTML template's head. Legacy templates without `[THEME]` receive the stylesheet
+alongside `[CONTENT]`, so their content remains themed.
 
 Code fragments can be created by adding `<<some identifying string>>=` to the
 info line of a code fence, separated by a colon `:` after the language identifier.
@@ -69,6 +72,36 @@ The command `Literate: Process` (`literate.process`) processes all workspace
 folders. Template-only edits currently require this command. Associate
 `*.literate` files with Markdown to enable the editor providers.
 
+## Document themes
+
+All **70 HErmonica built-in palettes** are available locally, with their original
+case-sensitive names. Set the project theme in the root `index.literate`:
+
+````markdown
+```SETTINGS
+theme=rosepine-dawn
+```
+````
+
+`rosepine-dawn` is the default when omitted. Other choices include `rosepine`,
+`hermonica`, `catppuccin`, `gruvbox`, `gruvbox_light`, `nord`, `github_light`,
+`tokyonight`, and `vscode_dark`. See the [theme catalogue](literate/themes.literate)
+for the full set. Hyphens and underscores are significant.
+
+The selection applies project-wide to prose, code fragments, syntax highlighting,
+tables, and Mermaid diagrams in both preview and default generated HTML. It is
+independent of VS Code's light/dark selection. Preview prefers unsaved root settings;
+CLI generation reads disk. Standalone Markdown previews use the default.
+Unknown or empty theme names produce a diagnostic and prevent output writes;
+preview falls back to the default while the setting is invalid. Chapter-local
+SETTINGS do not override the root theme. If you change saved inputs outside VS Code,
+run **Literate: Process** to refresh its cached project state.
+
+Generated pages embed their CSS, so nested chapters no longer depend on a relative
+`style.css` path. Custom templates control their own Mermaid initialization; the
+`[THEME]` placeholder supplies document CSS, not scripts. Palette provenance and
+MIT attribution are preserved in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ## Mermaid diagrams in Markdown preview
 
 This version requires **VS Code 1.96 or newer** for the bundled renderer's modern
@@ -83,7 +116,7 @@ flowchart TD
 ````
 
 Associate `*.literate` with Markdown, then use **Markdown: Open Preview to the Side**.
-Diagrams update with the document and follow VS Code's light/dark theme. Syntax
+Diagrams update with the document and follow the project's selected palette. Syntax
 errors appear beside the original diagram source without stopping other diagrams.
 Named literate fragments with the Mermaid language remain code, not diagrams.
 
