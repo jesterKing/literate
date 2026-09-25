@@ -1,69 +1,76 @@
 # Code actions
 
-Code actions allow us to give potential actions on errors and warnings, making
-it a bit easier to create new parts and bits.
+Missing-fragment diagnostics carry a stable code rather than relying on their
+human-readable message. Quick fixes refresh the read-only repository, then
+require an exact unresolved reference in the current source snapshot. Cancelled
+requests and buffers changed during refresh return no actions.
 
-## Provider class
-
-The action provider class takes a `FragmentRepository` in the constructor. This
-will be used to compute the fragment name for which we need to create an action.
+The edit belongs to the requested document URI, not the active editor. It adds
+an empty definition after the containing, closed top-level fragment fence.
+Unsafe insertion sites (including nested or unclosed fences) are declined rather
+than invoking the active-editor create command. VS Code applies the proposed
+edit; this provider neither applies edits nor generates output. Tilde fences permit
+backticks in fragment names and language identifiers without breaking the header.
 
 ``` ts : <<code action provider class>>=
 export class LiterateCodeActionProvider implements vscode.CodeActionProvider
 {
     constructor(public readonly repository : FragmentRepository) {}
-```
 
-The actual implementation of the provider is in `provideCodeActions`. It takes a
-document, range, context and cancellation token. The cancellation token and
-range we don't use.
-
-``` ts : <<code action provider class>>=+
-    public provideCodeActions(
+    public async provideCodeActions(
         document : vscode.TextDocument,
-        _: vscode.Range,
+        _ : vscode.Range,
         context : vscode.CodeActionContext,
-        __ : vscode.CancellationToken
-    ) : Thenable<vscode.CodeAction[]>
+        token : vscode.CancellationToken
+    ) : Promise<vscode.CodeAction[]>
     {
-```
-
-We start by initializing a new array of `CodeAction`, to which we will add any
-if we determine we can provide them.
-
-``` ts : <<code action provider class>>=+
-        let codeActions = new Array<vscode.CodeAction>();
-```
-
-Now loop over all the diagnostics received through the context. If we have one
-that starts with `"Could not find fragment"` we know we can create an action for
-defining the fragment.
-
-``` ts : <<code action provider class>>=+
-        for(const diag of context.diagnostics)
+        const diagnostics = context.diagnostics.filter(diag =>
+            (typeof diag.code === 'object' ? diag.code.value : diag.code) === 'missing-fragment');
+        if(token.isCancellationRequested || !diagnostics.length ||
+            (context.only && !context.only.contains(vscode.CodeActionKind.QuickFix))) { return []; }
+        const folder = determineWorkspaceFolder(document);
+        if(!folder) { return []; }
+        const version = document.version;
+        const text = document.getText();
+        await this.repository.processLiterateFiles(document);
+        if(token.isCancellationRequested || document.version !== version || document.getText() !== text) { return []; }
+        const documentPath = path.posix.relative(folder.uri.path, document.uri.path);
+        const sources = this.repository.getSourceDocuments(folder);
+        if(sources.find(source => source.path === documentPath)?.text !== text ||
+            vscode.workspace.textDocuments.some(open => open.uri.toString() === document.uri.toString() &&
+                (open.version !== version || open.getText() !== text))) { return []; }
+        const occurrences = this.repository.getFragmentOccurrences(folder);
+        const actions: vscode.CodeAction[] = [];
+        const offered = new Set<string>();
+        for(const diagnostic of diagnostics)
         {
-            if(diag.message.indexOf("Could not find fragment")>-1)
-            {
-```
-
-Now create a new `CodeAction` and set it up to run the
-`literate.create_fragment_for_tag` command with the range specified by the
-diagnostics. We also get the fragment location so that we have access to its
-name.
-
-``` ts : <<code action provider class>>=+
-                let fragmentLocation = this.repository.getFragmentTagLocation(document, document.lineAt(diag.range.start), diag.range.start);
-                let action = new vscode.CodeAction(`Create fragment for ${OPENING}${fragmentLocation.name}${CLOSING}`, context.only ? context.only : vscode.CodeActionKind.Refactor);
-                action.command = {command: 'literate.create_fragment_for_tag', title: `Create fragment for ${OPENING}${fragmentLocation.name}${CLOSING}`, arguments : [diag.range]};
-                codeActions.push(action);
-            }
+            const reference = occurrences.find(item => item.path === documentPath && item.kind === 'reference' &&
+                item.line === diagnostic.range.start.line && item.column === diagnostic.range.start.character);
+            if(!reference || offered.has(reference.name) || reference.name.endsWith('.*') ||
+                occurrences.some(item => item.name === reference.name && item.kind === 'definition')) { continue; }
+            const range = new vscode.Range(reference.line, reference.column, reference.line, reference.endColumn);
+            if(document.getText(range) !== `${OPENING}${reference.name}${CLOSING}`) { continue; }
+            const usage = this.repository.getTokenAtPosition(document, range).token;
+            if(!usage || usage.type !== 'fence' || !usage.map || usage.level !== 0) { continue; }
+            const header = parseFragmentHeader(usage.info);
+            const closing = document.lineAt(usage.map[1] - 1).text.trim();
+            if(!header || !/^(`{3,}|~{3,})$/.test(closing) || closing[0] !== usage.markup[0] ||
+                closing.length < usage.markup.length) { continue; }
+            const info = `${header.language} : ${OPENING}${reference.name}${CLOSING}=`;
+            if(parseFragmentHeader(info)?.name !== reference.name) { continue; }
+            const eol = document.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
+            const position = usage.map[1] < document.lineCount ? new vscode.Position(usage.map[1], 0)
+                : document.positionAt(text.length);
+            const edit = new vscode.WorkspaceEdit();
+            edit.insert(document.uri, position, `${eol}~~~ ${info}${eol}~~~${eol}`);
+            const action = new vscode.CodeAction(`Create fragment for ${OPENING}${reference.name}${CLOSING}`,
+                vscode.CodeActionKind.QuickFix);
+            action.diagnostics = [diagnostic];
+            action.edit = edit;
+            actions.push(action);
+            offered.add(reference.name);
         }
-```
-
-Finally return the code actions array.
-
-``` ts : <<code action provider class>>=+
-        return Promise.resolve(codeActions);
+        return token.isCancellationRequested ? [] : actions;
     }
 }
 ```

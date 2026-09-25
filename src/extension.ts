@@ -11,6 +11,9 @@
 /* Literate Programming by Nathan 'jesterKing' Letwory */
 
 import { TextDecoder } from 'util';
+import { randomUUID } from 'crypto';
+import { lstat, chmod } from 'fs/promises';
+import { commitOutputs, TransactionDirectoryError, TransactionFile, TransactionIO } from './output-transactions';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { discoveryExcludedDirectories, generateProject, resolveProjectTheme, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection } from './engine';
@@ -501,6 +504,35 @@ export class FragmentRepository {
   private sourceDocuments = new Map<string, SourceDocument[]>();
   private previewThemes = new Map<string, string>();
   private occurrences = new Map<string, FragmentOccurrence[]>();
+  private disposed = false;
+  private inputTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private inputSubscriptions: vscode.Disposable[] = [];
+  private generatedOutputs = new Map<string, Set<string>>();
+  private isWatchedInput(uri: vscode.Uri, folder: vscode.WorkspaceFolder): boolean {
+    if (this.generatedOutputs.get(folder.uri.toString())?.has(uri.toString())) { return false; }
+    const relative = path.posix.relative(folder.uri.path, uri.path);
+    if (relative.split('/').slice(0, -1).some(part => discoveryExcludedDirectories.includes(part))) {
+      return false;
+    }
+    if (relative.endsWith('.literate')) { return true; }
+    const documents = new Map((this.sourceDocuments.get(folder.uri.toString()) || [])
+      .map(document => [document.path, document]));
+    for (const document of vscode.workspace.textDocuments) {
+      if (!document.isClosed && document.uri.path.endsWith('.literate')
+        && vscode.workspace.getWorkspaceFolder(document.uri)?.uri.toString() === folder.uri.toString()) {
+        const name = path.posix.relative(folder.uri.path, document.uri.path);
+        if (!name.split('/').slice(0, -1).some(part => discoveryExcludedDirectories.includes(part))) {
+          documents.set(name, { path: name, text: document.getText() });
+        }
+      }
+    }
+    for (const document of documents.values()) {
+      try {
+        if (templateReferences([document]).includes(relative)) { return true; }
+      } catch (_) {}
+    }
+    return false;
+  }
   readonly fragmentsForWorkspaceFolders : Map<string, FragmentMap>;
   readonly grabbedStateForWorkspaceFolders : Map<string, GrabbedStateList>;
   readonly diagnostics : vscode.DiagnosticCollection;
@@ -514,18 +546,37 @@ export class FragmentRepository {
     this.diagnostics = vscode.languages.createDiagnosticCollection('literate');
     context.subscriptions.push(this.diagnostics);
   
-    context.subscriptions.push(
+    this.inputSubscriptions.push(
       vscode.workspace.onDidChangeTextDocument(
         async (e : vscode.TextDocumentChangeEvent) =>
         {
-          if(e.contentChanges.length > 0 && e.document.uri.path.endsWith('.literate'))
-          {
+          const folder = vscode.workspace.getWorkspaceFolder(e.document.uri);
+          if (!this.disposed && e.contentChanges.length > 0 && folder
+            && this.isWatchedInput(e.document.uri, folder)) {
+            const key = folder.uri.toString();
+            clearTimeout(this.inputTimers.get(key));
+            this.inputTimers.delete(key);
             await this.processLiterateFiles(e.document, true).catch(() => undefined);
           }
         }
       )
     );
-    context.subscriptions.push(
+    const watcher = vscode.workspace.createFileSystemWatcher('**/*');
+    const changed = (uri: vscode.Uri) => {
+      const folder = vscode.workspace.getWorkspaceFolder(uri);
+      if (this.disposed || !folder || !this.isWatchedInput(uri, folder)) { return; }
+      const key = folder.uri.toString();
+      clearTimeout(this.inputTimers.get(key));
+      this.inputTimers.set(key, setTimeout(() => {
+        this.inputTimers.delete(key);
+        if (!this.disposed) {
+          void this.processLiterateFiles(folder, true).catch(() => undefined);
+        }
+      }, 100));
+    };
+    this.inputSubscriptions.push(watcher, watcher.onDidCreate(changed),
+      watcher.onDidChange(changed), watcher.onDidDelete(changed));
+    this.inputSubscriptions.push(
       vscode.workspace.onDidChangeWorkspaceFolders(
         async (e : vscode.WorkspaceFoldersChangeEvent) =>
         {
@@ -535,6 +586,9 @@ export class FragmentRepository {
           for(const removedWorkspaceFolder of e.removed)
           {
             const key = removedWorkspaceFolder.uri.toString();
+            clearTimeout(this.inputTimers.get(key));
+            this.inputTimers.delete(key);
+            this.generatedOutputs.delete(key);
             this.fragmentsForWorkspaceFolders.delete(key);
             this.grabbedStateForWorkspaceFolders.delete(key);
             this.sourceDocuments.delete(key);
@@ -544,6 +598,7 @@ export class FragmentRepository {
         }
       )
     );
+    context.subscriptions.push(...this.inputSubscriptions);
   }
   getPreviewTheme(document?: vscode.Uri): string {
     const folder = document && vscode.workspace.getWorkspaceFolder(document);
@@ -559,6 +614,7 @@ export class FragmentRepository {
     writeFiles = false
   ) : Promise<void> {
     const operation = this.processingQueue.then(async () => {
+      if (this.disposed) { return; }
       const folder = trigger && ("eol" in trigger
         ? determineWorkspaceFolder(trigger) : trigger);
       const folders = trigger ? (folder ? [folder] : [])
@@ -601,8 +657,10 @@ export class FragmentRepository {
           const entries = diagnostics.get(key) || [];
           const range = new vscode.Range(diagnostic.line, diagnostic.column,
             diagnostic.line, diagnostic.column + 1);
-          entries.push(new vscode.Diagnostic(range, diagnostic.message,
-            vscode.DiagnosticSeverity.Error));
+          const entry = new vscode.Diagnostic(range, diagnostic.message,
+            vscode.DiagnosticSeverity.Error);
+          if (diagnostic.code !== undefined) { entry.code = diagnostic.code; }
+          entries.push(entry);
           diagnostics.set(key, entries);
         }
         const stale: vscode.Uri[] = [];
@@ -641,6 +699,8 @@ export class FragmentRepository {
         }
         fragments.map = handleFragments(states.list, result.inspection.fragments);
         if (!writeFiles || result.diagnostics.length) { continue; }
+        this.generatedOutputs.set(key, new Set(result.files.map(file =>
+          vscode.Uri.joinPath(workspaceFolder.uri, file.path).toString())));
         const outputs = await this.preflightOutputs(workspaceFolder.uri, result.files);
         await this.writeChangedOutputs(outputs);
       }
@@ -652,29 +712,124 @@ export class FragmentRepository {
   }
   private async preflightOutputs(
     root: vscode.Uri, files: readonly { path: string; content: string }[]
-  ): Promise<{ uri: vscode.Uri; content: string }[]> {
-    const outputs: { uri: vscode.Uri; content: string }[] = [];
+  ): Promise<{ files: TransactionFile[]; io: TransactionIO }> {
+    const io = this.outputTransactionIO(root);
+    const outputs: TransactionFile[] = [];
     for (const file of files) {
-      const relative = safeRelativePath(file.path);
-      if (!relative) { throw new Error(`Unsafe output path: ${file.path}`); }
+      if (await io.inspect(file.path) === 'directory') {
+        throw new Error(`Unsafe output path (expected file): ${file.path}`);
+      }
+      outputs.push({ path: file.path, content: Buffer.from(file.content, 'utf-8') });
+    }
+    return { files: outputs, io };
+  }
+  private outputTransactionIO(root: vscode.Uri): TransactionIO {
+    const modes = new Map<string, number>();
+    const uriFor = (relative: string): vscode.Uri => {
+      const safe = safeRelativePath(relative);
+      if (!safe) { throw new Error(`Unsafe output path: ${relative}`); }
+      return vscode.Uri.joinPath(root, safe);
+    };
+    const inspect: TransactionIO['inspect'] = async relativePath => {
+      const relative = safeRelativePath(relativePath);
+      if (!relative) { throw new Error(`Unsafe output path: ${relativePath}`); }
       const parts = relative.split('/');
       let parent = root;
       for (let index = 0; index < parts.length; index++) {
         const uri = vscode.Uri.joinPath(parent, parts[index]);
         const type = await this.outputEntryType(parent, uri, parts[index]);
-        if (type === undefined) { break; }
+        if (type === undefined) { return 'missing'; }
         if (type & vscode.FileType.SymbolicLink) {
           throw new Error(`Unsafe output path (symbolic link): ${uri.toString()}`);
         }
-        const expected = index === parts.length - 1 ? vscode.FileType.File : vscode.FileType.Directory;
-        if (type !== expected) {
-          throw new Error(`Unsafe output path (expected ${expected === vscode.FileType.File ? 'file' : 'directory'}): ${uri.toString()}`);
+        const leaf = index === parts.length - 1;
+        if (type !== vscode.FileType.Directory && !(leaf && type === vscode.FileType.File)) {
+          throw new Error(`Unsafe output path (expected ${leaf ? 'file or directory' : 'directory'}): ${uri.toString()}`);
         }
+        if (leaf) { return type === vscode.FileType.File ? 'file' : 'directory'; }
         parent = uri;
       }
-      outputs.push({ uri: vscode.Uri.joinPath(root, relative), content: file.content });
-    }
-    return outputs;
+      throw new Error(`Unsafe output path: ${relativePath}`);
+    };
+    const requireType = async (relative: string, expected: 'missing' | 'file' | 'directory'): Promise<void> => {
+      if (await inspect(relative) !== expected) {
+        throw new Error(`Unsafe output path (expected ${expected}): ${relative}`);
+      }
+    };
+    const requireParent = async (relative: string): Promise<void> => {
+      const safe = safeRelativePath(relative);
+      if (!safe) { throw new Error(`Unsafe output path: ${relative}`); }
+      const parent = safe.split('/').slice(0, -1).join('/');
+      if (parent) { await requireType(parent, 'directory'); }
+      else { await vscode.workspace.fs.readDirectory(root); }
+    };
+    const removeDirectory = async (relative: string): Promise<void> => {
+      await requireType(relative, 'directory');
+      const uri = uriFor(relative);
+      if ((await vscode.workspace.fs.readDirectory(uri)).length) {
+        throw new Error(`Output directory is not empty: ${relative}`);
+      }
+      await vscode.workspace.fs.delete(uri, { recursive: false, useTrash: false });
+    };
+    return {
+      inspect,
+      read: async relative => {
+        await requireType(relative, 'file');
+        const uri = uriFor(relative);
+        if (uri.scheme === 'file') {
+          const stat = await lstat(uri.fsPath);
+          if (stat.isSymbolicLink() || !stat.isFile()) {
+            throw new Error(`Unsafe output path (expected file): ${uri.toString()}`);
+          }
+          modes.set(uri.toString(), stat.mode & 0o7777);
+        }
+        return vscode.workspace.fs.readFile(uri);
+      },
+      mkdir: async relative => {
+        await requireType(relative, 'missing');
+        await requireParent(relative);
+        try { await vscode.workspace.fs.createDirectory(uriFor(relative)); }
+        catch (error) {
+          let createdEmptyDirectory = false;
+          try {
+            if (await inspect(relative) === 'directory') {
+              if ((await vscode.workspace.fs.readDirectory(uriFor(relative))).length) {
+                throw new Error(`Output directory is not empty: ${relative}`);
+              }
+              createdEmptyDirectory = true;
+              await removeDirectory(relative);
+            }
+          } catch (cleanupError) {
+            const message = `Directory creation failed: ${relative}; ${String(error)}; empty-directory cleanup failed: ${String(cleanupError)}`;
+            if (createdEmptyDirectory) { throw new TransactionDirectoryError(relative, message); }
+            throw new Error(message);
+          }
+          throw error;
+        }
+      },
+      writeNew: async (relative, content) => {
+        await requireType(relative, 'missing');
+        await requireParent(relative);
+        await vscode.workspace.fs.writeFile(uriFor(relative), content);
+      },
+      rename: async (from, to) => {
+        await requireType(from, 'file');
+        await requireType(to, 'missing');
+        await requireParent(to);
+        const source = uriFor(from), target = uriFor(to);
+        const mode = modes.get(target.toString());
+        if (source.scheme === 'file' && from.endsWith('.stage') && mode !== undefined) {
+          await chmod(source.fsPath, mode);
+        }
+        await vscode.workspace.fs.rename(source, target, { overwrite: false });
+      },
+      removeFile: async relative => {
+        await requireType(relative, 'file');
+        await vscode.workspace.fs.delete(uriFor(relative), { recursive: false, useTrash: false });
+      },
+      removeDirectory,
+      nonce: randomUUID
+    };
   }
   private async outputEntryType(parent: vscode.Uri, uri: vscode.Uri, name: string): Promise<vscode.FileType | undefined> {
     try {
@@ -687,20 +842,8 @@ export class FragmentRepository {
     const entries = await vscode.workspace.fs.readDirectory(parent);
     return entries.find(([entry]) => entry === name)?.[1];
   }
-  private async writeChangedOutputs(outputs: readonly { uri: vscode.Uri; content: string }[]): Promise<void> {
-    for (const output of outputs) {
-      const content = Buffer.from(output.content, 'utf-8');
-      try {
-        const previous = await vscode.workspace.fs.readFile(output.uri);
-        if (content.equals(Buffer.from(previous))) { continue; }
-      } catch (error) {
-        if (!(error instanceof vscode.FileSystemError) || error.code !== 'FileNotFound') {
-          throw error;
-        }
-      }
-      await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(output.uri, '..'));
-      await vscode.workspace.fs.writeFile(output.uri, content);
-    }
+  private async writeChangedOutputs(outputs: { files: readonly TransactionFile[]; io: TransactionIO }): Promise<void> {
+    await commitOutputs(outputs.files, outputs.io);
   }
 
   getFragments(workspaceFolder : vscode.WorkspaceFolder) : FragmentMap
@@ -793,6 +936,12 @@ export class FragmentRepository {
   }
 
   dispose() {
+    this.disposed = true;
+    for (const timer of this.inputTimers.values()) { clearTimeout(timer); }
+    this.inputTimers.clear();
+    this.generatedOutputs.clear();
+    for (const subscription of this.inputSubscriptions) { subscription.dispose(); }
+    this.inputSubscriptions.length = 0;
     for(let fragmentMap of this.fragmentsForWorkspaceFolders.values())
     {
       fragmentMap.dispose();
@@ -869,25 +1018,61 @@ export class LiterateRenameProvider implements vscode.RenameProvider
 export class LiterateCodeActionProvider implements vscode.CodeActionProvider
 {
     constructor(public readonly repository : FragmentRepository) {}
-    public provideCodeActions(
+
+    public async provideCodeActions(
         document : vscode.TextDocument,
-        _: vscode.Range,
+        _ : vscode.Range,
         context : vscode.CodeActionContext,
-        __ : vscode.CancellationToken
-    ) : Thenable<vscode.CodeAction[]>
+        token : vscode.CancellationToken
+    ) : Promise<vscode.CodeAction[]>
     {
-        let codeActions = new Array<vscode.CodeAction>();
-        for(const diag of context.diagnostics)
+        const diagnostics = context.diagnostics.filter(diag =>
+            (typeof diag.code === 'object' ? diag.code.value : diag.code) === 'missing-fragment');
+        if(token.isCancellationRequested || !diagnostics.length ||
+            (context.only && !context.only.contains(vscode.CodeActionKind.QuickFix))) { return []; }
+        const folder = determineWorkspaceFolder(document);
+        if(!folder) { return []; }
+        const version = document.version;
+        const text = document.getText();
+        await this.repository.processLiterateFiles(document);
+        if(token.isCancellationRequested || document.version !== version || document.getText() !== text) { return []; }
+        const documentPath = path.posix.relative(folder.uri.path, document.uri.path);
+        const sources = this.repository.getSourceDocuments(folder);
+        if(sources.find(source => source.path === documentPath)?.text !== text ||
+            vscode.workspace.textDocuments.some(open => open.uri.toString() === document.uri.toString() &&
+                (open.version !== version || open.getText() !== text))) { return []; }
+        const occurrences = this.repository.getFragmentOccurrences(folder);
+        const actions: vscode.CodeAction[] = [];
+        const offered = new Set<string>();
+        for(const diagnostic of diagnostics)
         {
-            if(diag.message.indexOf("Could not find fragment")>-1)
-            {
-                let fragmentLocation = this.repository.getFragmentTagLocation(document, document.lineAt(diag.range.start), diag.range.start);
-                let action = new vscode.CodeAction(`Create fragment for ${OPENING}${fragmentLocation.name}${CLOSING}`, context.only ? context.only : vscode.CodeActionKind.Refactor);
-                action.command = {command: 'literate.create_fragment_for_tag', title: `Create fragment for ${OPENING}${fragmentLocation.name}${CLOSING}`, arguments : [diag.range]};
-                codeActions.push(action);
-            }
+            const reference = occurrences.find(item => item.path === documentPath && item.kind === 'reference' &&
+                item.line === diagnostic.range.start.line && item.column === diagnostic.range.start.character);
+            if(!reference || offered.has(reference.name) || reference.name.endsWith('.*') ||
+                occurrences.some(item => item.name === reference.name && item.kind === 'definition')) { continue; }
+            const range = new vscode.Range(reference.line, reference.column, reference.line, reference.endColumn);
+            if(document.getText(range) !== `${OPENING}${reference.name}${CLOSING}`) { continue; }
+            const usage = this.repository.getTokenAtPosition(document, range).token;
+            if(!usage || usage.type !== 'fence' || !usage.map || usage.level !== 0) { continue; }
+            const header = parseFragmentHeader(usage.info);
+            const closing = document.lineAt(usage.map[1] - 1).text.trim();
+            if(!header || !/^(`{3,}|~{3,})$/.test(closing) || closing[0] !== usage.markup[0] ||
+                closing.length < usage.markup.length) { continue; }
+            const info = `${header.language} : ${OPENING}${reference.name}${CLOSING}=`;
+            if(parseFragmentHeader(info)?.name !== reference.name) { continue; }
+            const eol = document.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
+            const position = usage.map[1] < document.lineCount ? new vscode.Position(usage.map[1], 0)
+                : document.positionAt(text.length);
+            const edit = new vscode.WorkspaceEdit();
+            edit.insert(document.uri, position, `${eol}~~~ ${info}${eol}~~~${eol}`);
+            const action = new vscode.CodeAction(`Create fragment for ${OPENING}${reference.name}${CLOSING}`,
+                vscode.CodeActionKind.QuickFix);
+            action.diagnostics = [diagnostic];
+            action.edit = edit;
+            actions.push(action);
+            offered.add(reference.name);
         }
-        return Promise.resolve(codeActions);
+        return token.isCancellationRequested ? [] : actions;
     }
 }
 export class LiterateDefinitionProvider implements vscode.DefinitionProvider

@@ -124,10 +124,10 @@ test('depth-first diagnostics retain reference positions and cache invalid depen
     assert.deepEqual(result.diagnostics, [
         { line: 5, message: 'Invalid definition operator on reference: b' },
         { line: 9, message: 'Fragment cycle: main.* -> a -> b -> a' },
-        { line: 10, message: 'Missing fragment: nested missing' },
-        { line: 6, message: 'Missing fragment: missing' },
+        { line: 10, message: 'Missing fragment: nested missing', code: 'missing-fragment' },
+        { line: 6, message: 'Missing fragment: missing', code: 'missing-fragment' },
         { line: 13, message: 'Invalid definition operator on reference: b' },
-        { line: 14, message: 'Missing fragment: absent' },
+        { line: 14, message: 'Missing fragment: absent', code: 'missing-fragment' },
         { line: 17, message: 'Fragment cycle: unused -> unused' },
     ].map(diagnostic => ({ path: 'index.literate', column: 0, ...diagnostic })));
 });
@@ -279,7 +279,7 @@ for (const [name, broken, message] of [
 test('missing-reference diagnostics point to the zero-based reference position', () => {
     const result = generateProject([document(root('ok\n  <<missing>>'))]);
     assert.deepEqual(result.files, []);
-    assert.deepEqual(result.diagnostics, [{ path: 'index.literate', line: 2, column: 2, message: 'Missing fragment: missing' }]);
+    assert.deepEqual(result.diagnostics, [{ path: 'index.literate', line: 2, column: 2, message: 'Missing fragment: missing', code: 'missing-fragment' }]);
 });
 
 for (const path of ['../escape.txt', '/absolute.txt', 'C:/absolute.txt', 'dir/../../escape.txt', 'dir\\escape.txt', '.', 'bad\u0000name']) {

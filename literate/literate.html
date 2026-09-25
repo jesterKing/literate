@@ -307,6 +307,12 @@ above.These we introduce right before defining the repository class.</p>
   <span class="literate-tag-name">&lt;&lt;method to get all reference locations&gt;&gt;</span>
 
   <span class="hljs-title function_">dispose</span>(<span class="hljs-params"></span>) {
+    <span class="hljs-variable language_">this</span>.<span class="hljs-property">disposed</span> = <span class="hljs-literal">true</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> timer <span class="hljs-keyword">of</span> <span class="hljs-variable language_">this</span>.<span class="hljs-property">inputTimers</span>.<span class="hljs-title function_">values</span>()) { <span class="hljs-built_in">clearTimeout</span>(timer); }
+    <span class="hljs-variable language_">this</span>.<span class="hljs-property">inputTimers</span>.<span class="hljs-title function_">clear</span>();
+    <span class="hljs-variable language_">this</span>.<span class="hljs-property">generatedOutputs</span>.<span class="hljs-title function_">clear</span>();
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> subscription <span class="hljs-keyword">of</span> <span class="hljs-variable language_">this</span>.<span class="hljs-property">inputSubscriptions</span>) { subscription.<span class="hljs-title function_">dispose</span>(); }
+    <span class="hljs-variable language_">this</span>.<span class="hljs-property">inputSubscriptions</span>.<span class="hljs-property">length</span> = <span class="hljs-number">0</span>;
     <span class="hljs-keyword">for</span>(<span class="hljs-keyword">let</span> fragmentMap <span class="hljs-keyword">of</span> <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentsForWorkspaceFolders</span>.<span class="hljs-title function_">values</span>())
     {
       fragmentMap.<span class="hljs-title function_">dispose</span>();
@@ -337,6 +343,45 @@ properly. We'll need an instance of a properly configured <em>MarkdownIt</em> pa
 <span class="hljs-keyword">private</span> sourceDocuments = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">SourceDocument</span>[]&gt;();
 <span class="hljs-keyword">private</span> previewThemes = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;();
 <span class="hljs-keyword">private</span> occurrences = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">FragmentOccurrence</span>[]&gt;();
+<span class="hljs-keyword">private</span> disposed = <span class="hljs-literal">false</span>;
+<span class="hljs-keyword">private</span> inputTimers = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">ReturnType</span>&lt;<span class="hljs-keyword">typeof</span> <span class="hljs-built_in">setTimeout</span>&gt;&gt;();
+<span class="hljs-keyword">private</span> <span class="hljs-attr">inputSubscriptions</span>: vscode.<span class="hljs-property">Disposable</span>[] = [];
+<span class="hljs-keyword">private</span> generatedOutputs = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;&gt;();
+</code></pre>
+
+</div>
+</div><p>Filter input events before queueing work. Generated destinations are remembered
+per workspace, including outputs whose names happen to end in <code>.literate</code>.
+Template discovery is per document: one invalid chapter must not hide another
+chapter's dependencies.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;fragment repository member variables&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">private</span> <span class="hljs-title function_">isWatchedInput</span>(<span class="hljs-attr">uri</span>: vscode.<span class="hljs-property">Uri</span>, <span class="hljs-attr">folder</span>: vscode.<span class="hljs-property">WorkspaceFolder</span>): <span class="hljs-built_in">boolean</span> {
+  <span class="hljs-keyword">if</span> (<span class="hljs-variable language_">this</span>.<span class="hljs-property">generatedOutputs</span>.<span class="hljs-title function_">get</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>())?.<span class="hljs-title function_">has</span>(uri.<span class="hljs-title function_">toString</span>())) { <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>; }
+  <span class="hljs-keyword">const</span> relative = path.<span class="hljs-property">posix</span>.<span class="hljs-title function_">relative</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>, uri.<span class="hljs-property">path</span>);
+  <span class="hljs-keyword">if</span> (relative.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;/&#x27;</span>).<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, -<span class="hljs-number">1</span>).<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> discoveryExcludedDirectories.<span class="hljs-title function_">includes</span>(part))) {
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;
+  }
+  <span class="hljs-keyword">if</span> (relative.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;.literate&#x27;</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>; }
+  <span class="hljs-keyword">const</span> documents = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>((<span class="hljs-variable language_">this</span>.<span class="hljs-property">sourceDocuments</span>.<span class="hljs-title function_">get</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>()) || [])
+    .<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">document</span> =&gt;</span> [<span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>, <span class="hljs-variable language_">document</span>]));
+  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> <span class="hljs-variable language_">document</span> <span class="hljs-keyword">of</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">textDocuments</span>) {
+    <span class="hljs-keyword">if</span> (!<span class="hljs-variable language_">document</span>.<span class="hljs-property">isClosed</span> &amp;&amp; <span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;.literate&#x27;</span>)
+      &amp;&amp; vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title function_">getWorkspaceFolder</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>)?.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>() === folder.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>()) {
+      <span class="hljs-keyword">const</span> name = path.<span class="hljs-property">posix</span>.<span class="hljs-title function_">relative</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>, <span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>);
+      <span class="hljs-keyword">if</span> (!name.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;/&#x27;</span>).<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, -<span class="hljs-number">1</span>).<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> discoveryExcludedDirectories.<span class="hljs-title function_">includes</span>(part))) {
+        documents.<span class="hljs-title function_">set</span>(name, { <span class="hljs-attr">path</span>: name, <span class="hljs-attr">text</span>: <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">getText</span>() });
+      }
+    }
+  }
+  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> <span class="hljs-variable language_">document</span> <span class="hljs-keyword">of</span> documents.<span class="hljs-title function_">values</span>()) {
+    <span class="hljs-keyword">try</span> {
+      <span class="hljs-keyword">if</span> (<span class="hljs-title function_">templateReferences</span>([<span class="hljs-variable language_">document</span>]).<span class="hljs-title function_">includes</span>(relative)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>; }
+    } <span class="hljs-keyword">catch</span> (_) {}
+  }
+  <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;
+}
 </code></pre>
 
 </div>
@@ -388,6 +433,7 @@ files and HTML files.</p>
 
   <span class="literate-tag-name">&lt;&lt;subscribe to text document changes&gt;&gt;</span>
   <span class="literate-tag-name">&lt;&lt;subscribe to workspace changes&gt;&gt;</span>
+  context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(...<span class="hljs-variable language_">this</span>.<span class="hljs-property">inputSubscriptions</span>);
 }
 </code></pre>
 
@@ -421,12 +467,16 @@ are ignored so they cannot create a generation feedback loop.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;subscribe to text document changes&gt;&gt;= </div>
 <div class="code">
-<pre><code>context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(
+<pre><code><span class="hljs-variable language_">this</span>.<span class="hljs-property">inputSubscriptions</span>.<span class="hljs-title function_">push</span>(
   vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title function_">onDidChangeTextDocument</span>(
     <span class="hljs-keyword">async</span> (e : vscode.<span class="hljs-property">TextDocumentChangeEvent</span>) =&gt;
     {
-      <span class="hljs-keyword">if</span>(e.<span class="hljs-property">contentChanges</span>.<span class="hljs-property">length</span> &gt; <span class="hljs-number">0</span> &amp;&amp; e.<span class="hljs-property">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;.literate&#x27;</span>))
-      {
+      <span class="hljs-keyword">const</span> folder = vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title function_">getWorkspaceFolder</span>(e.<span class="hljs-property">document</span>.<span class="hljs-property">uri</span>);
+      <span class="hljs-keyword">if</span> (!<span class="hljs-variable language_">this</span>.<span class="hljs-property">disposed</span> &amp;&amp; e.<span class="hljs-property">contentChanges</span>.<span class="hljs-property">length</span> &gt; <span class="hljs-number">0</span> &amp;&amp; folder
+        &amp;&amp; <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">isWatchedInput</span>(e.<span class="hljs-property">document</span>.<span class="hljs-property">uri</span>, folder)) {
+        <span class="hljs-keyword">const</span> key = folder.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>();
+        <span class="hljs-built_in">clearTimeout</span>(<span class="hljs-variable language_">this</span>.<span class="hljs-property">inputTimers</span>.<span class="hljs-title function_">get</span>(key));
+        <span class="hljs-variable language_">this</span>.<span class="hljs-property">inputTimers</span>.<span class="hljs-title function_">delete</span>(key);
         <span class="hljs-keyword">await</span> <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">processLiterateFiles</span>(e.<span class="hljs-property">document</span>, <span class="hljs-literal">true</span>).<span class="hljs-title function_">catch</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-literal">undefined</span>);
       }
     }
@@ -443,7 +493,22 @@ workspace folder.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;subscribe to workspace changes&gt;&gt;= </div>
 <div class="code">
-<pre><code>context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title function_">push</span>(
+<pre><code><span class="hljs-keyword">const</span> watcher = vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title function_">createFileSystemWatcher</span>(<span class="hljs-string">&#x27;**/*&#x27;</span>);
+<span class="hljs-keyword">const</span> <span class="hljs-title function_">changed</span> = (<span class="hljs-params">uri: vscode.Uri</span>) =&gt; {
+  <span class="hljs-keyword">const</span> folder = vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title function_">getWorkspaceFolder</span>(uri);
+  <span class="hljs-keyword">if</span> (<span class="hljs-variable language_">this</span>.<span class="hljs-property">disposed</span> || !folder || !<span class="hljs-variable language_">this</span>.<span class="hljs-title function_">isWatchedInput</span>(uri, folder)) { <span class="hljs-keyword">return</span>; }
+  <span class="hljs-keyword">const</span> key = folder.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>();
+  <span class="hljs-built_in">clearTimeout</span>(<span class="hljs-variable language_">this</span>.<span class="hljs-property">inputTimers</span>.<span class="hljs-title function_">get</span>(key));
+  <span class="hljs-variable language_">this</span>.<span class="hljs-property">inputTimers</span>.<span class="hljs-title function_">set</span>(key, <span class="hljs-built_in">setTimeout</span>(<span class="hljs-function">() =&gt;</span> {
+    <span class="hljs-variable language_">this</span>.<span class="hljs-property">inputTimers</span>.<span class="hljs-title function_">delete</span>(key);
+    <span class="hljs-keyword">if</span> (!<span class="hljs-variable language_">this</span>.<span class="hljs-property">disposed</span>) {
+      <span class="hljs-built_in">void</span> <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">processLiterateFiles</span>(folder, <span class="hljs-literal">true</span>).<span class="hljs-title function_">catch</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-literal">undefined</span>);
+    }
+  }, <span class="hljs-number">100</span>));
+};
+<span class="hljs-variable language_">this</span>.<span class="hljs-property">inputSubscriptions</span>.<span class="hljs-title function_">push</span>(watcher, watcher.<span class="hljs-title function_">onDidCreate</span>(changed),
+  watcher.<span class="hljs-title function_">onDidChange</span>(changed), watcher.<span class="hljs-title function_">onDidDelete</span>(changed));
+<span class="hljs-variable language_">this</span>.<span class="hljs-property">inputSubscriptions</span>.<span class="hljs-title function_">push</span>(
   vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title function_">onDidChangeWorkspaceFolders</span>(
     <span class="hljs-keyword">async</span> (e : vscode.<span class="hljs-property">WorkspaceFoldersChangeEvent</span>) =&gt;
     {
@@ -453,6 +518,9 @@ workspace folder.</p>
       <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> removedWorkspaceFolder <span class="hljs-keyword">of</span> e.<span class="hljs-property">removed</span>)
       {
         <span class="hljs-keyword">const</span> key = removedWorkspaceFolder.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>();
+        <span class="hljs-built_in">clearTimeout</span>(<span class="hljs-variable language_">this</span>.<span class="hljs-property">inputTimers</span>.<span class="hljs-title function_">get</span>(key));
+        <span class="hljs-variable language_">this</span>.<span class="hljs-property">inputTimers</span>.<span class="hljs-title function_">delete</span>(key);
+        <span class="hljs-variable language_">this</span>.<span class="hljs-property">generatedOutputs</span>.<span class="hljs-title function_">delete</span>(key);
         <span class="hljs-variable language_">this</span>.<span class="hljs-property">fragmentsForWorkspaceFolders</span>.<span class="hljs-title function_">delete</span>(key);
         <span class="hljs-variable language_">this</span>.<span class="hljs-property">grabbedStateForWorkspaceFolders</span>.<span class="hljs-title function_">delete</span>(key);
         <span class="hljs-variable language_">this</span>.<span class="hljs-property">sourceDocuments</span>.<span class="hljs-title function_">delete</span>(key);
@@ -489,8 +557,10 @@ An invalid project produces no writes; existing outputs remain untouched. For a
 valid project the adapter compares UTF-8 bytes with disk, creates parent
 directories, and awaits writes only for changed files. This avoids unnecessary
 watcher events and preserves the engine's identical output across platforms.
-Writes are sequential but are not a transactional filesystem commit: an I/O
-failure can leave earlier writes applied. Obsolete outputs are not deleted.</p>
+Changed outputs are staged as a batch, installed by rename, and rolled back on
+caught failures. Originals stay available until commit; failed recovery reports
+retained backup locations. This is not crash-durable or simultaneously visible
+across all files. Obsolete outputs are not deleted.</p>
 <p>The navigation map is deliberately unexpanded and is built from the same
 snapshot, ordered by the engine's <code>orderSourceDocuments</code>: root index first,
 linked chapters next, and every remaining document in deterministic order.
@@ -514,11 +584,15 @@ sequenceDiagram
     alt Writes requested and no diagnostics
         Repo-&gt;&gt;FS: Preflight every output path
         alt All destinations are safe
-            loop Each generated file
-                Repo-&gt;&gt;FS: Compare disk bytes
-                opt Missing or changed
-                    Repo-&gt;&gt;FS: Create parent and write output
-                end
+            Repo-&gt;&gt;FS: Compare all disk bytes and stage changed files
+            loop Each changed output
+                Repo-&gt;&gt;FS: Back up original and install stage by rename
+            end
+            alt Installation succeeds
+                Repo-&gt;&gt;FS: Remove private staging material
+            else Staging or installation fails
+                Repo-&gt;&gt;FS: Restore originals and remove new outputs
+                Note over Repo,FS: Keep recovery material if rollback fails
             end
         else Unsafe destination or filesystem error
             Repo--&gt;&gt;VS: Report failure without starting output writes
@@ -554,6 +628,7 @@ processing queue cannot deadlock with a preview request.</p>
   writeFiles = <span class="hljs-literal">false</span>
 ) : <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; {
   <span class="hljs-keyword">const</span> operation = <span class="hljs-variable language_">this</span>.<span class="hljs-property">processingQueue</span>.<span class="hljs-title function_">then</span>(<span class="hljs-keyword">async</span> () =&gt; {
+    <span class="hljs-keyword">if</span> (<span class="hljs-variable language_">this</span>.<span class="hljs-property">disposed</span>) { <span class="hljs-keyword">return</span>; }
     <span class="hljs-keyword">const</span> folder = trigger &amp;&amp; (<span class="hljs-string">&quot;eol&quot;</span> <span class="hljs-keyword">in</span> trigger
       ? <span class="hljs-title function_">determineWorkspaceFolder</span>(trigger) : trigger);
     <span class="hljs-keyword">const</span> folders = trigger ? (folder ? [folder] : [])
@@ -596,8 +671,10 @@ processing queue cannot deadlock with a preview request.</p>
         <span class="hljs-keyword">const</span> entries = diagnostics.<span class="hljs-title function_">get</span>(key) || [];
         <span class="hljs-keyword">const</span> range = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(diagnostic.<span class="hljs-property">line</span>, diagnostic.<span class="hljs-property">column</span>,
           diagnostic.<span class="hljs-property">line</span>, diagnostic.<span class="hljs-property">column</span> + <span class="hljs-number">1</span>);
-        entries.<span class="hljs-title function_">push</span>(<span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Diagnostic</span>(range, diagnostic.<span class="hljs-property">message</span>,
-          vscode.<span class="hljs-property">DiagnosticSeverity</span>.<span class="hljs-property">Error</span>));
+        <span class="hljs-keyword">const</span> entry = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Diagnostic</span>(range, diagnostic.<span class="hljs-property">message</span>,
+          vscode.<span class="hljs-property">DiagnosticSeverity</span>.<span class="hljs-property">Error</span>);
+        <span class="hljs-keyword">if</span> (diagnostic.<span class="hljs-property">code</span> !== <span class="hljs-literal">undefined</span>) { entry.<span class="hljs-property">code</span> = diagnostic.<span class="hljs-property">code</span>; }
+        entries.<span class="hljs-title function_">push</span>(entry);
         diagnostics.<span class="hljs-title function_">set</span>(key, entries);
       }
       <span class="hljs-keyword">const</span> <span class="hljs-attr">stale</span>: vscode.<span class="hljs-property">Uri</span>[] = [];
@@ -636,6 +713,8 @@ processing queue cannot deadlock with a preview request.</p>
       }
       fragments.<span class="hljs-property">map</span> = <span class="hljs-title function_">handleFragments</span>(states.<span class="hljs-property">list</span>, result.<span class="hljs-property">inspection</span>.<span class="hljs-property">fragments</span>);
       <span class="hljs-keyword">if</span> (!writeFiles || result.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) { <span class="hljs-keyword">continue</span>; }
+      <span class="hljs-variable language_">this</span>.<span class="hljs-property">generatedOutputs</span>.<span class="hljs-title function_">set</span>(key, <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>(result.<span class="hljs-property">files</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">file</span> =&gt;</span>
+        vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">joinPath</span>(workspaceFolder.<span class="hljs-property">uri</span>, file.<span class="hljs-property">path</span>).<span class="hljs-title function_">toString</span>())));
       <span class="hljs-keyword">const</span> outputs = <span class="hljs-keyword">await</span> <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">preflightOutputs</span>(workspaceFolder.<span class="hljs-property">uri</span>, result.<span class="hljs-property">files</span>);
       <span class="hljs-keyword">await</span> <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">writeChangedOutputs</span>(outputs);
     }
@@ -664,29 +743,134 @@ entries before treating the component as absent. Other errors must propagate.</p
 <div class="code">
 <pre><code><span class="hljs-keyword">private</span> <span class="hljs-keyword">async</span> <span class="hljs-title function_">preflightOutputs</span>(
   <span class="hljs-attr">root</span>: vscode.<span class="hljs-property">Uri</span>, <span class="hljs-attr">files</span>: <span class="hljs-keyword">readonly</span> { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span> }[]
-): <span class="hljs-title class_">Promise</span>&lt;{ <span class="hljs-attr">uri</span>: vscode.<span class="hljs-property">Uri</span>; <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span> }[]&gt; {
-  <span class="hljs-keyword">const</span> <span class="hljs-attr">outputs</span>: { <span class="hljs-attr">uri</span>: vscode.<span class="hljs-property">Uri</span>; <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span> }[] = [];
+): <span class="hljs-title class_">Promise</span>&lt;{ <span class="hljs-attr">files</span>: <span class="hljs-title class_">TransactionFile</span>[]; <span class="hljs-attr">io</span>: <span class="hljs-title class_">TransactionIO</span> }&gt; {
+  <span class="hljs-keyword">const</span> io = <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">outputTransactionIO</span>(root);
+  <span class="hljs-keyword">const</span> <span class="hljs-attr">outputs</span>: <span class="hljs-title class_">TransactionFile</span>[] = [];
   <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> files) {
-    <span class="hljs-keyword">const</span> relative = <span class="hljs-title function_">safeRelativePath</span>(file.<span class="hljs-property">path</span>);
-    <span class="hljs-keyword">if</span> (!relative) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Unsafe output path: <span class="hljs-subst">${file.path}</span>`</span>); }
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> io.<span class="hljs-title function_">inspect</span>(file.<span class="hljs-property">path</span>) === <span class="hljs-string">&#x27;directory&#x27;</span>) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Unsafe output path (expected file): <span class="hljs-subst">${file.path}</span>`</span>);
+    }
+    outputs.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">path</span>: file.<span class="hljs-property">path</span>, <span class="hljs-attr">content</span>: <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(file.<span class="hljs-property">content</span>, <span class="hljs-string">&#x27;utf-8&#x27;</span>) });
+  }
+  <span class="hljs-keyword">return</span> { <span class="hljs-attr">files</span>: outputs, io };
+}
+</code></pre>
+
+</div>
+</div><p>The filesystem adapter supplies the transaction's small I/O contract. It keeps
+URIs intact for remote providers and validates every relative path before use.
+Generated destinations are registered before staging or committing can emit
+input-shaped watcher events.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;fragment generation method&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">private</span> <span class="hljs-title function_">outputTransactionIO</span>(<span class="hljs-attr">root</span>: vscode.<span class="hljs-property">Uri</span>): <span class="hljs-title class_">TransactionIO</span> {
+  <span class="hljs-keyword">const</span> modes = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">number</span>&gt;();
+  <span class="hljs-keyword">const</span> uriFor = (<span class="hljs-attr">relative</span>: <span class="hljs-built_in">string</span>): vscode.<span class="hljs-property">Uri</span> =&gt; {
+    <span class="hljs-keyword">const</span> safe = <span class="hljs-title function_">safeRelativePath</span>(relative);
+    <span class="hljs-keyword">if</span> (!safe) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Unsafe output path: <span class="hljs-subst">${relative}</span>`</span>); }
+    <span class="hljs-keyword">return</span> vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">joinPath</span>(root, safe);
+  };
+  <span class="hljs-keyword">const</span> <span class="hljs-attr">inspect</span>: <span class="hljs-title class_">TransactionIO</span>[<span class="hljs-string">&#x27;inspect&#x27;</span>] = <span class="hljs-keyword">async</span> relativePath =&gt; {
+    <span class="hljs-keyword">const</span> relative = <span class="hljs-title function_">safeRelativePath</span>(relativePath);
+    <span class="hljs-keyword">if</span> (!relative) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Unsafe output path: <span class="hljs-subst">${relativePath}</span>`</span>); }
     <span class="hljs-keyword">const</span> parts = relative.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;/&#x27;</span>);
     <span class="hljs-keyword">let</span> parent = root;
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = <span class="hljs-number">0</span>; index &lt; parts.<span class="hljs-property">length</span>; index++) {
       <span class="hljs-keyword">const</span> uri = vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">joinPath</span>(parent, parts[index]);
       <span class="hljs-keyword">const</span> <span class="hljs-keyword">type</span> = <span class="hljs-keyword">await</span> <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">outputEntryType</span>(parent, uri, parts[index]);
-      <span class="hljs-keyword">if</span> (<span class="hljs-keyword">type</span> === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">break</span>; }
+      <span class="hljs-keyword">if</span> (<span class="hljs-keyword">type</span> === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;missing&#x27;</span>; }
       <span class="hljs-keyword">if</span> (<span class="hljs-keyword">type</span> &amp; vscode.<span class="hljs-property">FileType</span>.<span class="hljs-property">SymbolicLink</span>) {
         <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Unsafe output path (symbolic link): <span class="hljs-subst">${uri.toString()}</span>`</span>);
       }
-      <span class="hljs-keyword">const</span> expected = index === parts.<span class="hljs-property">length</span> - <span class="hljs-number">1</span> ? vscode.<span class="hljs-property">FileType</span>.<span class="hljs-property">File</span> : vscode.<span class="hljs-property">FileType</span>.<span class="hljs-property">Directory</span>;
-      <span class="hljs-keyword">if</span> (<span class="hljs-keyword">type</span> !== expected) {
-        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Unsafe output path (expected <span class="hljs-subst">${expected === vscode.FileType.File ? <span class="hljs-string">&#x27;file&#x27;</span> : <span class="hljs-string">&#x27;directory&#x27;</span>}</span>): <span class="hljs-subst">${uri.toString()}</span>`</span>);
+      <span class="hljs-keyword">const</span> leaf = index === parts.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>;
+      <span class="hljs-keyword">if</span> (<span class="hljs-keyword">type</span> !== vscode.<span class="hljs-property">FileType</span>.<span class="hljs-property">Directory</span> &amp;&amp; !(leaf &amp;&amp; <span class="hljs-keyword">type</span> === vscode.<span class="hljs-property">FileType</span>.<span class="hljs-property">File</span>)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Unsafe output path (expected <span class="hljs-subst">${leaf ? <span class="hljs-string">&#x27;file or directory&#x27;</span> : <span class="hljs-string">&#x27;directory&#x27;</span>}</span>): <span class="hljs-subst">${uri.toString()}</span>`</span>);
       }
+      <span class="hljs-keyword">if</span> (leaf) { <span class="hljs-keyword">return</span> <span class="hljs-keyword">type</span> === vscode.<span class="hljs-property">FileType</span>.<span class="hljs-property">File</span> ? <span class="hljs-string">&#x27;file&#x27;</span> : <span class="hljs-string">&#x27;directory&#x27;</span>; }
       parent = uri;
     }
-    outputs.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">uri</span>: vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">joinPath</span>(root, relative), <span class="hljs-attr">content</span>: file.<span class="hljs-property">content</span> });
-  }
-  <span class="hljs-keyword">return</span> outputs;
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Unsafe output path: <span class="hljs-subst">${relativePath}</span>`</span>);
+  };
+  <span class="hljs-keyword">const</span> requireType = <span class="hljs-keyword">async</span> (<span class="hljs-attr">relative</span>: <span class="hljs-built_in">string</span>, <span class="hljs-attr">expected</span>: <span class="hljs-string">&#x27;missing&#x27;</span> | <span class="hljs-string">&#x27;file&#x27;</span> | <span class="hljs-string">&#x27;directory&#x27;</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; =&gt; {
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(relative) !== expected) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Unsafe output path (expected <span class="hljs-subst">${expected}</span>): <span class="hljs-subst">${relative}</span>`</span>);
+    }
+  };
+  <span class="hljs-keyword">const</span> requireParent = <span class="hljs-keyword">async</span> (<span class="hljs-attr">relative</span>: <span class="hljs-built_in">string</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; =&gt; {
+    <span class="hljs-keyword">const</span> safe = <span class="hljs-title function_">safeRelativePath</span>(relative);
+    <span class="hljs-keyword">if</span> (!safe) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Unsafe output path: <span class="hljs-subst">${relative}</span>`</span>); }
+    <span class="hljs-keyword">const</span> parent = safe.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;/&#x27;</span>).<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, -<span class="hljs-number">1</span>).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;/&#x27;</span>);
+    <span class="hljs-keyword">if</span> (parent) { <span class="hljs-keyword">await</span> requireType(parent, <span class="hljs-string">&#x27;directory&#x27;</span>); }
+    <span class="hljs-keyword">else</span> { <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">readDirectory</span>(root); }
+  };
+  <span class="hljs-keyword">const</span> removeDirectory = <span class="hljs-keyword">async</span> (<span class="hljs-attr">relative</span>: <span class="hljs-built_in">string</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; =&gt; {
+    <span class="hljs-keyword">await</span> requireType(relative, <span class="hljs-string">&#x27;directory&#x27;</span>);
+    <span class="hljs-keyword">const</span> uri = <span class="hljs-title function_">uriFor</span>(relative);
+    <span class="hljs-keyword">if</span> ((<span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">readDirectory</span>(uri)).<span class="hljs-property">length</span>) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Output directory is not empty: <span class="hljs-subst">${relative}</span>`</span>);
+    }
+    <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">delete</span>(uri, { <span class="hljs-attr">recursive</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">useTrash</span>: <span class="hljs-literal">false</span> });
+  };
+  <span class="hljs-keyword">return</span> {
+    inspect,
+    <span class="hljs-attr">read</span>: <span class="hljs-keyword">async</span> relative =&gt; {
+      <span class="hljs-keyword">await</span> requireType(relative, <span class="hljs-string">&#x27;file&#x27;</span>);
+      <span class="hljs-keyword">const</span> uri = <span class="hljs-title function_">uriFor</span>(relative);
+      <span class="hljs-keyword">if</span> (uri.<span class="hljs-property">scheme</span> === <span class="hljs-string">&#x27;file&#x27;</span>) {
+        <span class="hljs-keyword">const</span> stat = <span class="hljs-keyword">await</span> <span class="hljs-title function_">lstat</span>(uri.<span class="hljs-property">fsPath</span>);
+        <span class="hljs-keyword">if</span> (stat.<span class="hljs-title function_">isSymbolicLink</span>() || !stat.<span class="hljs-title function_">isFile</span>()) {
+          <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Unsafe output path (expected file): <span class="hljs-subst">${uri.toString()}</span>`</span>);
+        }
+        modes.<span class="hljs-title function_">set</span>(uri.<span class="hljs-title function_">toString</span>(), stat.<span class="hljs-property">mode</span> &amp; <span class="hljs-number">0o7777</span>);
+      }
+      <span class="hljs-keyword">return</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">readFile</span>(uri);
+    },
+    <span class="hljs-attr">mkdir</span>: <span class="hljs-keyword">async</span> relative =&gt; {
+      <span class="hljs-keyword">await</span> requireType(relative, <span class="hljs-string">&#x27;missing&#x27;</span>);
+      <span class="hljs-keyword">await</span> requireParent(relative);
+      <span class="hljs-keyword">try</span> { <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">createDirectory</span>(<span class="hljs-title function_">uriFor</span>(relative)); }
+      <span class="hljs-keyword">catch</span> (error) {
+        <span class="hljs-keyword">let</span> createdEmptyDirectory = <span class="hljs-literal">false</span>;
+        <span class="hljs-keyword">try</span> {
+          <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(relative) === <span class="hljs-string">&#x27;directory&#x27;</span>) {
+            <span class="hljs-keyword">if</span> ((<span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">readDirectory</span>(<span class="hljs-title function_">uriFor</span>(relative))).<span class="hljs-property">length</span>) {
+              <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Output directory is not empty: <span class="hljs-subst">${relative}</span>`</span>);
+            }
+            createdEmptyDirectory = <span class="hljs-literal">true</span>;
+            <span class="hljs-keyword">await</span> <span class="hljs-title function_">removeDirectory</span>(relative);
+          }
+        } <span class="hljs-keyword">catch</span> (cleanupError) {
+          <span class="hljs-keyword">const</span> message = <span class="hljs-string">`Directory creation failed: <span class="hljs-subst">${relative}</span>; <span class="hljs-subst">${<span class="hljs-built_in">String</span>(error)}</span>; empty-directory cleanup failed: <span class="hljs-subst">${<span class="hljs-built_in">String</span>(cleanupError)}</span>`</span>;
+          <span class="hljs-keyword">if</span> (createdEmptyDirectory) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">TransactionDirectoryError</span>(relative, message); }
+          <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(message);
+        }
+        <span class="hljs-keyword">throw</span> error;
+      }
+    },
+    <span class="hljs-attr">writeNew</span>: <span class="hljs-keyword">async</span> (relative, content) =&gt; {
+      <span class="hljs-keyword">await</span> requireType(relative, <span class="hljs-string">&#x27;missing&#x27;</span>);
+      <span class="hljs-keyword">await</span> requireParent(relative);
+      <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">writeFile</span>(<span class="hljs-title function_">uriFor</span>(relative), content);
+    },
+    <span class="hljs-attr">rename</span>: <span class="hljs-keyword">async</span> (<span class="hljs-keyword">from</span>, to) =&gt; {
+      <span class="hljs-keyword">await</span> requireType(<span class="hljs-keyword">from</span>, <span class="hljs-string">&#x27;file&#x27;</span>);
+      <span class="hljs-keyword">await</span> requireType(to, <span class="hljs-string">&#x27;missing&#x27;</span>);
+      <span class="hljs-keyword">await</span> requireParent(to);
+      <span class="hljs-keyword">const</span> source = <span class="hljs-title function_">uriFor</span>(<span class="hljs-keyword">from</span>), target = <span class="hljs-title function_">uriFor</span>(to);
+      <span class="hljs-keyword">const</span> mode = modes.<span class="hljs-title function_">get</span>(target.<span class="hljs-title function_">toString</span>());
+      <span class="hljs-keyword">if</span> (source.<span class="hljs-property">scheme</span> === <span class="hljs-string">&#x27;file&#x27;</span> &amp;&amp; <span class="hljs-keyword">from</span>.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;.stage&#x27;</span>) &amp;&amp; mode !== <span class="hljs-literal">undefined</span>) {
+        <span class="hljs-keyword">await</span> <span class="hljs-title function_">chmod</span>(source.<span class="hljs-property">fsPath</span>, mode);
+      }
+      <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">rename</span>(source, target, { <span class="hljs-attr">overwrite</span>: <span class="hljs-literal">false</span> });
+    },
+    <span class="hljs-attr">removeFile</span>: <span class="hljs-keyword">async</span> relative =&gt; {
+      <span class="hljs-keyword">await</span> requireType(relative, <span class="hljs-string">&#x27;file&#x27;</span>);
+      <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">delete</span>(<span class="hljs-title function_">uriFor</span>(relative), { <span class="hljs-attr">recursive</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">useTrash</span>: <span class="hljs-literal">false</span> });
+    },
+    removeDirectory,
+    <span class="hljs-attr">nonce</span>: randomUUID
+  };
 }
 </code></pre>
 
@@ -713,30 +897,38 @@ provider failures must stop generation rather than authorize a write.</p>
 </div>
 </div><p>These checks depend on the provider reporting links through <code>stat</code> or directory
 entries. VS Code has no portable no-follow open/write API: concurrent filesystem
-changes can race the checks (TOCTOU). Preflight is not a security sandbox or a
-multi-file transaction. It prevents a known unsafe later output from allowing
-earlier writes, but an I/O failure during writing can still leave partial output.
+changes can race the checks (TOCTOU). VS Code also has no exclusive mkdir or
+exclusive writeFile operation. The adapter checks absence and the immediate
+parent before creation, assuming no concurrent external changes. If directory
+creation throws after taking effect, it attempts to remove the empty directory.
+If a confirmed empty created directory cannot be removed, <code>TransactionDirectoryError</code>
+transfers ownership to the coordinator for rollback cleanup; persistent failure
+reports that artifact's recovery path along with the creation and cleanup errors.
+The workspace URI is the trusted boundary (not statted); directory listing checks
+that boundary when checking a missing immediate child or creating beneath it.
+Providers must honor non-overwriting move semantics and nonrecursive deletion.
+This is recoverable exception handling, not a security sandbox, crash-durable
+journal, or simultaneous atomic visibility across outputs. Rollback failures
+preserve recovery locations and propagate the transaction error.
 Read-only navigation refreshes bypass both output preflight and output writes.</p>
 <h4>Writing changed outputs</h4>
-<p>Only after the entire project's preflight succeeds do we compare disk bytes and
-write changed files. Open output buffers are not used for this comparison.</p>
+<p>Only after the entire project's preflight succeeds does the shared coordinator
+compare disk bytes, stage every changed file, and install the batch by rename.
+Open output buffers are not used for this comparison. Each workspace remains a
+separate transaction. Numbered stage and backup names do not end in <code>.literate</code>,
+so their watcher events do not trigger input processing.</p>
+<p>For local <code>file</code> URIs, reading an existing output snapshots its POSIX permission
+bits with Node <code>lstat</code>; <code>chmod</code> applies those bits to the stage before installation.
+Rollback moves the original backup back without changing its mode. New outputs
+use provider defaults. Remote URIs use only <code>workspace.fs</code>, which exposes no mode
+API: replacement metadata follows provider defaults, and remote permission or
+metadata restoration is not guaranteed. Ownership, ACLs and other metadata are
+not preserved by this local permission-bit handling either.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;fragment generation method&gt;&gt;=+ </div>
 <div class="code">
-<pre><code><span class="hljs-keyword">private</span> <span class="hljs-keyword">async</span> <span class="hljs-title function_">writeChangedOutputs</span>(<span class="hljs-attr">outputs</span>: <span class="hljs-keyword">readonly</span> { <span class="hljs-attr">uri</span>: vscode.<span class="hljs-property">Uri</span>; <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span> }[]): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; {
-  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> output <span class="hljs-keyword">of</span> outputs) {
-    <span class="hljs-keyword">const</span> content = <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(output.<span class="hljs-property">content</span>, <span class="hljs-string">&#x27;utf-8&#x27;</span>);
-    <span class="hljs-keyword">try</span> {
-      <span class="hljs-keyword">const</span> previous = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">readFile</span>(output.<span class="hljs-property">uri</span>);
-      <span class="hljs-keyword">if</span> (content.<span class="hljs-title function_">equals</span>(<span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(previous))) { <span class="hljs-keyword">continue</span>; }
-    } <span class="hljs-keyword">catch</span> (error) {
-      <span class="hljs-keyword">if</span> (!(error <span class="hljs-keyword">instanceof</span> vscode.<span class="hljs-property">FileSystemError</span>) || error.<span class="hljs-property">code</span> !== <span class="hljs-string">&#x27;FileNotFound&#x27;</span>) {
-        <span class="hljs-keyword">throw</span> error;
-      }
-    }
-    <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">createDirectory</span>(vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title function_">joinPath</span>(output.<span class="hljs-property">uri</span>, <span class="hljs-string">&#x27;..&#x27;</span>));
-    <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title function_">writeFile</span>(output.<span class="hljs-property">uri</span>, content);
-  }
+<pre><code><span class="hljs-keyword">private</span> <span class="hljs-keyword">async</span> <span class="hljs-title function_">writeChangedOutputs</span>(<span class="hljs-attr">outputs</span>: { <span class="hljs-attr">files</span>: <span class="hljs-keyword">readonly</span> <span class="hljs-title class_">TransactionFile</span>[]; <span class="hljs-attr">io</span>: <span class="hljs-title class_">TransactionIO</span> }): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; {
+  <span class="hljs-keyword">await</span> <span class="hljs-title function_">commitOutputs</span>(outputs.<span class="hljs-property">files</span>, outputs.<span class="hljs-property">io</span>);
 }
 </code></pre>
 
@@ -1792,6 +1984,9 @@ just an empty-bodied implementation for it.</p>
 <div class="fragmentname">&lt;&lt;import necessary modules for literate&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">import</span> { <span class="hljs-title class_">TextDecoder</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;util&#x27;</span>;
+<span class="hljs-keyword">import</span> { randomUUID } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;crypto&#x27;</span>;
+<span class="hljs-keyword">import</span> { lstat, chmod } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;fs/promises&#x27;</span>;
+<span class="hljs-keyword">import</span> { commitOutputs, <span class="hljs-title class_">TransactionDirectoryError</span>, <span class="hljs-title class_">TransactionFile</span>, <span class="hljs-title class_">TransactionIO</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./output-transactions&#x27;</span>;
 <span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> vscode <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;vscode&#x27;</span>;
 <span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> path <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;path&#x27;</span>;
 <span class="hljs-keyword">import</span> { discoveryExcludedDirectories, generateProject, resolveProjectTheme, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, <span class="hljs-title class_">SourceDocument</span>, <span class="hljs-title class_">FragmentInspection</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./engine&#x27;</span>;

@@ -205,6 +205,12 @@ export class FragmentRepository {
   <<method to get all reference locations>>
 
   dispose() {
+    this.disposed = true;
+    for (const timer of this.inputTimers.values()) { clearTimeout(timer); }
+    this.inputTimers.clear();
+    this.generatedOutputs.clear();
+    for (const subscription of this.inputSubscriptions) { subscription.dispose(); }
+    this.inputSubscriptions.length = 0;
     for(let fragmentMap of this.fragmentsForWorkspaceFolders.values())
     {
       fragmentMap.dispose();
@@ -234,6 +240,43 @@ private processingQueue: Promise<void> = Promise.resolve();
 private sourceDocuments = new Map<string, SourceDocument[]>();
 private previewThemes = new Map<string, string>();
 private occurrences = new Map<string, FragmentOccurrence[]>();
+private disposed = false;
+private inputTimers = new Map<string, ReturnType<typeof setTimeout>>();
+private inputSubscriptions: vscode.Disposable[] = [];
+private generatedOutputs = new Map<string, Set<string>>();
+```
+
+Filter input events before queueing work. Generated destinations are remembered
+per workspace, including outputs whose names happen to end in `.literate`.
+Template discovery is per document: one invalid chapter must not hide another
+chapter's dependencies.
+
+``` ts : <<fragment repository member variables>>=+
+private isWatchedInput(uri: vscode.Uri, folder: vscode.WorkspaceFolder): boolean {
+  if (this.generatedOutputs.get(folder.uri.toString())?.has(uri.toString())) { return false; }
+  const relative = path.posix.relative(folder.uri.path, uri.path);
+  if (relative.split('/').slice(0, -1).some(part => discoveryExcludedDirectories.includes(part))) {
+    return false;
+  }
+  if (relative.endsWith('.literate')) { return true; }
+  const documents = new Map((this.sourceDocuments.get(folder.uri.toString()) || [])
+    .map(document => [document.path, document]));
+  for (const document of vscode.workspace.textDocuments) {
+    if (!document.isClosed && document.uri.path.endsWith('.literate')
+      && vscode.workspace.getWorkspaceFolder(document.uri)?.uri.toString() === folder.uri.toString()) {
+      const name = path.posix.relative(folder.uri.path, document.uri.path);
+      if (!name.split('/').slice(0, -1).some(part => discoveryExcludedDirectories.includes(part))) {
+        documents.set(name, { path: name, text: document.getText() });
+      }
+    }
+  }
+  for (const document of documents.values()) {
+    try {
+      if (templateReferences([document]).includes(relative)) { return true; }
+    } catch (_) {}
+  }
+  return false;
+}
 ```
 
 The *MarkdownIt* parser will handle the actual tokenizing and parsing of the
@@ -279,6 +322,7 @@ constructor(
 
   <<subscribe to text document changes>>
   <<subscribe to workspace changes>>
+  context.subscriptions.push(...this.inputSubscriptions);
 }
 ```
 
@@ -310,12 +354,16 @@ chevron. Completion refreshes are read-only, and generated source/HTML changes
 are ignored so they cannot create a generation feedback loop.
 
 ``` ts :  <<subscribe to text document changes>>=
-context.subscriptions.push(
+this.inputSubscriptions.push(
   vscode.workspace.onDidChangeTextDocument(
     async (e : vscode.TextDocumentChangeEvent) =>
     {
-      if(e.contentChanges.length > 0 && e.document.uri.path.endsWith('.literate'))
-      {
+      const folder = vscode.workspace.getWorkspaceFolder(e.document.uri);
+      if (!this.disposed && e.contentChanges.length > 0 && folder
+        && this.isWatchedInput(e.document.uri, folder)) {
+        const key = folder.uri.toString();
+        clearTimeout(this.inputTimers.get(key));
+        this.inputTimers.delete(key);
         await this.processLiterateFiles(e.document, true).catch(() => undefined);
       }
     }
@@ -331,7 +379,22 @@ grabbed states for those workspace folders that have been removed from the
 workspace folder.
 
 ``` ts : <<subscribe to workspace changes>>=
-context.subscriptions.push(
+const watcher = vscode.workspace.createFileSystemWatcher('**/*');
+const changed = (uri: vscode.Uri) => {
+  const folder = vscode.workspace.getWorkspaceFolder(uri);
+  if (this.disposed || !folder || !this.isWatchedInput(uri, folder)) { return; }
+  const key = folder.uri.toString();
+  clearTimeout(this.inputTimers.get(key));
+  this.inputTimers.set(key, setTimeout(() => {
+    this.inputTimers.delete(key);
+    if (!this.disposed) {
+      void this.processLiterateFiles(folder, true).catch(() => undefined);
+    }
+  }, 100));
+};
+this.inputSubscriptions.push(watcher, watcher.onDidCreate(changed),
+  watcher.onDidChange(changed), watcher.onDidDelete(changed));
+this.inputSubscriptions.push(
   vscode.workspace.onDidChangeWorkspaceFolders(
     async (e : vscode.WorkspaceFoldersChangeEvent) =>
     {
@@ -341,6 +404,9 @@ context.subscriptions.push(
       for(const removedWorkspaceFolder of e.removed)
       {
         const key = removedWorkspaceFolder.uri.toString();
+        clearTimeout(this.inputTimers.get(key));
+        this.inputTimers.delete(key);
+        this.generatedOutputs.delete(key);
         this.fragmentsForWorkspaceFolders.delete(key);
         this.grabbedStateForWorkspaceFolders.delete(key);
         this.sourceDocuments.delete(key);
@@ -379,8 +445,10 @@ An invalid project produces no writes; existing outputs remain untouched. For a
 valid project the adapter compares UTF-8 bytes with disk, creates parent
 directories, and awaits writes only for changed files. This avoids unnecessary
 watcher events and preserves the engine's identical output across platforms.
-Writes are sequential but are not a transactional filesystem commit: an I/O
-failure can leave earlier writes applied. Obsolete outputs are not deleted.
+Changed outputs are staged as a batch, installed by rename, and rolled back on
+caught failures. Originals stay available until commit; failed recovery reports
+retained backup locations. This is not crash-durable or simultaneously visible
+across all files. Obsolete outputs are not deleted.
 
 The navigation map is deliberately unexpanded and is built from the same
 snapshot, ordered by the engine's `orderSourceDocuments`: root index first,
@@ -407,11 +475,15 @@ sequenceDiagram
     alt Writes requested and no diagnostics
         Repo->>FS: Preflight every output path
         alt All destinations are safe
-            loop Each generated file
-                Repo->>FS: Compare disk bytes
-                opt Missing or changed
-                    Repo->>FS: Create parent and write output
-                end
+            Repo->>FS: Compare all disk bytes and stage changed files
+            loop Each changed output
+                Repo->>FS: Back up original and install stage by rename
+            end
+            alt Installation succeeds
+                Repo->>FS: Remove private staging material
+            else Staging or installation fails
+                Repo->>FS: Restore originals and remove new outputs
+                Note over Repo,FS: Keep recovery material if rollback fails
             end
         else Unsafe destination or filesystem error
             Repo-->>VS: Report failure without starting output writes
@@ -444,6 +516,7 @@ processLiterateFiles(
   writeFiles = false
 ) : Promise<void> {
   const operation = this.processingQueue.then(async () => {
+    if (this.disposed) { return; }
     const folder = trigger && ("eol" in trigger
       ? determineWorkspaceFolder(trigger) : trigger);
     const folders = trigger ? (folder ? [folder] : [])
@@ -486,8 +559,10 @@ processLiterateFiles(
         const entries = diagnostics.get(key) || [];
         const range = new vscode.Range(diagnostic.line, diagnostic.column,
           diagnostic.line, diagnostic.column + 1);
-        entries.push(new vscode.Diagnostic(range, diagnostic.message,
-          vscode.DiagnosticSeverity.Error));
+        const entry = new vscode.Diagnostic(range, diagnostic.message,
+          vscode.DiagnosticSeverity.Error);
+        if (diagnostic.code !== undefined) { entry.code = diagnostic.code; }
+        entries.push(entry);
         diagnostics.set(key, entries);
       }
       const stale: vscode.Uri[] = [];
@@ -526,6 +601,8 @@ processLiterateFiles(
       }
       fragments.map = handleFragments(states.list, result.inspection.fragments);
       if (!writeFiles || result.diagnostics.length) { continue; }
+      this.generatedOutputs.set(key, new Set(result.files.map(file =>
+        vscode.Uri.joinPath(workspaceFolder.uri, file.path).toString())));
       const outputs = await this.preflightOutputs(workspaceFolder.uri, result.files);
       await this.writeChangedOutputs(outputs);
     }
@@ -554,29 +631,132 @@ entries before treating the component as absent. Other errors must propagate.
 ``` ts : <<fragment generation method>>=+
 private async preflightOutputs(
   root: vscode.Uri, files: readonly { path: string; content: string }[]
-): Promise<{ uri: vscode.Uri; content: string }[]> {
-  const outputs: { uri: vscode.Uri; content: string }[] = [];
+): Promise<{ files: TransactionFile[]; io: TransactionIO }> {
+  const io = this.outputTransactionIO(root);
+  const outputs: TransactionFile[] = [];
   for (const file of files) {
-    const relative = safeRelativePath(file.path);
-    if (!relative) { throw new Error(`Unsafe output path: ${file.path}`); }
+    if (await io.inspect(file.path) === 'directory') {
+      throw new Error(`Unsafe output path (expected file): ${file.path}`);
+    }
+    outputs.push({ path: file.path, content: Buffer.from(file.content, 'utf-8') });
+  }
+  return { files: outputs, io };
+}
+```
+
+The filesystem adapter supplies the transaction's small I/O contract. It keeps
+URIs intact for remote providers and validates every relative path before use.
+Generated destinations are registered before staging or committing can emit
+input-shaped watcher events.
+
+``` ts : <<fragment generation method>>=+
+private outputTransactionIO(root: vscode.Uri): TransactionIO {
+  const modes = new Map<string, number>();
+  const uriFor = (relative: string): vscode.Uri => {
+    const safe = safeRelativePath(relative);
+    if (!safe) { throw new Error(`Unsafe output path: ${relative}`); }
+    return vscode.Uri.joinPath(root, safe);
+  };
+  const inspect: TransactionIO['inspect'] = async relativePath => {
+    const relative = safeRelativePath(relativePath);
+    if (!relative) { throw new Error(`Unsafe output path: ${relativePath}`); }
     const parts = relative.split('/');
     let parent = root;
     for (let index = 0; index < parts.length; index++) {
       const uri = vscode.Uri.joinPath(parent, parts[index]);
       const type = await this.outputEntryType(parent, uri, parts[index]);
-      if (type === undefined) { break; }
+      if (type === undefined) { return 'missing'; }
       if (type & vscode.FileType.SymbolicLink) {
         throw new Error(`Unsafe output path (symbolic link): ${uri.toString()}`);
       }
-      const expected = index === parts.length - 1 ? vscode.FileType.File : vscode.FileType.Directory;
-      if (type !== expected) {
-        throw new Error(`Unsafe output path (expected ${expected === vscode.FileType.File ? 'file' : 'directory'}): ${uri.toString()}`);
+      const leaf = index === parts.length - 1;
+      if (type !== vscode.FileType.Directory && !(leaf && type === vscode.FileType.File)) {
+        throw new Error(`Unsafe output path (expected ${leaf ? 'file or directory' : 'directory'}): ${uri.toString()}`);
       }
+      if (leaf) { return type === vscode.FileType.File ? 'file' : 'directory'; }
       parent = uri;
     }
-    outputs.push({ uri: vscode.Uri.joinPath(root, relative), content: file.content });
-  }
-  return outputs;
+    throw new Error(`Unsafe output path: ${relativePath}`);
+  };
+  const requireType = async (relative: string, expected: 'missing' | 'file' | 'directory'): Promise<void> => {
+    if (await inspect(relative) !== expected) {
+      throw new Error(`Unsafe output path (expected ${expected}): ${relative}`);
+    }
+  };
+  const requireParent = async (relative: string): Promise<void> => {
+    const safe = safeRelativePath(relative);
+    if (!safe) { throw new Error(`Unsafe output path: ${relative}`); }
+    const parent = safe.split('/').slice(0, -1).join('/');
+    if (parent) { await requireType(parent, 'directory'); }
+    else { await vscode.workspace.fs.readDirectory(root); }
+  };
+  const removeDirectory = async (relative: string): Promise<void> => {
+    await requireType(relative, 'directory');
+    const uri = uriFor(relative);
+    if ((await vscode.workspace.fs.readDirectory(uri)).length) {
+      throw new Error(`Output directory is not empty: ${relative}`);
+    }
+    await vscode.workspace.fs.delete(uri, { recursive: false, useTrash: false });
+  };
+  return {
+    inspect,
+    read: async relative => {
+      await requireType(relative, 'file');
+      const uri = uriFor(relative);
+      if (uri.scheme === 'file') {
+        const stat = await lstat(uri.fsPath);
+        if (stat.isSymbolicLink() || !stat.isFile()) {
+          throw new Error(`Unsafe output path (expected file): ${uri.toString()}`);
+        }
+        modes.set(uri.toString(), stat.mode & 0o7777);
+      }
+      return vscode.workspace.fs.readFile(uri);
+    },
+    mkdir: async relative => {
+      await requireType(relative, 'missing');
+      await requireParent(relative);
+      try { await vscode.workspace.fs.createDirectory(uriFor(relative)); }
+      catch (error) {
+        let createdEmptyDirectory = false;
+        try {
+          if (await inspect(relative) === 'directory') {
+            if ((await vscode.workspace.fs.readDirectory(uriFor(relative))).length) {
+              throw new Error(`Output directory is not empty: ${relative}`);
+            }
+            createdEmptyDirectory = true;
+            await removeDirectory(relative);
+          }
+        } catch (cleanupError) {
+          const message = `Directory creation failed: ${relative}; ${String(error)}; empty-directory cleanup failed: ${String(cleanupError)}`;
+          if (createdEmptyDirectory) { throw new TransactionDirectoryError(relative, message); }
+          throw new Error(message);
+        }
+        throw error;
+      }
+    },
+    writeNew: async (relative, content) => {
+      await requireType(relative, 'missing');
+      await requireParent(relative);
+      await vscode.workspace.fs.writeFile(uriFor(relative), content);
+    },
+    rename: async (from, to) => {
+      await requireType(from, 'file');
+      await requireType(to, 'missing');
+      await requireParent(to);
+      const source = uriFor(from), target = uriFor(to);
+      const mode = modes.get(target.toString());
+      if (source.scheme === 'file' && from.endsWith('.stage') && mode !== undefined) {
+        await chmod(source.fsPath, mode);
+      }
+      await vscode.workspace.fs.rename(source, target, { overwrite: false });
+    },
+    removeFile: async relative => {
+      await requireType(relative, 'file');
+      await vscode.workspace.fs.delete(uriFor(relative), { recursive: false, useTrash: false });
+    },
+    removeDirectory,
+    nonce: randomUUID
+  };
 }
 ```
 
@@ -600,31 +780,40 @@ private async outputEntryType(parent: vscode.Uri, uri: vscode.Uri, name: string)
 
 These checks depend on the provider reporting links through `stat` or directory
 entries. VS Code has no portable no-follow open/write API: concurrent filesystem
-changes can race the checks (TOCTOU). Preflight is not a security sandbox or a
-multi-file transaction. It prevents a known unsafe later output from allowing
-earlier writes, but an I/O failure during writing can still leave partial output.
+changes can race the checks (TOCTOU). VS Code also has no exclusive mkdir or
+exclusive writeFile operation. The adapter checks absence and the immediate
+parent before creation, assuming no concurrent external changes. If directory
+creation throws after taking effect, it attempts to remove the empty directory.
+If a confirmed empty created directory cannot be removed, `TransactionDirectoryError`
+transfers ownership to the coordinator for rollback cleanup; persistent failure
+reports that artifact's recovery path along with the creation and cleanup errors.
+The workspace URI is the trusted boundary (not statted); directory listing checks
+that boundary when checking a missing immediate child or creating beneath it.
+Providers must honor non-overwriting move semantics and nonrecursive deletion.
+This is recoverable exception handling, not a security sandbox, crash-durable
+journal, or simultaneous atomic visibility across outputs. Rollback failures
+preserve recovery locations and propagate the transaction error.
 Read-only navigation refreshes bypass both output preflight and output writes.
 
 #### Writing changed outputs
 
-Only after the entire project's preflight succeeds do we compare disk bytes and
-write changed files. Open output buffers are not used for this comparison.
+Only after the entire project's preflight succeeds does the shared coordinator
+compare disk bytes, stage every changed file, and install the batch by rename.
+Open output buffers are not used for this comparison. Each workspace remains a
+separate transaction. Numbered stage and backup names do not end in `.literate`,
+so their watcher events do not trigger input processing.
+
+For local `file` URIs, reading an existing output snapshots its POSIX permission
+bits with Node `lstat`; `chmod` applies those bits to the stage before installation.
+Rollback moves the original backup back without changing its mode. New outputs
+use provider defaults. Remote URIs use only `workspace.fs`, which exposes no mode
+API: replacement metadata follows provider defaults, and remote permission or
+metadata restoration is not guaranteed. Ownership, ACLs and other metadata are
+not preserved by this local permission-bit handling either.
 
 ``` ts : <<fragment generation method>>=+
-private async writeChangedOutputs(outputs: readonly { uri: vscode.Uri; content: string }[]): Promise<void> {
-  for (const output of outputs) {
-    const content = Buffer.from(output.content, 'utf-8');
-    try {
-      const previous = await vscode.workspace.fs.readFile(output.uri);
-      if (content.equals(Buffer.from(previous))) { continue; }
-    } catch (error) {
-      if (!(error instanceof vscode.FileSystemError) || error.code !== 'FileNotFound') {
-        throw error;
-      }
-    }
-    await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(output.uri, '..'));
-    await vscode.workspace.fs.writeFile(output.uri, content);
-  }
+private async writeChangedOutputs(outputs: { files: readonly TransactionFile[]; io: TransactionIO }): Promise<void> {
+  await commitOutputs(outputs.files, outputs.io);
 }
 ```
 
@@ -1644,6 +1833,9 @@ export function deactivate() {}
 
 ``` ts : <<import necessary modules for literate>>=
 import { TextDecoder } from 'util';
+import { randomUUID } from 'crypto';
+import { lstat, chmod } from 'fs/promises';
+import { commitOutputs, TransactionDirectoryError, TransactionFile, TransactionIO } from './output-transactions';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { discoveryExcludedDirectories, generateProject, resolveProjectTheme, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection } from './engine';

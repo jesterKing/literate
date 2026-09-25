@@ -16,6 +16,9 @@ function expected(documents: SourceDocument[], templates: Record<string, string>
 
 function assertOutputs(f: ReturnType<typeof fixture>, files: ReturnType<typeof expected>): void {
     assert.deepEqual([...f.writes].sort(), files.map(file => f.uri(file.path)).sort());
+    assert.equal(f.stagedWrites.length, files.length);
+    assert.ok(f.stagedWrites.every(uri => /\/\.literate-txn-[^/]+\/\d+\.stage$/.test(uri)));
+    assert.ok(![...f.disk.keys(), ...f.types.keys()].some(uri => uri.includes('/.literate-txn-')));
     for (const file of files) {
         assert.deepEqual(f.disk.get(f.uri(file.path)), Buffer.from(file.content), file.path);
     }
@@ -100,9 +103,13 @@ test('adapter skips unchanged files and rewrites only changed disk output', { ti
     await f.process(true);
     assertOutputs(f, expected([{ path: 'index.literate', text: root('hello') }]));
     f.writes.length = 0;
+    f.stagedWrites.length = 0;
+    f.renames.length = 0;
     f.directories.length = 0;
     await f.process(true);
     assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.stagedWrites, []);
+    assert.deepEqual(f.renames, []);
     assert.deepEqual(f.directories, []);
     f.put('generated/main.txt', 'outdated');
     // Output comparison must use disk, not an editor buffer that happens to match.
@@ -204,7 +211,7 @@ test('nested remote outputs use the workspace provider and skip unchanged bytes'
     await f.process(true);
     assertOutputs(f, expected([{ path: 'index.literate', text }]));
     assert.ok(f.stats.includes(f.uri('nested/deeper')));
-    assert.ok(!f.stats.includes(f.uri('nested/deeper/main.txt')), 'stop at the first absent component');
+    assert.ok(f.stats.includes(f.uri('nested/deeper/main.txt')), 'transaction rechecks paths after creating missing parents');
     assert.ok([...f.stats, ...f.listings, ...f.writes].every(uri => uri.startsWith('vscode-remote://example/')));
     f.writes.length = 0;
     f.directories.length = 0;
@@ -212,6 +219,212 @@ test('nested remote outputs use the workspace provider and skip unchanged bytes'
     assert.ok(f.stats.includes(f.uri('nested/deeper/main.txt')));
     assert.deepEqual(f.writes, []);
     assert.deepEqual(f.directories, []);
+});
+
+// Hooks can fail before or after effect without also breaking rollback's retry.
+function failOnce(predicate: (...paths: string[]) => boolean, message: string) {
+    let failed = false;
+    return (...paths: string[]): void => {
+        if (!failed && predicate(...paths)) { failed = true; throw new Error(message); }
+    };
+}
+
+function snapshot(f: ReturnType<typeof fixture>) {
+    return { disk: new Map(f.disk), types: new Map(f.types), modes: new Map(f.modes) };
+}
+
+for (const mode of [0o755, 0o600]) {
+    test(`local replacement preserves ${mode.toString(8)} permission bits before installation`, { timeout: 5000 }, async () => {
+        const f = fixture();
+        const text = root('new');
+        f.put('index.literate', text);
+        for (const name of ['generated/main.txt', 'index.html']) {
+            f.put(name, 'old');
+            f.modes.set(f.uri(name), mode);
+        }
+        f.controls.beforeRename = (from, to) => {
+            if (from.endsWith('.stage')) {
+                assert.equal(f.modes.get(from), mode, 'apply original permissions before publishing the stage');
+                assert.ok(f.modeStats.includes(to));
+            }
+        };
+        await f.process(true);
+        assertOutputs(f, expected([{ path: 'index.literate', text }]));
+        for (const name of ['generated/main.txt', 'index.html']) { assert.equal(f.modes.get(f.uri(name)), mode); }
+        assert.equal(f.modeChanges.length, 2);
+        assert.ok(f.modeChanges.every(change => change.uri.endsWith('.stage') && change.mode === mode));
+        const before = snapshot(f);
+        f.modeChanges.length = 0;
+        f.writes.length = 0;
+        f.stagedWrites.length = 0;
+        await f.process(true);
+        assert.deepEqual(snapshot(f), before, 'unchanged outputs retain their modes without chmod or replacement');
+        assert.deepEqual(f.modeChanges, []);
+        assert.deepEqual(f.writes, []);
+        assert.deepEqual(f.stagedWrites, []);
+    });
+
+    for (const phase of ['beforeRename', 'afterRename'] as const) {
+        test(`local rollback preserves ${mode.toString(8)} permissions on ${phase} failure`, { timeout: 5000 }, async () => {
+            const f = fixture();
+            f.put('index.literate', root('new') + fence('text: <<second.*>>= fresh/new.txt $', 'new file'));
+            for (const name of ['generated/main.txt', 'index.html']) {
+                f.put(name, `old ${name}`);
+                f.modes.set(f.uri(name), mode);
+            }
+            const before = snapshot(f);
+            f.controls[phase] = failOnce((from, to) => from.endsWith('.stage') && to === f.uri('index.html'), 'install failure');
+            await assert.rejects(f.process(true), /rolled_back.*install failure/);
+            assert.ok(f.writes.includes(f.uri('fresh/new.txt')));
+            assert.deepEqual(snapshot(f), before, 'restore original bytes and modes, removing new outputs and their modes');
+            assert.equal(f.modeChanges.length, 2);
+            assert.ok(f.modeChanges.every(change => change.uri.endsWith('.stage')), 'never chmod a backup during restoration');
+        });
+    }
+}
+
+test('chmod failure aborts local installation and restores original bytes and modes', { timeout: 5000 }, async () => {
+    const f = fixture();
+    f.put('index.literate', root('new'));
+    f.put('generated/main.txt', 'old executable');
+    f.modes.set(f.uri('generated/main.txt'), 0o755);
+    const before = snapshot(f);
+    f.controls.chmodError = 'NoPermissions';
+    await assert.rejects(f.process(true), /rolled_back.*NoPermissions/);
+    assert.deepEqual(snapshot(f), before);
+    assert.deepEqual(f.writes, []);
+});
+
+test('remote replacements use provider-default modes without Node filesystem access', { timeout: 5000 }, async () => {
+    const f = fixture('vscode-remote://example/project');
+    f.put('index.literate', root('new'));
+    f.put('generated/main.txt', 'old executable');
+    f.put('index.html', 'old private HTML');
+    f.modes.set(f.uri('generated/main.txt'), 0o755);
+    f.modes.set(f.uri('index.html'), 0o600);
+    await f.process(true);
+    assert.equal(f.modes.get(f.uri('generated/main.txt')), 0o644);
+    assert.equal(f.modes.get(f.uri('index.html')), 0o644);
+    assert.deepEqual(f.modeStats, []);
+    assert.deepEqual(f.modeChanges, []);
+});
+
+for (const phase of ['beforeRename', 'afterRename'] as const) {
+    test(`transaction restores mixed existing/new outputs on ${phase} install failure`, { timeout: 5000 }, async () => {
+        const f = fixture('vscode-remote://example/project');
+        const text = root('new') + fence('text: <<second.*>>= fresh/deep/new.txt $', 'new file');
+        f.put('index.literate', text);
+        f.put('generated/main.txt', 'old source');
+        f.put('index.html', 'old HTML');
+        const before = snapshot(f);
+        f.controls[phase] = failOnce((from, to) => from.endsWith('.stage') && to === f.uri('index.html'), 'install failure');
+        await assert.rejects(f.process(true), (error: Error & { code?: string; recoveryPaths?: string[] }) => {
+            assert.equal(error.code, 'rolled_back');
+            assert.deepEqual(error.recoveryPaths, []);
+            assert.match(error.message, /install failure/);
+            return true;
+        });
+        assert.ok(f.writes.includes(f.uri('fresh/deep/new.txt')), 'new output was installed before failure');
+        assert.deepEqual(snapshot(f), before, 'restore bytes and remove newly created directories');
+        await new Promise(resolve => setTimeout(resolve, 180));
+        await tick();
+        assert.equal(f.discoveries(), 1, 'stage/backup events must not enqueue generation');
+        assert.match(f.errors[0], /rolled_back.*install failure/);
+    });
+}
+
+test('staging failure leaves no final writes and removes stages and empty parents', { timeout: 5000 }, async () => {
+    const f = fixture();
+    f.put('index.literate', root('new'));
+    f.put('index.html', 'old HTML');
+    const before = snapshot(f);
+    let attempts = 0;
+    f.controls.beforeWrite = async () => {
+        if (++attempts === 2) { throw new Error('staging failure'); }
+    };
+    await assert.rejects(f.process(true), /rolled_back.*staging failure/);
+    assert.equal(f.stagedWrites.length, 1);
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.renames, []);
+    assert.deepEqual(snapshot(f), before);
+});
+
+test('mkdir failure after creation removes the empty directory', { timeout: 5000 }, async () => {
+    const f = fixture();
+    f.put('index.literate', root('new'));
+    const before = snapshot(f);
+    f.controls.afterCreateDirectory = failOnce(() => true, 'mkdir after effect');
+    await assert.rejects(f.process(true), /rolled_back.*mkdir after effect/);
+    assert.deepEqual(snapshot(f), before);
+    assert.deepEqual(f.stagedWrites, []);
+    assert.deepEqual(f.writes, []);
+});
+
+for (const artifact of ['parent', 'stage'] as const) {
+    test(`persistent mkdir-after-effect cleanup failure reports the ${artifact} recovery path`, { timeout: 5000 }, async () => {
+        const f = fixture();
+        f.put('index.literate', root('new'));
+        const before = snapshot(f);
+        let created = '', removalAttempts = 0;
+        f.controls.afterCreateDirectory = uri => {
+            if (artifact === 'parent' ? uri === f.uri('generated') : uri.includes('/.literate-txn-')) {
+                created = uri;
+                throw new Error('mkdir after effect');
+            }
+        };
+        f.controls.beforeDelete = uri => {
+            if (uri === created) { removalAttempts++; throw new Error('persistent directory deletion failure'); }
+        };
+        await assert.rejects(f.process(true), (error: Error & {
+            code?: string; committed?: boolean; recoveryPaths?: string[];
+            originalError?: Error & { createdPath?: string };
+        }) => {
+            assert.equal(error.code, 'rollback_failed', 'must not claim successful rollback with a stranded directory');
+            assert.equal(error.committed, false);
+            assert.ok(created);
+            const relative = created.slice(f.folder.uri.toString().length + 1);
+            assert.ok(error.recoveryPaths?.includes(relative));
+            assert.match(error.message, /mkdir after effect/);
+            assert.match(error.message, /persistent directory deletion failure/);
+            assert.ok(error.message.includes(relative));
+            assert.equal(error.originalError?.name, 'TransactionDirectoryError');
+            assert.equal(error.originalError?.createdPath, relative);
+            assert.match(error.originalError!.message, /mkdir after effect.*persistent directory deletion failure/);
+            return true;
+        });
+        assert.equal(removalAttempts, 2, 'adapter compensates, then coordinator retries owned-directory cleanup');
+        assert.equal(f.types.get(created), f.mock.FileType.Directory);
+        assert.deepEqual(await f.workspace.fs.readDirectory(f.mock.Uri.parse(created)), []);
+        assert.deepEqual(f.disk, before.disk);
+        assert.deepEqual(f.modes, before.modes);
+        assert.deepEqual(f.stagedWrites, []);
+        assert.deepEqual(f.writes, []);
+        assert.match(f.errors[0], /rollback_failed.*mkdir after effect.*recovery locations:/);
+    });
+}
+
+test('failed rollback retains backups and reports recovery locations without swallowing the error', { timeout: 5000 }, async () => {
+    const f = fixture();
+    f.put('index.literate', root('new'));
+    f.put('generated/main.txt', 'old source');
+    f.put('index.html', 'old HTML');
+    f.controls.afterRename = failOnce((from, to) => from.endsWith('.stage') && to === f.uri('index.html'), 'install failure');
+    f.controls.beforeRename = failOnce(from => from.endsWith('.backup'), 'restore failure');
+    await assert.rejects(f.process(true), (error: Error & { code?: string; committed?: boolean; recoveryPaths?: string[] }) => {
+        assert.equal(error.code, 'rollback_failed');
+        assert.equal(error.committed, false);
+        assert.match(error.message, /install failure/);
+        assert.match(error.message, /restore failure/);
+        assert.ok(error.recoveryPaths?.length);
+        for (const location of error.recoveryPaths!) {
+            assert.ok(error.message.includes(location));
+            assert.equal(f.types.get(f.uri(location)), f.mock.FileType.Directory);
+        }
+        return true;
+    });
+    assert.ok([...f.disk].some(([uri, bytes]) => uri.endsWith('.backup') && bytes.toString() === 'old HTML'));
+    assert.ok(!f.deletions.some(uri => uri.includes('/.literate-txn-')), 'restoration failure suppresses artifact cleanup');
+    assert.match(f.errors[0], /rollback_failed.*recovery locations:/);
 });
 
 test('invalid projects preserve existing outputs and map engine diagnostics without offset changes', { timeout: 5000 }, async () => {
@@ -233,7 +446,8 @@ test('invalid projects preserve existing outputs and map engine diagnostics with
         assert.ok(result.diagnostics.length > 0);
         assert.deepEqual(f.diagnostics.get(f.uri('index.literate'))?.map(diagnostic => ({
             path: 'index.literate', line: diagnostic.range.start.line,
-            column: diagnostic.range.start.character, message: diagnostic.message
+            column: diagnostic.range.start.character, message: diagnostic.message,
+            ...(diagnostic.code === undefined ? {} : { code: diagnostic.code })
         })), result.diagnostics);
         for (const diagnostic of f.diagnostics.get(f.uri('index.literate')) || []) {
             assert.equal(diagnostic.severity, 0);

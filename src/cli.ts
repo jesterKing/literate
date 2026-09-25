@@ -1,5 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { randomUUID } from 'crypto';
+import { commitOutputs, OutputTransactionError, TransactionIO } from './output-transactions';
 import { discoveryExcludedDirectories, generateProject, safeRelativePath, templateReferences, SourceDocument } from './engine';
 
 export interface CliIO {
@@ -68,6 +70,72 @@ async function inspect(root: string, value: string): Promise<boolean> {
     return true;
 }
 
+export function createTransactionIO(root: string): TransactionIO {
+    root = path.resolve(root);
+    const modes = new Map<string, number>();
+    const target = (value: string): string => path.join(root, relative(value));
+    const inspectPath: TransactionIO['inspect'] = async value => {
+        const parts = relative(value).split('/');
+        const rootStat = await fs.lstat(root);
+        if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) {
+            throw new Error(`Root is not a regular directory: ${root}`);
+        }
+        let current = root;
+        for (const [index, part] of parts.entries()) {
+            current = path.join(current, part);
+            let stat;
+            try { stat = await fs.lstat(current); }
+            catch (error) {
+                if (missing(error)) { return 'missing'; }
+                throw error;
+            }
+            if (stat.isSymbolicLink()) { throw new Error(`Symbolic link is not allowed: ${value}`); }
+            if (index < parts.length - 1) {
+                if (!stat.isDirectory()) { throw new Error(`Parent is not a directory: ${value}`); }
+            } else {
+                if (stat.isFile()) { return 'file'; }
+                if (stat.isDirectory()) { return 'directory'; }
+                throw new Error(`Target is not a regular file or directory: ${value}`);
+            }
+        }
+        throw new Error(`Invalid relative path: ${value}`);
+    };
+    return {
+        inspect: inspectPath,
+        async read(value) {
+            if (await inspectPath(value) !== 'file') { throw new Error(`Not a file: ${value}`); }
+            const stat = await fs.lstat(target(value));
+            const bytes = await fs.readFile(target(value));
+            modes.set(relative(value), stat.mode & 0o7777);
+            return bytes;
+        },
+        async mkdir(value) {
+            if (await inspectPath(value) !== 'missing') { throw new Error(`Path exists: ${value}`); }
+            await fs.mkdir(target(value));
+        },
+        async writeNew(value, content) {
+            if (await inspectPath(value) !== 'missing') { throw new Error(`Path exists: ${value}`); }
+            await fs.writeFile(target(value), content, { flag: 'wx' });
+        },
+        async rename(from, to) {
+            if (await inspectPath(from) !== 'file') { throw new Error(`Not a file: ${from}`); }
+            if (await inspectPath(to) !== 'missing') { throw new Error(`Path exists: ${to}`); }
+            const mode = modes.get(relative(to));
+            if (from.endsWith('.stage') && mode !== undefined) { await fs.chmod(target(from), mode); }
+            await fs.rename(target(from), target(to));
+        },
+        async removeFile(value) {
+            if (await inspectPath(value) !== 'file') { throw new Error(`Not a file: ${value}`); }
+            await fs.unlink(target(value));
+        },
+        async removeDirectory(value) {
+            if (await inspectPath(value) !== 'directory') { throw new Error(`Not a directory: ${value}`); }
+            await fs.rmdir(target(value));
+        },
+        nonce: randomUUID
+    };
+}
+
 async function discover(root: string): Promise<SourceDocument[]> {
     const documents: SourceDocument[] = [];
     const visit = async (directory: string): Promise<void> => {
@@ -89,7 +157,8 @@ async function discover(root: string): Promise<SourceDocument[]> {
     return documents;
 }
 
-export async function run(args: string[], io: CliIO = defaultIO): Promise<number> {
+export async function run(args: string[], io: CliIO = defaultIO,
+    transactionIO: (root: string) => TransactionIO = createTransactionIO): Promise<number> {
     const json = args.includes('--json');
     const positional: string[] = [];
     const flags = new Set<string>();
@@ -200,14 +269,24 @@ export async function run(args: string[], io: CliIO = defaultIO): Promise<number
             }
             return finish(0);
         }
-        for (const change of changes) {
-            await inspect(root, change.path);
-            const target = path.join(root, change.path);
-            await fs.mkdir(path.dirname(target), { recursive: true });
-            await inspect(root, change.path);
-            await fs.writeFile(target, change.content, 'utf8');
-            change.output.status = 'written';
-            if (!json) { io.stdout(`generated: ${change.path}\n`); }
+        const markWritten = (paths: readonly string[]): void => {
+            const written = new Set(paths);
+            for (const output of response.outputs) {
+                if (!written.has(output.path)) { continue; }
+                output.status = 'written';
+                if (!json) { io.stdout(`generated: ${output.path}\n`); }
+            }
+        };
+        try {
+            const written = await commitOutputs(files.map(file => ({
+                path: file.path, content: Buffer.from(file.content, 'utf8')
+            })), transactionIO(root));
+            markWritten(written);
+        } catch (error) {
+            if (error instanceof OutputTransactionError && error.committed) {
+                markWritten(error.changedPaths);
+            }
+            throw error;
         }
         return finish(0);
     } catch (error) {

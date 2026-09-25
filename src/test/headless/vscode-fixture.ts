@@ -12,6 +12,7 @@ class Uri {
         this.path = decodeURIComponent(this.value.pathname);
     }
     get fsPath(): string { return this.path; }
+    get scheme(): string { return this.value.protocol.slice(0, -1); }
     toString(): string { return this.value.toString(); }
     static file(value: string): Uri { return new Uri('file:///' + value.replace(/^\//, '')); }
     static parse(value: string): Uri { return new Uri(value); }
@@ -57,6 +58,9 @@ class WorkspaceEdit {
         if (!this.edits.has(uri.toString())) { this.edits.set(uri.toString(), [uri, []]); }
         this.edits.get(uri.toString())![1].push({ range, newText });
     }
+    insert(uri: Uri, position: Position, newText: string): void {
+        this.replace(uri, new Range(position, position), newText);
+    }
     get(uri: Uri) { return this.edits.get(uri.toString())?.[1] || []; }
     entries() { return [...this.edits.values()]; }
     get size(): number { return this.edits.size; }
@@ -88,7 +92,24 @@ class RelativePattern {
     constructor(readonly base: { uri: Uri }, readonly pattern: string) {}
 }
 
+class CodeActionKind {
+    static readonly QuickFix = new CodeActionKind('quickfix');
+    static readonly Refactor = new CodeActionKind('refactor');
+    constructor(readonly value: string) {}
+    append(parts: string): CodeActionKind { return new CodeActionKind(this.value ? this.value + '.' + parts : parts); }
+    intersects(other: CodeActionKind): boolean { return this.contains(other) || other.contains(this); }
+    contains(other: CodeActionKind): boolean {
+        return !this.value || other.value === this.value || other.value.startsWith(this.value + '.');
+    }
+}
+class CodeAction {
+    diagnostics?: vscode.Diagnostic[];
+    edit?: vscode.WorkspaceEdit;
+    command?: vscode.Command;
+    constructor(readonly title: string, readonly kind?: CodeActionKind) {}
+}
 class Diagnostic {
+    code?: vscode.Diagnostic['code'];
     constructor(readonly range: Range, readonly message: string, readonly severity: number) {}
 }
 
@@ -103,6 +124,8 @@ export function fixture(workspaceUri = 'file:///project') {
     const folder = { name: 'project', uri: Uri.parse(workspaceUri), index: 0 };
     const other = { name: 'other', uri: Uri.file('/other'), index: 1 };
     const disk = new Map<string, Buffer>();
+    const modes = new Map<string, number>();
+    const modeStats: string[] = [], modeChanges: { uri: string; mode: number }[] = [];
     const types = new Map<string, number>();
     const statErrors = new Map<string, string>();
     const stats: string[] = [], listings: string[] = [];
@@ -117,10 +140,23 @@ export function fixture(workspaceUri = 'file:///project') {
         return undefined;
     };
     const diagnostics = new Map<string, Diagnostic[]>();
-    const reads: string[] = [], writes: string[] = [], directories: string[] = [], errors: string[] = [];
+    // writes tracks installed outputs; stagedWrites tracks provider writeFile calls.
+    const reads: string[] = [], writes: string[] = [], stagedWrites: string[] = [], directories: string[] = [], errors: string[] = [];
+    const renames: { from: string; to: string }[] = [];
+    const deletions: string[] = [];
     let discoveries = 0;
     const changeListeners = new Set<(event: vscode.TextDocumentChangeEvent) => unknown>();
-    const controls: { beforeWrite?: () => Promise<void>; readError?: string } = {};
+    const fileEvents = { create: new EventEmitter<Uri>(), change: new EventEmitter<Uri>(), delete: new EventEmitter<Uri>() };
+    const controls: {
+        beforeWrite?: (uri: string) => Promise<void>;
+        // beforeRename runs before mutation; afterRename runs after mutation and tracking.
+        beforeRename?: (from: string, to: string) => void | Promise<void>;
+        afterRename?: (from: string, to: string) => void | Promise<void>;
+        afterCreateDirectory?: (uri: string) => void | Promise<void>;
+        beforeDelete?: (uri: string) => void | Promise<void>;
+        readError?: string;
+        chmodError?: string;
+    } = {};
     const versions = new Map<string, number>();
     const document = (name: string, text: string, base = folder): vscode.TextDocument => {
         const uri = Uri.joinPath(base.uri, name);
@@ -167,6 +203,12 @@ export function fixture(workspaceUri = 'file:///project') {
             return { dispose: () => changeListeners.delete(callback) };
         },
         onDidChangeWorkspaceFolders() { return disposable(); },
+        createFileSystemWatcher(pattern: string) {
+            assert.equal(pattern, '**/*');
+            return { onDidCreate: fileEvents.create.event, onDidChange: fileEvents.change.event,
+                onDidDelete: fileEvents.delete.event,
+                dispose() { for (const event of Object.values(fileEvents)) { event.dispose(); } } };
+        },
         async findFiles(pattern: RelativePattern, exclude: unknown) {
             assert.equal(exclude, null, 'discovery must not apply editor search exclusions');
             discoveries++;
@@ -212,16 +254,57 @@ export function fixture(workspaceUri = 'file:///project') {
                 await tick();
                 directories.push(uri.toString());
                 types.set(uri.toString(), fileType.Directory);
+                await controls.afterCreateDirectory?.(uri.toString());
             },
             async writeFile(uri: Uri, content: Uint8Array) {
                 assert.ok(directories.includes(Uri.joinPath(uri, '..').toString()),
                     'parent directory creation must finish before writing');
-                if (controls.beforeWrite) { await controls.beforeWrite(); }
+                if (controls.beforeWrite) { await controls.beforeWrite(uri.toString()); }
                 await tick();
                 disk.set(uri.toString(), Buffer.from(content));
-                writes.push(uri.toString());
+                if (!modes.has(uri.toString())) { modes.set(uri.toString(), 0o644); }
+                stagedWrites.push(uri.toString());
+                if (!/\/\.literate-txn-[^/]+\/\d+\.stage$/.test(uri.toString())) { writes.push(uri.toString()); }
+                fileEvents.create.fire(uri);
                 // Model an open generated document changing; it must not enqueue generation.
                 await change(document(path.posix.relative(folder.uri.path, uri.path), Buffer.from(content).toString()));
+            },
+            async rename(from: Uri, to: Uri, options: { overwrite: boolean }) {
+                assert.deepEqual(options, { overwrite: false });
+                const source = from.toString(), target = to.toString();
+                await controls.beforeRename?.(source, target);
+                await tick();
+                if (entryType(target) !== undefined) { throw new FileSystemError('FileExists'); }
+                assert.equal(entryType(Uri.joinPath(to, '..').toString()), fileType.Directory);
+                const content = disk.get(source);
+                if (!content) { throw new FileSystemError('FileNotFound'); }
+                disk.set(target, content);
+                modes.set(target, modes.get(source) ?? 0o644);
+                modes.delete(source);
+                disk.delete(source);
+                types.delete(source);
+                renames.push({ from: source, to: target });
+                if (/\/\.literate-txn-[^/]+\/\d+\.stage$/.test(source)) { writes.push(target); }
+                fileEvents.delete.fire(from);
+                fileEvents.create.fire(to);
+                await change(document(path.posix.relative(folder.uri.path, to.path), content.toString()));
+                await controls.afterRename?.(source, target);
+            },
+            async delete(uri: Uri, options: { recursive: boolean; useTrash: boolean }) {
+                assert.deepEqual(options, { recursive: false, useTrash: false });
+                await controls.beforeDelete?.(uri.toString());
+                await tick();
+                const key = uri.toString();
+                const type = entryType(key);
+                if (type === undefined) { throw new FileSystemError('FileNotFound'); }
+                if (type === fileType.Directory && [...disk.keys(), ...types.keys()].some(child => child.startsWith(key + '/'))) {
+                    throw new FileSystemError('DirectoryNotEmpty');
+                }
+                disk.delete(key);
+                modes.delete(key);
+                types.delete(key);
+                deletions.push(key);
+                fileEvents.delete.fire(uri);
             }
         }
     };
@@ -233,7 +316,7 @@ export function fixture(workspaceUri = 'file:///project') {
     };
     const mock = {
         Uri, FileSystemError, FileType: fileType, Position, Range, WorkspaceEdit, Location, Hover, MarkdownString, EventEmitter,
-        Diagnostic, DiagnosticSeverity: { Error: 0 }, RelativePattern, workspace,
+        Diagnostic, DiagnosticSeverity: { Error: 0 }, CodeAction, CodeActionKind, EndOfLine: { LF: 1, CRLF: 2 }, RelativePattern, workspace,
         TreeItem: class { constructor(readonly label: string, readonly collapsibleState: number) {} },
         ThemeIcon: class { constructor(readonly id: string) {} },
         TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
@@ -271,6 +354,27 @@ export function fixture(workspaceUri = 'file:///project') {
     try {
         delete require.cache[extensionPath];
         loader._load = function (request, parent, isMain) {
+            if ((request === 'fs/promises' || request === 'node:fs/promises') && parent?.filename === extensionPath) {
+                // Only the extension's mode operations are mocked; never touch real /project files.
+                return {
+                    async lstat(filePath: string) {
+                        const key = Uri.file(filePath).toString();
+                        modeStats.push(key);
+                        const type = entryType(key);
+                        if (type === undefined) { throw new FileSystemError('FileNotFound'); }
+                        return { mode: 0o100000 | (modes.get(key) ?? 0o644),
+                            isFile: () => type === fileType.File,
+                            isSymbolicLink: () => !!(type & fileType.SymbolicLink) };
+                    },
+                    async chmod(filePath: string, mode: number) {
+                        const key = Uri.file(filePath).toString();
+                        if (controls.chmodError) { throw new FileSystemError(controls.chmodError); }
+                        assert.equal(entryType(key), fileType.File);
+                        modes.set(key, mode);
+                        modeChanges.push({ uri: key, mode });
+                    }
+                };
+            }
             return request === 'vscode' ? mock : originalLoad.call(this, request, parent, isMain);
         };
         extension = require(extensionPath) as typeof import('../../extension');
@@ -281,7 +385,11 @@ export function fixture(workspaceUri = 'file:///project') {
     }
     const repository = new extension.FragmentRepository({ subscriptions: [] } as unknown as vscode.ExtensionContext);
     const uri = (name: string, base = folder) => Uri.joinPath(base.uri, name).toString();
-    const put = (name: string, content: string, base = folder) => { disk.set(uri(name, base), Buffer.from(content)); };
+    const put = (name: string, content: string, base = folder) => {
+        const key = uri(name, base);
+        disk.set(key, Buffer.from(content));
+        if (!modes.has(key)) { modes.set(key, 0o644); }
+    };
     const open = (name: string, text: string, base = folder) => {
         const doc = document(name, text, base);
         workspace.textDocuments = workspace.textDocuments.filter(old => old.uri.toString() !== doc.uri.toString());
@@ -296,7 +404,10 @@ export function fixture(workspaceUri = 'file:///project') {
     }
     const process = (writeFiles?: boolean) => repository.processLiterateFiles(
         folder as unknown as vscode.WorkspaceFolder, writeFiles);
-    return { folder, other, disk, types, statErrors, stats, listings, diagnostics, reads, writes, directories, errors, controls,
+    return { folder, other, disk, modes, modeStats, modeChanges, types, statErrors, stats, listings, diagnostics, reads, writes, stagedWrites, renames, deletions, directories, errors, controls,
         workspace, repository, extension, mock, providers, commands, executedCommands, document, open, uri, put, change, process,
+        fileEvent(kind: keyof typeof fileEvents, name: string, base = folder) {
+            fileEvents[kind].fire(Uri.joinPath(base.uri, name));
+        },
         get docs() { return workspace.textDocuments; }, discoveries: () => discoveries };
 }

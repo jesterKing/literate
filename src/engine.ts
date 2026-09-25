@@ -4,7 +4,7 @@ import hljs from 'highlight.js';
 import { defaultThemeName, getTheme, themeCss, mermaidTheme } from './themes';
 
 export interface SourceDocument { path: string; text: string; }
-export interface GenerationDiagnostic { path: string; line: number; column: number; message: string; }
+export interface GenerationDiagnostic { path: string; line: number; column: number; message: string; code?: string; }
 export interface GeneratedFile { path: string; content: string; }
 export interface ProjectInspection { documents: string[]; templates: string[]; fragments: FragmentInspection[]; }
 export interface FragmentInspection {
@@ -218,8 +218,8 @@ function defaultTemplate(themeName: string): string {
 export function generateProject(documents: SourceDocument[], templates: Record<string, string> = {}): GenerationResult {
     const diagnostics: GenerationDiagnostic[] = [];
     const files: GeneratedFile[] = [];
-    const report = (location: Location, message: string): void => {
-        diagnostics.push({ ...location, message });
+    const report = (location: Location, message: string, code?: string): void => {
+        diagnostics.push({ ...location, message, ...(code === undefined ? {} : { code }) });
     };
     const md = new MarkdownIt();
     const escape = (value: string): string => md.utils.escapeHtml(value);
@@ -428,7 +428,7 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
             if (expanded.has(name)) {
                 frame.step = frame.expansion.next(expanded.get(name)!);
             } else if (!fragments.has(name)) {
-                report(at, `Missing fragment: ${name}`);
+                report(at, `Missing fragment: ${name}`, 'missing-fragment');
                 frame.step = frame.expansion.next('');
             } else if (active.has(name)) {
                 report(at, `Fragment cycle: ${frames.map(value => value.name).concat(name).join(' -> ')}`);

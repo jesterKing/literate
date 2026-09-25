@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Output transactions</h1>
+<p>This chapter is authoritative for <code>src/output-transactions.ts</code>. CLI and VS Code
+adapters share this provider-independent batch protocol. It returns normalized
+changed relative paths in input order, only after the whole batch and cleanup
+succeed. Equal bytes cause no writes or directory creation.</p>
+<p>There is <strong>no crash-durable journal, simultaneous atomic visibility, or concurrency
+lock</strong>. Callers must serialize writers and exclude external changes during a batch.
+Renames stay within one target parent (including its private staging directory),
+reducing cross-filesystem issues. This is recoverable exception handling, not a
+filesystem-wide atomic transaction.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;output transactions.*&gt;&gt;= src/output-transactions.ts $</div>
+<div class="code">
+<pre><code><span class="literate-tag-name">&lt;&lt;transaction contracts&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;transaction directory error&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;transaction error&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;transaction state&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;transaction parents&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;transaction normalize&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;transaction preflight&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;transaction reserve&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;transaction create directory&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;transaction prepare&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;transaction install&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;transaction restore rename&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;transaction undo output&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;transaction rollback&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;transaction cleanup&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;transaction commit&gt;&gt;</span>
+</code></pre>
+
+</div>
+</div><h2>Adapter obligations</h2>
+<p>All paths are portable, root-relative slash paths. <code>inspect</code> must validate every
+existing parent, not just the leaf, and reject symlinks (including dangling links)
+and special types rather than following them. It must distinguish genuine absence
+from permission/provider errors, including beneath a missing parent. The adapter
+also validates its trusted root. No Node or VS Code dependency belongs here.</p>
+<p><code>mkdir</code> is exclusive and creates exactly one directory. An ordinary rejection must
+leave nothing created by this operation. If the adapter knows it created the
+directory but its compensating empty-directory removal failed, it must throw
+<code>TransactionDirectoryError</code> with <code>createdPath</code> exactly equal to the requested
+relative path. This transfers ownership to the coordinator so rollback retries
+cleanup. Mere existence after a generic rejection does <strong>not</strong> prove ownership:
+a race/collision must never authorize deletion of someone else's directory.
+<code>writeNew</code> exclusively creates a file; failure may leave partial bytes.
+<code>rename</code> must <strong>not overwrite</strong> an existing destination. It may throw before or
+after moving the file, but must not copy it while leaving the source. Both removal
+operations are nonrecursive; directory removal must fail unless empty. <code>nonce</code>
+returns a nonempty portable ASCII token. These are obligations, not assumptions
+about the default behavior of Node rename or VS Code filesystem providers.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;transaction contracts&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> { safeRelativePath } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./engine&#x27;</span>;
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">TransactionFile</span> { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">content</span>: <span class="hljs-title class_">Uint8Array</span>; }
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">TransactionIO</span> {
+    <span class="hljs-title function_">inspect</span>(<span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-string">&#x27;missing&#x27;</span> | <span class="hljs-string">&#x27;file&#x27;</span> | <span class="hljs-string">&#x27;directory&#x27;</span>&gt;;
+    <span class="hljs-title function_">read</span>(<span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-title class_">Uint8Array</span>&gt;;
+    <span class="hljs-title function_">mkdir</span>(<span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt;;
+    <span class="hljs-title function_">writeNew</span>(<span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>, <span class="hljs-attr">content</span>: <span class="hljs-title class_">Uint8Array</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt;;
+    <span class="hljs-title function_">rename</span>(<span class="hljs-attr">from</span>: <span class="hljs-built_in">string</span>, <span class="hljs-attr">to</span>: <span class="hljs-built_in">string</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt;;
+    <span class="hljs-title function_">removeFile</span>(<span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt;;
+    <span class="hljs-title function_">removeDirectory</span>(<span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt;;
+    <span class="hljs-title function_">nonce</span>(): <span class="hljs-built_in">string</span>;
+}
+
+</code></pre>
+
+</div>
+</div><p>The typed mkdir failure carries only the positively known created path and an
+error message; adapters should include the creation/compensation failure details
+in that message. A mismatched path does not transfer ownership.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;transaction directory error&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">TransactionDirectoryError</span> <span class="hljs-keyword">extends</span> <span class="hljs-title class_ inherited__">Error</span> {
+    <span class="hljs-title function_">constructor</span>(<span class="hljs-params"><span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> createdPath: <span class="hljs-built_in">string</span>, message = <span class="hljs-string">&#x27;Directory created, cleanup failed&#x27;</span></span>) {
+        <span class="hljs-variable language_">super</span>(<span class="hljs-string">`<span class="hljs-subst">${message}</span>: <span class="hljs-subst">${createdPath}</span>`</span>);
+        <span class="hljs-variable language_">this</span>.<span class="hljs-property">name</span> = <span class="hljs-string">&#x27;TransactionDirectoryError&#x27;</span>;
+    }
+}
+
+</code></pre>
+
+</div>
+</div><h2>Exact failure semantics</h2>
+<p>Every rejected batch throws <code>OutputTransactionError</code>. <code>paths</code> identifies failed
+operations or conflicting paths, <code>recoveryPaths</code> lists owned staging directories
+that may still contain stages/backups and, on rollback failure, newly created
+parents that may still need cleanup. <code>originalError</code> retains the initiating
+failure. The message includes all failed paths and recovery locations.
+<code>changedPaths</code> is the normalized changed output list in input order for committed
+cleanup errors (the same list a successful return would provide), and is empty
+for uncommitted errors. CLI callers can report installed outputs without a stale
+fallback even when cleanup fails.</p>
+<ul>
+<li><code>preflight_failed</code>, <code>committed=false</code>: no mutations were attempted.</li>
+<li><code>rolled_back</code>, <code>committed=false</code>: preparation/installation failed; old bytes and
+absence of new outputs were restored and owned artifacts/empty parents removed.</li>
+<li><code>rollback_failed</code>, <code>committed=false</code>: restoration or its cleanup failed. Do not
+assume the old batch is intact. If restoration fails, <strong>no</strong> staging cleanup is
+attempted, preserving recovery material. Inspect the reported locations before
+manually restoring backups; never blindly delete them.</li>
+<li><code>cleanup_failed</code>, <code>committed=true</code>: <strong>committed, cleanup failed</strong>. All requested
+output bytes are installed; rollback is not attempted. Cleanup may already have
+removed some backups. Do not report this as an uncommitted batch or retry blindly.</li>
+</ul>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;transaction error&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">OutputTransactionError</span> <span class="hljs-keyword">extends</span> <span class="hljs-title class_ inherited__">Error</span> {
+    <span class="hljs-title function_">constructor</span>(<span class="hljs-params">
+        <span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> code: <span class="hljs-string">&#x27;preflight_failed&#x27;</span> | <span class="hljs-string">&#x27;rolled_back&#x27;</span> | <span class="hljs-string">&#x27;rollback_failed&#x27;</span> | <span class="hljs-string">&#x27;cleanup_failed&#x27;</span>,
+        <span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> committed: <span class="hljs-built_in">boolean</span>,
+        <span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> paths: <span class="hljs-built_in">string</span>[],
+        <span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> recoveryPaths: <span class="hljs-built_in">string</span>[],
+        <span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> originalError: <span class="hljs-built_in">unknown</span>,
+        details: <span class="hljs-built_in">string</span>[] = [],
+        <span class="hljs-keyword">public</span> <span class="hljs-keyword">readonly</span> changedPaths: <span class="hljs-built_in">string</span>[] = []
+    </span>) {
+        <span class="hljs-variable language_">super</span>(<span class="hljs-string">`<span class="hljs-subst">${committed ? <span class="hljs-string">&#x27;committed, cleanup failed&#x27;</span> : code}</span>: <span class="hljs-subst">${paths.join(<span class="hljs-string">&#x27;, &#x27;</span>)}</span>; <span class="hljs-subst">${<span class="hljs-built_in">String</span>(originalError)}</span>`</span>
+            + (details.<span class="hljs-property">length</span> ? <span class="hljs-string">`; <span class="hljs-subst">${details.join(<span class="hljs-string">&#x27;; &#x27;</span>)}</span>`</span> : <span class="hljs-string">&#x27;&#x27;</span>)
+            + (recoveryPaths.<span class="hljs-property">length</span> ? <span class="hljs-string">`; recovery locations: <span class="hljs-subst">${recoveryPaths.join(<span class="hljs-string">&#x27;, &#x27;</span>)}</span>`</span> : <span class="hljs-string">&#x27;&#x27;</span>));
+        <span class="hljs-variable language_">this</span>.<span class="hljs-property">name</span> = <span class="hljs-string">&#x27;OutputTransactionError&#x27;</span>;
+    }
+}
+
+</code></pre>
+
+</div>
+</div><p>Attempt flags are set <strong>before</strong> rename. Rollback inspects both locations rather
+than trusting a rejected promise to mean that no move occurred.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;transaction state&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">interface</span> <span class="hljs-title class_">PendingOutput</span> <span class="hljs-keyword">extends</span> <span class="hljs-title class_">TransactionFile</span> {
+    <span class="hljs-attr">original</span>: <span class="hljs-built_in">boolean</span>;
+    <span class="hljs-attr">stage</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">backup</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">backupAttempted</span>: <span class="hljs-built_in">boolean</span>;
+    <span class="hljs-attr">installAttempted</span>: <span class="hljs-built_in">boolean</span>;
+}
+<span class="hljs-keyword">interface</span> <span class="hljs-title class_">TransactionState</span> {
+    <span class="hljs-attr">outputs</span>: <span class="hljs-title class_">PendingOutput</span>[];
+    <span class="hljs-attr">directories</span>: <span class="hljs-built_in">string</span>[];
+    <span class="hljs-attr">owned</span>: <span class="hljs-built_in">string</span>[];
+    <span class="hljs-attr">parents</span>: <span class="hljs-built_in">string</span>[];
+    <span class="hljs-attr">active</span>: <span class="hljs-built_in">string</span>;
+}
+<span class="hljs-keyword">interface</span> <span class="hljs-title class_">TransactionFailure</span> { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">error</span>: <span class="hljs-built_in">unknown</span>; }
+
+</code></pre>
+
+</div>
+</div><div class="codefragment">
+<div class="fragmentname">&lt;&lt;transaction parents&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">parentPaths</span>(<span class="hljs-params">path: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span>[] {
+    <span class="hljs-keyword">const</span> parts = path.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;/&#x27;</span>);
+    <span class="hljs-keyword">return</span> parts.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, -<span class="hljs-number">1</span>).<span class="hljs-title function_">map</span>(<span class="hljs-function">(<span class="hljs-params">_, index</span>) =&gt;</span> parts.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, index + <span class="hljs-number">1</span>).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;/&#x27;</span>));
+}
+
+</code></pre>
+
+</div>
+</div><p>Normalize and reject case-folded duplicates and output/parent conflicts before
+consulting the provider. Snapshot input bytes so awaiting I/O cannot change the
+planned content through a caller-owned array.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;transaction normalize&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">normalizeOutputs</span>(<span class="hljs-params">files: <span class="hljs-keyword">readonly</span> TransactionFile[]</span>): <span class="hljs-title class_">TransactionFile</span>[] {
+    <span class="hljs-keyword">const</span> seen = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;();
+    <span class="hljs-keyword">const</span> outputs = files.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">file</span> =&gt;</span> {
+        <span class="hljs-keyword">const</span> path = <span class="hljs-title function_">safeRelativePath</span>(file.<span class="hljs-property">path</span>);
+        <span class="hljs-keyword">if</span> (!path) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">OutputTransactionError</span>(<span class="hljs-string">&#x27;preflight_failed&#x27;</span>, <span class="hljs-literal">false</span>, [file.<span class="hljs-property">path</span>], [], <span class="hljs-string">&#x27;Unsafe output path&#x27;</span>); }
+        <span class="hljs-keyword">const</span> key = path.<span class="hljs-title function_">toLowerCase</span>();
+        <span class="hljs-keyword">const</span> previous = seen.<span class="hljs-title function_">get</span>(key);
+        <span class="hljs-keyword">if</span> (previous) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">OutputTransactionError</span>(<span class="hljs-string">&#x27;preflight_failed&#x27;</span>, <span class="hljs-literal">false</span>, [previous, path], [], <span class="hljs-string">&#x27;Duplicate output path&#x27;</span>); }
+        seen.<span class="hljs-title function_">set</span>(key, path);
+        <span class="hljs-keyword">return</span> { path, <span class="hljs-attr">content</span>: <span class="hljs-keyword">new</span> <span class="hljs-title class_">Uint8Array</span>(file.<span class="hljs-property">content</span>) };
+    });
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> outputs) {
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> parent <span class="hljs-keyword">of</span> <span class="hljs-title function_">parentPaths</span>(file.<span class="hljs-property">path</span>)) {
+            <span class="hljs-keyword">const</span> collision = seen.<span class="hljs-title function_">get</span>(parent.<span class="hljs-title function_">toLowerCase</span>());
+            <span class="hljs-keyword">if</span> (collision) {
+                <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">OutputTransactionError</span>(<span class="hljs-string">&#x27;preflight_failed&#x27;</span>, <span class="hljs-literal">false</span>, [collision, file.<span class="hljs-property">path</span>], [], <span class="hljs-string">&#x27;Output parent collision&#x27;</span>);
+            }
+        }
+    }
+    <span class="hljs-keyword">return</span> outputs;
+}
+
+</code></pre>
+
+</div>
+</div><p>Preflight every output and parent, including unchanged outputs, before making any
+directory or write. A provider error rejects the batch without mutation.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;transaction preflight&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">preflight</span>(<span class="hljs-params">files: <span class="hljs-keyword">readonly</span> TransactionFile[], io: TransactionIO</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-title class_">TransactionState</span>&gt; {
+    <span class="hljs-keyword">const</span> normalized = <span class="hljs-title function_">normalizeOutputs</span>(files);
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">state</span>: <span class="hljs-title class_">TransactionState</span> = { <span class="hljs-attr">outputs</span>: [], <span class="hljs-attr">directories</span>: [], <span class="hljs-attr">owned</span>: [], <span class="hljs-attr">parents</span>: [], <span class="hljs-attr">active</span>: <span class="hljs-string">&#x27;&#x27;</span> };
+    <span class="hljs-keyword">try</span> {
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> normalized) {
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> parent <span class="hljs-keyword">of</span> <span class="hljs-title function_">parentPaths</span>(file.<span class="hljs-property">path</span>)) {
+                state.<span class="hljs-property">active</span> = parent;
+                <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> io.<span class="hljs-title function_">inspect</span>(parent) === <span class="hljs-string">&#x27;file&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Output parent is a file&#x27;</span>); }
+            }
+            state.<span class="hljs-property">active</span> = file.<span class="hljs-property">path</span>;
+            <span class="hljs-keyword">const</span> <span class="hljs-keyword">type</span> = <span class="hljs-keyword">await</span> io.<span class="hljs-title function_">inspect</span>(file.<span class="hljs-property">path</span>);
+            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">type</span> === <span class="hljs-string">&#x27;directory&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Output is a directory&#x27;</span>); }
+            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">type</span> === <span class="hljs-string">&#x27;file&#x27;</span>) {
+                <span class="hljs-keyword">const</span> old = <span class="hljs-keyword">await</span> io.<span class="hljs-title function_">read</span>(file.<span class="hljs-property">path</span>);
+                <span class="hljs-keyword">if</span> (old.<span class="hljs-property">length</span> === file.<span class="hljs-property">content</span>.<span class="hljs-property">length</span> &amp;&amp; old.<span class="hljs-title function_">every</span>(<span class="hljs-function">(<span class="hljs-params">byte, index</span>) =&gt;</span> byte === file.<span class="hljs-property">content</span>[index])) { <span class="hljs-keyword">continue</span>; }
+            }
+            state.<span class="hljs-property">outputs</span>.<span class="hljs-title function_">push</span>({ ...file, <span class="hljs-attr">original</span>: <span class="hljs-keyword">type</span> === <span class="hljs-string">&#x27;file&#x27;</span>, <span class="hljs-attr">stage</span>: <span class="hljs-string">&#x27;&#x27;</span>, <span class="hljs-attr">backup</span>: <span class="hljs-string">&#x27;&#x27;</span>,
+                <span class="hljs-attr">backupAttempted</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">installAttempted</span>: <span class="hljs-literal">false</span> });
+        }
+        <span class="hljs-keyword">await</span> <span class="hljs-title function_">reserveDirectories</span>(state, normalized, io);
+        <span class="hljs-keyword">return</span> state;
+    } <span class="hljs-keyword">catch</span> (error) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">OutputTransactionError</span>(<span class="hljs-string">&#x27;preflight_failed&#x27;</span>, <span class="hljs-literal">false</span>, [state.<span class="hljs-property">active</span>], [], error);
+    }
+}
+
+</code></pre>
+
+</div>
+</div><p>Use one hidden directory per changed target parent, with short numbered names
+independent of target filename length. Refuse collisions, including planned
+outputs/parents, rather than reusing another transaction's directory. A bad nonce
+is an adapter error. Reservation is read-only; exclusive mkdir later claims it.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;transaction reserve&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">reserveDirectories</span>(<span class="hljs-params">state: TransactionState, files: TransactionFile[], io: TransactionIO</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; {
+    <span class="hljs-keyword">const</span> byParent = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;();
+    <span class="hljs-keyword">const</span> occupied = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>(files.<span class="hljs-title function_">flatMap</span>(<span class="hljs-function"><span class="hljs-params">file</span> =&gt;</span> [file.<span class="hljs-property">path</span>, ...<span class="hljs-title function_">parentPaths</span>(file.<span class="hljs-property">path</span>)]).<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">path</span> =&gt;</span> path.<span class="hljs-title function_">toLowerCase</span>()));
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [index, output] <span class="hljs-keyword">of</span> state.<span class="hljs-property">outputs</span>.<span class="hljs-title function_">entries</span>()) {
+        <span class="hljs-keyword">const</span> parent = <span class="hljs-title function_">parentPaths</span>(output.<span class="hljs-property">path</span>).<span class="hljs-title function_">pop</span>() || <span class="hljs-string">&#x27;&#x27;</span>;
+        <span class="hljs-keyword">let</span> directory = byParent.<span class="hljs-title function_">get</span>(parent);
+        <span class="hljs-keyword">if</span> (!directory) {
+            state.<span class="hljs-property">active</span> = output.<span class="hljs-property">path</span>;
+            <span class="hljs-keyword">const</span> nonce = io.<span class="hljs-title function_">nonce</span>();
+            <span class="hljs-keyword">if</span> (!<span class="hljs-regexp">/^[a-zA-Z0-9_-]+$/</span>.<span class="hljs-title function_">test</span>(nonce)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Invalid transaction nonce&#x27;</span>); }
+            directory = <span class="hljs-string">`<span class="hljs-subst">${parent ? parent + <span class="hljs-string">&#x27;/&#x27;</span> : <span class="hljs-string">&#x27;&#x27;</span>}</span>.literate-txn-<span class="hljs-subst">${nonce}</span>`</span>;
+            state.<span class="hljs-property">active</span> = directory;
+            <span class="hljs-keyword">if</span> (occupied.<span class="hljs-title function_">has</span>(directory.<span class="hljs-title function_">toLowerCase</span>()) || <span class="hljs-keyword">await</span> io.<span class="hljs-title function_">inspect</span>(directory) !== <span class="hljs-string">&#x27;missing&#x27;</span>) {
+                <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Transaction stage collision&#x27;</span>);
+            }
+            byParent.<span class="hljs-title function_">set</span>(parent, directory);
+            state.<span class="hljs-property">directories</span>.<span class="hljs-title function_">push</span>(directory);
+        }
+        output.<span class="hljs-property">stage</span> = <span class="hljs-string">`<span class="hljs-subst">${directory}</span>/<span class="hljs-subst">${index}</span>.stage`</span>;
+        output.<span class="hljs-property">backup</span> = <span class="hljs-string">`<span class="hljs-subst">${directory}</span>/<span class="hljs-subst">${index}</span>.backup`</span>;
+    }
+}
+
+</code></pre>
+
+</div>
+</div><p>Record directory ownership on successful exclusive mkdir or an explicit typed
+failure for that exact path. Never infer ownership from a generic rejection.
+Rethrow the typed failure after recording ownership: installation must stop, and
+rollback will retry empty-directory cleanup using the appropriate ownership list.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;transaction create directory&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">createDirectory</span>(<span class="hljs-params">path: <span class="hljs-built_in">string</span>, owned: <span class="hljs-built_in">string</span>[], io: TransactionIO</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; {
+    <span class="hljs-keyword">try</span> { <span class="hljs-keyword">await</span> io.<span class="hljs-title function_">mkdir</span>(path); }
+    <span class="hljs-keyword">catch</span> (error) {
+        <span class="hljs-keyword">if</span> (error <span class="hljs-keyword">instanceof</span> <span class="hljs-title class_">TransactionDirectoryError</span> &amp;&amp; error.<span class="hljs-property">createdPath</span> === path) { owned.<span class="hljs-title function_">push</span>(path); }
+        <span class="hljs-keyword">throw</span> error;
+    }
+    owned.<span class="hljs-title function_">push</span>(path);
+}
+
+</code></pre>
+
+</div>
+</div><p>Preparation creates only changed outputs' missing parents. Every stage is fully
+written before installation begins. Target parents and staging directories have
+separate ownership lists because committed outputs retain their parents.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;transaction prepare&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">prepareOutputs</span>(<span class="hljs-params">state: TransactionState, io: TransactionIO</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; {
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> output <span class="hljs-keyword">of</span> state.<span class="hljs-property">outputs</span>) {
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> parent <span class="hljs-keyword">of</span> <span class="hljs-title function_">parentPaths</span>(output.<span class="hljs-property">path</span>)) {
+            state.<span class="hljs-property">active</span> = parent;
+            <span class="hljs-keyword">const</span> <span class="hljs-keyword">type</span> = <span class="hljs-keyword">await</span> io.<span class="hljs-title function_">inspect</span>(parent);
+            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">type</span> === <span class="hljs-string">&#x27;file&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Output parent is a file&#x27;</span>); }
+            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">type</span> === <span class="hljs-string">&#x27;missing&#x27;</span>) {
+                <span class="hljs-keyword">await</span> <span class="hljs-title function_">createDirectory</span>(parent, state.<span class="hljs-property">parents</span>, io);
+            }
+        }
+    }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> directory <span class="hljs-keyword">of</span> state.<span class="hljs-property">directories</span>) {
+        state.<span class="hljs-property">active</span> = directory;
+        <span class="hljs-keyword">await</span> <span class="hljs-title function_">createDirectory</span>(directory, state.<span class="hljs-property">owned</span>, io);
+    }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> output <span class="hljs-keyword">of</span> state.<span class="hljs-property">outputs</span>) {
+        state.<span class="hljs-property">active</span> = output.<span class="hljs-property">stage</span>;
+        <span class="hljs-keyword">await</span> io.<span class="hljs-title function_">writeNew</span>(output.<span class="hljs-property">stage</span>, output.<span class="hljs-property">content</span>);
+    }
+}
+
+</code></pre>
+
+</div>
+</div><div class="codefragment">
+<div class="fragmentname">&lt;&lt;transaction install&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">installOutputs</span>(<span class="hljs-params">state: TransactionState, io: TransactionIO</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; {
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> output <span class="hljs-keyword">of</span> state.<span class="hljs-property">outputs</span>) {
+        state.<span class="hljs-property">active</span> = output.<span class="hljs-property">path</span>;
+        <span class="hljs-keyword">if</span> (output.<span class="hljs-property">original</span>) {
+            output.<span class="hljs-property">backupAttempted</span> = <span class="hljs-literal">true</span>;
+            <span class="hljs-keyword">await</span> io.<span class="hljs-title function_">rename</span>(output.<span class="hljs-property">path</span>, output.<span class="hljs-property">backup</span>);
+        }
+        output.<span class="hljs-property">installAttempted</span> = <span class="hljs-literal">true</span>;
+        <span class="hljs-keyword">await</span> io.<span class="hljs-title function_">rename</span>(output.<span class="hljs-property">stage</span>, output.<span class="hljs-property">path</span>);
+    }
+}
+
+</code></pre>
+
+</div>
+</div><p>A restore rename that throws after effect is nevertheless a successful restore
+when the backup disappeared and the target is a regular file. Failed inspections
+remain failures; uncertainty must preserve recovery material.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;transaction restore rename&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">restoreBackup</span>(<span class="hljs-params">output: PendingOutput, io: TransactionIO</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; {
+    <span class="hljs-keyword">try</span> { <span class="hljs-keyword">await</span> io.<span class="hljs-title function_">rename</span>(output.<span class="hljs-property">backup</span>, output.<span class="hljs-property">path</span>); }
+    <span class="hljs-keyword">catch</span> (error) {
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> io.<span class="hljs-title function_">inspect</span>(output.<span class="hljs-property">backup</span>) === <span class="hljs-string">&#x27;missing&#x27;</span> &amp;&amp; <span class="hljs-keyword">await</span> io.<span class="hljs-title function_">inspect</span>(output.<span class="hljs-property">path</span>) === <span class="hljs-string">&#x27;file&#x27;</span>) { <span class="hljs-keyword">return</span>; }
+        <span class="hljs-keyword">throw</span> error;
+    }
+}
+
+</code></pre>
+
+</div>
+</div><p>Check for the original backup <strong>before</strong> removing an installed file. If an
+original has unexpectedly disappeared, destructive deletion cannot help recover
+it. A stage still present alongside a target is also ambiguous: leave both alone.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;transaction undo output&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">undoOutput</span>(<span class="hljs-params">output: PendingOutput, io: TransactionIO</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; {
+    <span class="hljs-keyword">if</span> (!output.<span class="hljs-property">backupAttempted</span> &amp;&amp; !output.<span class="hljs-property">installAttempted</span>) { <span class="hljs-keyword">return</span>; }
+    <span class="hljs-keyword">const</span> target = <span class="hljs-keyword">await</span> io.<span class="hljs-title function_">inspect</span>(output.<span class="hljs-property">path</span>);
+    <span class="hljs-keyword">if</span> (output.<span class="hljs-property">original</span>) {
+        <span class="hljs-keyword">const</span> backup = <span class="hljs-keyword">await</span> io.<span class="hljs-title function_">inspect</span>(output.<span class="hljs-property">backup</span>);
+        <span class="hljs-keyword">if</span> (backup === <span class="hljs-string">&#x27;missing&#x27;</span> &amp;&amp; !output.<span class="hljs-property">installAttempted</span> &amp;&amp; target === <span class="hljs-string">&#x27;file&#x27;</span>) { <span class="hljs-keyword">return</span>; }
+        <span class="hljs-keyword">if</span> (backup !== <span class="hljs-string">&#x27;file&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Original backup unavailable: <span class="hljs-subst">${output.backup}</span>; target left untouched`</span>); }
+    }
+    <span class="hljs-keyword">if</span> (target !== <span class="hljs-string">&#x27;missing&#x27;</span>) {
+        <span class="hljs-keyword">if</span> (!output.<span class="hljs-property">installAttempted</span> || target !== <span class="hljs-string">&#x27;file&#x27;</span> || <span class="hljs-keyword">await</span> io.<span class="hljs-title function_">inspect</span>(output.<span class="hljs-property">stage</span>) !== <span class="hljs-string">&#x27;missing&#x27;</span>) {
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Ambiguous target/stage state; target left untouched&#x27;</span>);
+        }
+        <span class="hljs-keyword">await</span> io.<span class="hljs-title function_">removeFile</span>(output.<span class="hljs-property">path</span>);
+    }
+    <span class="hljs-keyword">if</span> (output.<span class="hljs-property">original</span>) { <span class="hljs-keyword">await</span> <span class="hljs-title function_">restoreBackup</span>(output, io); }
+}
+
+</code></pre>
+
+</div>
+</div><p>Rollback proceeds in reverse, collecting every failure rather than stopping at
+the first one. Any restoration failure suppresses all artifact cleanup.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;transaction rollback&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">rollbackOutputs</span>(<span class="hljs-params">state: TransactionState, io: TransactionIO</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-title class_">TransactionFailure</span>[]&gt; {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">failures</span>: <span class="hljs-title class_">TransactionFailure</span>[] = [];
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> output <span class="hljs-keyword">of</span> [...state.<span class="hljs-property">outputs</span>].<span class="hljs-title function_">reverse</span>()) {
+        <span class="hljs-keyword">try</span> { <span class="hljs-keyword">await</span> <span class="hljs-title function_">undoOutput</span>(output, io); }
+        <span class="hljs-keyword">catch</span> (error) { failures.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">path</span>: output.<span class="hljs-property">path</span>, error }); }
+    }
+    <span class="hljs-keyword">return</span> failures;
+}
+
+</code></pre>
+
+</div>
+</div><p>Cleanup only removes known files and empty owned directories, never a recursive
+tree. After successful installation parents are retained; after rollback newly
+created empty parents are removed deepest-first. All cleanup failures are reported.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;transaction cleanup&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">cleanupTransaction</span>(<span class="hljs-params">state: TransactionState, io: TransactionIO, rolledBack: <span class="hljs-built_in">boolean</span></span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-title class_">TransactionFailure</span>[]&gt; {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">failures</span>: <span class="hljs-title class_">TransactionFailure</span>[] = [];
+    <span class="hljs-keyword">const</span> attempt = <span class="hljs-keyword">async</span> (<span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>, <span class="hljs-attr">directory</span>: <span class="hljs-built_in">boolean</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; =&gt; {
+        <span class="hljs-keyword">try</span> {
+            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> io.<span class="hljs-title function_">inspect</span>(path) === <span class="hljs-string">&#x27;missing&#x27;</span>) { <span class="hljs-keyword">return</span>; }
+            <span class="hljs-keyword">if</span> (directory) { <span class="hljs-keyword">await</span> io.<span class="hljs-title function_">removeDirectory</span>(path); }
+            <span class="hljs-keyword">else</span> { <span class="hljs-keyword">await</span> io.<span class="hljs-title function_">removeFile</span>(path); }
+        } <span class="hljs-keyword">catch</span> (error) { failures.<span class="hljs-title function_">push</span>({ path, error }); }
+    };
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> output <span class="hljs-keyword">of</span> state.<span class="hljs-property">outputs</span>) {
+        <span class="hljs-keyword">if</span> (!state.<span class="hljs-property">owned</span>.<span class="hljs-title function_">includes</span>(output.<span class="hljs-property">stage</span>.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, output.<span class="hljs-property">stage</span>.<span class="hljs-title function_">lastIndexOf</span>(<span class="hljs-string">&#x27;/&#x27;</span>)))) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">await</span> <span class="hljs-title function_">attempt</span>(output.<span class="hljs-property">stage</span>, <span class="hljs-literal">false</span>);
+        <span class="hljs-keyword">await</span> <span class="hljs-title function_">attempt</span>(output.<span class="hljs-property">backup</span>, <span class="hljs-literal">false</span>);
+    }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> directory <span class="hljs-keyword">of</span> [...state.<span class="hljs-property">owned</span>].<span class="hljs-title function_">reverse</span>()) { <span class="hljs-keyword">await</span> <span class="hljs-title function_">attempt</span>(directory, <span class="hljs-literal">true</span>); }
+    <span class="hljs-keyword">if</span> (rolledBack) {
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> parent <span class="hljs-keyword">of</span> [...state.<span class="hljs-property">parents</span>].<span class="hljs-title function_">reverse</span>()) { <span class="hljs-keyword">await</span> <span class="hljs-title function_">attempt</span>(parent, <span class="hljs-literal">true</span>); }
+    }
+    <span class="hljs-keyword">return</span> failures;
+}
+
+</code></pre>
+
+</div>
+</div><p>The commit point is completion of <strong>all</strong> installs. Cleanup is deliberately outside
+the rollback catch: deleting backups is irreversible and cannot honestly be
+reported as a rolled-back transaction.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;transaction commit&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">commitOutputs</span>(<span class="hljs-params">files: <span class="hljs-keyword">readonly</span> TransactionFile[], io: TransactionIO</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">string</span>[]&gt; {
+    <span class="hljs-keyword">const</span> state = <span class="hljs-keyword">await</span> <span class="hljs-title function_">preflight</span>(files, io);
+    <span class="hljs-keyword">try</span> {
+        <span class="hljs-keyword">await</span> <span class="hljs-title function_">prepareOutputs</span>(state, io);
+        <span class="hljs-keyword">await</span> <span class="hljs-title function_">installOutputs</span>(state, io);
+    } <span class="hljs-keyword">catch</span> (error) {
+        <span class="hljs-keyword">let</span> failures = <span class="hljs-keyword">await</span> <span class="hljs-title function_">rollbackOutputs</span>(state, io);
+        <span class="hljs-keyword">if</span> (!failures.<span class="hljs-property">length</span>) { failures = <span class="hljs-keyword">await</span> <span class="hljs-title function_">cleanupTransaction</span>(state, io, <span class="hljs-literal">true</span>); }
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">OutputTransactionError</span>(failures.<span class="hljs-property">length</span> ? <span class="hljs-string">&#x27;rollback_failed&#x27;</span> : <span class="hljs-string">&#x27;rolled_back&#x27;</span>, <span class="hljs-literal">false</span>,
+            [...<span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>([state.<span class="hljs-property">active</span>, ...failures.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">failure</span> =&gt;</span> failure.<span class="hljs-property">path</span>)])],
+            failures.<span class="hljs-property">length</span> ? [...state.<span class="hljs-property">owned</span>, ...state.<span class="hljs-property">parents</span>] : [], error,
+            failures.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">failure</span> =&gt;</span> <span class="hljs-string">`<span class="hljs-subst">${failure.path}</span>: <span class="hljs-subst">${<span class="hljs-built_in">String</span>(failure.error)}</span>`</span>));
+    }
+    <span class="hljs-keyword">const</span> failures = <span class="hljs-keyword">await</span> <span class="hljs-title function_">cleanupTransaction</span>(state, io, <span class="hljs-literal">false</span>);
+    <span class="hljs-keyword">if</span> (failures.<span class="hljs-property">length</span>) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">OutputTransactionError</span>(<span class="hljs-string">&#x27;cleanup_failed&#x27;</span>, <span class="hljs-literal">true</span>, failures.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">failure</span> =&gt;</span> failure.<span class="hljs-property">path</span>),
+            state.<span class="hljs-property">owned</span>, failures[<span class="hljs-number">0</span>].<span class="hljs-property">error</span>, failures.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">failure</span> =&gt;</span> <span class="hljs-string">`<span class="hljs-subst">${failure.path}</span>: <span class="hljs-subst">${<span class="hljs-built_in">String</span>(failure.error)}</span>`</span>),
+            state.<span class="hljs-property">outputs</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">output</span> =&gt;</span> output.<span class="hljs-property">path</span>));
+    }
+    <span class="hljs-keyword">return</span> state.<span class="hljs-property">outputs</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">output</span> =&gt;</span> output.<span class="hljs-property">path</span>);
+}
+</code></pre>
+
+</div>
+</div></div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

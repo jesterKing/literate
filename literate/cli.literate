@@ -13,6 +13,7 @@ validation, and an explicit read-only or writing operation.
 <<cli missing file predicate>>
 <<cli relative path validation>>
 <<cli filesystem inspection>>
+<<cli transaction IO>>
 <<cli document discovery>>
 <<cli command lifecycle>>
 <<cli executable entry point>>
@@ -88,6 +89,8 @@ load compiler tooling until verification is requested.
 ```typescript: <<cli imports>>=
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { randomUUID } from 'crypto';
+import { commitOutputs, OutputTransactionError, TransactionIO } from './output-transactions';
 import { discoveryExcludedDirectories, generateProject, safeRelativePath, templateReferences, SourceDocument } from './engine';
 
 ```
@@ -157,6 +160,90 @@ async function inspect(root: string, value: string): Promise<boolean> {
 
 ```
 
+## Transaction filesystem boundary
+
+The adapter validates the trusted root and every existing path component with
+`lstat`, including dangling links. Operations are exclusive or nonrecursive.
+Node has no portable no-replace rename: destination inspection followed by
+`fs.rename` prevents ordinary overwrites, but cannot close the race with another
+writer. Callers must serialize generation and exclude external filesystem changes.
+This is exception recovery, not crash durability or simultaneous atomic visibility.
+
+Reading an existing output records its POSIX permission bits. Before installing
+its stage we apply those bits, preserving executable/read-only modes on local
+POSIX filesystems. Ownership, ACLs and remote-provider permissions are not guaranteed.
+Recovery stages/backups have numbered names without a `.literate` suffix, so crash
+residue is not discovered as source. Never blindly delete reported recovery paths.
+
+```typescript: <<cli transaction IO>>=
+export function createTransactionIO(root: string): TransactionIO {
+    root = path.resolve(root);
+    const modes = new Map<string, number>();
+    const target = (value: string): string => path.join(root, relative(value));
+    const inspectPath: TransactionIO['inspect'] = async value => {
+        const parts = relative(value).split('/');
+        const rootStat = await fs.lstat(root);
+        if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) {
+            throw new Error(`Root is not a regular directory: ${root}`);
+        }
+        let current = root;
+        for (const [index, part] of parts.entries()) {
+            current = path.join(current, part);
+            let stat;
+            try { stat = await fs.lstat(current); }
+            catch (error) {
+                if (missing(error)) { return 'missing'; }
+                throw error;
+            }
+            if (stat.isSymbolicLink()) { throw new Error(`Symbolic link is not allowed: ${value}`); }
+            if (index < parts.length - 1) {
+                if (!stat.isDirectory()) { throw new Error(`Parent is not a directory: ${value}`); }
+            } else {
+                if (stat.isFile()) { return 'file'; }
+                if (stat.isDirectory()) { return 'directory'; }
+                throw new Error(`Target is not a regular file or directory: ${value}`);
+            }
+        }
+        throw new Error(`Invalid relative path: ${value}`);
+    };
+    return {
+        inspect: inspectPath,
+        async read(value) {
+            if (await inspectPath(value) !== 'file') { throw new Error(`Not a file: ${value}`); }
+            const stat = await fs.lstat(target(value));
+            const bytes = await fs.readFile(target(value));
+            modes.set(relative(value), stat.mode & 0o7777);
+            return bytes;
+        },
+        async mkdir(value) {
+            if (await inspectPath(value) !== 'missing') { throw new Error(`Path exists: ${value}`); }
+            await fs.mkdir(target(value));
+        },
+        async writeNew(value, content) {
+            if (await inspectPath(value) !== 'missing') { throw new Error(`Path exists: ${value}`); }
+            await fs.writeFile(target(value), content, { flag: 'wx' });
+        },
+        async rename(from, to) {
+            if (await inspectPath(from) !== 'file') { throw new Error(`Not a file: ${from}`); }
+            if (await inspectPath(to) !== 'missing') { throw new Error(`Path exists: ${to}`); }
+            const mode = modes.get(relative(to));
+            if (from.endsWith('.stage') && mode !== undefined) { await fs.chmod(target(from), mode); }
+            await fs.rename(target(from), target(to));
+        },
+        async removeFile(value) {
+            if (await inspectPath(value) !== 'file') { throw new Error(`Not a file: ${value}`); }
+            await fs.unlink(target(value));
+        },
+        async removeDirectory(value) {
+            if (await inspectPath(value) !== 'directory') { throw new Error(`Not a directory: ${value}`); }
+            await fs.rmdir(target(value));
+        },
+        nonce: randomUUID
+    };
+}
+
+```
+
 ## Discover saved inputs
 
 Directory enumeration is sorted, skips symlinks, and shares exclusions with the
@@ -196,7 +283,8 @@ paths; checking returns before the writing stage. A single completion function
 sets the exit status and emits a JSON response exactly once.
 
 ```typescript: <<cli command lifecycle>>=
-export async function run(args: string[], io: CliIO = defaultIO): Promise<number> {
+export async function run(args: string[], io: CliIO = defaultIO,
+    transactionIO: (root: string) => TransactionIO = createTransactionIO): Promise<number> {
     <<cli response setup>>
     <<cli argument parsing>>
     <<cli argument validation and help>>
@@ -400,20 +488,31 @@ if (command === 'check' || command === 'self-check') {
 
 ### Write changed outputs
 
-Writes are sequential and awaited. Recheck targets around directory creation,
-but do not promise a filesystem transaction or protection from concurrent hostile
-filesystem changes. An I/O failure may leave earlier files written; the response
-retains those completed statuses. Obsolete outputs are not deleted automatically.
+Recheck the entire candidate set, including unchanged targets, through the shared
+transaction coordinator before mutation. Only changed bytes are staged and installed.
+Report `written` only after the complete batch commits. A committed cleanup failure
+still marks installed outputs, but fails the command and reports recovery locations.
+Other failures never claim writes succeeded. Obsolete outputs are not deleted.
 
 ```typescript: <<cli write changed outputs>>=
-for (const change of changes) {
-    await inspect(root, change.path);
-    const target = path.join(root, change.path);
-    await fs.mkdir(path.dirname(target), { recursive: true });
-    await inspect(root, change.path);
-    await fs.writeFile(target, change.content, 'utf8');
-    change.output.status = 'written';
-    if (!json) { io.stdout(`generated: ${change.path}\n`); }
+const markWritten = (paths: readonly string[]): void => {
+    const written = new Set(paths);
+    for (const output of response.outputs) {
+        if (!written.has(output.path)) { continue; }
+        output.status = 'written';
+        if (!json) { io.stdout(`generated: ${output.path}\n`); }
+    }
+};
+try {
+    const written = await commitOutputs(files.map(file => ({
+        path: file.path, content: Buffer.from(file.content, 'utf8')
+    })), transactionIO(root));
+    markWritten(written);
+} catch (error) {
+    if (error instanceof OutputTransactionError && error.committed) {
+        markWritten(error.changedPaths);
+    }
+    throw error;
 }
 return finish(0);
 ```

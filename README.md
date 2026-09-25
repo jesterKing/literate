@@ -69,7 +69,8 @@ realization. This makes it suitable for use with languages like Python that use
 indentation to denote scope.
 
 The command `Literate: Process` (`literate.process`) processes all workspace
-folders. Template-only edits currently require this command. Associate
+folders. Edits to referenced source/HTML templates also regenerate automatically;
+external input create/change/delete events are debounced per workspace. Associate
 `*.literate` files with Markdown to enable the editor providers.
 
 ## Document themes
@@ -94,8 +95,8 @@ independent of VS Code's light/dark selection. Preview prefers unsaved root sett
 CLI generation reads disk. Standalone Markdown previews use the default.
 Unknown or empty theme names produce a diagnostic and prevent output writes;
 preview falls back to the default while the setting is invalid. Chapter-local
-SETTINGS do not override the root theme. If you change saved inputs outside VS Code,
-run **Literate: Process** to refresh its cached project state.
+SETTINGS do not override the root theme. Saved input changes outside VS Code refresh the cached project state through
+filesystem watchers; **Literate: Process** remains available for an explicit refresh.
 
 Generated pages embed their CSS, so nested chapters no longer depend on a relative
 `style.css` path. Custom templates control their own Mermaid initialization; the
@@ -147,6 +148,26 @@ concurrently against the same project.
 See [CONTRIBUTING.md](CONTRIBUTING.md) and the
 [development chapter](literate/development.literate) for the self-hosting workflow.
 Edit the literate chapters rather than their generated TypeScript.
+
+## Output transactions and recovery
+
+CLI and editor generation stage the entire changed batch before replacing output
+files. Originals remain in private `.literate-txn-*` directories until installation
+finishes. If staging or installation fails, the writer restores originals and
+removes newly installed files and empty directories it created. Unchanged files
+are not rewritten; local permission bits are preserved for existing files.
+
+If rollback itself fails, the error lists affected paths and recovery directories.
+**Keep those directories:** their numbered `.backup` files may contain your
+originals. Inspect them before manual recovery. A `committed, cleanup failed` error
+means new outputs are installed but some temporary material could not be removed;
+it is not an unsuccessful commit. CLI `written` statuses follow that distinction.
+
+This is a rollback-capable batch, not a crash-durable database transaction. Readers
+can observe intermediate renames, and power loss or process termination does not
+trigger automatic recovery. Do not run concurrent writers. Remote-provider rename
+semantics and metadata guarantees vary; see the
+[transaction chapter](literate/output_transactions.literate) for the contract.
 
 ## Example and documentation
 

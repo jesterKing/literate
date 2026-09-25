@@ -101,10 +101,10 @@ test('nested fences retain exact original columns and expansion diagnostics shar
     }]);
     assert.deepEqual(result.files, []);
     assert.deepEqual(result.diagnostics, [
-        { ...at('index.literate', 1, 8), message: 'Missing fragment: absent' },
-        { ...at('index.literate', 1, 19), message: 'Missing fragment: absent' },
+        { ...at('index.literate', 1, 8), message: 'Missing fragment: absent', code: 'missing-fragment' },
+        { ...at('index.literate', 1, 19), message: 'Missing fragment: absent', code: 'missing-fragment' },
         { ...at('index.literate', 5, 3), message: 'Invalid definition operator on reference: absent' },
-        { ...at('index.literate', 5, 3), message: 'Missing fragment: absent' }
+        { ...at('index.literate', 5, 3), message: 'Missing fragment: absent', code: 'missing-fragment' }
     ]);
 });
 
@@ -114,7 +114,9 @@ test('partially consumed tabs map references to source columns rather than visua
     }]);
     assert.deepEqual(result.inspection.fragments[0].definitions, [at('index.literate', 0, 2)]);
     assert.deepEqual(result.inspection.fragments[0].references, [ref('missing', 'index.literate', 1, 1)]);
-    assert.deepEqual(result.diagnostics, [{ ...at('index.literate', 1, 1), message: 'Missing fragment: missing' }]);
+    assert.deepEqual(result.diagnostics, [{
+            ...at('index.literate', 1, 1), message: 'Missing fragment: missing', code: 'missing-fragment'
+        }]);
     assert.deepEqual(result.files, []);
 });
 

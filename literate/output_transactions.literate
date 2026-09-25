@@ -1,0 +1,419 @@
+# Output transactions
+
+This chapter is authoritative for `src/output-transactions.ts`. CLI and VS Code
+adapters share this provider-independent batch protocol. It returns normalized
+changed relative paths in input order, only after the whole batch and cleanup
+succeed. Equal bytes cause no writes or directory creation.
+
+There is **no crash-durable journal, simultaneous atomic visibility, or concurrency
+lock**. Callers must serialize writers and exclude external changes during a batch.
+Renames stay within one target parent (including its private staging directory),
+reducing cross-filesystem issues. This is recoverable exception handling, not a
+filesystem-wide atomic transaction.
+
+```typescript: <<output transactions.*>>= src/output-transactions.ts $
+<<transaction contracts>>
+<<transaction directory error>>
+<<transaction error>>
+<<transaction state>>
+<<transaction parents>>
+<<transaction normalize>>
+<<transaction preflight>>
+<<transaction reserve>>
+<<transaction create directory>>
+<<transaction prepare>>
+<<transaction install>>
+<<transaction restore rename>>
+<<transaction undo output>>
+<<transaction rollback>>
+<<transaction cleanup>>
+<<transaction commit>>
+```
+
+## Adapter obligations
+
+All paths are portable, root-relative slash paths. `inspect` must validate every
+existing parent, not just the leaf, and reject symlinks (including dangling links)
+and special types rather than following them. It must distinguish genuine absence
+from permission/provider errors, including beneath a missing parent. The adapter
+also validates its trusted root. No Node or VS Code dependency belongs here.
+
+`mkdir` is exclusive and creates exactly one directory. An ordinary rejection must
+leave nothing created by this operation. If the adapter knows it created the
+directory but its compensating empty-directory removal failed, it must throw
+`TransactionDirectoryError` with `createdPath` exactly equal to the requested
+relative path. This transfers ownership to the coordinator so rollback retries
+cleanup. Mere existence after a generic rejection does **not** prove ownership:
+a race/collision must never authorize deletion of someone else's directory.
+`writeNew` exclusively creates a file; failure may leave partial bytes.
+`rename` must **not overwrite** an existing destination. It may throw before or
+after moving the file, but must not copy it while leaving the source. Both removal
+operations are nonrecursive; directory removal must fail unless empty. `nonce`
+returns a nonempty portable ASCII token. These are obligations, not assumptions
+about the default behavior of Node rename or VS Code filesystem providers.
+
+```typescript: <<transaction contracts>>=
+import { safeRelativePath } from './engine';
+
+export interface TransactionFile { path: string; content: Uint8Array; }
+export interface TransactionIO {
+    inspect(path: string): Promise<'missing' | 'file' | 'directory'>;
+    read(path: string): Promise<Uint8Array>;
+    mkdir(path: string): Promise<void>;
+    writeNew(path: string, content: Uint8Array): Promise<void>;
+    rename(from: string, to: string): Promise<void>;
+    removeFile(path: string): Promise<void>;
+    removeDirectory(path: string): Promise<void>;
+    nonce(): string;
+}
+
+```
+
+The typed mkdir failure carries only the positively known created path and an
+error message; adapters should include the creation/compensation failure details
+in that message. A mismatched path does not transfer ownership.
+
+```typescript: <<transaction directory error>>=
+export class TransactionDirectoryError extends Error {
+    constructor(public readonly createdPath: string, message = 'Directory created, cleanup failed') {
+        super(`${message}: ${createdPath}`);
+        this.name = 'TransactionDirectoryError';
+    }
+}
+
+```
+
+## Exact failure semantics
+
+Every rejected batch throws `OutputTransactionError`. `paths` identifies failed
+operations or conflicting paths, `recoveryPaths` lists owned staging directories
+that may still contain stages/backups and, on rollback failure, newly created
+parents that may still need cleanup. `originalError` retains the initiating
+failure. The message includes all failed paths and recovery locations.
+`changedPaths` is the normalized changed output list in input order for committed
+cleanup errors (the same list a successful return would provide), and is empty
+for uncommitted errors. CLI callers can report installed outputs without a stale
+fallback even when cleanup fails.
+
+- `preflight_failed`, `committed=false`: no mutations were attempted.
+- `rolled_back`, `committed=false`: preparation/installation failed; old bytes and
+  absence of new outputs were restored and owned artifacts/empty parents removed.
+- `rollback_failed`, `committed=false`: restoration or its cleanup failed. Do not
+  assume the old batch is intact. If restoration fails, **no** staging cleanup is
+  attempted, preserving recovery material. Inspect the reported locations before
+  manually restoring backups; never blindly delete them.
+- `cleanup_failed`, `committed=true`: **committed, cleanup failed**. All requested
+  output bytes are installed; rollback is not attempted. Cleanup may already have
+  removed some backups. Do not report this as an uncommitted batch or retry blindly.
+
+```typescript: <<transaction error>>=
+export class OutputTransactionError extends Error {
+    constructor(
+        public readonly code: 'preflight_failed' | 'rolled_back' | 'rollback_failed' | 'cleanup_failed',
+        public readonly committed: boolean,
+        public readonly paths: string[],
+        public readonly recoveryPaths: string[],
+        public readonly originalError: unknown,
+        details: string[] = [],
+        public readonly changedPaths: string[] = []
+    ) {
+        super(`${committed ? 'committed, cleanup failed' : code}: ${paths.join(', ')}; ${String(originalError)}`
+            + (details.length ? `; ${details.join('; ')}` : '')
+            + (recoveryPaths.length ? `; recovery locations: ${recoveryPaths.join(', ')}` : ''));
+        this.name = 'OutputTransactionError';
+    }
+}
+
+```
+
+Attempt flags are set **before** rename. Rollback inspects both locations rather
+than trusting a rejected promise to mean that no move occurred.
+
+```typescript: <<transaction state>>=
+interface PendingOutput extends TransactionFile {
+    original: boolean;
+    stage: string;
+    backup: string;
+    backupAttempted: boolean;
+    installAttempted: boolean;
+}
+interface TransactionState {
+    outputs: PendingOutput[];
+    directories: string[];
+    owned: string[];
+    parents: string[];
+    active: string;
+}
+interface TransactionFailure { path: string; error: unknown; }
+
+```
+
+```typescript: <<transaction parents>>=
+function parentPaths(path: string): string[] {
+    const parts = path.split('/');
+    return parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join('/'));
+}
+
+```
+
+Normalize and reject case-folded duplicates and output/parent conflicts before
+consulting the provider. Snapshot input bytes so awaiting I/O cannot change the
+planned content through a caller-owned array.
+
+```typescript: <<transaction normalize>>=
+function normalizeOutputs(files: readonly TransactionFile[]): TransactionFile[] {
+    const seen = new Map<string, string>();
+    const outputs = files.map(file => {
+        const path = safeRelativePath(file.path);
+        if (!path) { throw new OutputTransactionError('preflight_failed', false, [file.path], [], 'Unsafe output path'); }
+        const key = path.toLowerCase();
+        const previous = seen.get(key);
+        if (previous) { throw new OutputTransactionError('preflight_failed', false, [previous, path], [], 'Duplicate output path'); }
+        seen.set(key, path);
+        return { path, content: new Uint8Array(file.content) };
+    });
+    for (const file of outputs) {
+        for (const parent of parentPaths(file.path)) {
+            const collision = seen.get(parent.toLowerCase());
+            if (collision) {
+                throw new OutputTransactionError('preflight_failed', false, [collision, file.path], [], 'Output parent collision');
+            }
+        }
+    }
+    return outputs;
+}
+
+```
+
+Preflight every output and parent, including unchanged outputs, before making any
+directory or write. A provider error rejects the batch without mutation.
+
+```typescript: <<transaction preflight>>=
+async function preflight(files: readonly TransactionFile[], io: TransactionIO): Promise<TransactionState> {
+    const normalized = normalizeOutputs(files);
+    const state: TransactionState = { outputs: [], directories: [], owned: [], parents: [], active: '' };
+    try {
+        for (const file of normalized) {
+            for (const parent of parentPaths(file.path)) {
+                state.active = parent;
+                if (await io.inspect(parent) === 'file') { throw new Error('Output parent is a file'); }
+            }
+            state.active = file.path;
+            const type = await io.inspect(file.path);
+            if (type === 'directory') { throw new Error('Output is a directory'); }
+            if (type === 'file') {
+                const old = await io.read(file.path);
+                if (old.length === file.content.length && old.every((byte, index) => byte === file.content[index])) { continue; }
+            }
+            state.outputs.push({ ...file, original: type === 'file', stage: '', backup: '',
+                backupAttempted: false, installAttempted: false });
+        }
+        await reserveDirectories(state, normalized, io);
+        return state;
+    } catch (error) {
+        throw new OutputTransactionError('preflight_failed', false, [state.active], [], error);
+    }
+}
+
+```
+
+Use one hidden directory per changed target parent, with short numbered names
+independent of target filename length. Refuse collisions, including planned
+outputs/parents, rather than reusing another transaction's directory. A bad nonce
+is an adapter error. Reservation is read-only; exclusive mkdir later claims it.
+
+```typescript: <<transaction reserve>>=
+async function reserveDirectories(state: TransactionState, files: TransactionFile[], io: TransactionIO): Promise<void> {
+    const byParent = new Map<string, string>();
+    const occupied = new Set(files.flatMap(file => [file.path, ...parentPaths(file.path)]).map(path => path.toLowerCase()));
+    for (const [index, output] of state.outputs.entries()) {
+        const parent = parentPaths(output.path).pop() || '';
+        let directory = byParent.get(parent);
+        if (!directory) {
+            state.active = output.path;
+            const nonce = io.nonce();
+            if (!/^[a-zA-Z0-9_-]+$/.test(nonce)) { throw new Error('Invalid transaction nonce'); }
+            directory = `${parent ? parent + '/' : ''}.literate-txn-${nonce}`;
+            state.active = directory;
+            if (occupied.has(directory.toLowerCase()) || await io.inspect(directory) !== 'missing') {
+                throw new Error('Transaction stage collision');
+            }
+            byParent.set(parent, directory);
+            state.directories.push(directory);
+        }
+        output.stage = `${directory}/${index}.stage`;
+        output.backup = `${directory}/${index}.backup`;
+    }
+}
+
+```
+
+Record directory ownership on successful exclusive mkdir or an explicit typed
+failure for that exact path. Never infer ownership from a generic rejection.
+Rethrow the typed failure after recording ownership: installation must stop, and
+rollback will retry empty-directory cleanup using the appropriate ownership list.
+
+```typescript: <<transaction create directory>>=
+async function createDirectory(path: string, owned: string[], io: TransactionIO): Promise<void> {
+    try { await io.mkdir(path); }
+    catch (error) {
+        if (error instanceof TransactionDirectoryError && error.createdPath === path) { owned.push(path); }
+        throw error;
+    }
+    owned.push(path);
+}
+
+```
+
+Preparation creates only changed outputs' missing parents. Every stage is fully
+written before installation begins. Target parents and staging directories have
+separate ownership lists because committed outputs retain their parents.
+
+```typescript: <<transaction prepare>>=
+async function prepareOutputs(state: TransactionState, io: TransactionIO): Promise<void> {
+    for (const output of state.outputs) {
+        for (const parent of parentPaths(output.path)) {
+            state.active = parent;
+            const type = await io.inspect(parent);
+            if (type === 'file') { throw new Error('Output parent is a file'); }
+            if (type === 'missing') {
+                await createDirectory(parent, state.parents, io);
+            }
+        }
+    }
+    for (const directory of state.directories) {
+        state.active = directory;
+        await createDirectory(directory, state.owned, io);
+    }
+    for (const output of state.outputs) {
+        state.active = output.stage;
+        await io.writeNew(output.stage, output.content);
+    }
+}
+
+```
+
+```typescript: <<transaction install>>=
+async function installOutputs(state: TransactionState, io: TransactionIO): Promise<void> {
+    for (const output of state.outputs) {
+        state.active = output.path;
+        if (output.original) {
+            output.backupAttempted = true;
+            await io.rename(output.path, output.backup);
+        }
+        output.installAttempted = true;
+        await io.rename(output.stage, output.path);
+    }
+}
+
+```
+
+A restore rename that throws after effect is nevertheless a successful restore
+when the backup disappeared and the target is a regular file. Failed inspections
+remain failures; uncertainty must preserve recovery material.
+
+```typescript: <<transaction restore rename>>=
+async function restoreBackup(output: PendingOutput, io: TransactionIO): Promise<void> {
+    try { await io.rename(output.backup, output.path); }
+    catch (error) {
+        if (await io.inspect(output.backup) === 'missing' && await io.inspect(output.path) === 'file') { return; }
+        throw error;
+    }
+}
+
+```
+
+Check for the original backup **before** removing an installed file. If an
+original has unexpectedly disappeared, destructive deletion cannot help recover
+it. A stage still present alongside a target is also ambiguous: leave both alone.
+
+```typescript: <<transaction undo output>>=
+async function undoOutput(output: PendingOutput, io: TransactionIO): Promise<void> {
+    if (!output.backupAttempted && !output.installAttempted) { return; }
+    const target = await io.inspect(output.path);
+    if (output.original) {
+        const backup = await io.inspect(output.backup);
+        if (backup === 'missing' && !output.installAttempted && target === 'file') { return; }
+        if (backup !== 'file') { throw new Error(`Original backup unavailable: ${output.backup}; target left untouched`); }
+    }
+    if (target !== 'missing') {
+        if (!output.installAttempted || target !== 'file' || await io.inspect(output.stage) !== 'missing') {
+            throw new Error('Ambiguous target/stage state; target left untouched');
+        }
+        await io.removeFile(output.path);
+    }
+    if (output.original) { await restoreBackup(output, io); }
+}
+
+```
+
+Rollback proceeds in reverse, collecting every failure rather than stopping at
+the first one. Any restoration failure suppresses all artifact cleanup.
+
+```typescript: <<transaction rollback>>=
+async function rollbackOutputs(state: TransactionState, io: TransactionIO): Promise<TransactionFailure[]> {
+    const failures: TransactionFailure[] = [];
+    for (const output of [...state.outputs].reverse()) {
+        try { await undoOutput(output, io); }
+        catch (error) { failures.push({ path: output.path, error }); }
+    }
+    return failures;
+}
+
+```
+
+Cleanup only removes known files and empty owned directories, never a recursive
+tree. After successful installation parents are retained; after rollback newly
+created empty parents are removed deepest-first. All cleanup failures are reported.
+
+```typescript: <<transaction cleanup>>=
+async function cleanupTransaction(state: TransactionState, io: TransactionIO, rolledBack: boolean): Promise<TransactionFailure[]> {
+    const failures: TransactionFailure[] = [];
+    const attempt = async (path: string, directory: boolean): Promise<void> => {
+        try {
+            if (await io.inspect(path) === 'missing') { return; }
+            if (directory) { await io.removeDirectory(path); }
+            else { await io.removeFile(path); }
+        } catch (error) { failures.push({ path, error }); }
+    };
+    for (const output of state.outputs) {
+        if (!state.owned.includes(output.stage.slice(0, output.stage.lastIndexOf('/')))) { continue; }
+        await attempt(output.stage, false);
+        await attempt(output.backup, false);
+    }
+    for (const directory of [...state.owned].reverse()) { await attempt(directory, true); }
+    if (rolledBack) {
+        for (const parent of [...state.parents].reverse()) { await attempt(parent, true); }
+    }
+    return failures;
+}
+
+```
+
+The commit point is completion of **all** installs. Cleanup is deliberately outside
+the rollback catch: deleting backups is irreversible and cannot honestly be
+reported as a rolled-back transaction.
+
+```typescript: <<transaction commit>>=
+export async function commitOutputs(files: readonly TransactionFile[], io: TransactionIO): Promise<string[]> {
+    const state = await preflight(files, io);
+    try {
+        await prepareOutputs(state, io);
+        await installOutputs(state, io);
+    } catch (error) {
+        let failures = await rollbackOutputs(state, io);
+        if (!failures.length) { failures = await cleanupTransaction(state, io, true); }
+        throw new OutputTransactionError(failures.length ? 'rollback_failed' : 'rolled_back', false,
+            [...new Set([state.active, ...failures.map(failure => failure.path)])],
+            failures.length ? [...state.owned, ...state.parents] : [], error,
+            failures.map(failure => `${failure.path}: ${String(failure.error)}`));
+    }
+    const failures = await cleanupTransaction(state, io, false);
+    if (failures.length) {
+        throw new OutputTransactionError('cleanup_failed', true, failures.map(failure => failure.path),
+            state.owned, failures[0].error, failures.map(failure => `${failure.path}: ${String(failure.error)}`),
+            state.outputs.map(output => output.path));
+    }
+    return state.outputs.map(output => output.path);
+}
+```

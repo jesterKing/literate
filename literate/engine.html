@@ -175,7 +175,7 @@ test-runtime directories.</p>
 <span class="hljs-keyword">import</span> { defaultThemeName, getTheme, themeCss, mermaidTheme } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./themes&#x27;</span>;
 
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">SourceDocument</span> { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">text</span>: <span class="hljs-built_in">string</span>; }
-<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">GenerationDiagnostic</span> { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">line</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">column</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>; }
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">GenerationDiagnostic</span> { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">line</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">column</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>; code?: <span class="hljs-built_in">string</span>; }
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">GeneratedFile</span> { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span>; }
 </code></pre>
 
@@ -567,8 +567,8 @@ template references must resolve in the supplied template map.</p>
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">generateProject</span>(<span class="hljs-params">documents: SourceDocument[], templates: Record&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; = {}</span>): <span class="hljs-title class_">GenerationResult</span> {
     <span class="hljs-keyword">const</span> <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">GenerationDiagnostic</span>[] = [];
     <span class="hljs-keyword">const</span> <span class="hljs-attr">files</span>: <span class="hljs-title class_">GeneratedFile</span>[] = [];
-    <span class="hljs-keyword">const</span> report = (<span class="hljs-attr">location</span>: <span class="hljs-title class_">Location</span>, <span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>): <span class="hljs-function"><span class="hljs-params">void</span> =&gt;</span> {
-        diagnostics.<span class="hljs-title function_">push</span>({ ...location, message });
+    <span class="hljs-keyword">const</span> report = (<span class="hljs-attr">location</span>: <span class="hljs-title class_">Location</span>, <span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>, code?: <span class="hljs-built_in">string</span>): <span class="hljs-function"><span class="hljs-params">void</span> =&gt;</span> {
+        diagnostics.<span class="hljs-title function_">push</span>({ ...location, message, ...(code === <span class="hljs-literal">undefined</span> ? {} : { code }) });
     };
     <span class="hljs-keyword">const</span> md = <span class="hljs-keyword">new</span> <span class="hljs-title class_">MarkdownIt</span>();
     <span class="hljs-keyword">const</span> <span class="hljs-built_in">escape</span> = (<span class="hljs-attr">value</span>: <span class="hljs-built_in">string</span>): <span class="hljs-function"><span class="hljs-params">string</span> =&gt;</span> md.<span class="hljs-property">utils</span>.escapeHtml(value);
@@ -892,7 +892,7 @@ so invalid operators are reported once per occurrence, not once per resume.</p>
             <span class="hljs-keyword">if</span> (expanded.<span class="hljs-title function_">has</span>(name)) {
                 frame.<span class="hljs-property">step</span> = frame.<span class="hljs-property">expansion</span>.<span class="hljs-title function_">next</span>(expanded.<span class="hljs-title function_">get</span>(name)!);
             } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (!fragments.<span class="hljs-title function_">has</span>(name)) {
-                <span class="hljs-title function_">report</span>(at, <span class="hljs-string">`Missing fragment: <span class="hljs-subst">${name}</span>`</span>);
+                <span class="hljs-title function_">report</span>(at, <span class="hljs-string">`Missing fragment: <span class="hljs-subst">${name}</span>`</span>, <span class="hljs-string">&#x27;missing-fragment&#x27;</span>);
                 frame.<span class="hljs-property">step</span> = frame.<span class="hljs-property">expansion</span>.<span class="hljs-title function_">next</span>(<span class="hljs-string">&#x27;&#x27;</span>);
             } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (active.<span class="hljs-title function_">has</span>(name)) {
                 <span class="hljs-title function_">report</span>(at, <span class="hljs-string">`Fragment cycle: <span class="hljs-subst">${frames.map(value =&gt; value.name).concat(name).join(<span class="hljs-string">&#x27; -&gt; &#x27;</span>)}</span>`</span>);

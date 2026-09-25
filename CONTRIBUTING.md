@@ -15,7 +15,8 @@ yarn esbuild
 
 The authoritative implementations are in `literate/*.literate`.
 `src/extension.ts`, `src/grabber.ts`, `src/engine.ts`, `src/cli.ts`,
-`src/self-hosting.ts`, `src/symbols.ts`, `src/themes.ts`, and `src/mermaid-preview.js` are generated;
+`src/self-hosting.ts`, `src/symbols.ts`, `src/themes.ts`, `src/output-transactions.ts`,
+and `src/mermaid-preview.js` are generated;
 commit them together with their literate sources and rendered HTML.
 Tests and configuration remain ordinary files. Interleave prose with focused
 fragments: at most one function per fragment where practical, splitting larger
@@ -96,11 +97,26 @@ before retiring the old checkout. Avoid destructive resets as a line-ending fix.
 Disable the published Literate extension if installed to avoid conflicts. Do not
 regenerate this book with the old generator: the new chapters use explicit literal
 delimiter escapes that require the shared engine. Bootstrap with the CLI first.
-Run `yarn esbuild-watch`, then select **Run Extension** and press **F5**.
-The current F5 prelaunch task compiles TypeScript but does not rebuild the bundle.
+After installing dependencies, select **Run Extension** and press **F5**.
+Its prelaunch task uses the default **Build extension and preview** task to run
+`yarn generate && yarn compile && yarn esbuild` from the repository root. This
+regenerates sources from the authoritative book, type-checks them, and builds both
+`out/main.js` and `out/mermaid-preview.js` before launching. The task finishes;
+no watcher or separate manual bundle build is required. **Extension Tests** uses
+that same default build task.
+
+Ordinary edits need one generation pass. When changing the generator itself, also
+run `yarn literate self-check` after generation to verify the rebuilt engine's
+fixed point, as described above.
+
+Contributed commands and views activate the extension implicitly on the supported
+VS Code versions (1.96 and newer). The `markdown.markdownItPlugins` contribution
+is retained so Markdown preview can load the extension's Markdown plugin.
+
 Use a disposable workspace in the Extension Development Host and associate
 `*.literate` with Markdown.
 
 The CLI reads disk, while the extension uses unsaved editor buffers. Do not run
-both generators concurrently against the same project. Template-only edits in
-VS Code currently need `Literate: Process`.
+both generators concurrently against the same project. Referenced template edits
+and external input changes now trigger generation; filesystem events are debounced.
+Use `Literate: Process` to explicitly refresh a project at any time.

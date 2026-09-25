@@ -131,7 +131,11 @@ strings or comments; this is a text generator, not a programming-language parser
 The CLI reads saved files. The VS Code adapter uses open editor buffers, including
 empty buffers, and automatically generates on literate content changes. It shares
 the engine with the CLI; completion refreshes do not write files. Template-only
-edits currently require `Literate: Process`. Do not run CLI generation concurrently
+editor edits also regenerate projects referencing that source or HTML template,
+including templates with custom filenames. Saved literate inputs and referenced
+template creation, changes, and deletion trigger a per-workspace debounced refresh;
+open buffers still take precedence. Generated outputs and vendor directories do
+not trigger regeneration. Do not run CLI generation concurrently
 with editor generation against the same project or leave unsaved literate buffers
 open while checking disk-based results.
 
@@ -146,13 +150,22 @@ preflight or write outputs. Permission errors propagate rather than being treate
 as missing files. Remote workspaces use their filesystem provider, not Node's
 local filesystem.
 
+Both adapters now use the shared output transaction coordinator. It stages every
+changed file before installation, backs up originals, and attempts reverse-order
+rollback on failure. Successful rollback restores original bytes and removes new
+outputs and owned empty directories. Local permission bits are preserved; remote
+providers do not expose portable permission metadata. A failed rollback preserves
+recovery material and reports its paths. A post-commit cleanup failure explicitly
+reports that the batch was committed; do not mistake it for a rolled-back batch.
+
 This safety depends on the provider reporting symbolic links in file types;
 VS Code has no portable no-follow write API. Concurrent filesystem changes can
-race preflight (TOCTOU), and writing several files is not a filesystem
-transaction. A known unsafe output blocks all writes for that project, but a
-later I/O failure can leave earlier writes in place. Resolve the error and
-generate again. The CLI also skips symlink inputs; output preflight does not
-establish an equivalent input policy for the VS Code provider.
+race preflight (TOCTOU). The transaction has no durable journal, crash recovery,
+concurrency lock, or simultaneous atomic visibility across all files. A power loss
+can interrupt a batch; preserve remaining `.literate-txn-*` directories for manual
+inspection. The CLI also skips symlink inputs; output preflight does not establish
+an equivalent input policy for the VS Code provider. See the
+[output transaction chapter](output_transactions.html) for exact failure semantics.
 
 ## Testing the editor
 
@@ -163,10 +176,11 @@ Disable the published extension in this repository: older generators do not
 understand the explicit literal-delimiter escapes used by the new chapters.
 Bootstrap with the CLI, then debug the newly built extension.
 
-For interactive debugging, run `yarn esbuild-watch` in a terminal, select **Run
-Extension**, and press **F5**. The existing launch task compiles TypeScript but
-does not bundle `out/main.js`, so the watcher is important. Use a disposable test
-workspace and associate `*.literate` with Markdown for editor providers.
+For interactive debugging, select **Run Extension** and press **F5**. The default
+build task generates the book sources, compiles TypeScript, and builds both the
+extension and browser preview bundles before launch. It terminates normally; no
+separate watcher is required. Use a disposable test workspace and associate
+`*.literate` with Markdown for editor providers.
 
 `yarn test:extension` builds the extension and invokes the existing VS Code test
 runner. That runner may download VS Code and requires an appropriate GUI/display
