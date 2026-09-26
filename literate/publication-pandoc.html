@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>A controlled Pandoc document bridge</h1>
+<p>This chapter is authoritative for <code>src/publication-pandoc.ts</code>. It prepares an
+in-memory Pandoc document from <code>parseProject</code> without running Pandoc, tangling
+source, loading a template, or writing files. The caller supplies a trusted
+contribution renderer; ordinary author content never becomes raw output.</p>
+<p>Preparation has two phases. First validate the graph and every document's full
+Markdown token stream, retaining contribution placeholders inside their actual
+containers. Only after the entire project passes validation may callbacks replace
+those placeholders. A late unsupported image or missing reference therefore
+cannot cause an earlier contribution renderer to run.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc bridge.*&gt;&gt;= src/publication-pandoc.ts $</div>
+<div class="code">
+<pre><code><span class="literate-tag-name">&lt;&lt;publication Pandoc dependencies&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication Pandoc public types&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication Pandoc pending types&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication Pandoc diagnostics&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication Pandoc graph validation&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication Pandoc document links&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication Pandoc inline reader&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication Pandoc block reader&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication Pandoc materialization&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication Pandoc preparation&gt;&gt;</span>
+</code></pre>
+
+</div>
+</div><h2>The supported JSON contract</h2>
+<p>Only types are imported from the engine and Markdown-it. This bridge does not
+construct another parser or import Node filesystem/process facilities.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc dependencies&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> <span class="hljs-title class_">Token</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/token&#x27;</span>);
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> {
+    <span class="hljs-title class_">GenerationDiagnostic</span>, <span class="hljs-title class_">ParsedDocument</span>, <span class="hljs-title class_">ParsedProject</span>,
+    <span class="hljs-title class_">PublicationContribution</span>, <span class="hljs-title class_">PublicationLocation</span>
+} <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./engine&#x27;</span>;
+</code></pre>
+
+</div>
+</div><p>Pandoc 3.7.0.2 was checked with its JSON reader and writer. It emits API version
+<code>[1,23,1,1]</code> and accepts the compatible <code>[1,23,1]</code> used here, normalizing that
+version on round-trip. Attributes are the actual identifier/classes/key-value
+triple, not HTML attribute objects. Metadata is deliberately empty in this slice.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc public types&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title class_">PandocAttr</span> = [<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>[], [<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>][]];
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">PandocDocument</span> {
+
+    <span class="hljs-string">&#x27;pandoc-api-version&#x27;</span>: [<span class="hljs-number">1</span>, <span class="hljs-number">23</span>, <span class="hljs-number">1</span>];
+    <span class="hljs-attr">meta</span>: <span class="hljs-title class_">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">never</span>&gt;;
+    <span class="hljs-attr">blocks</span>: <span class="hljs-title class_">PandocBlock</span>[];
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">PandocPreparationResult</span> {
+    <span class="hljs-variable language_">document</span>?: <span class="hljs-title class_">PandocDocument</span>;
+    <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">GenerationDiagnostic</span>[];
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title class_">PandocInline</span> =
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Str&#x27;</span>; <span class="hljs-attr">c</span>: <span class="hljs-built_in">string</span> }
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Space&#x27;</span> | <span class="hljs-string">&#x27;SoftBreak&#x27;</span> | <span class="hljs-string">&#x27;LineBreak&#x27;</span> }
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Code&#x27;</span>; <span class="hljs-attr">c</span>: [<span class="hljs-title class_">PandocAttr</span>, <span class="hljs-built_in">string</span>] }
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Emph&#x27;</span> | <span class="hljs-string">&#x27;Strong&#x27;</span> | <span class="hljs-string">&#x27;Strikeout&#x27;</span>; <span class="hljs-attr">c</span>: <span class="hljs-title class_">PandocInline</span>[] }
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Link&#x27;</span>; <span class="hljs-attr">c</span>: [<span class="hljs-title class_">PandocAttr</span>, <span class="hljs-title class_">PandocInline</span>[], [<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>]] };
+</code></pre>
+
+</div>
+</div><p>The public block subset includes <code>RawBlock</code> solely for the trusted contribution
+callback. The Markdown walker never constructs one. Tables, images, raw tokens,
+and other extensions require an explicit future implementation, not a fallback
+that silently loses content. Ordered-list style and delimiter are tagged Pandoc
+enumerations; Markdown-it supplies the starting number and marker.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc public types&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title class_">PandocListAttributes</span> = [<span class="hljs-built_in">number</span>, { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Decimal&#x27;</span> }, { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Period&#x27;</span> | <span class="hljs-string">&#x27;OneParen&#x27;</span> }];
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title class_">PandocLeafBlock</span> =
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Plain&#x27;</span> | <span class="hljs-string">&#x27;Para&#x27;</span>; <span class="hljs-attr">c</span>: <span class="hljs-title class_">PandocInline</span>[] }
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Header&#x27;</span>; <span class="hljs-attr">c</span>: [<span class="hljs-built_in">number</span>, <span class="hljs-title class_">PandocAttr</span>, <span class="hljs-title class_">PandocInline</span>[]] }
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;HorizontalRule&#x27;</span> }
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;CodeBlock&#x27;</span>; <span class="hljs-attr">c</span>: [<span class="hljs-title class_">PandocAttr</span>, <span class="hljs-built_in">string</span>] }
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;RawBlock&#x27;</span>; <span class="hljs-attr">c</span>: [<span class="hljs-string">&#x27;latex&#x27;</span>, <span class="hljs-built_in">string</span>] };
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title class_">PandocBlock</span> = <span class="hljs-title class_">PandocLeafBlock</span>
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;BlockQuote&#x27;</span>; <span class="hljs-attr">c</span>: <span class="hljs-title class_">PandocBlock</span>[] }
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;BulletList&#x27;</span>; <span class="hljs-attr">c</span>: <span class="hljs-title class_">PandocBlock</span>[][] }
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;OrderedList&#x27;</span>; <span class="hljs-attr">c</span>: [<span class="hljs-title class_">PandocListAttributes</span>, <span class="hljs-title class_">PandocBlock</span>[][]] }
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Div&#x27;</span>; <span class="hljs-attr">c</span>: [<span class="hljs-title class_">PandocAttr</span>, <span class="hljs-title class_">PandocBlock</span>[]] };
+</code></pre>
+
+</div>
+</div><p>Pending blocks differ only at contribution slots and containers holding them.
+They never cross the public API boundary. This small explicit representation
+keeps validation separate from callbacks without a generic visitor framework or
+string placeholders that could collide with author text.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc pending types&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">type</span> <span class="hljs-title class_">PendingBlock</span> = <span class="hljs-title class_">PandocLeafBlock</span>
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Contribution&#x27;</span>; <span class="hljs-attr">part</span>: <span class="hljs-title class_">PublicationContribution</span> }
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;BlockQuote&#x27;</span>; <span class="hljs-attr">c</span>: <span class="hljs-title class_">PendingBlock</span>[] }
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;BulletList&#x27;</span>; <span class="hljs-attr">c</span>: <span class="hljs-title class_">PendingBlock</span>[][] }
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;OrderedList&#x27;</span>; <span class="hljs-attr">c</span>: [<span class="hljs-title class_">PandocListAttributes</span>, <span class="hljs-title class_">PendingBlock</span>[][]] }
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Div&#x27;</span>; <span class="hljs-attr">c</span>: [<span class="hljs-title class_">PandocAttr</span>, <span class="hljs-title class_">PendingBlock</span>[]] };
+<span class="hljs-keyword">type</span> <span class="hljs-title class_">ContributionRenderer</span> = <span class="hljs-function">(<span class="hljs-params">part: PublicationContribution</span>) =&gt;</span> <span class="hljs-title class_">PandocBlock</span>[];
+<span class="hljs-keyword">const</span> maximumNesting = <span class="hljs-number">128</span>;
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">emptyAttributes</span>(<span class="hljs-params"></span>): <span class="hljs-title class_">PandocAttr</span> { <span class="hljs-keyword">return</span> [<span class="hljs-string">&#x27;&#x27;</span>, [], []]; }
+</code></pre>
+
+</div>
+</div><h2>Diagnostics and graph validation</h2>
+<p>Positions remain zero-based. Markdown-it does not provide precise positions for
+inline children, so their diagnostics use the containing inline block's starting
+line and column zero. Semantic reference diagnostics retain the engine's exact
+source locations. No fabricated character offsets are inferred from rendered text.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc diagnostics&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">report</span>(<span class="hljs-params">
+    diagnostics: GenerationDiagnostic[], at: PublicationLocation, code: <span class="hljs-built_in">string</span>, message: <span class="hljs-built_in">string</span>
+</span>): <span class="hljs-built_in">void</span> {
+    diagnostics.<span class="hljs-title function_">push</span>({ ...at, code, message });
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">tokenLocation</span>(<span class="hljs-params"><span class="hljs-variable language_">document</span>: ParsedDocument, token?: Token, fallback = <span class="hljs-number">0</span></span>): <span class="hljs-title class_">PublicationLocation</span> {
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">path</span>: <span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>, <span class="hljs-attr">line</span>: token?.<span class="hljs-property">map</span>?.[<span class="hljs-number">0</span>] ?? fallback, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span> };
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">unsupported</span>(<span class="hljs-params">diagnostics: GenerationDiagnostic[], at: PublicationLocation, <span class="hljs-keyword">type</span>: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">const</span> raw = <span class="hljs-regexp">/^(html|raw|tex|latex)(_|$)/</span>.<span class="hljs-title function_">test</span>(<span class="hljs-keyword">type</span>);
+    <span class="hljs-title function_">report</span>(diagnostics, at, raw ? <span class="hljs-string">&#x27;unsupported-raw-content&#x27;</span> : <span class="hljs-string">&#x27;unsupported-pandoc-token&#x27;</span>,
+        raw ? <span class="hljs-string">`Raw author content is unsupported: <span class="hljs-subst">${<span class="hljs-keyword">type</span>}</span>`</span> : <span class="hljs-string">`Unsupported Markdown token: <span class="hljs-subst">${<span class="hljs-keyword">type</span>}</span>`</span>);
+}
+</code></pre>
+
+</div>
+</div><p>Existing parser diagnostics are a hard gate. For otherwise accepted projects,
+check every reference, even in unused fragments, before inspecting dependency
+cycles. Reference modifiers are invalid regardless of whether their target exists.
+Names and boundaries come from publication segments: a literal <code>\&lt;&lt;name&gt;&gt;</code> is
+never rescanned into a semantic reference here.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc graph validation&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">interface</span> <span class="hljs-title class_">Dependency</span> { <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">at</span>: <span class="hljs-title class_">PublicationLocation</span>; }
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">validateReferences</span>(<span class="hljs-params">project: ParsedProject, diagnostics: GenerationDiagnostic[]</span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">const</span> families = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>(project.<span class="hljs-property">publication</span>.<span class="hljs-property">fragments</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">family</span> =&gt;</span> [family.<span class="hljs-property">target</span>, family]));
+    <span class="hljs-keyword">const</span> edges = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">Dependency</span>[]&gt;();
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> family <span class="hljs-keyword">of</span> families.<span class="hljs-title function_">values</span>()) { edges.<span class="hljs-title function_">set</span>(family.<span class="hljs-property">target</span>, []); }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> part <span class="hljs-keyword">of</span> project.<span class="hljs-property">publication</span>.<span class="hljs-property">contributions</span>) {
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> segment <span class="hljs-keyword">of</span> part.<span class="hljs-property">segments</span>) {
+            <span class="hljs-keyword">if</span> (segment.<span class="hljs-property">kind</span> !== <span class="hljs-string">&#x27;reference&#x27;</span>) { <span class="hljs-keyword">continue</span>; }
+            <span class="hljs-keyword">if</span> (segment.<span class="hljs-property">modifier</span> !== <span class="hljs-literal">undefined</span>) {
+                <span class="hljs-title function_">report</span>(diagnostics, segment.<span class="hljs-property">at</span>, <span class="hljs-string">&#x27;invalid-reference-modifier&#x27;</span>,
+                    <span class="hljs-string">`Invalid definition operator on reference: <span class="hljs-subst">${segment.name}</span>`</span>);
+            }
+            <span class="hljs-keyword">if</span> (segment.<span class="hljs-property">resolution</span>.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;missing&#x27;</span> || !families.<span class="hljs-title function_">has</span>(segment.<span class="hljs-property">resolution</span>.<span class="hljs-property">target</span>)) {
+                <span class="hljs-title function_">report</span>(diagnostics, segment.<span class="hljs-property">at</span>, <span class="hljs-string">&#x27;missing-fragment&#x27;</span>, <span class="hljs-string">`Missing fragment: <span class="hljs-subst">${segment.name}</span>`</span>);
+            } <span class="hljs-keyword">else</span> {
+                edges.<span class="hljs-title function_">get</span>(part.<span class="hljs-property">fragmentTarget</span>)?.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">target</span>: segment.<span class="hljs-property">resolution</span>.<span class="hljs-property">target</span>, <span class="hljs-attr">at</span>: segment.<span class="hljs-property">at</span> });
+            }
+        }
+    }
+    <span class="hljs-title function_">validateCycles</span>(edges, families, diagnostics);
+}
+</code></pre>
+
+</div>
+</div><p>An iterative depth-first walk uses active and finished sets. It never expands a
+fragment, so deep or exponentially expanding graphs require only graph-sized
+storage and traversal. A back edge reports a cycle at the reference that closes
+it; repeated back edges may produce separate source diagnostics.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc graph validation&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">validateCycles</span>(<span class="hljs-params">
+    edges: <span class="hljs-built_in">Map</span>&lt;<span class="hljs-built_in">string</span>, Dependency[]&gt;, families: <span class="hljs-built_in">Map</span>&lt;<span class="hljs-built_in">string</span>, { name: <span class="hljs-built_in">string</span> }&gt;,
+    diagnostics: GenerationDiagnostic[]
+</span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">const</span> active = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;(), finished = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> target <span class="hljs-keyword">of</span> edges.<span class="hljs-title function_">keys</span>()) {
+        <span class="hljs-keyword">if</span> (finished.<span class="hljs-title function_">has</span>(target)) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">const</span> stack = [{ target, <span class="hljs-attr">index</span>: <span class="hljs-number">0</span> }];
+        active.<span class="hljs-title function_">add</span>(target);
+        <span class="hljs-keyword">while</span> (stack.<span class="hljs-property">length</span>) {
+            <span class="hljs-keyword">const</span> frame = stack[stack.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>];
+            <span class="hljs-keyword">const</span> edge = edges.<span class="hljs-title function_">get</span>(frame.<span class="hljs-property">target</span>)![frame.<span class="hljs-property">index</span>++];
+            <span class="hljs-keyword">if</span> (!edge) {
+                active.<span class="hljs-title function_">delete</span>(frame.<span class="hljs-property">target</span>); finished.<span class="hljs-title function_">add</span>(frame.<span class="hljs-property">target</span>); stack.<span class="hljs-title function_">pop</span>();
+            } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (active.<span class="hljs-title function_">has</span>(edge.<span class="hljs-property">target</span>)) {
+                <span class="hljs-title function_">report</span>(diagnostics, edge.<span class="hljs-property">at</span>, <span class="hljs-string">&#x27;fragment-cycle&#x27;</span>,
+                    <span class="hljs-string">`Fragment cycle through: <span class="hljs-subst">${families.get(edge.target)!.name}</span>`</span>);
+            } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (!finished.<span class="hljs-title function_">has</span>(edge.<span class="hljs-property">target</span>)) {
+                active.<span class="hljs-title function_">add</span>(edge.<span class="hljs-property">target</span>); stack.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">target</span>: edge.<span class="hljs-property">target</span>, <span class="hljs-attr">index</span>: <span class="hljs-number">0</span> });
+            }
+        }
+    }
+}
+</code></pre>
+
+</div>
+</div><h2>Document destinations and links</h2>
+<p>Each canonical document path gets a separate <code>d-</code> namespace with fixed-width
+UTF-16 hexadecimal encoding. This is injective and independent of titles, line
+numbers, and chapter order. Each document, including an empty one, has a <code>Div</code>
+destination. Heading identifiers are intentionally absent until a heading-slug
+and duplicate-heading policy is implemented.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc document links&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">documentTarget</span>(<span class="hljs-params">path: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">let</span> encoded = <span class="hljs-string">&#x27;d-&#x27;</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = <span class="hljs-number">0</span>; index &lt; path.<span class="hljs-property">length</span>; index++) {
+        encoded += path.<span class="hljs-title function_">charCodeAt</span>(index).<span class="hljs-title function_">toString</span>(<span class="hljs-number">16</span>).<span class="hljs-title function_">padStart</span>(<span class="hljs-number">4</span>, <span class="hljs-string">&#x27;0&#x27;</span>);
+    }
+    <span class="hljs-keyword">return</span> encoded;
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">localDocumentPath</span>(<span class="hljs-params">href: <span class="hljs-built_in">string</span>, source: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">if</span> (!href || <span class="hljs-regexp">/[?#\\\x00-\x20\x7f]/</span>.<span class="hljs-title function_">test</span>(href) || href.<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&#x27;/&#x27;</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">let</span> <span class="hljs-attr">decoded</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-keyword">try</span> { decoded = <span class="hljs-built_in">decodeURIComponent</span>(href); } <span class="hljs-keyword">catch</span> { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">if</span> (<span class="hljs-regexp">/[?#\\\x00-\x1f\x7f]/</span>.<span class="hljs-title function_">test</span>(decoded) || decoded.<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&#x27;/&#x27;</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">if</span> (!<span class="hljs-regexp">/\.(html|literate)$/</span>.<span class="hljs-title function_">test</span>(decoded)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">const</span> parts = source.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;/&#x27;</span>).<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, -<span class="hljs-number">1</span>);
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> part <span class="hljs-keyword">of</span> decoded.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;/&#x27;</span>)) {
+        <span class="hljs-keyword">if</span> (!part || part === <span class="hljs-string">&#x27;.&#x27;</span>) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">if</span> (part === <span class="hljs-string">&#x27;..&#x27;</span>) { <span class="hljs-keyword">if</span> (!parts.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; } parts.<span class="hljs-title function_">pop</span>(); }
+        <span class="hljs-keyword">else</span> { parts.<span class="hljs-title function_">push</span>(part); }
+    }
+    <span class="hljs-keyword">return</span> parts.<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;/&#x27;</span>).<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\.html$/</span>, <span class="hljs-string">&#x27;.literate&#x27;</span>);
+}
+</code></pre>
+
+</div>
+</div><p>Only HTTP, HTTPS, and mailto schemes are admitted as external links. Relative
+links must resolve exactly to an included <code>.literate</code> document or its <code>.html</code>
+alias. Percent-encoded path names and parent-directory navigation are supported
+without permitting escape above the project root. Local queries and heading
+fragments produce diagnostics instead of guessed destinations. Link text and
+titles remain Pandoc data, never TeX commands.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc document links&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">safeExternalLink</span>(<span class="hljs-params">href: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">boolean</span> {
+    <span class="hljs-keyword">try</span> {
+        <span class="hljs-keyword">if</span> (<span class="hljs-regexp">/[\\\x00-\x20\x7f]/</span>.<span class="hljs-title function_">test</span>(href) || <span class="hljs-regexp">/[\x00-\x1f\x7f]/</span>.<span class="hljs-title function_">test</span>(<span class="hljs-built_in">decodeURIComponent</span>(href))) { <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>; }
+        <span class="hljs-keyword">const</span> url = <span class="hljs-keyword">new</span> <span class="hljs-title function_">URL</span>(href);
+        <span class="hljs-keyword">if</span> (<span class="hljs-regexp">/^https?:\/\//i</span>.<span class="hljs-title function_">test</span>(href)) { <span class="hljs-keyword">return</span> !!url.<span class="hljs-property">hostname</span>; }
+        <span class="hljs-keyword">return</span> <span class="hljs-regexp">/^mailto:/i</span>.<span class="hljs-title function_">test</span>(href) &amp;&amp; url.<span class="hljs-property">protocol</span> === <span class="hljs-string">&#x27;mailto:&#x27;</span> &amp;&amp; !!url.<span class="hljs-property">pathname</span>;
+    } <span class="hljs-keyword">catch</span> { <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>; }
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">linkDestination</span>(<span class="hljs-params">
+    href: <span class="hljs-built_in">string</span>, <span class="hljs-variable language_">document</span>: ParsedDocument, targets: <span class="hljs-built_in">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;,
+    diagnostics: GenerationDiagnostic[], at: PublicationLocation
+</span>): <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">if</span> (<span class="hljs-regexp">/^[a-z][a-z0-9+.-]*:/i</span>.<span class="hljs-title function_">test</span>(href)) {
+        <span class="hljs-keyword">if</span> (<span class="hljs-title function_">safeExternalLink</span>(href)) { <span class="hljs-keyword">return</span> href; }
+    } <span class="hljs-keyword">else</span> {
+        <span class="hljs-keyword">const</span> path = <span class="hljs-title function_">localDocumentPath</span>(href, <span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>);
+        <span class="hljs-keyword">if</span> (path !== <span class="hljs-literal">undefined</span> &amp;&amp; targets.<span class="hljs-title function_">has</span>(path)) { <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;#&#x27;</span> + targets.<span class="hljs-title function_">get</span>(path)!; }
+    }
+    <span class="hljs-title function_">report</span>(diagnostics, at, <span class="hljs-string">&#x27;unsupported-publication-link&#x27;</span>,
+        <span class="hljs-string">`Unsupported link (expected safe HTTP/HTTPS/mailto or an included document without query/fragment): <span class="hljs-subst">${href}</span>`</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
+}
+</code></pre>
+
+</div>
+</div><h2>Reading inline tokens</h2>
+<p>The inline reader consumes matching pairs recursively. Ordinary text is split
+into Pandoc words and spaces; HTML- or TeX-looking text is still ordinary text.
+Code spans preserve their exact token content. Literal code is not scanned for
+fragment references. The nesting limit turns excessively nested input into a
+source diagnostic before JavaScript recursion becomes unsafe.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc inline reader&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">interface</span> <span class="hljs-title class_">InlineReader</span> {
+    <span class="hljs-attr">document</span>: <span class="hljs-title class_">ParsedDocument</span>;
+    <span class="hljs-attr">tokens</span>: <span class="hljs-keyword">readonly</span> <span class="hljs-title class_">Token</span>[];
+    <span class="hljs-attr">index</span>: <span class="hljs-built_in">number</span>;
+    <span class="hljs-attr">at</span>: <span class="hljs-title class_">PublicationLocation</span>;
+    <span class="hljs-attr">targets</span>: <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;;
+    <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">GenerationDiagnostic</span>[];
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">textInlines</span>(<span class="hljs-params">text: <span class="hljs-built_in">string</span></span>): <span class="hljs-title class_">PandocInline</span>[] {
+    <span class="hljs-keyword">return</span> text.<span class="hljs-title function_">split</span>(<span class="hljs-regexp">/([ \t\r\n]+)/</span>).<span class="hljs-title function_">filter</span>(<span class="hljs-title class_">Boolean</span>).<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">value</span> =&gt;</span>
+        <span class="hljs-regexp">/^[ \t\r\n]+$/</span>.<span class="hljs-title function_">test</span>(value) ? { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Space&#x27;</span> } : { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Str&#x27;</span>, <span class="hljs-attr">c</span>: value });
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">readInlines</span>(<span class="hljs-params">reader: InlineReader, stop?: <span class="hljs-built_in">string</span>, depth = <span class="hljs-number">0</span></span>): <span class="hljs-title class_">PandocInline</span>[] {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">result</span>: <span class="hljs-title class_">PandocInline</span>[] = [];
+    <span class="hljs-keyword">if</span> (depth &gt; maximumNesting) {
+        <span class="hljs-title function_">report</span>(reader.<span class="hljs-property">diagnostics</span>, reader.<span class="hljs-property">at</span>, <span class="hljs-string">&#x27;publication-nesting-limit&#x27;</span>, <span class="hljs-string">&#x27;Inline nesting exceeds 128 levels&#x27;</span>);
+        reader.<span class="hljs-property">index</span> = reader.<span class="hljs-property">tokens</span>.<span class="hljs-property">length</span>;
+        <span class="hljs-keyword">return</span> result;
+    }
+    <span class="literate-tag-name">&lt;&lt;publication Pandoc inline loop&gt;&gt;</span>
+    <span class="hljs-keyword">if</span> (stop) { <span class="hljs-title function_">report</span>(reader.<span class="hljs-property">diagnostics</span>, reader.<span class="hljs-property">at</span>, <span class="hljs-string">&#x27;invalid-markdown-structure&#x27;</span>, <span class="hljs-string">`Missing <span class="hljs-subst">${stop}</span>`</span>); }
+    <span class="hljs-keyword">return</span> result;
+}
+</code></pre>
+
+</div>
+</div><p>Closers terminate only the matching container. Unsupported tokens, including
+images and raw HTML tokens from a caller-provided parser extension, cannot be
+silently interpreted as strings. Their diagnostics block the whole preparation.
+Append text nodes iteratively: a flat, very long paragraph must not consume one
+JavaScript argument per word and exceed the runtime's argument limit.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc inline loop&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">while</span> (reader.<span class="hljs-property">index</span> &lt; reader.<span class="hljs-property">tokens</span>.<span class="hljs-property">length</span>) {
+    <span class="hljs-keyword">const</span> token = reader.<span class="hljs-property">tokens</span>[reader.<span class="hljs-property">index</span>++];
+    <span class="hljs-keyword">if</span> (stop &amp;&amp; token.<span class="hljs-property">type</span> === stop) { <span class="hljs-keyword">return</span> result; }
+    <span class="hljs-keyword">switch</span> (token.<span class="hljs-property">type</span>) {
+        <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;text&#x27;</span>:
+                    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> inline <span class="hljs-keyword">of</span> <span class="hljs-title function_">textInlines</span>(token.<span class="hljs-property">content</span>)) { result.<span class="hljs-title function_">push</span>(inline); }
+                    <span class="hljs-keyword">break</span>;
+        <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;code_inline&#x27;</span>: result.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Code&#x27;</span>, <span class="hljs-attr">c</span>: [<span class="hljs-title function_">emptyAttributes</span>(), token.<span class="hljs-property">content</span>] }); <span class="hljs-keyword">break</span>;
+        <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;softbreak&#x27;</span>: result.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;SoftBreak&#x27;</span> }); <span class="hljs-keyword">break</span>;
+        <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;hardbreak&#x27;</span>: result.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;LineBreak&#x27;</span> }); <span class="hljs-keyword">break</span>;
+        <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;em_open&#x27;</span>: result.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Emph&#x27;</span>, <span class="hljs-attr">c</span>: <span class="hljs-title function_">readInlines</span>(reader, <span class="hljs-string">&#x27;em_close&#x27;</span>, depth + <span class="hljs-number">1</span>) }); <span class="hljs-keyword">break</span>;
+        <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;strong_open&#x27;</span>: result.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Strong&#x27;</span>, <span class="hljs-attr">c</span>: <span class="hljs-title function_">readInlines</span>(reader, <span class="hljs-string">&#x27;strong_close&#x27;</span>, depth + <span class="hljs-number">1</span>) }); <span class="hljs-keyword">break</span>;
+        <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;s_open&#x27;</span>: result.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Strikeout&#x27;</span>, <span class="hljs-attr">c</span>: <span class="hljs-title function_">readInlines</span>(reader, <span class="hljs-string">&#x27;s_close&#x27;</span>, depth + <span class="hljs-number">1</span>) }); <span class="hljs-keyword">break</span>;
+        <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;link_open&#x27;</span>: result.<span class="hljs-title function_">push</span>(<span class="hljs-title function_">readLink</span>(reader, token, depth)); <span class="hljs-keyword">break</span>;
+        <span class="hljs-attr">default</span>: <span class="hljs-title function_">unsupported</span>(reader.<span class="hljs-property">diagnostics</span>, reader.<span class="hljs-property">at</span>, token.<span class="hljs-property">type</span>);
+    }
+}
+</code></pre>
+
+</div>
+</div><p>Link validation still visits the complete label before returning. The temporary
+empty destination on failure is never exposed, because any diagnostic suppresses
+the public document and all renderer callbacks.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc inline reader&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">readLink</span>(<span class="hljs-params">reader: InlineReader, token: Token, depth: <span class="hljs-built_in">number</span></span>): <span class="hljs-title class_">PandocInline</span> {
+    <span class="hljs-keyword">const</span> href = <span class="hljs-title function_">linkDestination</span>(token.<span class="hljs-title function_">attrGet</span>(<span class="hljs-string">&#x27;href&#x27;</span>) ?? <span class="hljs-string">&#x27;&#x27;</span>, reader.<span class="hljs-property">document</span>,
+        reader.<span class="hljs-property">targets</span>, reader.<span class="hljs-property">diagnostics</span>, reader.<span class="hljs-property">at</span>);
+    <span class="hljs-keyword">const</span> label = <span class="hljs-title function_">readInlines</span>(reader, <span class="hljs-string">&#x27;link_close&#x27;</span>, depth + <span class="hljs-number">1</span>);
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Link&#x27;</span>, <span class="hljs-attr">c</span>: [<span class="hljs-title function_">emptyAttributes</span>(), label, [href ?? <span class="hljs-string">&#x27;&#x27;</span>, token.<span class="hljs-title function_">attrGet</span>(<span class="hljs-string">&#x27;title&#x27;</span>) ?? <span class="hljs-string">&#x27;&#x27;</span>]] };
+}
+</code></pre>
+
+</div>
+</div><h2>Reading the complete block stream</h2>
+<p>Markdown ranges in <code>ParsedDocument.blocks</code> may end inside lists or blockquotes.
+They are therefore used only to locate accepted contributions, never rendered
+independently. The block reader walks the complete <code>tokens</code> array with one shared
+cursor, preserving nesting and authored order across each contribution.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc block reader&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">interface</span> <span class="hljs-title class_">BlockReader</span> {
+    <span class="hljs-attr">document</span>: <span class="hljs-title class_">ParsedDocument</span>;
+    <span class="hljs-attr">index</span>: <span class="hljs-built_in">number</span>;
+    <span class="hljs-attr">contributions</span>: <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">number</span>, <span class="hljs-title class_">PublicationContribution</span>&gt;;
+    <span class="hljs-attr">targets</span>: <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;;
+    <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">GenerationDiagnostic</span>[];
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">contributionIndex</span>(<span class="hljs-params">
+    <span class="hljs-variable language_">document</span>: ParsedDocument, parts: <span class="hljs-built_in">Map</span>&lt;<span class="hljs-built_in">string</span>, PublicationContribution&gt;, diagnostics: GenerationDiagnostic[]
+</span>): <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">number</span>, <span class="hljs-title class_">PublicationContribution</span>&gt; {
+    <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">number</span>, <span class="hljs-title class_">PublicationContribution</span>&gt;();
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> block <span class="hljs-keyword">of</span> <span class="hljs-variable language_">document</span>.<span class="hljs-property">blocks</span>) {
+        <span class="hljs-keyword">if</span> (block.<span class="hljs-property">kind</span> !== <span class="hljs-string">&#x27;contribution&#x27;</span>) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">const</span> part = parts.<span class="hljs-title function_">get</span>(block.<span class="hljs-property">target</span>), token = <span class="hljs-variable language_">document</span>.<span class="hljs-property">tokens</span>[block.<span class="hljs-property">tokenIndex</span>];
+        <span class="hljs-keyword">if</span> (!part || part.<span class="hljs-property">tokenIndex</span> !== block.<span class="hljs-property">tokenIndex</span> || part.<span class="hljs-property">definition</span>.<span class="hljs-property">path</span> !== <span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>
+            || token?.<span class="hljs-property">type</span> !== <span class="hljs-string">&#x27;fence&#x27;</span> || result.<span class="hljs-title function_">has</span>(block.<span class="hljs-property">tokenIndex</span>)) {
+            <span class="hljs-title function_">report</span>(diagnostics, <span class="hljs-title function_">tokenLocation</span>(<span class="hljs-variable language_">document</span>, token), <span class="hljs-string">&#x27;invalid-publication-snapshot&#x27;</span>,
+                <span class="hljs-string">`Invalid contribution binding: <span class="hljs-subst">${block.target}</span>`</span>);
+        } <span class="hljs-keyword">else</span> { result.<span class="hljs-title function_">set</span>(block.<span class="hljs-property">tokenIndex</span>, part); }
+    }
+    <span class="hljs-keyword">return</span> result;
+}
+</code></pre>
+
+</div>
+</div><p>Every block container expects its own closing token. Malformed or excessively
+nested snapshots produce diagnostics rather than partially published output.
+Parser-generated snapshots normally satisfy these structural checks already.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc block reader&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">readBlocks</span>(<span class="hljs-params">reader: BlockReader, stop?: <span class="hljs-built_in">string</span>, depth = <span class="hljs-number">0</span></span>): <span class="hljs-title class_">PendingBlock</span>[] {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">result</span>: <span class="hljs-title class_">PendingBlock</span>[] = [];
+    <span class="hljs-keyword">const</span> tokens = reader.<span class="hljs-property">document</span>.<span class="hljs-property">tokens</span>;
+    <span class="hljs-keyword">if</span> (depth &gt; maximumNesting) {
+        <span class="hljs-title function_">report</span>(reader.<span class="hljs-property">diagnostics</span>, <span class="hljs-title function_">tokenLocation</span>(reader.<span class="hljs-property">document</span>, tokens[reader.<span class="hljs-property">index</span>]),
+            <span class="hljs-string">&#x27;publication-nesting-limit&#x27;</span>, <span class="hljs-string">&#x27;Block nesting exceeds 128 levels&#x27;</span>);
+        reader.<span class="hljs-property">index</span> = tokens.<span class="hljs-property">length</span>;
+        <span class="hljs-keyword">return</span> result;
+    }
+    <span class="hljs-keyword">while</span> (reader.<span class="hljs-property">index</span> &lt; tokens.<span class="hljs-property">length</span>) {
+        <span class="hljs-keyword">const</span> index = reader.<span class="hljs-property">index</span>++, token = tokens[index];
+        <span class="hljs-keyword">if</span> (stop &amp;&amp; token.<span class="hljs-property">type</span> === stop) { <span class="hljs-keyword">return</span> result; }
+        result.<span class="hljs-title function_">push</span>(...<span class="hljs-title function_">readBlock</span>(reader, token, index, depth));
+    }
+    <span class="hljs-keyword">if</span> (stop) {
+        <span class="hljs-title function_">report</span>(reader.<span class="hljs-property">diagnostics</span>, <span class="hljs-title function_">tokenLocation</span>(reader.<span class="hljs-property">document</span>, tokens[tokens.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>]),
+            <span class="hljs-string">&#x27;invalid-markdown-structure&#x27;</span>, <span class="hljs-string">`Missing <span class="hljs-subst">${stop}</span>`</span>);
+    }
+    <span class="hljs-keyword">return</span> result;
+}
+</code></pre>
+
+</div>
+</div><p>Paragraphs inside tight lists become <code>Plain</code>, matching Markdown-it's hidden
+paragraph markers. Headings retain their explicit level; the future writer may
+choose chapter-level LaTeX division without changing this document structure.
+Blockquotes and lists recurse over the same cursor, not isolated token slices.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc block reader&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">readBlock</span>(<span class="hljs-params">reader: BlockReader, token: Token, index: <span class="hljs-built_in">number</span>, depth: <span class="hljs-built_in">number</span></span>): <span class="hljs-title class_">PendingBlock</span>[] {
+    <span class="hljs-keyword">switch</span> (token.<span class="hljs-property">type</span>) {
+        <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;paragraph_open&#x27;</span>: <span class="hljs-keyword">return</span> [{ <span class="hljs-attr">t</span>: token.<span class="hljs-property">hidden</span> ? <span class="hljs-string">&#x27;Plain&#x27;</span> : <span class="hljs-string">&#x27;Para&#x27;</span>, <span class="hljs-attr">c</span>: <span class="hljs-title function_">readTextBlock</span>(reader, token) }];
+        <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;heading_open&#x27;</span>: <span class="hljs-keyword">return</span> [<span class="hljs-title function_">readHeading</span>(reader, token)];
+        <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;hr&#x27;</span>: <span class="hljs-keyword">return</span> [{ <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;HorizontalRule&#x27;</span> }];
+        <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;blockquote_open&#x27;</span>: <span class="hljs-keyword">return</span> [{ <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;BlockQuote&#x27;</span>, <span class="hljs-attr">c</span>: <span class="hljs-title function_">readBlocks</span>(reader, <span class="hljs-string">&#x27;blockquote_close&#x27;</span>, depth + <span class="hljs-number">1</span>) }];
+        <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;bullet_list_open&#x27;</span>: <span class="hljs-keyword">return</span> [{ <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;BulletList&#x27;</span>, <span class="hljs-attr">c</span>: <span class="hljs-title function_">readList</span>(reader, <span class="hljs-string">&#x27;bullet_list_close&#x27;</span>, depth + <span class="hljs-number">1</span>) }];
+        <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;ordered_list_open&#x27;</span>: <span class="hljs-keyword">return</span> [<span class="hljs-title function_">readOrderedList</span>(reader, token, depth)];
+        <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;fence&#x27;</span>: <span class="hljs-keyword">return</span> <span class="hljs-title function_">readFence</span>(reader, token, index);
+        <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;code_block&#x27;</span>: <span class="hljs-keyword">return</span> [{ <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;CodeBlock&#x27;</span>, <span class="hljs-attr">c</span>: [<span class="hljs-title function_">emptyAttributes</span>(), token.<span class="hljs-property">content</span>] }];
+        <span class="hljs-attr">default</span>: <span class="hljs-title function_">unsupported</span>(reader.<span class="hljs-property">diagnostics</span>, <span class="hljs-title function_">tokenLocation</span>(reader.<span class="hljs-property">document</span>, token), token.<span class="hljs-property">type</span>); <span class="hljs-keyword">return</span> [];
+    }
+}
+</code></pre>
+
+</div>
+</div><p>A text block must contain the inline token followed by its matching closer. The
+children are already parsed Markdown; feeding <code>token.content</code> to a second parser
+would introduce a different interpretation of escaping and links.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc block reader&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">readTextBlock</span>(<span class="hljs-params">reader: BlockReader, opening: Token</span>): <span class="hljs-title class_">PandocInline</span>[] {
+    <span class="hljs-keyword">const</span> token = reader.<span class="hljs-property">document</span>.<span class="hljs-property">tokens</span>[reader.<span class="hljs-property">index</span>];
+    <span class="hljs-keyword">const</span> at = <span class="hljs-title function_">tokenLocation</span>(reader.<span class="hljs-property">document</span>, token, opening.<span class="hljs-property">map</span>?.[<span class="hljs-number">0</span>] ?? <span class="hljs-number">0</span>);
+    <span class="hljs-keyword">const</span> stop = opening.<span class="hljs-property">type</span> === <span class="hljs-string">&#x27;heading_open&#x27;</span> ? <span class="hljs-string">&#x27;heading_close&#x27;</span> : <span class="hljs-string">&#x27;paragraph_close&#x27;</span>;
+    <span class="hljs-keyword">if</span> (token?.<span class="hljs-property">type</span> !== <span class="hljs-string">&#x27;inline&#x27;</span>) {
+        <span class="hljs-title function_">report</span>(reader.<span class="hljs-property">diagnostics</span>, at, <span class="hljs-string">&#x27;invalid-markdown-structure&#x27;</span>, <span class="hljs-string">`Expected inline after <span class="hljs-subst">${opening.<span class="hljs-keyword">type</span>}</span>`</span>);
+        <span class="hljs-keyword">return</span> [];
+    }
+    reader.<span class="hljs-property">index</span>++;
+    <span class="hljs-keyword">const</span> result = <span class="hljs-title function_">readInlines</span>({ <span class="hljs-attr">document</span>: reader.<span class="hljs-property">document</span>, <span class="hljs-attr">tokens</span>: token.<span class="hljs-property">children</span> ?? [],
+        <span class="hljs-attr">index</span>: <span class="hljs-number">0</span>, at, <span class="hljs-attr">targets</span>: reader.<span class="hljs-property">targets</span>, <span class="hljs-attr">diagnostics</span>: reader.<span class="hljs-property">diagnostics</span> });
+    <span class="hljs-keyword">if</span> (reader.<span class="hljs-property">document</span>.<span class="hljs-property">tokens</span>[reader.<span class="hljs-property">index</span>]?.<span class="hljs-property">type</span> === stop) { reader.<span class="hljs-property">index</span>++; }
+    <span class="hljs-keyword">else</span> { <span class="hljs-title function_">report</span>(reader.<span class="hljs-property">diagnostics</span>, at, <span class="hljs-string">&#x27;invalid-markdown-structure&#x27;</span>, <span class="hljs-string">`Expected <span class="hljs-subst">${stop}</span>`</span>); }
+    <span class="hljs-keyword">return</span> result;
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">readHeading</span>(<span class="hljs-params">reader: BlockReader, token: Token</span>): <span class="hljs-title class_">PandocLeafBlock</span> {
+    <span class="hljs-keyword">const</span> level = <span class="hljs-regexp">/^h[1-6]$/</span>.<span class="hljs-title function_">test</span>(token.<span class="hljs-property">tag</span>) ? <span class="hljs-title class_">Number</span>(token.<span class="hljs-property">tag</span>.<span class="hljs-title function_">slice</span>(<span class="hljs-number">1</span>)) : <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">if</span> (!level) {
+        <span class="hljs-title function_">report</span>(reader.<span class="hljs-property">diagnostics</span>, <span class="hljs-title function_">tokenLocation</span>(reader.<span class="hljs-property">document</span>, token), <span class="hljs-string">&#x27;invalid-markdown-structure&#x27;</span>, <span class="hljs-string">&#x27;Invalid heading level&#x27;</span>);
+    }
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Header&#x27;</span>, <span class="hljs-attr">c</span>: [level, <span class="hljs-title function_">emptyAttributes</span>(), <span class="hljs-title function_">readTextBlock</span>(reader, token)] };
+}
+</code></pre>
+
+</div>
+</div><p>Lists consume item boundaries explicitly. An item may hold any supported block,
+including nested lists and contribution placeholders. Empty item arrays are
+valid; unknown list children still receive diagnostics.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc block reader&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">readList</span>(<span class="hljs-params">reader: BlockReader, stop: <span class="hljs-built_in">string</span>, depth: <span class="hljs-built_in">number</span></span>): <span class="hljs-title class_">PendingBlock</span>[][] {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">result</span>: <span class="hljs-title class_">PendingBlock</span>[][] = [], tokens = reader.<span class="hljs-property">document</span>.<span class="hljs-property">tokens</span>;
+    <span class="hljs-keyword">while</span> (reader.<span class="hljs-property">index</span> &lt; tokens.<span class="hljs-property">length</span>) {
+        <span class="hljs-keyword">const</span> token = tokens[reader.<span class="hljs-property">index</span>++];
+        <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> === stop) { <span class="hljs-keyword">return</span> result; }
+        <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> === <span class="hljs-string">&#x27;list_item_open&#x27;</span>) { result.<span class="hljs-title function_">push</span>(<span class="hljs-title function_">readBlocks</span>(reader, <span class="hljs-string">&#x27;list_item_close&#x27;</span>, depth)); }
+        <span class="hljs-keyword">else</span> { <span class="hljs-title function_">unsupported</span>(reader.<span class="hljs-property">diagnostics</span>, <span class="hljs-title function_">tokenLocation</span>(reader.<span class="hljs-property">document</span>, token), token.<span class="hljs-property">type</span>); }
+    }
+    <span class="hljs-title function_">report</span>(reader.<span class="hljs-property">diagnostics</span>, <span class="hljs-title function_">tokenLocation</span>(reader.<span class="hljs-property">document</span>, tokens[tokens.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>]),
+        <span class="hljs-string">&#x27;invalid-markdown-structure&#x27;</span>, <span class="hljs-string">`Missing <span class="hljs-subst">${stop}</span>`</span>);
+    <span class="hljs-keyword">return</span> result;
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">readOrderedList</span>(<span class="hljs-params">reader: BlockReader, token: Token, depth: <span class="hljs-built_in">number</span></span>): <span class="hljs-title class_">PendingBlock</span> {
+    <span class="hljs-keyword">const</span> start = <span class="hljs-title class_">Number</span>(token.<span class="hljs-title function_">attrGet</span>(<span class="hljs-string">&#x27;start&#x27;</span>) ?? <span class="hljs-string">&#x27;1&#x27;</span>);
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title class_">Number</span>.<span class="hljs-title function_">isSafeInteger</span>(start) || start &lt; <span class="hljs-number">0</span> || ![<span class="hljs-string">&#x27;.&#x27;</span>, <span class="hljs-string">&#x27;)&#x27;</span>].<span class="hljs-title function_">includes</span>(token.<span class="hljs-property">markup</span>)) {
+        <span class="hljs-title function_">report</span>(reader.<span class="hljs-property">diagnostics</span>, <span class="hljs-title function_">tokenLocation</span>(reader.<span class="hljs-property">document</span>, token), <span class="hljs-string">&#x27;invalid-markdown-structure&#x27;</span>, <span class="hljs-string">&#x27;Invalid ordered-list marker&#x27;</span>);
+    }
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">attributes</span>: <span class="hljs-title class_">PandocListAttributes</span> = [start, { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Decimal&#x27;</span> }, { <span class="hljs-attr">t</span>: token.<span class="hljs-property">markup</span> === <span class="hljs-string">&#x27;)&#x27;</span> ? <span class="hljs-string">&#x27;OneParen&#x27;</span> : <span class="hljs-string">&#x27;Period&#x27;</span> }];
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;OrderedList&#x27;</span>, <span class="hljs-attr">c</span>: [attributes, <span class="hljs-title function_">readList</span>(reader, <span class="hljs-string">&#x27;ordered_list_close&#x27;</span>, depth + <span class="hljs-number">1</span>)] };
+}
+</code></pre>
+
+</div>
+</div><p>All <code>SETTINGS</code> fences are omitted, matching current generation behavior, without
+activating new settings. Mermaid is explicitly unsupported, including a named
+contribution whose own language is Mermaid. Other ordinary fences are code data;
+a tag-looking string there is not a contribution or dependency.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc block reader&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">readFence</span>(<span class="hljs-params">reader: BlockReader, token: Token, index: <span class="hljs-built_in">number</span></span>): <span class="hljs-title class_">PendingBlock</span>[] {
+    <span class="hljs-keyword">if</span> (token.<span class="hljs-property">info</span>.<span class="hljs-title function_">trim</span>() === <span class="hljs-string">&#x27;SETTINGS&#x27;</span>) { <span class="hljs-keyword">return</span> []; }
+    <span class="hljs-keyword">const</span> part = reader.<span class="hljs-property">contributions</span>.<span class="hljs-title function_">get</span>(index);
+    <span class="hljs-keyword">const</span> language = part?.<span class="hljs-property">language</span> ?? token.<span class="hljs-property">info</span>.<span class="hljs-title function_">trim</span>().<span class="hljs-title function_">split</span>(<span class="hljs-regexp">/\s+/</span>)[<span class="hljs-number">0</span>];
+    <span class="hljs-keyword">if</span> (language.<span class="hljs-title function_">toLowerCase</span>() === <span class="hljs-string">&#x27;mermaid&#x27;</span>) {
+        <span class="hljs-title function_">report</span>(reader.<span class="hljs-property">diagnostics</span>, <span class="hljs-title function_">tokenLocation</span>(reader.<span class="hljs-property">document</span>, token), <span class="hljs-string">&#x27;unsupported-mermaid&#x27;</span>,
+            <span class="hljs-string">&#x27;Mermaid publication is unsupported; no diagram was rendered&#x27;</span>);
+        <span class="hljs-keyword">return</span> [];
+    }
+    <span class="hljs-keyword">if</span> (part) { <span class="hljs-keyword">return</span> [{ <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Contribution&#x27;</span>, part }]; }
+    <span class="hljs-keyword">return</span> [{ <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;CodeBlock&#x27;</span>, <span class="hljs-attr">c</span>: [[<span class="hljs-string">&#x27;&#x27;</span>, language ? [language] : [], []], token.<span class="hljs-property">content</span>] }];
+}
+</code></pre>
+
+</div>
+</div><h2>Materializing trusted contributions</h2>
+<p>Only validated pending trees reach this phase. Contributions are replaced in
+place with zero or more callback blocks, preserving surrounding containers. The
+callback owns semantic code rendering and may deliberately emit LaTeX <code>RawBlock</code>
+values. Its output is trusted renderer code, not an author-supplied AST or a
+custom-template security boundary. Neither the callback nor this bridge should
+mutate the shared parsed snapshot.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc materialization&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">materialize</span>(<span class="hljs-params">
+    pending: PendingBlock[], render: ContributionRenderer, diagnostics: GenerationDiagnostic[]
+</span>): <span class="hljs-title class_">PandocBlock</span>[] {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">result</span>: <span class="hljs-title class_">PandocBlock</span>[] = [];
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> block <span class="hljs-keyword">of</span> pending) {
+        <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">break</span>; }
+        <span class="hljs-keyword">switch</span> (block.<span class="hljs-property">t</span>) {
+            <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;Contribution&#x27;</span>:
+                            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> rendered <span class="hljs-keyword">of</span> <span class="hljs-title function_">renderPart</span>(block.<span class="hljs-property">part</span>, render, diagnostics)) { result.<span class="hljs-title function_">push</span>(rendered); }
+                            <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;BlockQuote&#x27;</span>: result.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;BlockQuote&#x27;</span>, <span class="hljs-attr">c</span>: <span class="hljs-title function_">materialize</span>(block.<span class="hljs-property">c</span>, render, diagnostics) }); <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;BulletList&#x27;</span>: result.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;BulletList&#x27;</span>, <span class="hljs-attr">c</span>: block.<span class="hljs-property">c</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span> <span class="hljs-title function_">materialize</span>(item, render, diagnostics)) }); <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;OrderedList&#x27;</span>: result.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;OrderedList&#x27;</span>, <span class="hljs-attr">c</span>: [block.<span class="hljs-property">c</span>[<span class="hljs-number">0</span>],
+                block.<span class="hljs-property">c</span>[<span class="hljs-number">1</span>].<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span> <span class="hljs-title function_">materialize</span>(item, render, diagnostics))] }); <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;Div&#x27;</span>: result.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Div&#x27;</span>, <span class="hljs-attr">c</span>: [block.<span class="hljs-property">c</span>[<span class="hljs-number">0</span>], <span class="hljs-title function_">materialize</span>(block.<span class="hljs-property">c</span>[<span class="hljs-number">1</span>], render, diagnostics)] }); <span class="hljs-keyword">break</span>;
+            <span class="hljs-attr">default</span>: result.<span class="hljs-title function_">push</span>(block);
+        }
+    }
+    <span class="hljs-keyword">return</span> result;
+}
+</code></pre>
+
+</div>
+</div><p>A callback exception is reported at that contribution's declaration. No public
+document is returned, and later callbacks are not invoked. Earlier callbacks
+cannot be undone, so callers should keep rendering free of external side effects.
+The array check catches a common untyped-caller mistake, but is not presented as
+validation or sanitization of the trusted renderer's complete output tree.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc materialization&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">renderPart</span>(<span class="hljs-params">
+    part: PublicationContribution, render: ContributionRenderer, diagnostics: GenerationDiagnostic[]
+</span>): <span class="hljs-title class_">PandocBlock</span>[] {
+    <span class="hljs-keyword">try</span> {
+        <span class="hljs-keyword">const</span> blocks = <span class="hljs-title function_">render</span>(part);
+        <span class="hljs-keyword">if</span> (!<span class="hljs-title class_">Array</span>.<span class="hljs-title function_">isArray</span>(blocks)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Contribution renderer must return a block array&#x27;</span>); }
+        <span class="hljs-keyword">return</span> blocks;
+    } <span class="hljs-keyword">catch</span> (error) {
+        <span class="hljs-title function_">report</span>(diagnostics, part.<span class="hljs-property">definition</span>, <span class="hljs-string">&#x27;contribution-render-failed&#x27;</span>,
+            <span class="hljs-string">`Contribution renderer failed: <span class="hljs-subst">${error <span class="hljs-keyword">instanceof</span> <span class="hljs-built_in">Error</span> ? error.message : <span class="hljs-built_in">String</span>(error)}</span>`</span>);
+        <span class="hljs-keyword">return</span> [];
+    }
+}
+</code></pre>
+
+</div>
+</div><h2>Preparing the document</h2>
+<p>The public API preserves document order and returns either a complete document
+with no diagnostics or diagnostics without a document. Existing parse diagnostics
+are copied, not mutated. Graph validation never calls the contribution renderer;
+token validation still runs across all documents when graph errors are found,
+so callers receive both graph and content diagnostics in deterministic order.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication Pandoc preparation&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">preparePandoc</span>(<span class="hljs-params">
+    project: ParsedProject, renderContribution: (part: PublicationContribution) =&gt; PandocBlock[]
+</span>): <span class="hljs-title class_">PandocPreparationResult</span> {
+    <span class="hljs-keyword">const</span> diagnostics = project.<span class="hljs-property">diagnostics</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">diagnostic</span> =&gt;</span> ({ ...diagnostic }));
+    <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { diagnostics }; }
+    <span class="hljs-title function_">validateReferences</span>(project, diagnostics);
+    <span class="hljs-keyword">const</span> targets = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>(project.<span class="hljs-property">documents</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">document</span> =&gt;</span> [<span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>, <span class="hljs-title function_">documentTarget</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>)]));
+    <span class="hljs-keyword">const</span> parts = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>(project.<span class="hljs-property">publication</span>.<span class="hljs-property">contributions</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> [part.<span class="hljs-property">target</span>, part]));
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">pending</span>: <span class="hljs-title class_">PendingBlock</span>[] = project.<span class="hljs-property">documents</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">document</span> =&gt;</span> {
+        <span class="hljs-keyword">const</span> contributions = <span class="hljs-title function_">contributionIndex</span>(<span class="hljs-variable language_">document</span>, parts, diagnostics);
+        <span class="hljs-keyword">const</span> body = <span class="hljs-title function_">readBlocks</span>({ <span class="hljs-variable language_">document</span>, <span class="hljs-attr">index</span>: <span class="hljs-number">0</span>, contributions, targets, diagnostics });
+        <span class="hljs-keyword">return</span> { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Div&#x27;</span>, <span class="hljs-attr">c</span>: [[targets.<span class="hljs-title function_">get</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>)!, [], []], body] };
+    });
+    <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { diagnostics }; }
+    <span class="hljs-keyword">const</span> blocks = <span class="hljs-title function_">materialize</span>(pending, renderContribution, diagnostics);
+    <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { diagnostics }; }
+
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">document</span>: { <span class="hljs-string">&#x27;pandoc-api-version&#x27;</span>: [<span class="hljs-number">1</span>, <span class="hljs-number">23</span>, <span class="hljs-number">1</span>], <span class="hljs-attr">meta</span>: {}, blocks }, diagnostics };
+}
+</code></pre>
+
+</div>
+</div><p>The intended cases are deliberately narrow: nested prose and contributions,
+ordinary code, stable document-to-document links, and exact semantic callback
+inputs. Missing references, invalid modifiers, cycles, unsupported tokens,
+Mermaid, and heading links block callbacks. HTML/TeX-looking ordinary text remains
+data. Empty projects produce an empty Pandoc document. Font selection, syntax
+highlighting, LaTeX assembly, heading-link policy, images, tables, Pandoc process
+execution, and export commands belong to later slices.</p>
+</div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

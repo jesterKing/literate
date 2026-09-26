@@ -1,0 +1,349 @@
+import type Token = require('markdown-it/lib/token');
+import type {
+    GenerationDiagnostic, ParsedDocument, ParsedProject,
+    PublicationContribution, PublicationLocation
+} from './engine';
+export type PandocAttr = [string, string[], [string, string][]];
+export interface PandocDocument {
+// eslint-disable-next-line @typescript-eslint/naming-convention -- Pandoc's wire-format key.
+    'pandoc-api-version': [1, 23, 1];
+    meta: Record<string, never>;
+    blocks: PandocBlock[];
+}
+export interface PandocPreparationResult {
+    document?: PandocDocument;
+    diagnostics: GenerationDiagnostic[];
+}
+export type PandocInline =
+    | { t: 'Str'; c: string }
+    | { t: 'Space' | 'SoftBreak' | 'LineBreak' }
+    | { t: 'Code'; c: [PandocAttr, string] }
+    | { t: 'Emph' | 'Strong' | 'Strikeout'; c: PandocInline[] }
+    | { t: 'Link'; c: [PandocAttr, PandocInline[], [string, string]] };
+export type PandocListAttributes = [number, { t: 'Decimal' }, { t: 'Period' | 'OneParen' }];
+export type PandocLeafBlock =
+    | { t: 'Plain' | 'Para'; c: PandocInline[] }
+    | { t: 'Header'; c: [number, PandocAttr, PandocInline[]] }
+    | { t: 'HorizontalRule' }
+    | { t: 'CodeBlock'; c: [PandocAttr, string] }
+    | { t: 'RawBlock'; c: ['latex', string] };
+export type PandocBlock = PandocLeafBlock
+    | { t: 'BlockQuote'; c: PandocBlock[] }
+    | { t: 'BulletList'; c: PandocBlock[][] }
+    | { t: 'OrderedList'; c: [PandocListAttributes, PandocBlock[][]] }
+    | { t: 'Div'; c: [PandocAttr, PandocBlock[]] };
+type PendingBlock = PandocLeafBlock
+    | { t: 'Contribution'; part: PublicationContribution }
+    | { t: 'BlockQuote'; c: PendingBlock[] }
+    | { t: 'BulletList'; c: PendingBlock[][] }
+    | { t: 'OrderedList'; c: [PandocListAttributes, PendingBlock[][]] }
+    | { t: 'Div'; c: [PandocAttr, PendingBlock[]] };
+type ContributionRenderer = (part: PublicationContribution) => PandocBlock[];
+const maximumNesting = 128;
+function emptyAttributes(): PandocAttr { return ['', [], []]; }
+function report(
+    diagnostics: GenerationDiagnostic[], at: PublicationLocation, code: string, message: string
+): void {
+    diagnostics.push({ ...at, code, message });
+}
+function tokenLocation(document: ParsedDocument, token?: Token, fallback = 0): PublicationLocation {
+    return { path: document.path, line: token?.map?.[0] ?? fallback, column: 0 };
+}
+function unsupported(diagnostics: GenerationDiagnostic[], at: PublicationLocation, type: string): void {
+    const raw = /^(html|raw|tex|latex)(_|$)/.test(type);
+    report(diagnostics, at, raw ? 'unsupported-raw-content' : 'unsupported-pandoc-token',
+        raw ? `Raw author content is unsupported: ${type}` : `Unsupported Markdown token: ${type}`);
+}
+interface Dependency { target: string; at: PublicationLocation; }
+function validateReferences(project: ParsedProject, diagnostics: GenerationDiagnostic[]): void {
+    const families = new Map(project.publication.fragments.map(family => [family.target, family]));
+    const edges = new Map<string, Dependency[]>();
+    for (const family of families.values()) { edges.set(family.target, []); }
+    for (const part of project.publication.contributions) {
+        for (const segment of part.segments) {
+            if (segment.kind !== 'reference') { continue; }
+            if (segment.modifier !== undefined) {
+                report(diagnostics, segment.at, 'invalid-reference-modifier',
+                    `Invalid definition operator on reference: ${segment.name}`);
+            }
+            if (segment.resolution.kind === 'missing' || !families.has(segment.resolution.target)) {
+                report(diagnostics, segment.at, 'missing-fragment', `Missing fragment: ${segment.name}`);
+            } else {
+                edges.get(part.fragmentTarget)?.push({ target: segment.resolution.target, at: segment.at });
+            }
+        }
+    }
+    validateCycles(edges, families, diagnostics);
+}
+function validateCycles(
+    edges: Map<string, Dependency[]>, families: Map<string, { name: string }>,
+    diagnostics: GenerationDiagnostic[]
+): void {
+    const active = new Set<string>(), finished = new Set<string>();
+    for (const target of edges.keys()) {
+        if (finished.has(target)) { continue; }
+        const stack = [{ target, index: 0 }];
+        active.add(target);
+        while (stack.length) {
+            const frame = stack[stack.length - 1];
+            const edge = edges.get(frame.target)![frame.index++];
+            if (!edge) {
+                active.delete(frame.target); finished.add(frame.target); stack.pop();
+            } else if (active.has(edge.target)) {
+                report(diagnostics, edge.at, 'fragment-cycle',
+                    `Fragment cycle through: ${families.get(edge.target)!.name}`);
+            } else if (!finished.has(edge.target)) {
+                active.add(edge.target); stack.push({ target: edge.target, index: 0 });
+            }
+        }
+    }
+}
+function documentTarget(path: string): string {
+    let encoded = 'd-';
+    for (let index = 0; index < path.length; index++) {
+        encoded += path.charCodeAt(index).toString(16).padStart(4, '0');
+    }
+    return encoded;
+}
+function localDocumentPath(href: string, source: string): string | undefined {
+    if (!href || /[?#\\\x00-\x20\x7f]/.test(href) || href.startsWith('/')) { return undefined; }
+    let decoded: string;
+    try { decoded = decodeURIComponent(href); } catch { return undefined; }
+    if (/[?#\\\x00-\x1f\x7f]/.test(decoded) || decoded.startsWith('/')) { return undefined; }
+    if (!/\.(html|literate)$/.test(decoded)) { return undefined; }
+    const parts = source.split('/').slice(0, -1);
+    for (const part of decoded.split('/')) {
+        if (!part || part === '.') { continue; }
+        if (part === '..') { if (!parts.length) { return undefined; } parts.pop(); }
+        else { parts.push(part); }
+    }
+    return parts.join('/').replace(/\.html$/, '.literate');
+}
+function safeExternalLink(href: string): boolean {
+    try {
+        if (/[\\\x00-\x20\x7f]/.test(href) || /[\x00-\x1f\x7f]/.test(decodeURIComponent(href))) { return false; }
+        const url = new URL(href);
+        if (/^https?:\/\//i.test(href)) { return !!url.hostname; }
+        return /^mailto:/i.test(href) && url.protocol === 'mailto:' && !!url.pathname;
+    } catch { return false; }
+}
+function linkDestination(
+    href: string, document: ParsedDocument, targets: Map<string, string>,
+    diagnostics: GenerationDiagnostic[], at: PublicationLocation
+): string | undefined {
+    if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {
+        if (safeExternalLink(href)) { return href; }
+    } else {
+        const path = localDocumentPath(href, document.path);
+        if (path !== undefined && targets.has(path)) { return '#' + targets.get(path)!; }
+    }
+    report(diagnostics, at, 'unsupported-publication-link',
+        `Unsupported link (expected safe HTTP/HTTPS/mailto or an included document without query/fragment): ${href}`);
+    return undefined;
+}
+interface InlineReader {
+    document: ParsedDocument;
+    tokens: readonly Token[];
+    index: number;
+    at: PublicationLocation;
+    targets: Map<string, string>;
+    diagnostics: GenerationDiagnostic[];
+}
+function textInlines(text: string): PandocInline[] {
+    return text.split(/([ \t\r\n]+)/).filter(Boolean).map(value =>
+        /^[ \t\r\n]+$/.test(value) ? { t: 'Space' } : { t: 'Str', c: value });
+}
+function readInlines(reader: InlineReader, stop?: string, depth = 0): PandocInline[] {
+    const result: PandocInline[] = [];
+    if (depth > maximumNesting) {
+        report(reader.diagnostics, reader.at, 'publication-nesting-limit', 'Inline nesting exceeds 128 levels');
+        reader.index = reader.tokens.length;
+        return result;
+    }
+    while (reader.index < reader.tokens.length) {
+        const token = reader.tokens[reader.index++];
+        if (stop && token.type === stop) { return result; }
+        switch (token.type) {
+            case 'text':
+                        for (const inline of textInlines(token.content)) { result.push(inline); }
+                        break;
+            case 'code_inline': result.push({ t: 'Code', c: [emptyAttributes(), token.content] }); break;
+            case 'softbreak': result.push({ t: 'SoftBreak' }); break;
+            case 'hardbreak': result.push({ t: 'LineBreak' }); break;
+            case 'em_open': result.push({ t: 'Emph', c: readInlines(reader, 'em_close', depth + 1) }); break;
+            case 'strong_open': result.push({ t: 'Strong', c: readInlines(reader, 'strong_close', depth + 1) }); break;
+            case 's_open': result.push({ t: 'Strikeout', c: readInlines(reader, 's_close', depth + 1) }); break;
+            case 'link_open': result.push(readLink(reader, token, depth)); break;
+            default: unsupported(reader.diagnostics, reader.at, token.type);
+        }
+    }
+    if (stop) { report(reader.diagnostics, reader.at, 'invalid-markdown-structure', `Missing ${stop}`); }
+    return result;
+}
+function readLink(reader: InlineReader, token: Token, depth: number): PandocInline {
+    const href = linkDestination(token.attrGet('href') ?? '', reader.document,
+        reader.targets, reader.diagnostics, reader.at);
+    const label = readInlines(reader, 'link_close', depth + 1);
+    return { t: 'Link', c: [emptyAttributes(), label, [href ?? '', token.attrGet('title') ?? '']] };
+}
+interface BlockReader {
+    document: ParsedDocument;
+    index: number;
+    contributions: Map<number, PublicationContribution>;
+    targets: Map<string, string>;
+    diagnostics: GenerationDiagnostic[];
+}
+function contributionIndex(
+    document: ParsedDocument, parts: Map<string, PublicationContribution>, diagnostics: GenerationDiagnostic[]
+): Map<number, PublicationContribution> {
+    const result = new Map<number, PublicationContribution>();
+    for (const block of document.blocks) {
+        if (block.kind !== 'contribution') { continue; }
+        const part = parts.get(block.target), token = document.tokens[block.tokenIndex];
+        if (!part || part.tokenIndex !== block.tokenIndex || part.definition.path !== document.path
+            || token?.type !== 'fence' || result.has(block.tokenIndex)) {
+            report(diagnostics, tokenLocation(document, token), 'invalid-publication-snapshot',
+                `Invalid contribution binding: ${block.target}`);
+        } else { result.set(block.tokenIndex, part); }
+    }
+    return result;
+}
+function readBlocks(reader: BlockReader, stop?: string, depth = 0): PendingBlock[] {
+    const result: PendingBlock[] = [];
+    const tokens = reader.document.tokens;
+    if (depth > maximumNesting) {
+        report(reader.diagnostics, tokenLocation(reader.document, tokens[reader.index]),
+            'publication-nesting-limit', 'Block nesting exceeds 128 levels');
+        reader.index = tokens.length;
+        return result;
+    }
+    while (reader.index < tokens.length) {
+        const index = reader.index++, token = tokens[index];
+        if (stop && token.type === stop) { return result; }
+        result.push(...readBlock(reader, token, index, depth));
+    }
+    if (stop) {
+        report(reader.diagnostics, tokenLocation(reader.document, tokens[tokens.length - 1]),
+            'invalid-markdown-structure', `Missing ${stop}`);
+    }
+    return result;
+}
+function readBlock(reader: BlockReader, token: Token, index: number, depth: number): PendingBlock[] {
+    switch (token.type) {
+        case 'paragraph_open': return [{ t: token.hidden ? 'Plain' : 'Para', c: readTextBlock(reader, token) }];
+        case 'heading_open': return [readHeading(reader, token)];
+        case 'hr': return [{ t: 'HorizontalRule' }];
+        case 'blockquote_open': return [{ t: 'BlockQuote', c: readBlocks(reader, 'blockquote_close', depth + 1) }];
+        case 'bullet_list_open': return [{ t: 'BulletList', c: readList(reader, 'bullet_list_close', depth + 1) }];
+        case 'ordered_list_open': return [readOrderedList(reader, token, depth)];
+        case 'fence': return readFence(reader, token, index);
+        case 'code_block': return [{ t: 'CodeBlock', c: [emptyAttributes(), token.content] }];
+        default: unsupported(reader.diagnostics, tokenLocation(reader.document, token), token.type); return [];
+    }
+}
+function readTextBlock(reader: BlockReader, opening: Token): PandocInline[] {
+    const token = reader.document.tokens[reader.index];
+    const at = tokenLocation(reader.document, token, opening.map?.[0] ?? 0);
+    const stop = opening.type === 'heading_open' ? 'heading_close' : 'paragraph_close';
+    if (token?.type !== 'inline') {
+        report(reader.diagnostics, at, 'invalid-markdown-structure', `Expected inline after ${opening.type}`);
+        return [];
+    }
+    reader.index++;
+    const result = readInlines({ document: reader.document, tokens: token.children ?? [],
+        index: 0, at, targets: reader.targets, diagnostics: reader.diagnostics });
+    if (reader.document.tokens[reader.index]?.type === stop) { reader.index++; }
+    else { report(reader.diagnostics, at, 'invalid-markdown-structure', `Expected ${stop}`); }
+    return result;
+}
+function readHeading(reader: BlockReader, token: Token): PandocLeafBlock {
+    const level = /^h[1-6]$/.test(token.tag) ? Number(token.tag.slice(1)) : 0;
+    if (!level) {
+        report(reader.diagnostics, tokenLocation(reader.document, token), 'invalid-markdown-structure', 'Invalid heading level');
+    }
+    return { t: 'Header', c: [level, emptyAttributes(), readTextBlock(reader, token)] };
+}
+function readList(reader: BlockReader, stop: string, depth: number): PendingBlock[][] {
+    const result: PendingBlock[][] = [], tokens = reader.document.tokens;
+    while (reader.index < tokens.length) {
+        const token = tokens[reader.index++];
+        if (token.type === stop) { return result; }
+        if (token.type === 'list_item_open') { result.push(readBlocks(reader, 'list_item_close', depth)); }
+        else { unsupported(reader.diagnostics, tokenLocation(reader.document, token), token.type); }
+    }
+    report(reader.diagnostics, tokenLocation(reader.document, tokens[tokens.length - 1]),
+        'invalid-markdown-structure', `Missing ${stop}`);
+    return result;
+}
+function readOrderedList(reader: BlockReader, token: Token, depth: number): PendingBlock {
+    const start = Number(token.attrGet('start') ?? '1');
+    if (!Number.isSafeInteger(start) || start < 0 || !['.', ')'].includes(token.markup)) {
+        report(reader.diagnostics, tokenLocation(reader.document, token), 'invalid-markdown-structure', 'Invalid ordered-list marker');
+    }
+    const attributes: PandocListAttributes = [start, { t: 'Decimal' }, { t: token.markup === ')' ? 'OneParen' : 'Period' }];
+    return { t: 'OrderedList', c: [attributes, readList(reader, 'ordered_list_close', depth + 1)] };
+}
+function readFence(reader: BlockReader, token: Token, index: number): PendingBlock[] {
+    if (token.info.trim() === 'SETTINGS') { return []; }
+    const part = reader.contributions.get(index);
+    const language = part?.language ?? token.info.trim().split(/\s+/)[0];
+    if (language.toLowerCase() === 'mermaid') {
+        report(reader.diagnostics, tokenLocation(reader.document, token), 'unsupported-mermaid',
+            'Mermaid publication is unsupported; no diagram was rendered');
+        return [];
+    }
+    if (part) { return [{ t: 'Contribution', part }]; }
+    return [{ t: 'CodeBlock', c: [['', language ? [language] : [], []], token.content] }];
+}
+function materialize(
+    pending: PendingBlock[], render: ContributionRenderer, diagnostics: GenerationDiagnostic[]
+): PandocBlock[] {
+    const result: PandocBlock[] = [];
+    for (const block of pending) {
+        if (diagnostics.length) { break; }
+        switch (block.t) {
+            case 'Contribution':
+                            for (const rendered of renderPart(block.part, render, diagnostics)) { result.push(rendered); }
+                            break;
+            case 'BlockQuote': result.push({ t: 'BlockQuote', c: materialize(block.c, render, diagnostics) }); break;
+            case 'BulletList': result.push({ t: 'BulletList', c: block.c.map(item => materialize(item, render, diagnostics)) }); break;
+            case 'OrderedList': result.push({ t: 'OrderedList', c: [block.c[0],
+                block.c[1].map(item => materialize(item, render, diagnostics))] }); break;
+            case 'Div': result.push({ t: 'Div', c: [block.c[0], materialize(block.c[1], render, diagnostics)] }); break;
+            default: result.push(block);
+        }
+    }
+    return result;
+}
+function renderPart(
+    part: PublicationContribution, render: ContributionRenderer, diagnostics: GenerationDiagnostic[]
+): PandocBlock[] {
+    try {
+        const blocks = render(part);
+        if (!Array.isArray(blocks)) { throw new Error('Contribution renderer must return a block array'); }
+        return blocks;
+    } catch (error) {
+        report(diagnostics, part.definition, 'contribution-render-failed',
+            `Contribution renderer failed: ${error instanceof Error ? error.message : String(error)}`);
+        return [];
+    }
+}
+export function preparePandoc(
+    project: ParsedProject, renderContribution: (part: PublicationContribution) => PandocBlock[]
+): PandocPreparationResult {
+    const diagnostics = project.diagnostics.map(diagnostic => ({ ...diagnostic }));
+    if (diagnostics.length) { return { diagnostics }; }
+    validateReferences(project, diagnostics);
+    const targets = new Map(project.documents.map(document => [document.path, documentTarget(document.path)]));
+    const parts = new Map(project.publication.contributions.map(part => [part.target, part]));
+    const pending: PendingBlock[] = project.documents.map(document => {
+        const contributions = contributionIndex(document, parts, diagnostics);
+        const body = readBlocks({ document, index: 0, contributions, targets, diagnostics });
+        return { t: 'Div', c: [[targets.get(document.path)!, [], []], body] };
+    });
+    if (diagnostics.length) { return { diagnostics }; }
+    const blocks = materialize(pending, renderContribution, diagnostics);
+    if (diagnostics.length) { return { diagnostics }; }
+// eslint-disable-next-line @typescript-eslint/naming-convention -- Pandoc's wire-format key.
+    return { document: { 'pandoc-api-version': [1, 23, 1], meta: {}, blocks }, diagnostics };
+}
