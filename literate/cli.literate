@@ -181,67 +181,126 @@ export function createTransactionIO(root: string): TransactionIO {
     const modes = new Map<string, number>();
     const target = (value: string): string => path.join(root, relative(value));
     const inspectPath: TransactionIO['inspect'] = async value => {
-        const parts = relative(value).split('/');
-        const rootStat = await fs.lstat(root);
-        if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) {
-            throw new Error(`Root is not a regular directory: ${root}`);
-        }
-        let current = root;
-        for (const [index, part] of parts.entries()) {
-            current = path.join(current, part);
-            let stat;
-            try { stat = await fs.lstat(current); }
-            catch (error) {
-                if (missing(error)) { return 'missing'; }
-                throw error;
-            }
-            if (stat.isSymbolicLink()) { throw new Error(`Symbolic link is not allowed: ${value}`); }
-            if (index < parts.length - 1) {
-                if (!stat.isDirectory()) { throw new Error(`Parent is not a directory: ${value}`); }
-            } else {
-                if (stat.isFile()) { return 'file'; }
-                if (stat.isDirectory()) { return 'directory'; }
-                throw new Error(`Target is not a regular file or directory: ${value}`);
-            }
-        }
-        throw new Error(`Invalid relative path: ${value}`);
+        <<cli transaction root inspection>>
+        <<cli transaction component inspection>>
     };
     return {
         inspect: inspectPath,
-        async read(value) {
-            if (await inspectPath(value) !== 'file') { throw new Error(`Not a file: ${value}`); }
-            const stat = await fs.lstat(target(value));
-            const bytes = await fs.readFile(target(value));
-            modes.set(relative(value), stat.mode & 0o7777);
-            return bytes;
-        },
-        async mkdir(value) {
-            if (await inspectPath(value) !== 'missing') { throw new Error(`Path exists: ${value}`); }
-            await fs.mkdir(target(value));
-        },
-        async writeNew(value, content) {
-            if (await inspectPath(value) !== 'missing') { throw new Error(`Path exists: ${value}`); }
-            await fs.writeFile(target(value), content, { flag: 'wx' });
-        },
-        async rename(from, to) {
-            if (await inspectPath(from) !== 'file') { throw new Error(`Not a file: ${from}`); }
-            if (await inspectPath(to) !== 'missing') { throw new Error(`Path exists: ${to}`); }
-            const mode = modes.get(relative(to));
-            if (from.endsWith('.stage') && mode !== undefined) { await fs.chmod(target(from), mode); }
-            await fs.rename(target(from), target(to));
-        },
-        async removeFile(value) {
-            if (await inspectPath(value) !== 'file') { throw new Error(`Not a file: ${value}`); }
-            await fs.unlink(target(value));
-        },
-        async removeDirectory(value) {
-            if (await inspectPath(value) !== 'directory') { throw new Error(`Not a directory: ${value}`); }
-            await fs.rmdir(target(value));
-        },
+        <<cli transaction read with permissions>>
+        <<cli transaction exclusive creation>>
+        <<cli transaction rename with permissions>>
+        <<cli transaction removal>>
         nonce: randomUUID
     };
 }
 
+```
+
+### Establish a trusted directory before classifying a target
+
+Every inspection rechecks the root rather than relying on an earlier preflight.
+The normalized components feed the walk below; neither root symlinks nor a
+non-directory root can be treated as a missing destination.
+
+```typescript: <<cli transaction root inspection>>=
+const parts = relative(value).split('/');
+const rootStat = await fs.lstat(root);
+if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) {
+    throw new Error(`Root is not a regular directory: ${root}`);
+}
+```
+
+The walk distinguishes files, directories, and absence for the transaction
+coordinator. Only absence is recoverable here; links and special files are
+errors. Returning at the first missing component permits later staged creation
+without creating anything during inspection.
+
+```typescript: <<cli transaction component inspection>>=
+let current = root;
+for (const [index, part] of parts.entries()) {
+    current = path.join(current, part);
+    let stat;
+    try { stat = await fs.lstat(current); }
+    catch (error) {
+        if (missing(error)) { return 'missing'; }
+        throw error;
+    }
+    if (stat.isSymbolicLink()) { throw new Error(`Symbolic link is not allowed: ${value}`); }
+    if (index < parts.length - 1) {
+        if (!stat.isDirectory()) { throw new Error(`Parent is not a directory: ${value}`); }
+    } else {
+        if (stat.isFile()) { return 'file'; }
+        if (stat.isDirectory()) { return 'directory'; }
+        throw new Error(`Target is not a regular file or directory: ${value}`);
+    }
+}
+throw new Error(`Invalid relative path: ${value}`);
+```
+
+### Carry permissions from the original to its replacement
+
+Reading records mode bits under the normalized destination, not the temporary
+stage name. The byte snapshot and permission snapshot belong to the same adapter
+instance and remain available during installation or recovery.
+
+```typescript: <<cli transaction read with permissions>>=
+async read(value) {
+    if (await inspectPath(value) !== 'file') { throw new Error(`Not a file: ${value}`); }
+    const stat = await fs.lstat(target(value));
+    const bytes = await fs.readFile(target(value));
+    modes.set(relative(value), stat.mode & 0o7777);
+    return bytes;
+},
+```
+
+### Create without replacing existing entries
+
+Both creation operations require an absent path. File creation also uses the
+filesystem's exclusive flag; directory creation is deliberately nonrecursive so
+the coordinator can track exactly which directories it owns.
+
+```typescript: <<cli transaction exclusive creation>>=
+async mkdir(value) {
+    if (await inspectPath(value) !== 'missing') { throw new Error(`Path exists: ${value}`); }
+    await fs.mkdir(target(value));
+},
+async writeNew(value, content) {
+    if (await inspectPath(value) !== 'missing') { throw new Error(`Path exists: ${value}`); }
+    await fs.writeFile(target(value), content, { flag: 'wx' });
+},
+```
+
+### Install a stage using the destination's remembered mode
+
+A rename requires a regular source and absent destination. Only stage files
+inherit the destination's saved mode, leaving backup moves unchanged. The
+inspection/rename race remains subject to the serialization contract above.
+
+```typescript: <<cli transaction rename with permissions>>=
+async rename(from, to) {
+    if (await inspectPath(from) !== 'file') { throw new Error(`Not a file: ${from}`); }
+    if (await inspectPath(to) !== 'missing') { throw new Error(`Path exists: ${to}`); }
+    const mode = modes.get(relative(to));
+    if (from.endsWith('.stage') && mode !== undefined) { await fs.chmod(target(from), mode); }
+    await fs.rename(target(from), target(to));
+},
+```
+
+### Remove only the expected entry kind
+
+Cleanup revalidates each recovery path. Nonrecursive directory removal refuses
+to erase unexpected contents, allowing the coordinator to report recoverable
+residue rather than broadening the cleanup operation.
+
+```typescript: <<cli transaction removal>>=
+async removeFile(value) {
+    if (await inspectPath(value) !== 'file') { throw new Error(`Not a file: ${value}`); }
+    await fs.unlink(target(value));
+},
+async removeDirectory(value) {
+    if (await inspectPath(value) !== 'directory') { throw new Error(`Not a directory: ${value}`); }
+    await fs.rmdir(target(value));
+},
 ```
 
 ## Discover saved inputs

@@ -136,11 +136,22 @@ class FragmentMap {
     this.map = new Map<string, FragmentInformation>();
   }
 
+```
+
+Clearing retains the map object, so holders of the map see its contents emptied.
+
+``` ts : <<fragment map>>=+
   clear()
   {
     this.map.clear();
   }
 
+```
+
+The map owns no external resources; disposal has the same effect on its contents
+as an explicit clear.
+
+``` ts : <<fragment map>>=+
   dispose()
   {
     this.map.clear();
@@ -166,11 +177,23 @@ class GrabbedStateList {
     this.list = new Array<GrabbedState>();
   }
 
+```
+
+A refresh replaces the list rather than mutating the previous array. Consumers
+holding an earlier array therefore keep that snapshot.
+
+``` ts : <<list of grabbed states>>=+
   clear()
   {
     this.list = new Array<GrabbedState>();
   }
 
+```
+
+Disposal instead drains the current array, releasing the retained parser states
+through that same array object.
+
+``` ts : <<list of grabbed states>>=+
   dispose()
   {
     while(this.list.length>0)
@@ -204,28 +227,35 @@ export class FragmentRepository {
   <<method to get state for document>>
   <<method to get all reference locations>>
 
-  dispose() {
-    this.disposed = true;
-    for (const timer of this.inputTimers.values()) { clearTimeout(timer); }
-    this.inputTimers.clear();
-    this.generatedOutputs.clear();
-    for (const subscription of this.inputSubscriptions) { subscription.dispose(); }
-    this.inputSubscriptions.length = 0;
-    for(let fragmentMap of this.fragmentsForWorkspaceFolders.values())
-    {
-      fragmentMap.dispose();
-    }
-    this.fragmentsForWorkspaceFolders.clear();
+  <<dispose fragment repository>>
+}
+```
 
-    for(let grabbedState of this.grabbedStateForWorkspaceFolders.values())
-    {
-      grabbedState.dispose();
-    }
-    this.grabbedStateForWorkspaceFolders.clear();
-        this.sourceDocuments.clear();
-        this.previewThemes.clear();
-        this.occurrences.clear();
+Disposal first closes the input side: pending timers and subscriptions must not
+schedule more work while workspace snapshots are being released. The disposed
+flag also makes already-queued processing requests inert.
+
+``` ts : <<dispose fragment repository>>=
+dispose() {
+  this.disposed = true;
+  for (const timer of this.inputTimers.values()) { clearTimeout(timer); }
+  this.inputTimers.clear();
+  this.generatedOutputs.clear();
+  for (const subscription of this.inputSubscriptions) { subscription.dispose(); }
+  this.inputSubscriptions.length = 0;
+  for(let fragmentMap of this.fragmentsForWorkspaceFolders.values())
+  {
+    fragmentMap.dispose();
   }
+  this.fragmentsForWorkspaceFolders.clear();
+  for(let grabbedState of this.grabbedStateForWorkspaceFolders.values())
+  {
+    grabbedState.dispose();
+  }
+  this.grabbedStateForWorkspaceFolders.clear();
+      this.sourceDocuments.clear();
+      this.previewThemes.clear();
+      this.occurrences.clear();
 }
 ```
 
@@ -394,6 +424,14 @@ const changed = (uri: vscode.Uri) => {
 };
 this.inputSubscriptions.push(watcher, watcher.onDidCreate(changed),
   watcher.onDidChange(changed), watcher.onDidDelete(changed));
+```
+
+Filesystem events above share a short per-workspace debounce, coalescing bursts
+without delaying unrelated roots. Workspace membership changes have a different
+lifetime: additions need an initial snapshot, while removals must discard both
+pending timers and every cache keyed by that root's URI.
+
+``` ts : <<subscribe to workspace changes>>=+
 this.inputSubscriptions.push(
   vscode.workspace.onDidChangeWorkspaceFolders(
     async (e : vscode.WorkspaceFoldersChangeEvent) =>
@@ -522,89 +560,14 @@ processLiterateFiles(
     const folders = trigger ? (folder ? [folder] : [])
       : vscode.workspace.workspaceFolders || [];
     for (const workspaceFolder of folders) {
-      const documents: SourceDocument[] = [];
-      for (const uri of await getLiterateFileUris(workspaceFolder)) {
-        documents.push({
-          path: path.posix.relative(workspaceFolder.uri.path, uri.path),
-          text: await getFileContent(uri)
-        });
-      }
-      const themeKey = workspaceFolder.uri.toString();
-      const theme = previewThemeName(documents);
-      const previousTheme = this.previewThemes.get(themeKey) ?? defaultThemeName;
-      this.previewThemes.set(themeKey, theme);
-      if (theme !== previousTheme) {
-        void vscode.commands.executeCommand('markdown.preview.refresh').then(undefined, () => undefined);
-      }
-      const templates: Record<string, string> = Object.create(null);
-      let references: string[] = [];
-      try {
-        references = templateReferences(documents);
-      } catch (_) {}
-      for (const reference of references) {
-        try {
-          templates[reference] = await getFileContent(
-            vscode.Uri.joinPath(workspaceFolder.uri, reference));
-        } catch (error) {
-          if (!(error instanceof vscode.FileSystemError) || error.code !== 'FileNotFound') {
-            throw error;
-          }
-        }
-      }
+      <<snapshot workspace documents and theme>>
+      <<load snapshot templates>>
       const result = generateProject(documents, templates);
-      const diagnostics = new Map<string, vscode.Diagnostic[]>();
-      for (const diagnostic of result.diagnostics) {
-        const uri = vscode.Uri.joinPath(workspaceFolder.uri, diagnostic.path);
-        const key = uri.toString();
-        const entries = diagnostics.get(key) || [];
-        const range = new vscode.Range(diagnostic.line, diagnostic.column,
-          diagnostic.line, diagnostic.column + 1);
-        const entry = new vscode.Diagnostic(range, diagnostic.message,
-          vscode.DiagnosticSeverity.Error);
-        if (diagnostic.code !== undefined) { entry.code = diagnostic.code; }
-        entries.push(entry);
-        diagnostics.set(key, entries);
-      }
-      const stale: vscode.Uri[] = [];
-      this.diagnostics.forEach(uri => {
-        if (vscode.workspace.getWorkspaceFolder(uri)?.uri.toString() === workspaceFolder.uri.toString()) {
-          stale.push(uri);
-        }
-      });
-      for (const uri of stale) { this.diagnostics.delete(uri); }
-      for (const [uri, entries] of diagnostics) {
-        this.diagnostics.set(vscode.Uri.parse(uri), entries);
-      }
-      const states = new GrabbedStateList();
-      const fragments = new FragmentMap();
-      const key = workspaceFolder.uri.toString();
-      this.grabbedStateForWorkspaceFolders.set(key, states);
-      this.fragmentsForWorkspaceFolders.set(key, fragments);
-      this.sourceDocuments.set(key, []);
-      this.occurrences.set(key, []);
-      let ordered: SourceDocument[];
-      try {
-        ordered = orderSourceDocuments(documents);
-                this.occurrences.set(key, collectFragmentOccurrences(ordered));
-                this.sourceDocuments.set(key, ordered);
-      } catch (_) {
-        continue;
-      }
-      for (const document of ordered) {
-        const env: GrabbedState = {
-          literateFileName: document.path,
-          literateUri: vscode.Uri.joinPath(workspaceFolder.uri, document.path),
-          gstate: new StateCore('', this.md, {})
-        };
-        this.md.parse(document.text, env);
-        states.list.push(env);
-      }
-      fragments.map = handleFragments(states.list, result.inspection.fragments);
-      if (!writeFiles || result.diagnostics.length) { continue; }
-      this.generatedOutputs.set(key, new Set(result.files.map(file =>
-        vscode.Uri.joinPath(workspaceFolder.uri, file.path).toString())));
-      const outputs = await this.preflightOutputs(workspaceFolder.uri, result.files);
-      await this.writeChangedOutputs(outputs);
+      <<translate generation diagnostics>>
+      <<replace workspace diagnostics>>
+      <<prepare ordered navigation snapshot>>
+      <<parse navigation snapshot>>
+      <<commit valid requested outputs>>
     }
   });
   this.processingQueue = operation.catch(error => {
@@ -612,6 +575,146 @@ processLiterateFiles(
   });
   return operation;
 }
+```
+
+##### Snapshot inputs before generation
+
+Every downstream view uses the same document contents. Theme selection happens
+before template loading and generation, so preview refresh does not depend on
+successful output writes. The refresh is deliberately not awaited by the queue.
+
+``` ts : <<snapshot workspace documents and theme>>=
+const documents: SourceDocument[] = [];
+for (const uri of await getLiterateFileUris(workspaceFolder)) {
+  documents.push({
+    path: path.posix.relative(workspaceFolder.uri.path, uri.path),
+    text: await getFileContent(uri)
+  });
+}
+const themeKey = workspaceFolder.uri.toString();
+const theme = previewThemeName(documents);
+const previousTheme = this.previewThemes.get(themeKey) ?? defaultThemeName;
+this.previewThemes.set(themeKey, theme);
+if (theme !== previousTheme) {
+  void vscode.commands.executeCommand('markdown.preview.refresh').then(undefined, () => undefined);
+}
+```
+
+Template discovery can reject malformed declarations, but that must not suppress
+the engine's source diagnostics. Likewise a missing template is represented by
+its absence in `templates`. Other read failures abort this queued operation
+rather than supplying a misleading partial snapshot.
+
+``` ts : <<load snapshot templates>>=
+const templates: Record<string, string> = Object.create(null);
+let references: string[] = [];
+try {
+  references = templateReferences(documents);
+} catch (_) {}
+for (const reference of references) {
+  try {
+    templates[reference] = await getFileContent(
+      vscode.Uri.joinPath(workspaceFolder.uri, reference));
+  } catch (error) {
+    if (!(error instanceof vscode.FileSystemError) || error.code !== 'FileNotFound') {
+      throw error;
+    }
+  }
+}
+```
+
+##### Publish diagnostics for one workspace
+
+The engine's relative paths become full document URIs at the editor boundary.
+Grouping first lets the adapter replace a document's entries together, retaining
+engine diagnostic codes for consumers of the Problems collection.
+
+``` ts : <<translate generation diagnostics>>=
+const diagnostics = new Map<string, vscode.Diagnostic[]>();
+for (const diagnostic of result.diagnostics) {
+  const uri = vscode.Uri.joinPath(workspaceFolder.uri, diagnostic.path);
+  const key = uri.toString();
+  const entries = diagnostics.get(key) || [];
+  const range = new vscode.Range(diagnostic.line, diagnostic.column,
+    diagnostic.line, diagnostic.column + 1);
+  const entry = new vscode.Diagnostic(range, diagnostic.message,
+    vscode.DiagnosticSeverity.Error);
+  if (diagnostic.code !== undefined) { entry.code = diagnostic.code; }
+  entries.push(entry);
+  diagnostics.set(key, entries);
+}
+```
+
+A successful correction can leave no new entries at all. Removing the old set
+before publishing the new one clears those resolved errors without disturbing
+diagnostics owned by other workspace folders.
+
+``` ts : <<replace workspace diagnostics>>=
+const stale: vscode.Uri[] = [];
+this.diagnostics.forEach(uri => {
+  if (vscode.workspace.getWorkspaceFolder(uri)?.uri.toString() === workspaceFolder.uri.toString()) {
+    stale.push(uri);
+  }
+});
+for (const uri of stale) { this.diagnostics.delete(uri); }
+for (const [uri, entries] of diagnostics) {
+  this.diagnostics.set(vscode.Uri.parse(uri), entries);
+}
+```
+
+##### Rebuild navigation before considering writes
+
+Navigation must not retain an earlier valid snapshot when ordering the new one
+fails. Install empty containers first, then publish the ordered source and its
+occurrences. These fragments expand inside the workspace loop: `continue`
+skips that workspace's remaining work, not the whole queued request.
+
+``` ts : <<prepare ordered navigation snapshot>>=
+const states = new GrabbedStateList();
+const fragments = new FragmentMap();
+const key = workspaceFolder.uri.toString();
+this.grabbedStateForWorkspaceFolders.set(key, states);
+this.fragmentsForWorkspaceFolders.set(key, fragments);
+this.sourceDocuments.set(key, []);
+this.occurrences.set(key, []);
+let ordered: SourceDocument[];
+try {
+  ordered = orderSourceDocuments(documents);
+          this.occurrences.set(key, collectFragmentOccurrences(ordered));
+          this.sourceDocuments.set(key, ordered);
+} catch (_) {
+  continue;
+}
+```
+
+The parser adds editor token locations to the ordered snapshot. Accepted fragment
+parts still come from engine inspection, so navigation does not introduce a
+second declaration-acceptance policy or expand code of its own.
+
+``` ts : <<parse navigation snapshot>>=
+for (const document of ordered) {
+  const env: GrabbedState = {
+    literateFileName: document.path,
+    literateUri: vscode.Uri.joinPath(workspaceFolder.uri, document.path),
+    gstate: new StateCore('', this.md, {})
+  };
+  this.md.parse(document.text, env);
+  states.list.push(env);
+}
+fragments.map = handleFragments(states.list, result.inspection.fragments);
+```
+
+Only the final step depends on write intent and a diagnostic-free result.
+Remembering destinations before filesystem work prevents output-shaped input
+events from feeding back into generation. Preflight covers the whole batch
+before the transaction coordinator is allowed to stage changes.
+
+``` ts : <<commit valid requested outputs>>=
+if (!writeFiles || result.diagnostics.length) { continue; }
+this.generatedOutputs.set(key, new Set(result.files.map(file =>
+  vscode.Uri.joinPath(workspaceFolder.uri, file.path).toString())));
+const outputs = await this.preflightOutputs(workspaceFolder.uri, result.files);
+await this.writeChangedOutputs(outputs);
 ```
 
 #### Preflighting output paths
@@ -652,112 +755,194 @@ input-shaped watcher events.
 ``` ts : <<fragment generation method>>=+
 private outputTransactionIO(root: vscode.Uri): TransactionIO {
   const modes = new Map<string, number>();
-  const uriFor = (relative: string): vscode.Uri => {
-    const safe = safeRelativePath(relative);
-    if (!safe) { throw new Error(`Unsafe output path: ${relative}`); }
-    return vscode.Uri.joinPath(root, safe);
-  };
-  const inspect: TransactionIO['inspect'] = async relativePath => {
-    const relative = safeRelativePath(relativePath);
-    if (!relative) { throw new Error(`Unsafe output path: ${relativePath}`); }
-    const parts = relative.split('/');
-    let parent = root;
-    for (let index = 0; index < parts.length; index++) {
-      const uri = vscode.Uri.joinPath(parent, parts[index]);
-      const type = await this.outputEntryType(parent, uri, parts[index]);
-      if (type === undefined) { return 'missing'; }
-      if (type & vscode.FileType.SymbolicLink) {
-        throw new Error(`Unsafe output path (symbolic link): ${uri.toString()}`);
-      }
-      const leaf = index === parts.length - 1;
-      if (type !== vscode.FileType.Directory && !(leaf && type === vscode.FileType.File)) {
-        throw new Error(`Unsafe output path (expected ${leaf ? 'file or directory' : 'directory'}): ${uri.toString()}`);
-      }
-      if (leaf) { return type === vscode.FileType.File ? 'file' : 'directory'; }
-      parent = uri;
-    }
-    throw new Error(`Unsafe output path: ${relativePath}`);
-  };
-  const requireType = async (relative: string, expected: 'missing' | 'file' | 'directory'): Promise<void> => {
-    if (await inspect(relative) !== expected) {
-      throw new Error(`Unsafe output path (expected ${expected}): ${relative}`);
-    }
-  };
-  const requireParent = async (relative: string): Promise<void> => {
-    const safe = safeRelativePath(relative);
-    if (!safe) { throw new Error(`Unsafe output path: ${relative}`); }
-    const parent = safe.split('/').slice(0, -1).join('/');
-    if (parent) { await requireType(parent, 'directory'); }
-    else { await vscode.workspace.fs.readDirectory(root); }
-  };
-  const removeDirectory = async (relative: string): Promise<void> => {
-    await requireType(relative, 'directory');
-    const uri = uriFor(relative);
-    if ((await vscode.workspace.fs.readDirectory(uri)).length) {
-      throw new Error(`Output directory is not empty: ${relative}`);
-    }
-    await vscode.workspace.fs.delete(uri, { recursive: false, useTrash: false });
-  };
+  <<resolve transaction URI>>
+  <<inspect transaction path>>
+  <<require transaction entry type>>
+  <<require transaction parent>>
+  <<remove empty transaction directory>>
   return {
     inspect,
-    read: async relative => {
-      await requireType(relative, 'file');
-      const uri = uriFor(relative);
-      if (uri.scheme === 'file') {
-        const stat = await lstat(uri.fsPath);
-        if (stat.isSymbolicLink() || !stat.isFile()) {
-          throw new Error(`Unsafe output path (expected file): ${uri.toString()}`);
-        }
-        modes.set(uri.toString(), stat.mode & 0o7777);
-      }
-      return vscode.workspace.fs.readFile(uri);
-    },
-    mkdir: async relative => {
-      await requireType(relative, 'missing');
-      await requireParent(relative);
-      try { await vscode.workspace.fs.createDirectory(uriFor(relative)); }
-      catch (error) {
-        let createdEmptyDirectory = false;
-        try {
-          if (await inspect(relative) === 'directory') {
-            if ((await vscode.workspace.fs.readDirectory(uriFor(relative))).length) {
-              throw new Error(`Output directory is not empty: ${relative}`);
-            }
-            createdEmptyDirectory = true;
-            await removeDirectory(relative);
-          }
-        } catch (cleanupError) {
-          const message = `Directory creation failed: ${relative}; ${String(error)}; empty-directory cleanup failed: ${String(cleanupError)}`;
-          if (createdEmptyDirectory) { throw new TransactionDirectoryError(relative, message); }
-          throw new Error(message);
-        }
-        throw error;
-      }
-    },
-    writeNew: async (relative, content) => {
-      await requireType(relative, 'missing');
-      await requireParent(relative);
-      await vscode.workspace.fs.writeFile(uriFor(relative), content);
-    },
-    rename: async (from, to) => {
-      await requireType(from, 'file');
-      await requireType(to, 'missing');
-      await requireParent(to);
-      const source = uriFor(from), target = uriFor(to);
-      const mode = modes.get(target.toString());
-      if (source.scheme === 'file' && from.endsWith('.stage') && mode !== undefined) {
-        await chmod(source.fsPath, mode);
-      }
-      await vscode.workspace.fs.rename(source, target, { overwrite: false });
-    },
-    removeFile: async relative => {
-      await requireType(relative, 'file');
-      await vscode.workspace.fs.delete(uriFor(relative), { recursive: false, useTrash: false });
-    },
+    <<read transaction file>>
+    <<create transaction directory>>
+    <<write new transaction file>>
+    <<rename transaction file>>
+    <<remove transaction file>>
     removeDirectory,
     nonce: randomUUID
   };
 }
+```
+
+The adapter's helpers close over one trusted root and one permission snapshot.
+URI construction validates the relative spelling even for operations that have
+already inspected the path; no provider operation should bypass that boundary.
+
+``` ts : <<resolve transaction URI>>=
+const uriFor = (relative: string): vscode.Uri => {
+  const safe = safeRelativePath(relative);
+  if (!safe) { throw new Error(`Unsafe output path: ${relative}`); }
+  return vscode.Uri.joinPath(root, safe);
+};
+```
+
+Inspection walks from the trusted root towards the leaf. An absent component
+ends the walk, whereas links or unsuitable intermediate types reject it. A leaf
+may be either a file or a directory; each operation imposes its own narrower
+requirement afterward.
+
+``` ts : <<inspect transaction path>>=
+const inspect: TransactionIO['inspect'] = async relativePath => {
+  const relative = safeRelativePath(relativePath);
+  if (!relative) { throw new Error(`Unsafe output path: ${relativePath}`); }
+  const parts = relative.split('/');
+  let parent = root;
+  for (let index = 0; index < parts.length; index++) {
+    const uri = vscode.Uri.joinPath(parent, parts[index]);
+    const type = await this.outputEntryType(parent, uri, parts[index]);
+    if (type === undefined) { return 'missing'; }
+    if (type & vscode.FileType.SymbolicLink) {
+      throw new Error(`Unsafe output path (symbolic link): ${uri.toString()}`);
+    }
+    const leaf = index === parts.length - 1;
+    if (type !== vscode.FileType.Directory && !(leaf && type === vscode.FileType.File)) {
+      throw new Error(`Unsafe output path (expected ${leaf ? 'file or directory' : 'directory'}): ${uri.toString()}`);
+    }
+    if (leaf) { return type === vscode.FileType.File ? 'file' : 'directory'; }
+    parent = uri;
+  }
+  throw new Error(`Unsafe output path: ${relativePath}`);
+};
+```
+
+Preflight alone is not enough for a multi-step transaction: staging and rollback
+change which entries should exist. Each operation rechecks the expected state
+at its own boundary, using the same inspection policy.
+
+``` ts : <<require transaction entry type>>=
+const requireType = async (relative: string, expected: 'missing' | 'file' | 'directory'): Promise<void> => {
+  if (await inspect(relative) !== expected) {
+    throw new Error(`Unsafe output path (expected ${expected}): ${relative}`);
+  }
+};
+```
+
+Creation requires an existing immediate parent. For a direct child of the trusted
+root there is no relative parent to inspect, so a directory listing checks that
+the provider can access the root instead.
+
+``` ts : <<require transaction parent>>=
+const requireParent = async (relative: string): Promise<void> => {
+  const safe = safeRelativePath(relative);
+  if (!safe) { throw new Error(`Unsafe output path: ${relative}`); }
+  const parent = safe.split('/').slice(0, -1).join('/');
+  if (parent) { await requireType(parent, 'directory'); }
+  else { await vscode.workspace.fs.readDirectory(root); }
+};
+```
+
+Cleanup is intentionally nonrecursive. A directory containing unexpected entries
+must survive for recovery rather than allowing rollback to erase unrelated data.
+
+``` ts : <<remove empty transaction directory>>=
+const removeDirectory = async (relative: string): Promise<void> => {
+  await requireType(relative, 'directory');
+  const uri = uriFor(relative);
+  if ((await vscode.workspace.fs.readDirectory(uri)).length) {
+    throw new Error(`Output directory is not empty: ${relative}`);
+  }
+  await vscode.workspace.fs.delete(uri, { recursive: false, useTrash: false });
+};
+```
+
+Reading a local original also records its permission bits for later replacement.
+The extra local `lstat` rejects links and non-files; remote providers stay on the
+portable workspace filesystem API and do not contribute mode metadata.
+
+``` ts : <<read transaction file>>=
+read: async relative => {
+  await requireType(relative, 'file');
+  const uri = uriFor(relative);
+  if (uri.scheme === 'file') {
+    const stat = await lstat(uri.fsPath);
+    if (stat.isSymbolicLink() || !stat.isFile()) {
+      throw new Error(`Unsafe output path (expected file): ${uri.toString()}`);
+    }
+    modes.set(uri.toString(), stat.mode & 0o7777);
+  }
+  return vscode.workspace.fs.readFile(uri);
+},
+```
+
+A provider may throw after creating a directory. On that failure path we attempt
+to remove only a confirmed empty directory. If its removal also fails, the
+special transaction error lets the coordinator take responsibility for recovery;
+otherwise the original creation error remains the failure reported.
+
+``` ts : <<create transaction directory>>=
+mkdir: async relative => {
+  await requireType(relative, 'missing');
+  await requireParent(relative);
+  try { await vscode.workspace.fs.createDirectory(uriFor(relative)); }
+  catch (error) {
+    let createdEmptyDirectory = false;
+    try {
+      if (await inspect(relative) === 'directory') {
+        if ((await vscode.workspace.fs.readDirectory(uriFor(relative))).length) {
+          throw new Error(`Output directory is not empty: ${relative}`);
+        }
+        createdEmptyDirectory = true;
+        await removeDirectory(relative);
+      }
+    } catch (cleanupError) {
+      const message = `Directory creation failed: ${relative}; ${String(error)}; empty-directory cleanup failed: ${String(cleanupError)}`;
+      if (createdEmptyDirectory) { throw new TransactionDirectoryError(relative, message); }
+      throw new Error(message);
+    }
+    throw error;
+  }
+},
+```
+
+Stage writes require absence and an accessible parent. These checks express the
+transaction's no-overwrite intent, though the provider API does not make the
+check and write an exclusive filesystem operation.
+
+``` ts : <<write new transaction file>>=
+writeNew: async (relative, content) => {
+  await requireType(relative, 'missing');
+  await requireParent(relative);
+  await vscode.workspace.fs.writeFile(uriFor(relative), content);
+},
+```
+
+Renames serve both installation and rollback. Permission restoration applies
+only when installing a local stage over a previously read destination; backup
+restoration moves the original itself. Non-overwriting rename protects an
+unexpected destination rather than silently replacing it.
+
+``` ts : <<rename transaction file>>=
+rename: async (from, to) => {
+  await requireType(from, 'file');
+  await requireType(to, 'missing');
+  await requireParent(to);
+  const source = uriFor(from), target = uriFor(to);
+  const mode = modes.get(target.toString());
+  if (source.scheme === 'file' && from.endsWith('.stage') && mode !== undefined) {
+    await chmod(source.fsPath, mode);
+  }
+  await vscode.workspace.fs.rename(source, target, { overwrite: false });
+},
+```
+
+File cleanup shares the same type checks and never requests recursive deletion.
+Directory cleanup is supplied separately, keeping the transaction's two kinds
+of recovery action distinct.
+
+``` ts : <<remove transaction file>>=
+removeFile: async relative => {
+  await requireType(relative, 'file');
+  await vscode.workspace.fs.delete(uriFor(relative), { recursive: false, useTrash: false });
+},
 ```
 
 The entry lookup distinguishes an absent path from a dangling link. Only a
@@ -901,6 +1086,13 @@ export class FragmentLocation
     }
   }
 }
+```
+
+Failed lookups share a sentinel location rather than returning `undefined`. Its
+special URI keeps `valid` false, so the empty range is not treated as a tag whose
+delimiters can be stripped.
+
+``` ts : <<fragment tag location>>=+
 const unsetFragmentLocation =
     new FragmentLocation(
       '',
@@ -1224,21 +1416,18 @@ interface FragmentInformation {
    * is a top fragment.
    */
   sourceFileName: string;
-  /**
-   * Uri to source template filename.
-   */
+```
+
+The remaining fields retain the unexpanded representation needed by editor
+features. Tokens can span several accepted parts; `env` belongs to the first
+part, not necessarily to every token. The template slot remains optional (the
+current editor collector leaves it unset); generation resolves templates in the
+engine rather than through this navigation record.
+
+``` ts : <<fragment information type>>=+
   templateFileName: vscode.Uri | undefined;
-  /**
-   * The code fragment.
-   */
   code: string;
-  /**
-   * List of tokens that make up the entire code fragment.
-   */
   tokens: Token[];
-  /**
-   * The GrabbedState related to this fragment.
-   */
   env: GrabbedState;
 }
 ```
@@ -1286,6 +1475,13 @@ function previewThemeName(documents: SourceDocument[]): string {
   return theme.diagnostics.length ? defaultThemeName : theme.name;
 }
 
+```
+
+The document wrapper chooses its theme at render time, not parser installation
+time. This lets a reused preview parser follow the document's workspace and its
+latest open index buffer.
+
+```ts : <<renderCodeFence rule>>=+
 function installPreviewDocument(md: MarkdownIt, repository: FragmentRepository): void {
   const originalRender = md.renderer.render;
   md.renderer.render = function (tokens, options, env) {
@@ -1295,6 +1491,13 @@ function installPreviewDocument(md: MarkdownIt, repository: FragmentRepository):
   };
 }
 
+```
+
+Fence handling captures the previous rule separately from the document wrapper.
+Settings are hidden and plain Mermaid is handed to the browser client; all other
+fences proceed to the delegation and fragment-decoration path.
+
+```ts : <<renderCodeFence rule>>=+
 function installPreviewFences(md: MarkdownIt): void {
   const originalFence = md.renderer.rules.fence;
   md.renderer.rules.fence = (tokens, idx, options, env, slf) => {
@@ -1702,6 +1905,13 @@ async function getLiterateFileUris(workspaceFolder: vscode.WorkspaceFolder): Pro
   return Array.from(uris.keys()).sort().map(key => uris.get(key)!);
 }
 
+```
+
+Discovery determines membership; reading determines which version enters the
+snapshot. A matching editor buffer wins even when it is empty, avoiding a silent
+fallback to stale disk content for either documents or templates.
+
+``` ts : <<utility functions>>=+
 async function getFileContent(file: vscode.Uri): Promise<string> {
   const document = vscode.workspace.textDocuments.find(
     document => document.uri.toString() === file.toString());

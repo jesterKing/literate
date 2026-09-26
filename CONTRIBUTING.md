@@ -20,8 +20,15 @@ and `src/mermaid-preview.js` are generated;
 commit them together with their literate sources and rendered HTML.
 Tests and configuration remain ordinary files. Interleave prose with focused
 fragments: at most one function per fragment where practical, splitting larger
-functions into named steps. Explain intent and constraints rather than narrating
-every statement.
+functions into named steps. Aim for roughly 10–25 lines per code block; review
+blocks approaching 30 lines for a useful conceptual split. This applies to data
+catalogues and stylesheets as well as functions. Diagram source is different:
+judge the rendered diagram's readability rather than its fence length.
+
+Let the prose lead: introduce the problem, explain the design choice or invariant,
+then show the fragment that implements it. Connect each step to what comes next.
+Do not merely split blocks to meet a line count or narrate every statement. The
+chapter should read as a knowledge book, not a source listing with captions.
 
 - `yarn build:cli`: bootstrap from generated CLI sources without compiling the extension.
 - `yarn build:preview`: bundle the pinned Mermaid dependency and browser preview client locally.

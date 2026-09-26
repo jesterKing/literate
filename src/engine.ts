@@ -151,7 +151,6 @@ export function templateReferences(documents: SourceDocument[]): string[] {
             const header = fragmentHeader.exec(token.info);
             if (!header) { continue; }
             let settings = header[4];
-
             const filename = outputFilename.exec(settings);
             if (filename) { settings = settings.slice(filename[0].length); }
             for (const setting of settings.split(';').map(value => value.trim()).filter(Boolean)) {

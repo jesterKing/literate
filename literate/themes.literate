@@ -89,6 +89,13 @@ background and text relative luminance (sRGB linearization), rather than guessin
 from the palette name. Muted and syntax colors intentionally retain the original
 contrast characteristics; the catalogue does not claim WCAG compliance.
 
+### Native defaults and A–F
+
+The native palette stays first, followed by the upstream A–F entries. These are
+contiguous slices of the snapshot, not a new sort: related light and dark variants
+stay where upstream placed them. Append fragments continue the same array without
+adding a runtime concatenation or changing catalogue order.
+
 ```ts : <<Theme palette rows>>=
 const paletteRows = [
     'hermonica #0a0d10 #11161b #161d23 #edf2f4 #85919c #29323b #5ee6b0 #67a8ff #ffad66 #ff6c74 #8b68a8 #568291 #728249',
@@ -113,6 +120,15 @@ const paletteRows = [
     'flex-light #FFFCF0 #f2efe4 #ebe8dd #2a2929 #94928b #b8b5ad #879A39 #4385BE #DA702C #D14D41 #8B7EC8 #3AA99F #D0A215',
     'flexoki-light #FFFCF0 #f2efe4 #ebe8dd #2a2929 #94928b #b8b5ad #66800B #205EA6 #BC5215 #AF3029 #8265c0 #24837B #AD8301',
     'flexoki #100F0F #1c1b1b #292626 #CECDC3 #6a6363 #393636 #879A39 #4385BE #DA702C #D14D41 #8B7EC8 #3AA99F #D0A215',
+```
+
+### G–M
+
+This slice keeps paired variants together where the source does. In particular,
+light variants remain independent snapshots rather than transformations of their
+dark counterparts; shared family names do not imply shared RGB values.
+
+```ts : <<Theme palette rows>>=+
     'gatekeeper #101010 #181818 #1e1e1e #cccdd1 #4d4d4d #363636 #00e756 #29adff #ffa300 #ff1a67 #a79ac0 #29adff #fff024',
     'github_dark #24292E #2e3338 #33383d #d3dbe3 #6a6f74 #4c5156 #56d364 #79c0ff #ffab70 #ff7f8d #d2a8ff #56d4dd #ffdf5d',
     'github_light #ffffff #edeff1 #eaecee #24292e #a6a8aa #c7c9cb #18654B #0D7FDD #d15704 #DE2C2E #8263EB #0598bc #dbab09',
@@ -129,6 +145,15 @@ const paletteRows = [
     'monekai #272822 #2F302A #363731 #f5f4f1 #64655F #4D4E48 #96c367 #51afef #d39467 #e36d76 #c885d7 #41afef #e6c181',
     'monochrome #101010 #202020 #242424 #D8DEE9 #677777 #424242 #c9d36a #8abae1 #efb6a0 #ec8989 #e1bee9 #9aafe6 #ffe6b5',
     'mountain #0f0f0f #181818 #191919 #F0f0f0 #535353 #373737 #8aac8b #9691b3 #9d9a7b #ac8a8c #C49EC4 #9EC3C4 #ACA98A',
+```
+
+### N–P
+
+Names are lookup keys, not display labels to normalize. Preserve underscores,
+hyphens and the source order here, including `pasteldark` before `pastelbeans`,
+so consumers see the same catalogue and exact-name lookup behavior.
+
+```ts : <<Theme palette rows>>=+
     'nano-light #FFFfff #ECEFF1 #ebebeb #37474F #848484 #c4c4c4 #66BB6A #42A5F5 #FF6F00 #EF5350 #673AB7 #26C6DA #d0b22b',
     'nightfox #192330 #202a37 #252f3c #cdcecf #646e7b #495360 #8ebaa4 #719cd6 #fe9373 #c94f6d #baa1e2 #8be5e7 #dbc074',
     'nightlamp #18191f #202127 #27282e #e0d6bd #55565c #3d3e44 #8aa387 #5a6986 #cd9672 #a67476 #b8aad9 #90a0a0 #ccb89c',
@@ -147,6 +172,15 @@ const paletteRows = [
     'penumbra_dark #303338 #3a3d42 #3d4045 #FFFDFB #7d8085 #5c5f64 #4EB67F #8C96EC #CE9042 #CA7081 #ac78bd #00B3C2 #c1ad4b',
     'penumbra_light #FFF7ED #f0e8de #F2E6D4 #3E4044 #b0a89e #cec6bc #3ea57b #6E8DD5 #BA823A #ca7081 #ac78bd #00A0BA #92963a',
     'poimandres #1b1e28 #222633 #2b3040 #E4F0FB #657096 #48506a #5FB3A1 #89DDFF #91B4D5 #D0679D #A6ACCD #92e0ff #FFFAC2',
+```
+
+### R–Y
+
+The final slice includes the default `rosepine-dawn` but does not promote it to
+the front of the catalogue. Default selection is a separate policy from snapshot
+order. Closing the array here completes the single declaration begun above.
+
+```ts : <<Theme palette rows>>=+
     'radium #101317 #191d22 #212428 #d4d4d5 #525559 #3e4145 #37d99e #7ab0df #f0a988 #f87070 #c397d8 #50cad2 #ffe59e',
     'rosepine-dawn #faf4ed #EDE1D6 #EADCCF #575279 #908B9D #b0acb9 #286983 #56949f #ea9d34 #b4637a #907aa9 #d7827e #ea9d34',
     'rosepine #191724 #1f1d2a #262431 #e0def4 #5d5b68 #3f3d4a #ABE9B3 #8bbec7 #f6c177 #eb6f92 #c4a7e7 #a3d6df #f6c177',
@@ -236,36 +270,76 @@ export function mermaidTheme(theme: LiterateTheme) {
     return {
         theme: 'base' as const,
         themeVariables: {
-            darkMode: theme.dark === true,
-            background: c.background, textColor: c.text,
-            fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-            fontSize: '16px',
-            primaryColor: c.surface, primaryTextColor: c.text, primaryBorderColor: c.accent,
-            secondaryColor: c.surfaceRaised, secondaryTextColor: c.text, secondaryBorderColor: c.information,
-            tertiaryColor: c.background, tertiaryTextColor: c.text, tertiaryBorderColor: c.border,
-            lineColor: c.information, mainBkg: c.surface, nodeBorder: c.accent,
-            nodeTextColor: c.text, clusterBkg: c.surfaceRaised, clusterBorder: c.border,
-            titleColor: c.text, edgeLabelBackground: c.background,
-            actorBkg: c.surface, actorBorder: c.accent, actorTextColor: c.text,
-            actorLineColor: c.border, signalColor: c.information, signalTextColor: c.text,
-            labelBoxBkgColor: c.surfaceRaised, labelBoxBorderColor: c.border,
-            labelTextColor: c.text, loopTextColor: c.text,
-            noteBkgColor: c.surfaceRaised, noteTextColor: c.text, noteBorderColor: c.warning,
-            activationBkgColor: c.surfaceRaised, activationBorderColor: c.accent,
-            sequenceNumberColor: c.background,
-            classText: c.text, attributeBackgroundColorOdd: c.surface,
-            attributeBackgroundColorEven: c.surfaceRaised,
-            relationColor: c.information, relationLabelColor: c.text,
-            relationLabelBackground: c.background,
-            pie1: c.accent, pie2: c.information, pie3: c.warning, pie4: c.danger,
-            pie5: c.purple, pie6: c.cyan, pie7: c.yellow, pie8: c.muted,
-            pie9: c.accent, pie10: c.information, pie11: c.purple, pie12: c.cyan,
-            pieTitleTextColor: c.text, pieSectionTextColor: c.background,
-            pieLegendTextColor: c.text, pieStrokeColor: c.background,
-            pieOuterStrokeColor: c.border
+            <<Mermaid base and flowchart variables>>
+            <<Mermaid sequence variables>>
+            <<Mermaid class and relation variables>>
+            <<Mermaid pie variables>>
         }
     };
 }
+```
+
+### Base surfaces and flowcharts
+
+Mermaid's base theme accepts explicit semantic colors. Establish typography and
+three surface tiers first, then assign nodes, clusters and edge labels so a
+flowchart does not fall back to colors from the editor host.
+
+```ts : <<Mermaid base and flowchart variables>>=
+darkMode: theme.dark === true,
+background: c.background, textColor: c.text,
+fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+fontSize: '16px',
+primaryColor: c.surface, primaryTextColor: c.text, primaryBorderColor: c.accent,
+secondaryColor: c.surfaceRaised, secondaryTextColor: c.text, secondaryBorderColor: c.information,
+tertiaryColor: c.background, tertiaryTextColor: c.text, tertiaryBorderColor: c.border,
+lineColor: c.information, mainBkg: c.surface, nodeBorder: c.accent,
+nodeTextColor: c.text, clusterBkg: c.surfaceRaised, clusterBorder: c.border,
+titleColor: c.text, edgeLabelBackground: c.background,
+```
+
+### Sequence diagrams
+
+Actors and signals reuse the document's surface and information roles. Notes
+receive warning borders, while activations use the accent; both retain raised
+surfaces so their text follows the same foreground policy as other labels.
+
+```ts : <<Mermaid sequence variables>>=
+actorBkg: c.surface, actorBorder: c.accent, actorTextColor: c.text,
+actorLineColor: c.border, signalColor: c.information, signalTextColor: c.text,
+labelBoxBkgColor: c.surfaceRaised, labelBoxBorderColor: c.border,
+labelTextColor: c.text, loopTextColor: c.text,
+noteBkgColor: c.surfaceRaised, noteTextColor: c.text, noteBorderColor: c.warning,
+activationBkgColor: c.surfaceRaised, activationBorderColor: c.accent,
+sequenceNumberColor: c.background,
+```
+
+### Classes and relationships
+
+Alternating attribute rows distinguish structure without changing text color.
+Relationship labels sit on the document background, keeping their treatment
+consistent with the lines that connect entities.
+
+```ts : <<Mermaid class and relation variables>>=
+classText: c.text, attributeBackgroundColorOdd: c.surface,
+attributeBackgroundColorEven: c.surfaceRaised,
+relationColor: c.information, relationLabelColor: c.text,
+relationLabelBackground: c.background,
+```
+
+### Pie charts
+
+The categorical sequence draws from the same accents rather than introducing a
+second palette. Section labels and slice strokes use the background color,
+whereas titles and legends retain the document foreground.
+
+```ts : <<Mermaid pie variables>>=
+pie1: c.accent, pie2: c.information, pie3: c.warning, pie4: c.danger,
+pie5: c.purple, pie6: c.cyan, pie7: c.yellow, pie8: c.muted,
+pie9: c.accent, pie10: c.information, pie11: c.purple, pie12: c.cyan,
+pieTitleTextColor: c.text, pieSectionTextColor: c.background,
+pieLegendTextColor: c.text, pieStrokeColor: c.background,
+pieOuterStrokeColor: c.border
 ```
 
 ## Standalone document styles
@@ -280,7 +354,30 @@ would otherwise leak a dark editor's pale text into a light document.
 
 ```ts : <<Theme document stylesheet>>=
 export function themeCss(theme: LiterateTheme): string {
-    return `.literate-document {
+    return `<<Document CSS layout>>
+<<Document CSS typography>>
+<<Document CSS code>>
+<<Document CSS tables>>
+<<Document CSS diagrams and media>>
+<<Document CSS responsive and license>>
+`;
+}
+```
+
+These are source fragments inside one template literal, not runtime string
+joins. References stay at column zero so expansion introduces no indentation;
+the newline between each pair of fragments is part of the exported CSS. Keep
+literal opening fragment delimiters escaped according to the shared generator's
+rules when adding examples to these strings.
+
+### Layout and scope
+
+The wrapper establishes a bounded reading column and owns the palette variables.
+Its local box-sizing reset makes nested content predictable without imposing
+layout or a color scheme on the surrounding editor page.
+
+```css : <<Document CSS layout>>=
+.literate-document {
 ${themeVariables(theme)}
     display: block;
     box-sizing: border-box;
@@ -296,6 +393,15 @@ ${themeVariables(theme)}
     overflow-wrap: anywhere;
 }
 .literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+```
+
+### Reading typography
+
+Headings establish hierarchy; lists and definitions retain their native reading
+structure. Links keep underlines and visible keyboard focus, while quotations
+use a surface and accent border rather than relying on italics alone.
+
+```css : <<Document CSS typography>>=
 .literate-document h1, .literate-document h2, .literate-document h3,
 .literate-document h4, .literate-document h5, .literate-document h6 {
     color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
@@ -319,6 +425,16 @@ ${themeVariables(theme)}
 .literate-document em { font-style: italic; }
 .literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
 .literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+```
+
+### Code and literate fragments
+
+Monospace text and fragment panels share the same surface treatment. Preformatted
+blocks scroll instead of wrapping; fragment names can wrap to avoid widening the
+page. The token reset must precede the semantic highlighting rules so inherited
+host colors cannot override the chosen palette's baseline foreground.
+
+```css : <<Document CSS code>>=
 .literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
 .literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 .literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
@@ -343,17 +459,46 @@ ${themeVariables(theme)}
 .literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
 .literate-document .hljs-emphasis { font-style: italic; }
 .literate-document .hljs-strong { font-weight: bold; }
+```
+
+### Tables
+
+Wide tables own their horizontal scrolling rather than stretching the reading
+column. Tabular numerals aid comparison, and headers and alternating rows use
+the two surface levels already established for structured content.
+
+```css : <<Document CSS tables>>=
 .literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
 .literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
 .literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
 .literate-document tr:nth-child(even) { background: var(--literate-surface); }
 .literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+```
+
+### Media and diagrams
+
+Media scale within the column while preserving aspect ratio. Mermaid containers
+can scroll, but these rules do not recolor SVG internals: that belongs to the
+configuration patch above. A failed diagram is readable as an alert instead of
+being centered like a successful rendering.
+
+```css : <<Document CSS diagrams and media>>=
 .literate-document img, .literate-document video { max-width: 100%; height: auto; }
 .literate-document figure { margin: 1.5em 0; }
 .literate-document figcaption { color: var(--literate-muted); }
 .literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
 .literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
 .literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+```
+
+### Narrow screens and retained license
+
+Small screens reduce outer and fragment padding without changing document
+structure. The retained comment ends the stylesheet, carrying the complete
+upstream notice into every standalone export; its interpolation and trailing
+newline remain inside the original template literal.
+
+```css : <<Document CSS responsive and license>>=
 @media (max-width: 40rem) {
     .literate-document { padding: 1rem; }
     .literate-document h1 { font-size: 1.8em; }
@@ -362,6 +507,4 @@ ${themeVariables(theme)}
 /*!
 ${upstreamThemeNotice}
 */
-`;
-}
 ```

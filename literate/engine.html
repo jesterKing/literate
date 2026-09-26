@@ -264,14 +264,32 @@ computed from the original text, including its original line endings.</p>
     <span class="hljs-keyword">return</span> parts.<span class="hljs-property">length</span> ? parts.<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;/&#x27;</span>) : <span class="hljs-literal">undefined</span>;
 }
 
+</code></pre>
 
+</div>
+</div><p>Canonicalization and collision detection are separate policies. Once paths are
+normalized, case-folding and ancestor checks conservatively reject aliases even
+when the host filesystem would allow them.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine path and source validation&gt;&gt;=+ </div>
+<div class="code">
+<pre><code>
 <span class="hljs-keyword">function</span> <span class="hljs-title function_">pathKey</span>(<span class="hljs-params">path: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> { <span class="hljs-keyword">return</span> path.<span class="hljs-title function_">toLowerCase</span>(); }
 
 <span class="hljs-keyword">function</span> <span class="hljs-title function_">ancestorConflict</span>(<span class="hljs-params">left: <span class="hljs-built_in">string</span>, right: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">boolean</span> {
     <span class="hljs-keyword">return</span> left.<span class="hljs-title function_">startsWith</span>(right + <span class="hljs-string">&#x27;/&#x27;</span>) || right.<span class="hljs-title function_">startsWith</span>(left + <span class="hljs-string">&#x27;/&#x27;</span>);
 }
 
-<span class="hljs-keyword">const</span> fragmentHeader = <span class="hljs-regexp">/^\s*(?:(\S+)\s*:\s*|:\s*)?<span class="literate-tag-name">&lt;&lt;([^&lt;&gt;\r\n]+)&gt;&gt;</span>=(\+)?\s*(.*?)\s*$/</span>;
+</code></pre>
+
+</div>
+</div><p>Header recognition shares one grammar between discovery and generation. Source
+validation precedes either use: rejecting NUL in the original text preserves the
+coordinates that Markdown normalization would otherwise obscure.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine path and source validation&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> fragmentHeader = <span class="hljs-regexp">/^\s*(?:(\S+)\s*:\s*|:\s*)?<span class="literate-tag-name">&lt;&lt;([^&lt;&gt;\r\n]+)&gt;&gt;</span>=(\+)?\s*(.*?)\s*$/</span>;
 <span class="hljs-keyword">const</span> outputFilename = <span class="hljs-regexp">/^(.*?)\s+\$(?:\s+|$)|^\$(?:\s+|$)/</span>;
 
 <span class="hljs-keyword">function</span> <span class="hljs-title function_">sourceNulDiagnostic</span>(<span class="hljs-params"><span class="hljs-variable language_">document</span>: SourceDocument</span>): <span class="hljs-title class_">GenerationDiagnostic</span> | <span class="hljs-literal">undefined</span> {
@@ -358,17 +376,7 @@ The standalone helper throws an ordinary <code>Error</code> for NUL-containing s
     paths.<span class="hljs-title function_">set</span>(<span class="hljs-string">&#x27;index.literate&#x27;</span>, <span class="hljs-number">0</span>);
     <span class="hljs-keyword">const</span> index = documents.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">document</span> =&gt;</span> <span class="hljs-title function_">canonical</span>(<span class="hljs-variable language_">document</span>) === <span class="hljs-string">&#x27;index.literate&#x27;</span>);
     <span class="hljs-keyword">if</span> (index) {
-        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">MarkdownIt</span>().<span class="hljs-title function_">parse</span>(index.<span class="hljs-property">text</span>, {})) {
-            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> child <span class="hljs-keyword">of</span> token.<span class="hljs-property">children</span> || []) {
-                <span class="hljs-keyword">if</span> (child.<span class="hljs-property">type</span> !== <span class="hljs-string">&#x27;link_open&#x27;</span>) { <span class="hljs-keyword">continue</span>; }
-                <span class="hljs-keyword">const</span> href = child.<span class="hljs-title function_">attrGet</span>(<span class="hljs-string">&#x27;href&#x27;</span>);
-                <span class="hljs-keyword">if</span> (!href) { <span class="hljs-keyword">continue</span>; }
-                <span class="hljs-keyword">let</span> target = href.<span class="hljs-title function_">split</span>(<span class="hljs-regexp">/[?#]/</span>)[<span class="hljs-number">0</span>];
-                <span class="hljs-keyword">try</span> { target = <span class="hljs-built_in">decodeURIComponent</span>(target); } <span class="hljs-keyword">catch</span> { <span class="hljs-keyword">continue</span>; }
-                <span class="hljs-keyword">const</span> path = <span class="hljs-title function_">safeRelativePath</span>(target.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\.html$/</span>, <span class="hljs-string">&#x27;.literate&#x27;</span>));
-                <span class="hljs-keyword">if</span> (path &amp;&amp; !paths.<span class="hljs-title function_">has</span>(path)) { paths.<span class="hljs-title function_">set</span>(path, paths.<span class="hljs-property">size</span>); }
-            }
-        }
+        <span class="literate-tag-name">&lt;&lt;engine index link ranks&gt;&gt;</span>
     }
     <span class="hljs-keyword">return</span> [...documents].<span class="hljs-title function_">sort</span>(<span class="hljs-function">(<span class="hljs-params">a, b</span>) =&gt;</span> {
         <span class="hljs-keyword">const</span> left = <span class="hljs-title function_">canonical</span>(a), right = <span class="hljs-title function_">canonical</span>(b);
@@ -377,6 +385,26 @@ The standalone helper throws an ordinary <code>Error</code> for NUL-containing s
     });
 }
 
+</code></pre>
+
+</div>
+</div><p>Link encounter order assigns ranks without replacing an earlier rank. Decoding
+and normalization must succeed before a link can influence ordering; unrelated
+or malformed links cannot disturb the fallback lexical order.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine index link ranks&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">MarkdownIt</span>().<span class="hljs-title function_">parse</span>(index.<span class="hljs-property">text</span>, {})) {
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> child <span class="hljs-keyword">of</span> token.<span class="hljs-property">children</span> || []) {
+        <span class="hljs-keyword">if</span> (child.<span class="hljs-property">type</span> !== <span class="hljs-string">&#x27;link_open&#x27;</span>) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">const</span> href = child.<span class="hljs-title function_">attrGet</span>(<span class="hljs-string">&#x27;href&#x27;</span>);
+        <span class="hljs-keyword">if</span> (!href) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">let</span> target = href.<span class="hljs-title function_">split</span>(<span class="hljs-regexp">/[?#]/</span>)[<span class="hljs-number">0</span>];
+        <span class="hljs-keyword">try</span> { target = <span class="hljs-built_in">decodeURIComponent</span>(target); } <span class="hljs-keyword">catch</span> { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">const</span> path = <span class="hljs-title function_">safeRelativePath</span>(target.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\.html$/</span>, <span class="hljs-string">&#x27;.literate&#x27;</span>));
+        <span class="hljs-keyword">if</span> (path &amp;&amp; !paths.<span class="hljs-title function_">has</span>(path)) { paths.<span class="hljs-title function_">set</span>(path, paths.<span class="hljs-property">size</span>); }
+    }
+}
 </code></pre>
 
 </div>
@@ -407,30 +435,49 @@ separators until after the filename terminator.</p>
         <span class="hljs-keyword">if</span> (diagnostic) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`<span class="hljs-subst">${diagnostic.path}</span>: <span class="hljs-subst">${diagnostic.message}</span>`</span>); }
         <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> md.<span class="hljs-title function_">parse</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">text</span>, {})) {
             <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> !== <span class="hljs-string">&#x27;fence&#x27;</span>) { <span class="hljs-keyword">continue</span>; }
-            <span class="hljs-keyword">if</span> (token.<span class="hljs-property">info</span>.<span class="hljs-title function_">trim</span>() === <span class="hljs-string">&#x27;SETTINGS&#x27;</span>) {
-                <span class="hljs-keyword">if</span> (<span class="hljs-title function_">safeRelativePath</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>) === <span class="hljs-string">&#x27;index.literate&#x27;</span>) {
-                    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> line <span class="hljs-keyword">of</span> token.<span class="hljs-property">content</span>.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;\n&#x27;</span>)) {
-                        <span class="hljs-keyword">const</span> setting = <span class="hljs-regexp">/^\s*template\s*=(.*)$/</span>.<span class="hljs-title function_">exec</span>(line);
-                        <span class="hljs-keyword">if</span> (setting) { <span class="hljs-title function_">add</span>(setting[<span class="hljs-number">1</span>].<span class="hljs-title function_">trim</span>()); }
-                    }
-                }
-                <span class="hljs-keyword">continue</span>;
-            }
-            <span class="hljs-keyword">const</span> header = fragmentHeader.<span class="hljs-title function_">exec</span>(token.<span class="hljs-property">info</span>);
-            <span class="hljs-keyword">if</span> (!header) { <span class="hljs-keyword">continue</span>; }
-            <span class="hljs-keyword">let</span> settings = header[<span class="hljs-number">4</span>];
-
-            <span class="hljs-keyword">const</span> filename = outputFilename.<span class="hljs-title function_">exec</span>(settings);
-            <span class="hljs-keyword">if</span> (filename) { settings = settings.<span class="hljs-title function_">slice</span>(filename[<span class="hljs-number">0</span>].<span class="hljs-property">length</span>); }
-            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> setting <span class="hljs-keyword">of</span> settings.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;;&#x27;</span>).<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">value</span> =&gt;</span> value.<span class="hljs-title function_">trim</span>()).<span class="hljs-title function_">filter</span>(<span class="hljs-title class_">Boolean</span>)) {
-                <span class="hljs-keyword">const</span> template = <span class="hljs-regexp">/^template\s*=\s*(.*)$/</span>.<span class="hljs-title function_">exec</span>(setting);
-                <span class="hljs-keyword">if</span> (template) { <span class="hljs-title function_">add</span>(template[<span class="hljs-number">1</span>].<span class="hljs-title function_">trim</span>()); }
-            }
+            <span class="literate-tag-name">&lt;&lt;engine discover root template setting&gt;&gt;</span>
+            <span class="literate-tag-name">&lt;&lt;engine discover fragment template settings&gt;&gt;</span>
         }
     }
     <span class="hljs-keyword">return</span> <span class="hljs-title class_">Array</span>.<span class="hljs-title function_">from</span>(references).<span class="hljs-title function_">sort</span>();
 }
 
+</code></pre>
+
+</div>
+</div><p>Root SETTINGS contributes project-wide HTML dependencies; other documents'
+SETTINGS fences are still consumed but cannot select a project template. The
+shared <code>add</code> closure validates every discovered path before deduplication.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine discover root template setting&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">if</span> (token.<span class="hljs-property">info</span>.<span class="hljs-title function_">trim</span>() === <span class="hljs-string">&#x27;SETTINGS&#x27;</span>) {
+    <span class="hljs-keyword">if</span> (<span class="hljs-title function_">safeRelativePath</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>) === <span class="hljs-string">&#x27;index.literate&#x27;</span>) {
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> line <span class="hljs-keyword">of</span> token.<span class="hljs-property">content</span>.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;\n&#x27;</span>)) {
+            <span class="hljs-keyword">const</span> setting = <span class="hljs-regexp">/^\s*template\s*=(.*)$/</span>.<span class="hljs-title function_">exec</span>(line);
+            <span class="hljs-keyword">if</span> (setting) { <span class="hljs-title function_">add</span>(setting[<span class="hljs-number">1</span>].<span class="hljs-title function_">trim</span>()); }
+        }
+    }
+    <span class="hljs-keyword">continue</span>;
+}
+</code></pre>
+
+</div>
+</div><p>Fragment settings contribute source-template dependencies independently of whether
+the fragment will be used. Removing the output filename first keeps semicolons
+inside filenames out of the settings grammar; this phase does not load templates.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine discover fragment template settings&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> header = fragmentHeader.<span class="hljs-title function_">exec</span>(token.<span class="hljs-property">info</span>);
+<span class="hljs-keyword">if</span> (!header) { <span class="hljs-keyword">continue</span>; }
+<span class="hljs-keyword">let</span> settings = header[<span class="hljs-number">4</span>];
+<span class="hljs-keyword">const</span> filename = outputFilename.<span class="hljs-title function_">exec</span>(settings);
+<span class="hljs-keyword">if</span> (filename) { settings = settings.<span class="hljs-title function_">slice</span>(filename[<span class="hljs-number">0</span>].<span class="hljs-property">length</span>); }
+<span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> setting <span class="hljs-keyword">of</span> settings.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;;&#x27;</span>).<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">value</span> =&gt;</span> value.<span class="hljs-title function_">trim</span>()).<span class="hljs-title function_">filter</span>(<span class="hljs-title class_">Boolean</span>)) {
+    <span class="hljs-keyword">const</span> template = <span class="hljs-regexp">/^template\s*=\s*(.*)$/</span>.<span class="hljs-title function_">exec</span>(setting);
+    <span class="hljs-keyword">if</span> (template) { <span class="hljs-title function_">add</span>(template[<span class="hljs-number">1</span>].<span class="hljs-title function_">trim</span>()); }
+}
 </code></pre>
 
 </div>
@@ -576,24 +623,44 @@ template references must resolve in the supplied template map.</p>
     <span class="hljs-keyword">const</span> templateMap = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;();
     <span class="hljs-keyword">const</span> sourceKeys = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
     <span class="hljs-keyword">const</span> templateKeys = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
-    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> <span class="hljs-variable language_">document</span> <span class="hljs-keyword">of</span> documents) {
-        <span class="hljs-keyword">const</span> path = <span class="hljs-title function_">safeRelativePath</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>);
-        <span class="hljs-keyword">const</span> location = { <span class="hljs-attr">path</span>: <span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>, <span class="hljs-attr">line</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span> };
-        <span class="hljs-keyword">if</span> (!path) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">&#x27;Invalid source path&#x27;</span>); <span class="hljs-keyword">continue</span>; }
-        <span class="hljs-keyword">if</span> (sourceKeys.<span class="hljs-title function_">has</span>(<span class="hljs-title function_">pathKey</span>(path))) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Duplicate source document: <span class="hljs-subst">${path}</span>`</span>); <span class="hljs-keyword">continue</span>; }
-        sourceKeys.<span class="hljs-title function_">add</span>(<span class="hljs-title function_">pathKey</span>(path));
-        <span class="hljs-keyword">const</span> nul = <span class="hljs-title function_">sourceNulDiagnostic</span>(<span class="hljs-variable language_">document</span>);
-        <span class="hljs-keyword">if</span> (nul) { diagnostics.<span class="hljs-title function_">push</span>(nul); <span class="hljs-keyword">continue</span>; }
-        sources.<span class="hljs-title function_">set</span>(path, { path, <span class="hljs-attr">text</span>: <span class="hljs-variable language_">document</span>.<span class="hljs-property">text</span> });
-    }
-    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> key <span class="hljs-keyword">of</span> <span class="hljs-title class_">Object</span>.<span class="hljs-title function_">keys</span>(templates).<span class="hljs-title function_">sort</span>()) {
-        <span class="hljs-keyword">const</span> path = <span class="hljs-title function_">safeRelativePath</span>(key);
-        <span class="hljs-keyword">const</span> location = { <span class="hljs-attr">path</span>: key, <span class="hljs-attr">line</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span> };
-        <span class="hljs-keyword">if</span> (!path) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">&#x27;Invalid template path&#x27;</span>); <span class="hljs-keyword">continue</span>; }
-        <span class="hljs-keyword">if</span> (templateKeys.<span class="hljs-title function_">has</span>(<span class="hljs-title function_">pathKey</span>(path))) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Duplicate template path: <span class="hljs-subst">${path}</span>`</span>); <span class="hljs-keyword">continue</span>; }
-        templateKeys.<span class="hljs-title function_">add</span>(<span class="hljs-title function_">pathKey</span>(path));
-        templateMap.<span class="hljs-title function_">set</span>(path, templates[key]);
-    }
+    <span class="literate-tag-name">&lt;&lt;engine accept source inputs&gt;&gt;</span>
+    <span class="literate-tag-name">&lt;&lt;engine accept template inputs&gt;&gt;</span>
+</code></pre>
+
+</div>
+</div><p>Accept sources under canonical paths, reserving a collision key before the NUL
+check. Even a rejected source's name therefore remains protected against aliases
+and output collisions; only accepted text enters the parser's source map.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine accept source inputs&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> <span class="hljs-variable language_">document</span> <span class="hljs-keyword">of</span> documents) {
+    <span class="hljs-keyword">const</span> path = <span class="hljs-title function_">safeRelativePath</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>);
+    <span class="hljs-keyword">const</span> location = { <span class="hljs-attr">path</span>: <span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>, <span class="hljs-attr">line</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span> };
+    <span class="hljs-keyword">if</span> (!path) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">&#x27;Invalid source path&#x27;</span>); <span class="hljs-keyword">continue</span>; }
+    <span class="hljs-keyword">if</span> (sourceKeys.<span class="hljs-title function_">has</span>(<span class="hljs-title function_">pathKey</span>(path))) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Duplicate source document: <span class="hljs-subst">${path}</span>`</span>); <span class="hljs-keyword">continue</span>; }
+    sourceKeys.<span class="hljs-title function_">add</span>(<span class="hljs-title function_">pathKey</span>(path));
+    <span class="hljs-keyword">const</span> nul = <span class="hljs-title function_">sourceNulDiagnostic</span>(<span class="hljs-variable language_">document</span>);
+    <span class="hljs-keyword">if</span> (nul) { diagnostics.<span class="hljs-title function_">push</span>(nul); <span class="hljs-keyword">continue</span>; }
+    sources.<span class="hljs-title function_">set</span>(path, { path, <span class="hljs-attr">text</span>: <span class="hljs-variable language_">document</span>.<span class="hljs-property">text</span> });
+}
+</code></pre>
+
+</div>
+</div><p>Template keys are visited in sorted order so duplicate and invalid-path
+diagnostics do not depend on object insertion order. The template map retains
+canonical paths, while the separate key set enforces portable collision policy.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine accept template inputs&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> key <span class="hljs-keyword">of</span> <span class="hljs-title class_">Object</span>.<span class="hljs-title function_">keys</span>(templates).<span class="hljs-title function_">sort</span>()) {
+    <span class="hljs-keyword">const</span> path = <span class="hljs-title function_">safeRelativePath</span>(key);
+    <span class="hljs-keyword">const</span> location = { <span class="hljs-attr">path</span>: key, <span class="hljs-attr">line</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span> };
+    <span class="hljs-keyword">if</span> (!path) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">&#x27;Invalid template path&#x27;</span>); <span class="hljs-keyword">continue</span>; }
+    <span class="hljs-keyword">if</span> (templateKeys.<span class="hljs-title function_">has</span>(<span class="hljs-title function_">pathKey</span>(path))) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Duplicate template path: <span class="hljs-subst">${path}</span>`</span>); <span class="hljs-keyword">continue</span>; }
+    templateKeys.<span class="hljs-title function_">add</span>(<span class="hljs-title function_">pathKey</span>(path));
+    templateMap.<span class="hljs-title function_">set</span>(path, templates[key]);
+}
 </code></pre>
 
 </div>
@@ -620,19 +687,29 @@ project-level HTML settings.</p>
     diagnostics.<span class="hljs-title function_">push</span>(...projectTheme.<span class="hljs-property">diagnostics</span>);
     <span class="hljs-keyword">let</span> authors = <span class="hljs-string">&#x27;&#x27;</span>;
     <span class="hljs-keyword">let</span> htmlTemplate = <span class="hljs-title function_">defaultTemplate</span>(projectTheme.<span class="hljs-property">name</span>);
-    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> tokens.<span class="hljs-title function_">get</span>(<span class="hljs-string">&#x27;index.literate&#x27;</span>) || []) {
-        <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> !== <span class="hljs-string">&#x27;fence&#x27;</span> || token.<span class="hljs-property">info</span>.<span class="hljs-title function_">trim</span>() !== <span class="hljs-string">&#x27;SETTINGS&#x27;</span>) { <span class="hljs-keyword">continue</span>; }
-        token.<span class="hljs-property">content</span>.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;\n&#x27;</span>).<span class="hljs-title function_">forEach</span>(<span class="hljs-function">(<span class="hljs-params">line: <span class="hljs-built_in">string</span>, index: <span class="hljs-built_in">number</span></span>) =&gt;</span> {
-            <span class="hljs-keyword">const</span> match = <span class="hljs-regexp">/^\s*(authors|template)\s*=(.*)$/</span>.<span class="hljs-title function_">exec</span>(line);
-            <span class="hljs-keyword">if</span> (!match) { <span class="hljs-keyword">return</span>; }
-            <span class="hljs-keyword">const</span> value = match[<span class="hljs-number">2</span>].<span class="hljs-title function_">trim</span>();
-            <span class="hljs-keyword">if</span> (match[<span class="hljs-number">1</span>] === <span class="hljs-string">&#x27;authors&#x27;</span>) { authors = value; }
-            <span class="hljs-keyword">else</span> {
-                <span class="hljs-keyword">const</span> loaded = <span class="hljs-title function_">loadTemplate</span>(value, { <span class="hljs-attr">path</span>: <span class="hljs-string">&#x27;index.literate&#x27;</span>, <span class="hljs-attr">line</span>: (token.<span class="hljs-property">map</span>?.[<span class="hljs-number">0</span>] || <span class="hljs-number">0</span>) + index + <span class="hljs-number">1</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span> });
-                <span class="hljs-keyword">if</span> (loaded !== <span class="hljs-literal">undefined</span>) { htmlTemplate = loaded; }
-            }
-        });
-    }
+    <span class="literate-tag-name">&lt;&lt;engine apply root HTML settings&gt;&gt;</span>
+</code></pre>
+
+</div>
+</div><p>Root settings update authors and the HTML template in encounter order. A failed
+template load records a diagnostic without replacing the previous template;
+that fallback is only planning state, since any diagnostic later blocks emission.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine apply root HTML settings&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> tokens.<span class="hljs-title function_">get</span>(<span class="hljs-string">&#x27;index.literate&#x27;</span>) || []) {
+    <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> !== <span class="hljs-string">&#x27;fence&#x27;</span> || token.<span class="hljs-property">info</span>.<span class="hljs-title function_">trim</span>() !== <span class="hljs-string">&#x27;SETTINGS&#x27;</span>) { <span class="hljs-keyword">continue</span>; }
+    token.<span class="hljs-property">content</span>.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;\n&#x27;</span>).<span class="hljs-title function_">forEach</span>(<span class="hljs-function">(<span class="hljs-params">line: <span class="hljs-built_in">string</span>, index: <span class="hljs-built_in">number</span></span>) =&gt;</span> {
+        <span class="hljs-keyword">const</span> match = <span class="hljs-regexp">/^\s*(authors|template)\s*=(.*)$/</span>.<span class="hljs-title function_">exec</span>(line);
+        <span class="hljs-keyword">if</span> (!match) { <span class="hljs-keyword">return</span>; }
+        <span class="hljs-keyword">const</span> value = match[<span class="hljs-number">2</span>].<span class="hljs-title function_">trim</span>();
+        <span class="hljs-keyword">if</span> (match[<span class="hljs-number">1</span>] === <span class="hljs-string">&#x27;authors&#x27;</span>) { authors = value; }
+        <span class="hljs-keyword">else</span> {
+            <span class="hljs-keyword">const</span> loaded = <span class="hljs-title function_">loadTemplate</span>(value, { <span class="hljs-attr">path</span>: <span class="hljs-string">&#x27;index.literate&#x27;</span>, <span class="hljs-attr">line</span>: (token.<span class="hljs-property">map</span>?.[<span class="hljs-number">0</span>] || <span class="hljs-number">0</span>) + index + <span class="hljs-number">1</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span> });
+            <span class="hljs-keyword">if</span> (loaded !== <span class="hljs-literal">undefined</span>) { htmlTemplate = loaded; }
+        }
+    });
+}
 </code></pre>
 
 </div>
@@ -697,16 +774,26 @@ this lets inspection and diagnostics refer to the same declaration.</p>
                 remainder = remainder.<span class="hljs-title function_">slice</span>(filename[<span class="hljs-number">0</span>].<span class="hljs-property">length</span>);
                 <span class="hljs-keyword">if</span> (!header.<span class="hljs-property">output</span>) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">&#x27;Invalid output path: empty filename&#x27;</span>); }
             }
-            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> setting <span class="hljs-keyword">of</span> remainder.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;;&#x27;</span>).<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">value</span> =&gt;</span> value.<span class="hljs-title function_">trim</span>()).<span class="hljs-title function_">filter</span>(<span class="hljs-title class_">Boolean</span>)) {
-                <span class="hljs-keyword">const</span> template = <span class="hljs-regexp">/^template\s*=\s*(.+)$/</span>.<span class="hljs-title function_">exec</span>(setting);
-                <span class="hljs-keyword">if</span> (!template || header.<span class="hljs-property">template</span> !== <span class="hljs-literal">undefined</span>) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Invalid fragment setting: <span class="hljs-subst">${setting}</span>`</span>); }
-                <span class="hljs-keyword">else</span> { header.<span class="hljs-property">template</span> = template[<span class="hljs-number">1</span>].<span class="hljs-title function_">trim</span>(); }
-            }
-            headers.<span class="hljs-title function_">set</span>(token, header);
-            <span class="hljs-keyword">if</span> (header.<span class="hljs-property">template</span> !== <span class="hljs-literal">undefined</span>) {
-                <span class="hljs-keyword">const</span> templatePath = <span class="hljs-title function_">safeRelativePath</span>(header.<span class="hljs-property">template</span>);
-                <span class="hljs-keyword">if</span> (templatePath) { referencedTemplates.<span class="hljs-title function_">add</span>(templatePath); }
-            }
+            <span class="literate-tag-name">&lt;&lt;engine collect fragment template setting&gt;&gt;</span>
+</code></pre>
+
+</div>
+</div><p>Only one template setting is allowed on a declaration. Record a valid normalized
+reference for inspection immediately, even if later validation rejects the
+fragment or the template contents are unavailable.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine collect fragment template setting&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> setting <span class="hljs-keyword">of</span> remainder.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;;&#x27;</span>).<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">value</span> =&gt;</span> value.<span class="hljs-title function_">trim</span>()).<span class="hljs-title function_">filter</span>(<span class="hljs-title class_">Boolean</span>)) {
+    <span class="hljs-keyword">const</span> template = <span class="hljs-regexp">/^template\s*=\s*(.+)$/</span>.<span class="hljs-title function_">exec</span>(setting);
+    <span class="hljs-keyword">if</span> (!template || header.<span class="hljs-property">template</span> !== <span class="hljs-literal">undefined</span>) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Invalid fragment setting: <span class="hljs-subst">${setting}</span>`</span>); }
+    <span class="hljs-keyword">else</span> { header.<span class="hljs-property">template</span> = template[<span class="hljs-number">1</span>].<span class="hljs-title function_">trim</span>(); }
+}
+headers.<span class="hljs-title function_">set</span>(token, header);
+<span class="hljs-keyword">if</span> (header.<span class="hljs-property">template</span> !== <span class="hljs-literal">undefined</span>) {
+    <span class="hljs-keyword">const</span> templatePath = <span class="hljs-title function_">safeRelativePath</span>(header.<span class="hljs-property">template</span>);
+    <span class="hljs-keyword">if</span> (templatePath) { referencedTemplates.<span class="hljs-title function_">add</span>(templatePath); }
+}
 </code></pre>
 
 </div>
@@ -739,13 +826,23 @@ location separately so appends appear as definitions in their own documents.</p>
             } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (header.<span class="hljs-property">output</span> !== <span class="hljs-literal">undefined</span> || header.<span class="hljs-property">template</span> !== <span class="hljs-literal">undefined</span>) {
                 <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Only top-level fragments may specify output or template: <span class="hljs-subst">${header.name}</span>`</span>);
             }
-            <span class="hljs-keyword">if</span> (header.<span class="hljs-property">template</span> !== <span class="hljs-literal">undefined</span>) {
-                <span class="hljs-keyword">const</span> template = <span class="hljs-title function_">loadTemplate</span>(header.<span class="hljs-property">template</span>, location);
-                <span class="hljs-keyword">if</span> (template !== <span class="hljs-literal">undefined</span>) { sourceTemplates.<span class="hljs-title function_">set</span>(header.<span class="hljs-property">name</span>, template); }
-            }
-            fragments.<span class="hljs-title function_">set</span>(header.<span class="hljs-property">name</span>, { header, <span class="hljs-attr">parts</span>: [part], location });
+            <span class="literate-tag-name">&lt;&lt;engine register collected fragment&gt;&gt;</span>
         }
     }
+</code></pre>
+
+</div>
+</div><p>Registration follows append, duplicate, and output checks. A source template is
+associated with the accepted name only when loading succeeds; diagnostics still
+accumulate, and the fragment remains available for dependency inspection.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine register collected fragment&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">if</span> (header.<span class="hljs-property">template</span> !== <span class="hljs-literal">undefined</span>) {
+    <span class="hljs-keyword">const</span> template = <span class="hljs-title function_">loadTemplate</span>(header.<span class="hljs-property">template</span>, location);
+    <span class="hljs-keyword">if</span> (template !== <span class="hljs-literal">undefined</span>) { sourceTemplates.<span class="hljs-title function_">set</span>(header.<span class="hljs-property">name</span>, template); }
+}
+fragments.<span class="hljs-title function_">set</span>(header.<span class="hljs-property">name</span>, { header, <span class="hljs-attr">parts</span>: [part], location });
 </code></pre>
 
 </div>
@@ -873,36 +970,68 @@ so invalid operators are reported once per occurrence, not once per resume.</p>
         active.<span class="hljs-title function_">add</span>(name);
         frames.<span class="hljs-title function_">push</span>({ name, expansion, <span class="hljs-attr">step</span>: expansion.<span class="hljs-title function_">next</span>() });
     };
-    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> fragment <span class="hljs-keyword">of</span> fragments.<span class="hljs-title function_">values</span>()) {
-        <span class="hljs-keyword">if</span> (expanded.<span class="hljs-title function_">has</span>(fragment.<span class="hljs-property">header</span>.<span class="hljs-property">name</span>)) { <span class="hljs-keyword">continue</span>; }
-        <span class="hljs-title function_">push</span>(fragment.<span class="hljs-property">header</span>.<span class="hljs-property">name</span>);
-        <span class="hljs-keyword">while</span> (frames.<span class="hljs-property">length</span>) {
-            <span class="hljs-keyword">const</span> frame = frames[frames.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>];
-            <span class="hljs-keyword">if</span> (frame.<span class="hljs-property">step</span>.<span class="hljs-property">done</span>) {
-                <span class="hljs-keyword">const</span> content = frame.<span class="hljs-property">step</span>.<span class="hljs-property">value</span>;
-                expanded.<span class="hljs-title function_">set</span>(frame.<span class="hljs-property">name</span>, content);
-                active.<span class="hljs-title function_">delete</span>(frame.<span class="hljs-property">name</span>);
-                frames.<span class="hljs-title function_">pop</span>();
-                <span class="hljs-keyword">const</span> parent = frames[frames.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>];
-                <span class="hljs-keyword">if</span> (parent) { parent.<span class="hljs-property">step</span> = parent.<span class="hljs-property">expansion</span>.<span class="hljs-title function_">next</span>(content); }
-                <span class="hljs-keyword">continue</span>;
-            }
-            <span class="hljs-keyword">const</span> { name, modifier, at } = frame.<span class="hljs-property">step</span>.<span class="hljs-property">value</span>;
-            <span class="hljs-keyword">if</span> (modifier) { <span class="hljs-title function_">report</span>(at, <span class="hljs-string">`Invalid definition operator on reference: <span class="hljs-subst">${name}</span>`</span>); }
-            <span class="hljs-keyword">if</span> (expanded.<span class="hljs-title function_">has</span>(name)) {
-                frame.<span class="hljs-property">step</span> = frame.<span class="hljs-property">expansion</span>.<span class="hljs-title function_">next</span>(expanded.<span class="hljs-title function_">get</span>(name)!);
-            } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (!fragments.<span class="hljs-title function_">has</span>(name)) {
-                <span class="hljs-title function_">report</span>(at, <span class="hljs-string">`Missing fragment: <span class="hljs-subst">${name}</span>`</span>, <span class="hljs-string">&#x27;missing-fragment&#x27;</span>);
-                frame.<span class="hljs-property">step</span> = frame.<span class="hljs-property">expansion</span>.<span class="hljs-title function_">next</span>(<span class="hljs-string">&#x27;&#x27;</span>);
-            } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (active.<span class="hljs-title function_">has</span>(name)) {
-                <span class="hljs-title function_">report</span>(at, <span class="hljs-string">`Fragment cycle: <span class="hljs-subst">${frames.map(value =&gt; value.name).concat(name).join(<span class="hljs-string">&#x27; -&gt; &#x27;</span>)}</span>`</span>);
-                frame.<span class="hljs-property">step</span> = frame.<span class="hljs-property">expansion</span>.<span class="hljs-title function_">next</span>(<span class="hljs-string">&#x27;&#x27;</span>);
-            } <span class="hljs-keyword">else</span> {
-                <span class="hljs-title function_">push</span>(name);
-            }
-        }
-    }
+    <span class="literate-tag-name">&lt;&lt;engine drive expansion frames&gt;&gt;</span>
     <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">files</span>: [], diagnostics, inspection }; }
+</code></pre>
+
+</div>
+</div><p>Every collected fragment enters the driver, including unused ones. A frame stays
+on the stack until its generator completes; each iteration either retires that
+frame or handles its currently suspended reference. The validation barrier stays
+after the entire traversal so inspection receives all dependency diagnostics.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine drive expansion frames&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> fragment <span class="hljs-keyword">of</span> fragments.<span class="hljs-title function_">values</span>()) {
+    <span class="hljs-keyword">if</span> (expanded.<span class="hljs-title function_">has</span>(fragment.<span class="hljs-property">header</span>.<span class="hljs-property">name</span>)) { <span class="hljs-keyword">continue</span>; }
+    <span class="hljs-title function_">push</span>(fragment.<span class="hljs-property">header</span>.<span class="hljs-property">name</span>);
+    <span class="hljs-keyword">while</span> (frames.<span class="hljs-property">length</span>) {
+        <span class="hljs-keyword">const</span> frame = frames[frames.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>];
+        <span class="literate-tag-name">&lt;&lt;engine retire completed expansion&gt;&gt;</span>
+        <span class="literate-tag-name">&lt;&lt;engine resolve suspended dependency&gt;&gt;</span>
+    }
+}
+</code></pre>
+
+</div>
+</div><p>Completion publishes the cached text before removing the active name and popping
+the frame. Its parent receives that text exactly once. Continuing the driver here
+also narrows the remaining path to a yielded reference, not a completed result.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine retire completed expansion&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">if</span> (frame.<span class="hljs-property">step</span>.<span class="hljs-property">done</span>) {
+    <span class="hljs-keyword">const</span> content = frame.<span class="hljs-property">step</span>.<span class="hljs-property">value</span>;
+    expanded.<span class="hljs-title function_">set</span>(frame.<span class="hljs-property">name</span>, content);
+    active.<span class="hljs-title function_">delete</span>(frame.<span class="hljs-property">name</span>);
+    frames.<span class="hljs-title function_">pop</span>();
+    <span class="hljs-keyword">const</span> parent = frames[frames.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>];
+    <span class="hljs-keyword">if</span> (parent) { parent.<span class="hljs-property">step</span> = parent.<span class="hljs-property">expansion</span>.<span class="hljs-title function_">next</span>(content); }
+    <span class="hljs-keyword">continue</span>;
+}
+</code></pre>
+
+</div>
+</div><p>A suspended reference can reuse a cache entry, fail with empty replacement text,
+or push a child. Missing names and active-path cycles resume the same generator
+so later occurrences still receive diagnostics. An operator is diagnosed before
+choosing any of those paths, preserving encounter order.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine resolve suspended dependency&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> { name, modifier, at } = frame.<span class="hljs-property">step</span>.<span class="hljs-property">value</span>;
+<span class="hljs-keyword">if</span> (modifier) { <span class="hljs-title function_">report</span>(at, <span class="hljs-string">`Invalid definition operator on reference: <span class="hljs-subst">${name}</span>`</span>); }
+<span class="hljs-keyword">if</span> (expanded.<span class="hljs-title function_">has</span>(name)) {
+    frame.<span class="hljs-property">step</span> = frame.<span class="hljs-property">expansion</span>.<span class="hljs-title function_">next</span>(expanded.<span class="hljs-title function_">get</span>(name)!);
+} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (!fragments.<span class="hljs-title function_">has</span>(name)) {
+    <span class="hljs-title function_">report</span>(at, <span class="hljs-string">`Missing fragment: <span class="hljs-subst">${name}</span>`</span>, <span class="hljs-string">&#x27;missing-fragment&#x27;</span>);
+    frame.<span class="hljs-property">step</span> = frame.<span class="hljs-property">expansion</span>.<span class="hljs-title function_">next</span>(<span class="hljs-string">&#x27;&#x27;</span>);
+} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (active.<span class="hljs-title function_">has</span>(name)) {
+    <span class="hljs-title function_">report</span>(at, <span class="hljs-string">`Fragment cycle: <span class="hljs-subst">${frames.map(value =&gt; value.name).concat(name).join(<span class="hljs-string">&#x27; -&gt; &#x27;</span>)}</span>`</span>);
+    frame.<span class="hljs-property">step</span> = frame.<span class="hljs-property">expansion</span>.<span class="hljs-title function_">next</span>(<span class="hljs-string">&#x27;&#x27;</span>);
+} <span class="hljs-keyword">else</span> {
+    <span class="hljs-title function_">push</span>(name);
+}
 </code></pre>
 
 </div>
@@ -925,40 +1054,70 @@ hosts without adding or removing a final newline.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;engine source and HTML emission&gt;&gt;= </div>
 <div class="code">
-<pre><code>    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> fragment <span class="hljs-keyword">of</span> fragments.<span class="hljs-title function_">values</span>()) {
-        <span class="hljs-keyword">if</span> (!fragment.<span class="hljs-property">header</span>.<span class="hljs-property">output</span>) { <span class="hljs-keyword">continue</span>; }
-        <span class="hljs-keyword">const</span> code = expanded.<span class="hljs-title function_">get</span>(fragment.<span class="hljs-property">header</span>.<span class="hljs-property">name</span>)!.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\\&lt;&lt;/g</span>, <span class="hljs-function">() =&gt;</span> <span class="hljs-string">&#x27;&lt;&lt;&#x27;</span>);
-        files.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">path</span>: fragment.<span class="hljs-property">header</span>.<span class="hljs-property">output</span>, <span class="hljs-attr">content</span>: <span class="hljs-title function_">substitute</span>(sourceTemplates.<span class="hljs-title function_">get</span>(fragment.<span class="hljs-property">header</span>.<span class="hljs-property">name</span>) ?? <span class="hljs-string">&#x27;[CODE]&#x27;</span>, { code }) });
-    }
-    md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">fence</span> = <span class="hljs-function">(<span class="hljs-params">fenceTokens: Token[], index: <span class="hljs-built_in">number</span></span>) =&gt;</span> {
-        <span class="hljs-keyword">const</span> token = fenceTokens[index];
-        <span class="hljs-keyword">if</span> (token.<span class="hljs-property">info</span>.<span class="hljs-title function_">trim</span>() === <span class="hljs-string">&#x27;SETTINGS&#x27;</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;&#x27;</span>; }
-        <span class="hljs-keyword">const</span> header = headers.<span class="hljs-title function_">get</span>(token);
-        <span class="hljs-keyword">const</span> language = header?.<span class="hljs-property">language</span> || token.<span class="hljs-property">info</span>.<span class="hljs-title function_">trim</span>().<span class="hljs-title function_">split</span>(<span class="hljs-regexp">/\s+/</span>)[<span class="hljs-number">0</span>];
-        <span class="hljs-keyword">const</span> code = token.<span class="hljs-property">content</span>.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\\&lt;&lt;/g</span>, <span class="hljs-function">() =&gt;</span> <span class="hljs-string">&#x27;&lt;&lt;&#x27;</span>);
-        <span class="hljs-keyword">if</span> (!header &amp;&amp; language === <span class="hljs-string">&#x27;mermaid&#x27;</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">`&lt;pre class=&quot;mermaid&quot;&gt;\n<span class="hljs-subst">${<span class="hljs-built_in">escape</span>(code)}</span>&lt;/pre&gt;\n`</span>; }
-        <span class="hljs-keyword">let</span> rendered = language &amp;&amp; hljs.<span class="hljs-title function_">getLanguage</span>(language)
-            ? hljs.<span class="hljs-title function_">highlight</span>(code, { language }).<span class="hljs-property">value</span> : <span class="hljs-built_in">escape</span>(code);
-        <span class="hljs-keyword">if</span> (header) {
-            rendered = rendered.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/&lt;span class=&quot;hljs-comment&quot;&gt;.*?&lt;\/span&gt;/g</span>s, <span class="hljs-function">() =&gt;</span> <span class="hljs-string">&#x27;&#x27;</span>);
-            rendered = rendered.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/&amp;lt;&amp;lt;.*?&amp;gt;&amp;gt;/g</span>, <span class="hljs-function">(<span class="hljs-params">tag: <span class="hljs-built_in">string</span></span>) =&gt;</span>
-                <span class="hljs-string">`&lt;span class=&quot;literate-tag-name&quot;&gt;<span class="hljs-subst">${tag.replace(/&lt;\/?span\b[^&gt;]*&gt;/g, () =&gt; <span class="hljs-string">&#x27;&#x27;</span>)}</span>&lt;/span&gt;`</span>);
-        }
-        <span class="hljs-keyword">const</span> block = <span class="hljs-string">`&lt;pre&gt;&lt;code&gt;<span class="hljs-subst">${rendered}</span>&lt;/code&gt;&lt;/pre&gt;\n`</span>;
-        <span class="hljs-keyword">if</span> (!header) { <span class="hljs-keyword">return</span> block; }
-        <span class="hljs-keyword">const</span> label = <span class="hljs-built_in">escape</span>(<span class="hljs-string">`<span class="literate-tag-name">&lt;&lt;${header.name}&gt;&gt;</span>=<span class="hljs-subst">${header.append ? <span class="hljs-string">&#x27;+&#x27;</span> : <span class="hljs-string">&#x27;&#x27;</span>}</span> <span class="hljs-subst">${header.output ? header.output + <span class="hljs-string">&#x27; $&#x27;</span> : <span class="hljs-string">&#x27;&#x27;</span>}</span>`</span>);
-        <span class="hljs-keyword">return</span> <span class="hljs-string">`&lt;div class=&quot;codefragment&quot;&gt;\n&lt;div class=&quot;fragmentname&quot;&gt;<span class="hljs-subst">${label}</span>&lt;/div&gt;\n&lt;div class=&quot;code&quot;&gt;\n<span class="hljs-subst">${block}</span>\n&lt;/div&gt;\n&lt;/div&gt;`</span>;
-    };
-    <span class="hljs-keyword">const</span> metaAuthors = authors.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;;&#x27;</span>).<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">author</span> =&gt;</span> <span class="hljs-string">`&lt;meta name=&quot;author&quot; content=&quot;<span class="hljs-subst">${<span class="hljs-built_in">escape</span>(author)}</span>&quot;&gt;`</span>).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;&#x27;</span>);
-    <span class="hljs-keyword">const</span> theme = <span class="hljs-string">`&lt;style&gt;<span class="hljs-subst">${themeCss(getTheme(projectTheme.name)!)}</span>&lt;/style&gt;`</span>;
-    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> path <span class="hljs-keyword">of</span> order) {
-        <span class="hljs-keyword">const</span> rendered = md.<span class="hljs-property">renderer</span>.<span class="hljs-title function_">render</span>(tokens.<span class="hljs-title function_">get</span>(path)!, md.<span class="hljs-property">options</span>, {});
-        <span class="hljs-keyword">const</span> wrapper = <span class="hljs-string">`&lt;div class=&quot;literate-document&quot; data-literate-theme=&quot;<span class="hljs-subst">${<span class="hljs-built_in">escape</span>(projectTheme.name)}</span>&quot;&gt;<span class="hljs-subst">${rendered}</span>&lt;/div&gt;`</span>;
-        <span class="hljs-keyword">const</span> content = htmlTemplate.<span class="hljs-title function_">includes</span>(<span class="hljs-string">&#x27;[THEME]&#x27;</span>) ? wrapper : theme + wrapper;
-        files.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">path</span>: <span class="hljs-title function_">safeRelativePath</span>(path.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\.literate$/</span>, <span class="hljs-string">&#x27;.html&#x27;</span>))!, <span class="hljs-attr">content</span>: <span class="hljs-title function_">substitute</span>(htmlTemplate, { content, <span class="hljs-attr">authors</span>: metaAuthors, theme }) });
-    }
+<pre><code>    <span class="literate-tag-name">&lt;&lt;engine emit source files&gt;&gt;</span>
+    <span class="literate-tag-name">&lt;&lt;engine install fence renderer&gt;&gt;</span>
+    <span class="literate-tag-name">&lt;&lt;engine render documentation pages&gt;&gt;</span>
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> files) { file.<span class="hljs-property">content</span> = file.<span class="hljs-property">content</span>.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\r\n|\r/g</span>, <span class="hljs-string">&#x27;\n&#x27;</span>); }
     <span class="hljs-keyword">return</span> { files, diagnostics, inspection };
+}
+</code></pre>
+
+</div>
+</div><p>Source emission consumes only validated expansions. Unescaping belongs here,
+after dependency resolution, so a literal tag never becomes a new dependency;
+source templates receive the resulting code through single-pass substitution.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine emit source files&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> fragment <span class="hljs-keyword">of</span> fragments.<span class="hljs-title function_">values</span>()) {
+    <span class="hljs-keyword">if</span> (!fragment.<span class="hljs-property">header</span>.<span class="hljs-property">output</span>) { <span class="hljs-keyword">continue</span>; }
+    <span class="hljs-keyword">const</span> code = expanded.<span class="hljs-title function_">get</span>(fragment.<span class="hljs-property">header</span>.<span class="hljs-property">name</span>)!.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\\&lt;&lt;/g</span>, <span class="hljs-function">() =&gt;</span> <span class="hljs-string">&#x27;&lt;&lt;&#x27;</span>);
+    files.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">path</span>: fragment.<span class="hljs-property">header</span>.<span class="hljs-property">output</span>, <span class="hljs-attr">content</span>: <span class="hljs-title function_">substitute</span>(sourceTemplates.<span class="hljs-title function_">get</span>(fragment.<span class="hljs-property">header</span>.<span class="hljs-property">name</span>) ?? <span class="hljs-string">&#x27;[CODE]&#x27;</span>, { code }) });
+}
+</code></pre>
+
+</div>
+</div><p>The fence renderer uses the collected header map to distinguish named code from
+ordinary Markdown. Mermaid bypasses highlighting, and named-code decoration is
+HTML-only: hiding highlighted comments never changes the tangled source bytes.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine install fence renderer&gt;&gt;= </div>
+<div class="code">
+<pre><code>md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">fence</span> = <span class="hljs-function">(<span class="hljs-params">fenceTokens: Token[], index: <span class="hljs-built_in">number</span></span>) =&gt;</span> {
+    <span class="hljs-keyword">const</span> token = fenceTokens[index];
+    <span class="hljs-keyword">if</span> (token.<span class="hljs-property">info</span>.<span class="hljs-title function_">trim</span>() === <span class="hljs-string">&#x27;SETTINGS&#x27;</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;&#x27;</span>; }
+    <span class="hljs-keyword">const</span> header = headers.<span class="hljs-title function_">get</span>(token);
+    <span class="hljs-keyword">const</span> language = header?.<span class="hljs-property">language</span> || token.<span class="hljs-property">info</span>.<span class="hljs-title function_">trim</span>().<span class="hljs-title function_">split</span>(<span class="hljs-regexp">/\s+/</span>)[<span class="hljs-number">0</span>];
+    <span class="hljs-keyword">const</span> code = token.<span class="hljs-property">content</span>.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\\&lt;&lt;/g</span>, <span class="hljs-function">() =&gt;</span> <span class="hljs-string">&#x27;&lt;&lt;&#x27;</span>);
+    <span class="hljs-keyword">if</span> (!header &amp;&amp; language === <span class="hljs-string">&#x27;mermaid&#x27;</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">`&lt;pre class=&quot;mermaid&quot;&gt;\n<span class="hljs-subst">${<span class="hljs-built_in">escape</span>(code)}</span>&lt;/pre&gt;\n`</span>; }
+    <span class="hljs-keyword">let</span> rendered = language &amp;&amp; hljs.<span class="hljs-title function_">getLanguage</span>(language)
+        ? hljs.<span class="hljs-title function_">highlight</span>(code, { language }).<span class="hljs-property">value</span> : <span class="hljs-built_in">escape</span>(code);
+    <span class="hljs-keyword">if</span> (header) {
+        rendered = rendered.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/&lt;span class=&quot;hljs-comment&quot;&gt;.*?&lt;\/span&gt;/g</span>s, <span class="hljs-function">() =&gt;</span> <span class="hljs-string">&#x27;&#x27;</span>);
+        rendered = rendered.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/&amp;lt;&amp;lt;.*?&amp;gt;&amp;gt;/g</span>, <span class="hljs-function">(<span class="hljs-params">tag: <span class="hljs-built_in">string</span></span>) =&gt;</span>
+            <span class="hljs-string">`&lt;span class=&quot;literate-tag-name&quot;&gt;<span class="hljs-subst">${tag.replace(/&lt;\/?span\b[^&gt;]*&gt;/g, () =&gt; <span class="hljs-string">&#x27;&#x27;</span>)}</span>&lt;/span&gt;`</span>);
+    }
+    <span class="hljs-keyword">const</span> block = <span class="hljs-string">`&lt;pre&gt;&lt;code&gt;<span class="hljs-subst">${rendered}</span>&lt;/code&gt;&lt;/pre&gt;\n`</span>;
+    <span class="hljs-keyword">if</span> (!header) { <span class="hljs-keyword">return</span> block; }
+    <span class="hljs-keyword">const</span> label = <span class="hljs-built_in">escape</span>(<span class="hljs-string">`<span class="literate-tag-name">&lt;&lt;${header.name}&gt;&gt;</span>=<span class="hljs-subst">${header.append ? <span class="hljs-string">&#x27;+&#x27;</span> : <span class="hljs-string">&#x27;&#x27;</span>}</span> <span class="hljs-subst">${header.output ? header.output + <span class="hljs-string">&#x27; $&#x27;</span> : <span class="hljs-string">&#x27;&#x27;</span>}</span>`</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-string">`&lt;div class=&quot;codefragment&quot;&gt;\n&lt;div class=&quot;fragmentname&quot;&gt;<span class="hljs-subst">${label}</span>&lt;/div&gt;\n&lt;div class=&quot;code&quot;&gt;\n<span class="hljs-subst">${block}</span>\n&lt;/div&gt;\n&lt;/div&gt;`</span>;
+};
+</code></pre>
+
+</div>
+</div><p>All pages share escaped author metadata and the selected stylesheet. Legacy
+templates receive the stylesheet through content rather than losing theme support;
+the final normalization in the orchestration applies equally to source and HTML.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine render documentation pages&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> metaAuthors = authors.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;;&#x27;</span>).<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">author</span> =&gt;</span> <span class="hljs-string">`&lt;meta name=&quot;author&quot; content=&quot;<span class="hljs-subst">${<span class="hljs-built_in">escape</span>(author)}</span>&quot;&gt;`</span>).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;&#x27;</span>);
+<span class="hljs-keyword">const</span> theme = <span class="hljs-string">`&lt;style&gt;<span class="hljs-subst">${themeCss(getTheme(projectTheme.name)!)}</span>&lt;/style&gt;`</span>;
+<span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> path <span class="hljs-keyword">of</span> order) {
+    <span class="hljs-keyword">const</span> rendered = md.<span class="hljs-property">renderer</span>.<span class="hljs-title function_">render</span>(tokens.<span class="hljs-title function_">get</span>(path)!, md.<span class="hljs-property">options</span>, {});
+    <span class="hljs-keyword">const</span> wrapper = <span class="hljs-string">`&lt;div class=&quot;literate-document&quot; data-literate-theme=&quot;<span class="hljs-subst">${<span class="hljs-built_in">escape</span>(projectTheme.name)}</span>&quot;&gt;<span class="hljs-subst">${rendered}</span>&lt;/div&gt;`</span>;
+    <span class="hljs-keyword">const</span> content = htmlTemplate.<span class="hljs-title function_">includes</span>(<span class="hljs-string">&#x27;[THEME]&#x27;</span>) ? wrapper : theme + wrapper;
+    files.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">path</span>: <span class="hljs-title function_">safeRelativePath</span>(path.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\.literate$/</span>, <span class="hljs-string">&#x27;.html&#x27;</span>))!, <span class="hljs-attr">content</span>: <span class="hljs-title function_">substitute</span>(htmlTemplate, { content, <span class="hljs-attr">authors</span>: metaAuthors, theme }) });
 }
 </code></pre>
 

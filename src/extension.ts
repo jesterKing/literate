@@ -64,21 +64,9 @@ interface FragmentInformation {
    * is a top fragment.
    */
   sourceFileName: string;
-  /**
-   * Uri to source template filename.
-   */
   templateFileName: vscode.Uri | undefined;
-  /**
-   * The code fragment.
-   */
   code: string;
-  /**
-   * List of tokens that make up the entire code fragment.
-   */
   tokens: Token[];
-  /**
-   * The GrabbedState related to this fragment.
-   */
   env: GrabbedState;
 }
 interface TokenUsage
@@ -947,7 +935,6 @@ export class FragmentRepository {
       fragmentMap.dispose();
     }
     this.fragmentsForWorkspaceFolders.clear();
-
     for(let grabbedState of this.grabbedStateForWorkspaceFolders.values())
     {
       grabbedState.dispose();

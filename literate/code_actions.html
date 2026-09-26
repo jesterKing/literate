@@ -145,55 +145,90 @@ backticks in fragment names and language identifiers without breaking the header
         token : vscode.<span class="hljs-property">CancellationToken</span>
     ) : <span class="hljs-title class_">Promise</span>&lt;vscode.<span class="hljs-property">CodeAction</span>[]&gt;
     {
-        <span class="hljs-keyword">const</span> diagnostics = context.<span class="hljs-property">diagnostics</span>.<span class="hljs-title function_">filter</span>(<span class="hljs-function"><span class="hljs-params">diag</span> =&gt;</span>
-            (<span class="hljs-keyword">typeof</span> diag.<span class="hljs-property">code</span> === <span class="hljs-string">&#x27;object&#x27;</span> ? diag.<span class="hljs-property">code</span>.<span class="hljs-property">value</span> : diag.<span class="hljs-property">code</span>) === <span class="hljs-string">&#x27;missing-fragment&#x27;</span>);
-        <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span> || !diagnostics.<span class="hljs-property">length</span> ||
-            (context.<span class="hljs-property">only</span> &amp;&amp; !context.<span class="hljs-property">only</span>.<span class="hljs-title function_">contains</span>(vscode.<span class="hljs-property">CodeActionKind</span>.<span class="hljs-property">QuickFix</span>))) { <span class="hljs-keyword">return</span> []; }
-        <span class="hljs-keyword">const</span> folder = <span class="hljs-title function_">determineWorkspaceFolder</span>(<span class="hljs-variable language_">document</span>);
-        <span class="hljs-keyword">if</span>(!folder) { <span class="hljs-keyword">return</span> []; }
-        <span class="hljs-keyword">const</span> version = <span class="hljs-variable language_">document</span>.<span class="hljs-property">version</span>;
-        <span class="hljs-keyword">const</span> text = <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">getText</span>();
-        <span class="hljs-keyword">await</span> <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">processLiterateFiles</span>(<span class="hljs-variable language_">document</span>);
-        <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span> || <span class="hljs-variable language_">document</span>.<span class="hljs-property">version</span> !== version || <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">getText</span>() !== text) { <span class="hljs-keyword">return</span> []; }
-        <span class="hljs-keyword">const</span> documentPath = path.<span class="hljs-property">posix</span>.<span class="hljs-title function_">relative</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>, <span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>);
-        <span class="hljs-keyword">const</span> sources = <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">getSourceDocuments</span>(folder);
-        <span class="hljs-keyword">if</span>(sources.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">source</span> =&gt;</span> source.<span class="hljs-property">path</span> === documentPath)?.<span class="hljs-property">text</span> !== text ||
-            vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">textDocuments</span>.<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">open</span> =&gt;</span> open.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>() === <span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>() &amp;&amp;
-                (open.<span class="hljs-property">version</span> !== version || open.<span class="hljs-title function_">getText</span>() !== text))) { <span class="hljs-keyword">return</span> []; }
+        <span class="literate-tag-name">&lt;&lt;code action snapshot validation&gt;&gt;</span>
         <span class="hljs-keyword">const</span> occurrences = <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">getFragmentOccurrences</span>(folder);
         <span class="hljs-keyword">const</span> <span class="hljs-attr">actions</span>: vscode.<span class="hljs-property">CodeAction</span>[] = [];
         <span class="hljs-keyword">const</span> offered = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
         <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> diagnostic <span class="hljs-keyword">of</span> diagnostics)
         {
-            <span class="hljs-keyword">const</span> reference = occurrences.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span> item.<span class="hljs-property">path</span> === documentPath &amp;&amp; item.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;reference&#x27;</span> &amp;&amp;
-                item.<span class="hljs-property">line</span> === diagnostic.<span class="hljs-property">range</span>.<span class="hljs-property">start</span>.<span class="hljs-property">line</span> &amp;&amp; item.<span class="hljs-property">column</span> === diagnostic.<span class="hljs-property">range</span>.<span class="hljs-property">start</span>.<span class="hljs-property">character</span>);
-            <span class="hljs-keyword">if</span>(!reference || offered.<span class="hljs-title function_">has</span>(reference.<span class="hljs-property">name</span>) || reference.<span class="hljs-property">name</span>.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;.*&#x27;</span>) ||
-                occurrences.<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span> item.<span class="hljs-property">name</span> === reference.<span class="hljs-property">name</span> &amp;&amp; item.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;definition&#x27;</span>)) { <span class="hljs-keyword">continue</span>; }
-            <span class="hljs-keyword">const</span> range = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(reference.<span class="hljs-property">line</span>, reference.<span class="hljs-property">column</span>, reference.<span class="hljs-property">line</span>, reference.<span class="hljs-property">endColumn</span>);
-            <span class="hljs-keyword">if</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-title function_">getText</span>(range) !== <span class="hljs-string">`<span class="hljs-subst">${OPENING}</span><span class="hljs-subst">${reference.name}</span><span class="hljs-subst">${CLOSING}</span>`</span>) { <span class="hljs-keyword">continue</span>; }
-            <span class="hljs-keyword">const</span> usage = <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">getTokenAtPosition</span>(<span class="hljs-variable language_">document</span>, range).<span class="hljs-property">token</span>;
-            <span class="hljs-keyword">if</span>(!usage || usage.<span class="hljs-property">type</span> !== <span class="hljs-string">&#x27;fence&#x27;</span> || !usage.<span class="hljs-property">map</span> || usage.<span class="hljs-property">level</span> !== <span class="hljs-number">0</span>) { <span class="hljs-keyword">continue</span>; }
-            <span class="hljs-keyword">const</span> header = <span class="hljs-title function_">parseFragmentHeader</span>(usage.<span class="hljs-property">info</span>);
-            <span class="hljs-keyword">const</span> closing = <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">lineAt</span>(usage.<span class="hljs-property">map</span>[<span class="hljs-number">1</span>] - <span class="hljs-number">1</span>).<span class="hljs-property">text</span>.<span class="hljs-title function_">trim</span>();
-            <span class="hljs-keyword">if</span>(!header || !<span class="hljs-regexp">/^(`{3,}|~{3,})$/</span>.<span class="hljs-title function_">test</span>(closing) || closing[<span class="hljs-number">0</span>] !== usage.<span class="hljs-property">markup</span>[<span class="hljs-number">0</span>] ||
-                closing.<span class="hljs-property">length</span> &lt; usage.<span class="hljs-property">markup</span>.<span class="hljs-property">length</span>) { <span class="hljs-keyword">continue</span>; }
-            <span class="hljs-keyword">const</span> info = <span class="hljs-string">`<span class="hljs-subst">${header.language}</span> : <span class="hljs-subst">${OPENING}</span><span class="hljs-subst">${reference.name}</span><span class="hljs-subst">${CLOSING}</span>=`</span>;
-            <span class="hljs-keyword">if</span>(<span class="hljs-title function_">parseFragmentHeader</span>(info)?.<span class="hljs-property">name</span> !== reference.<span class="hljs-property">name</span>) { <span class="hljs-keyword">continue</span>; }
-            <span class="hljs-keyword">const</span> eol = <span class="hljs-variable language_">document</span>.<span class="hljs-property">eol</span> === vscode.<span class="hljs-property">EndOfLine</span>.<span class="hljs-property">CRLF</span> ? <span class="hljs-string">&#x27;\r\n&#x27;</span> : <span class="hljs-string">&#x27;\n&#x27;</span>;
-            <span class="hljs-keyword">const</span> position = usage.<span class="hljs-property">map</span>[<span class="hljs-number">1</span>] &lt; <span class="hljs-variable language_">document</span>.<span class="hljs-property">lineCount</span> ? <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Position</span>(usage.<span class="hljs-property">map</span>[<span class="hljs-number">1</span>], <span class="hljs-number">0</span>)
-                : <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">positionAt</span>(text.<span class="hljs-property">length</span>);
-            <span class="hljs-keyword">const</span> edit = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">WorkspaceEdit</span>();
-            edit.<span class="hljs-title function_">insert</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>, position, <span class="hljs-string">`<span class="hljs-subst">${eol}</span>~~~ <span class="hljs-subst">${info}</span><span class="hljs-subst">${eol}</span>~~~<span class="hljs-subst">${eol}</span>`</span>);
-            <span class="hljs-keyword">const</span> action = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">CodeAction</span>(<span class="hljs-string">`Create fragment for <span class="hljs-subst">${OPENING}</span><span class="hljs-subst">${reference.name}</span><span class="hljs-subst">${CLOSING}</span>`</span>,
-                vscode.<span class="hljs-property">CodeActionKind</span>.<span class="hljs-property">QuickFix</span>);
-            action.<span class="hljs-property">diagnostics</span> = [diagnostic];
-            action.<span class="hljs-property">edit</span> = edit;
-            actions.<span class="hljs-title function_">push</span>(action);
-            offered.<span class="hljs-title function_">add</span>(reference.<span class="hljs-property">name</span>);
+            <span class="literate-tag-name">&lt;&lt;code action unresolved reference and insertion site&gt;&gt;</span>
+            <span class="literate-tag-name">&lt;&lt;code action proposed edit&gt;&gt;</span>
         }
         <span class="hljs-keyword">return</span> token.<span class="hljs-property">isCancellationRequested</span> ? [] : actions;
     }
 }
+</code></pre>
+
+</div>
+</div><h2>Match a stable source snapshot</h2>
+<p>Filter diagnostics before refreshing the repository, then verify both the requested
+buffer and any open copy against the captured text and version. The repository's
+source must agree too: an action derived from stale occurrences could edit the
+wrong range. These checks share the method's scope without adding an async boundary.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;code action snapshot validation&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> diagnostics = context.<span class="hljs-property">diagnostics</span>.<span class="hljs-title function_">filter</span>(<span class="hljs-function"><span class="hljs-params">diag</span> =&gt;</span>
+    (<span class="hljs-keyword">typeof</span> diag.<span class="hljs-property">code</span> === <span class="hljs-string">&#x27;object&#x27;</span> ? diag.<span class="hljs-property">code</span>.<span class="hljs-property">value</span> : diag.<span class="hljs-property">code</span>) === <span class="hljs-string">&#x27;missing-fragment&#x27;</span>);
+<span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span> || !diagnostics.<span class="hljs-property">length</span> ||
+    (context.<span class="hljs-property">only</span> &amp;&amp; !context.<span class="hljs-property">only</span>.<span class="hljs-title function_">contains</span>(vscode.<span class="hljs-property">CodeActionKind</span>.<span class="hljs-property">QuickFix</span>))) { <span class="hljs-keyword">return</span> []; }
+<span class="hljs-keyword">const</span> folder = <span class="hljs-title function_">determineWorkspaceFolder</span>(<span class="hljs-variable language_">document</span>);
+<span class="hljs-keyword">if</span>(!folder) { <span class="hljs-keyword">return</span> []; }
+<span class="hljs-keyword">const</span> version = <span class="hljs-variable language_">document</span>.<span class="hljs-property">version</span>;
+<span class="hljs-keyword">const</span> text = <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">getText</span>();
+<span class="hljs-keyword">await</span> <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">processLiterateFiles</span>(<span class="hljs-variable language_">document</span>);
+<span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span> || <span class="hljs-variable language_">document</span>.<span class="hljs-property">version</span> !== version || <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">getText</span>() !== text) { <span class="hljs-keyword">return</span> []; }
+<span class="hljs-keyword">const</span> documentPath = path.<span class="hljs-property">posix</span>.<span class="hljs-title function_">relative</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>, <span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>);
+<span class="hljs-keyword">const</span> sources = <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">getSourceDocuments</span>(folder);
+<span class="hljs-keyword">if</span>(sources.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">source</span> =&gt;</span> source.<span class="hljs-property">path</span> === documentPath)?.<span class="hljs-property">text</span> !== text ||
+    vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">textDocuments</span>.<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">open</span> =&gt;</span> open.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>() === <span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-title function_">toString</span>() &amp;&amp;
+        (open.<span class="hljs-property">version</span> !== version || open.<span class="hljs-title function_">getText</span>() !== text))) { <span class="hljs-keyword">return</span> []; }
+</code></pre>
+
+</div>
+</div><h2>Require an exact reference and a safe insertion site</h2>
+<p>One fix per unresolved name is enough. Wildcard roots and already-defined names
+are not creation candidates. Matching source text guards the diagnostic range;
+checking a closed, top-level fence ensures insertion cannot capture existing prose
+or code. Re-parsing the proposed header protects fragment identity.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;code action unresolved reference and insertion site&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> reference = occurrences.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span> item.<span class="hljs-property">path</span> === documentPath &amp;&amp; item.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;reference&#x27;</span> &amp;&amp;
+    item.<span class="hljs-property">line</span> === diagnostic.<span class="hljs-property">range</span>.<span class="hljs-property">start</span>.<span class="hljs-property">line</span> &amp;&amp; item.<span class="hljs-property">column</span> === diagnostic.<span class="hljs-property">range</span>.<span class="hljs-property">start</span>.<span class="hljs-property">character</span>);
+<span class="hljs-keyword">if</span>(!reference || offered.<span class="hljs-title function_">has</span>(reference.<span class="hljs-property">name</span>) || reference.<span class="hljs-property">name</span>.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;.*&#x27;</span>) ||
+    occurrences.<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span> item.<span class="hljs-property">name</span> === reference.<span class="hljs-property">name</span> &amp;&amp; item.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;definition&#x27;</span>)) { <span class="hljs-keyword">continue</span>; }
+<span class="hljs-keyword">const</span> range = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Range</span>(reference.<span class="hljs-property">line</span>, reference.<span class="hljs-property">column</span>, reference.<span class="hljs-property">line</span>, reference.<span class="hljs-property">endColumn</span>);
+<span class="hljs-keyword">if</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-title function_">getText</span>(range) !== <span class="hljs-string">`<span class="hljs-subst">${OPENING}</span><span class="hljs-subst">${reference.name}</span><span class="hljs-subst">${CLOSING}</span>`</span>) { <span class="hljs-keyword">continue</span>; }
+<span class="hljs-keyword">const</span> usage = <span class="hljs-variable language_">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title function_">getTokenAtPosition</span>(<span class="hljs-variable language_">document</span>, range).<span class="hljs-property">token</span>;
+<span class="hljs-keyword">if</span>(!usage || usage.<span class="hljs-property">type</span> !== <span class="hljs-string">&#x27;fence&#x27;</span> || !usage.<span class="hljs-property">map</span> || usage.<span class="hljs-property">level</span> !== <span class="hljs-number">0</span>) { <span class="hljs-keyword">continue</span>; }
+<span class="hljs-keyword">const</span> header = <span class="hljs-title function_">parseFragmentHeader</span>(usage.<span class="hljs-property">info</span>);
+<span class="hljs-keyword">const</span> closing = <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">lineAt</span>(usage.<span class="hljs-property">map</span>[<span class="hljs-number">1</span>] - <span class="hljs-number">1</span>).<span class="hljs-property">text</span>.<span class="hljs-title function_">trim</span>();
+<span class="hljs-keyword">if</span>(!header || !<span class="hljs-regexp">/^(`{3,}|~{3,})$/</span>.<span class="hljs-title function_">test</span>(closing) || closing[<span class="hljs-number">0</span>] !== usage.<span class="hljs-property">markup</span>[<span class="hljs-number">0</span>] ||
+    closing.<span class="hljs-property">length</span> &lt; usage.<span class="hljs-property">markup</span>.<span class="hljs-property">length</span>) { <span class="hljs-keyword">continue</span>; }
+<span class="hljs-keyword">const</span> info = <span class="hljs-string">`<span class="hljs-subst">${header.language}</span> : <span class="hljs-subst">${OPENING}</span><span class="hljs-subst">${reference.name}</span><span class="hljs-subst">${CLOSING}</span>=`</span>;
+<span class="hljs-keyword">if</span>(<span class="hljs-title function_">parseFragmentHeader</span>(info)?.<span class="hljs-property">name</span> !== reference.<span class="hljs-property">name</span>) { <span class="hljs-keyword">continue</span>; }
+</code></pre>
+
+</div>
+</div><h2>Offer the edit without applying it</h2>
+<p>Preserve the document's line ending and attach the edit to its URI, even if another
+editor is active. Only a fully constructed action marks a name as offered; VS Code
+retains responsibility for applying the edit and presenting its diagnostic.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;code action proposed edit&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> eol = <span class="hljs-variable language_">document</span>.<span class="hljs-property">eol</span> === vscode.<span class="hljs-property">EndOfLine</span>.<span class="hljs-property">CRLF</span> ? <span class="hljs-string">&#x27;\r\n&#x27;</span> : <span class="hljs-string">&#x27;\n&#x27;</span>;
+<span class="hljs-keyword">const</span> position = usage.<span class="hljs-property">map</span>[<span class="hljs-number">1</span>] &lt; <span class="hljs-variable language_">document</span>.<span class="hljs-property">lineCount</span> ? <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">Position</span>(usage.<span class="hljs-property">map</span>[<span class="hljs-number">1</span>], <span class="hljs-number">0</span>)
+    : <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">positionAt</span>(text.<span class="hljs-property">length</span>);
+<span class="hljs-keyword">const</span> edit = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">WorkspaceEdit</span>();
+edit.<span class="hljs-title function_">insert</span>(<span class="hljs-variable language_">document</span>.<span class="hljs-property">uri</span>, position, <span class="hljs-string">`<span class="hljs-subst">${eol}</span>~~~ <span class="hljs-subst">${info}</span><span class="hljs-subst">${eol}</span>~~~<span class="hljs-subst">${eol}</span>`</span>);
+<span class="hljs-keyword">const</span> action = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title class_">CodeAction</span>(<span class="hljs-string">`Create fragment for <span class="hljs-subst">${OPENING}</span><span class="hljs-subst">${reference.name}</span><span class="hljs-subst">${CLOSING}</span>`</span>,
+    vscode.<span class="hljs-property">CodeActionKind</span>.<span class="hljs-property">QuickFix</span>);
+action.<span class="hljs-property">diagnostics</span> = [diagnostic];
+action.<span class="hljs-property">edit</span> = edit;
+actions.<span class="hljs-title function_">push</span>(action);
+offered.<span class="hljs-title function_">add</span>(reference.<span class="hljs-property">name</span>);
 </code></pre>
 
 </div>

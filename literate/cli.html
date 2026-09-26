@@ -314,67 +314,133 @@ residue is not discovered as source. Never blindly delete reported recovery path
     <span class="hljs-keyword">const</span> modes = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">number</span>&gt;();
     <span class="hljs-keyword">const</span> target = (<span class="hljs-attr">value</span>: <span class="hljs-built_in">string</span>): <span class="hljs-function"><span class="hljs-params">string</span> =&gt;</span> path.<span class="hljs-title function_">join</span>(root, <span class="hljs-title function_">relative</span>(value));
     <span class="hljs-keyword">const</span> <span class="hljs-attr">inspectPath</span>: <span class="hljs-title class_">TransactionIO</span>[<span class="hljs-string">&#x27;inspect&#x27;</span>] = <span class="hljs-keyword">async</span> value =&gt; {
-        <span class="hljs-keyword">const</span> parts = <span class="hljs-title function_">relative</span>(value).<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;/&#x27;</span>);
-        <span class="hljs-keyword">const</span> rootStat = <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">lstat</span>(root);
-        <span class="hljs-keyword">if</span> (rootStat.<span class="hljs-title function_">isSymbolicLink</span>() || !rootStat.<span class="hljs-title function_">isDirectory</span>()) {
-            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Root is not a regular directory: <span class="hljs-subst">${root}</span>`</span>);
-        }
-        <span class="hljs-keyword">let</span> current = root;
-        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [index, part] <span class="hljs-keyword">of</span> parts.<span class="hljs-title function_">entries</span>()) {
-            current = path.<span class="hljs-title function_">join</span>(current, part);
-            <span class="hljs-keyword">let</span> stat;
-            <span class="hljs-keyword">try</span> { stat = <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">lstat</span>(current); }
-            <span class="hljs-keyword">catch</span> (error) {
-                <span class="hljs-keyword">if</span> (<span class="hljs-title function_">missing</span>(error)) { <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;missing&#x27;</span>; }
-                <span class="hljs-keyword">throw</span> error;
-            }
-            <span class="hljs-keyword">if</span> (stat.<span class="hljs-title function_">isSymbolicLink</span>()) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Symbolic link is not allowed: <span class="hljs-subst">${value}</span>`</span>); }
-            <span class="hljs-keyword">if</span> (index &lt; parts.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>) {
-                <span class="hljs-keyword">if</span> (!stat.<span class="hljs-title function_">isDirectory</span>()) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Parent is not a directory: <span class="hljs-subst">${value}</span>`</span>); }
-            } <span class="hljs-keyword">else</span> {
-                <span class="hljs-keyword">if</span> (stat.<span class="hljs-title function_">isFile</span>()) { <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;file&#x27;</span>; }
-                <span class="hljs-keyword">if</span> (stat.<span class="hljs-title function_">isDirectory</span>()) { <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;directory&#x27;</span>; }
-                <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Target is not a regular file or directory: <span class="hljs-subst">${value}</span>`</span>);
-            }
-        }
-        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Invalid relative path: <span class="hljs-subst">${value}</span>`</span>);
+        <span class="literate-tag-name">&lt;&lt;cli transaction root inspection&gt;&gt;</span>
+        <span class="literate-tag-name">&lt;&lt;cli transaction component inspection&gt;&gt;</span>
     };
     <span class="hljs-keyword">return</span> {
         <span class="hljs-attr">inspect</span>: inspectPath,
-        <span class="hljs-keyword">async</span> <span class="hljs-title function_">read</span>(<span class="hljs-params">value</span>) {
-            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspectPath</span>(value) !== <span class="hljs-string">&#x27;file&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Not a file: <span class="hljs-subst">${value}</span>`</span>); }
-            <span class="hljs-keyword">const</span> stat = <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">lstat</span>(<span class="hljs-title function_">target</span>(value));
-            <span class="hljs-keyword">const</span> bytes = <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">readFile</span>(<span class="hljs-title function_">target</span>(value));
-            modes.<span class="hljs-title function_">set</span>(<span class="hljs-title function_">relative</span>(value), stat.<span class="hljs-property">mode</span> &amp; <span class="hljs-number">0o7777</span>);
-            <span class="hljs-keyword">return</span> bytes;
-        },
-        <span class="hljs-keyword">async</span> <span class="hljs-title function_">mkdir</span>(<span class="hljs-params">value</span>) {
-            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspectPath</span>(value) !== <span class="hljs-string">&#x27;missing&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Path exists: <span class="hljs-subst">${value}</span>`</span>); }
-            <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">mkdir</span>(<span class="hljs-title function_">target</span>(value));
-        },
-        <span class="hljs-keyword">async</span> <span class="hljs-title function_">writeNew</span>(<span class="hljs-params">value, content</span>) {
-            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspectPath</span>(value) !== <span class="hljs-string">&#x27;missing&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Path exists: <span class="hljs-subst">${value}</span>`</span>); }
-            <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">writeFile</span>(<span class="hljs-title function_">target</span>(value), content, { <span class="hljs-attr">flag</span>: <span class="hljs-string">&#x27;wx&#x27;</span> });
-        },
-        <span class="hljs-keyword">async</span> <span class="hljs-title function_">rename</span>(<span class="hljs-params"><span class="hljs-keyword">from</span>, to</span>) {
-            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspectPath</span>(<span class="hljs-keyword">from</span>) !== <span class="hljs-string">&#x27;file&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Not a file: <span class="hljs-subst">${<span class="hljs-keyword">from</span>}</span>`</span>); }
-            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspectPath</span>(to) !== <span class="hljs-string">&#x27;missing&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Path exists: <span class="hljs-subst">${to}</span>`</span>); }
-            <span class="hljs-keyword">const</span> mode = modes.<span class="hljs-title function_">get</span>(<span class="hljs-title function_">relative</span>(to));
-            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">from</span>.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;.stage&#x27;</span>) &amp;&amp; mode !== <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">chmod</span>(<span class="hljs-title function_">target</span>(<span class="hljs-keyword">from</span>), mode); }
-            <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">rename</span>(<span class="hljs-title function_">target</span>(<span class="hljs-keyword">from</span>), <span class="hljs-title function_">target</span>(to));
-        },
-        <span class="hljs-keyword">async</span> <span class="hljs-title function_">removeFile</span>(<span class="hljs-params">value</span>) {
-            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspectPath</span>(value) !== <span class="hljs-string">&#x27;file&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Not a file: <span class="hljs-subst">${value}</span>`</span>); }
-            <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">unlink</span>(<span class="hljs-title function_">target</span>(value));
-        },
-        <span class="hljs-keyword">async</span> <span class="hljs-title function_">removeDirectory</span>(<span class="hljs-params">value</span>) {
-            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspectPath</span>(value) !== <span class="hljs-string">&#x27;directory&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Not a directory: <span class="hljs-subst">${value}</span>`</span>); }
-            <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">rmdir</span>(<span class="hljs-title function_">target</span>(value));
-        },
+        <span class="literate-tag-name">&lt;&lt;cli transaction read with permissions&gt;&gt;</span>
+        <span class="literate-tag-name">&lt;&lt;cli transaction exclusive creation&gt;&gt;</span>
+        <span class="literate-tag-name">&lt;&lt;cli transaction rename with permissions&gt;&gt;</span>
+        <span class="literate-tag-name">&lt;&lt;cli transaction removal&gt;&gt;</span>
         <span class="hljs-attr">nonce</span>: randomUUID
     };
 }
 
+</code></pre>
+
+</div>
+</div><h3>Establish a trusted directory before classifying a target</h3>
+<p>Every inspection rechecks the root rather than relying on an earlier preflight.
+The normalized components feed the walk below; neither root symlinks nor a
+non-directory root can be treated as a missing destination.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli transaction root inspection&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> parts = <span class="hljs-title function_">relative</span>(value).<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;/&#x27;</span>);
+<span class="hljs-keyword">const</span> rootStat = <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">lstat</span>(root);
+<span class="hljs-keyword">if</span> (rootStat.<span class="hljs-title function_">isSymbolicLink</span>() || !rootStat.<span class="hljs-title function_">isDirectory</span>()) {
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Root is not a regular directory: <span class="hljs-subst">${root}</span>`</span>);
+}
+</code></pre>
+
+</div>
+</div><p>The walk distinguishes files, directories, and absence for the transaction
+coordinator. Only absence is recoverable here; links and special files are
+errors. Returning at the first missing component permits later staged creation
+without creating anything during inspection.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli transaction component inspection&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">let</span> current = root;
+<span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [index, part] <span class="hljs-keyword">of</span> parts.<span class="hljs-title function_">entries</span>()) {
+    current = path.<span class="hljs-title function_">join</span>(current, part);
+    <span class="hljs-keyword">let</span> stat;
+    <span class="hljs-keyword">try</span> { stat = <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">lstat</span>(current); }
+    <span class="hljs-keyword">catch</span> (error) {
+        <span class="hljs-keyword">if</span> (<span class="hljs-title function_">missing</span>(error)) { <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;missing&#x27;</span>; }
+        <span class="hljs-keyword">throw</span> error;
+    }
+    <span class="hljs-keyword">if</span> (stat.<span class="hljs-title function_">isSymbolicLink</span>()) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Symbolic link is not allowed: <span class="hljs-subst">${value}</span>`</span>); }
+    <span class="hljs-keyword">if</span> (index &lt; parts.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>) {
+        <span class="hljs-keyword">if</span> (!stat.<span class="hljs-title function_">isDirectory</span>()) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Parent is not a directory: <span class="hljs-subst">${value}</span>`</span>); }
+    } <span class="hljs-keyword">else</span> {
+        <span class="hljs-keyword">if</span> (stat.<span class="hljs-title function_">isFile</span>()) { <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;file&#x27;</span>; }
+        <span class="hljs-keyword">if</span> (stat.<span class="hljs-title function_">isDirectory</span>()) { <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;directory&#x27;</span>; }
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Target is not a regular file or directory: <span class="hljs-subst">${value}</span>`</span>);
+    }
+}
+<span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Invalid relative path: <span class="hljs-subst">${value}</span>`</span>);
+</code></pre>
+
+</div>
+</div><h3>Carry permissions from the original to its replacement</h3>
+<p>Reading records mode bits under the normalized destination, not the temporary
+stage name. The byte snapshot and permission snapshot belong to the same adapter
+instance and remain available during installation or recovery.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli transaction read with permissions&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-title function_">read</span>(<span class="hljs-params">value</span>) {
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspectPath</span>(value) !== <span class="hljs-string">&#x27;file&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Not a file: <span class="hljs-subst">${value}</span>`</span>); }
+    <span class="hljs-keyword">const</span> stat = <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">lstat</span>(<span class="hljs-title function_">target</span>(value));
+    <span class="hljs-keyword">const</span> bytes = <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">readFile</span>(<span class="hljs-title function_">target</span>(value));
+    modes.<span class="hljs-title function_">set</span>(<span class="hljs-title function_">relative</span>(value), stat.<span class="hljs-property">mode</span> &amp; <span class="hljs-number">0o7777</span>);
+    <span class="hljs-keyword">return</span> bytes;
+},
+</code></pre>
+
+</div>
+</div><h3>Create without replacing existing entries</h3>
+<p>Both creation operations require an absent path. File creation also uses the
+filesystem's exclusive flag; directory creation is deliberately nonrecursive so
+the coordinator can track exactly which directories it owns.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli transaction exclusive creation&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-title function_">mkdir</span>(<span class="hljs-params">value</span>) {
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspectPath</span>(value) !== <span class="hljs-string">&#x27;missing&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Path exists: <span class="hljs-subst">${value}</span>`</span>); }
+    <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">mkdir</span>(<span class="hljs-title function_">target</span>(value));
+},
+<span class="hljs-keyword">async</span> <span class="hljs-title function_">writeNew</span>(<span class="hljs-params">value, content</span>) {
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspectPath</span>(value) !== <span class="hljs-string">&#x27;missing&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Path exists: <span class="hljs-subst">${value}</span>`</span>); }
+    <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">writeFile</span>(<span class="hljs-title function_">target</span>(value), content, { <span class="hljs-attr">flag</span>: <span class="hljs-string">&#x27;wx&#x27;</span> });
+},
+</code></pre>
+
+</div>
+</div><h3>Install a stage using the destination's remembered mode</h3>
+<p>A rename requires a regular source and absent destination. Only stage files
+inherit the destination's saved mode, leaving backup moves unchanged. The
+inspection/rename race remains subject to the serialization contract above.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli transaction rename with permissions&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-title function_">rename</span>(<span class="hljs-params"><span class="hljs-keyword">from</span>, to</span>) {
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspectPath</span>(<span class="hljs-keyword">from</span>) !== <span class="hljs-string">&#x27;file&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Not a file: <span class="hljs-subst">${<span class="hljs-keyword">from</span>}</span>`</span>); }
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspectPath</span>(to) !== <span class="hljs-string">&#x27;missing&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Path exists: <span class="hljs-subst">${to}</span>`</span>); }
+    <span class="hljs-keyword">const</span> mode = modes.<span class="hljs-title function_">get</span>(<span class="hljs-title function_">relative</span>(to));
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">from</span>.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;.stage&#x27;</span>) &amp;&amp; mode !== <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">chmod</span>(<span class="hljs-title function_">target</span>(<span class="hljs-keyword">from</span>), mode); }
+    <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">rename</span>(<span class="hljs-title function_">target</span>(<span class="hljs-keyword">from</span>), <span class="hljs-title function_">target</span>(to));
+},
+</code></pre>
+
+</div>
+</div><h3>Remove only the expected entry kind</h3>
+<p>Cleanup revalidates each recovery path. Nonrecursive directory removal refuses
+to erase unexpected contents, allowing the coordinator to report recoverable
+residue rather than broadening the cleanup operation.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli transaction removal&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-title function_">removeFile</span>(<span class="hljs-params">value</span>) {
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspectPath</span>(value) !== <span class="hljs-string">&#x27;file&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Not a file: <span class="hljs-subst">${value}</span>`</span>); }
+    <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">unlink</span>(<span class="hljs-title function_">target</span>(value));
+},
+<span class="hljs-keyword">async</span> <span class="hljs-title function_">removeDirectory</span>(<span class="hljs-params">value</span>) {
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspectPath</span>(value) !== <span class="hljs-string">&#x27;directory&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Not a directory: <span class="hljs-subst">${value}</span>`</span>); }
+    <span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">rmdir</span>(<span class="hljs-title function_">target</span>(value));
+},
 </code></pre>
 
 </div>
