@@ -108,6 +108,35 @@ const themesByName = new Map(themes.map(theme => [theme.name, theme]));
 export function getTheme(name: string): LiterateTheme | undefined {
     return themesByName.get(name);
 }
+interface SyntaxColorGroup {
+    scopes: string;
+    color: keyof LiterateTheme['colors'];
+}
+const syntaxColorGroups: readonly SyntaxColorGroup[] = [
+    { scopes: 'keyword selector-tag literal', color: 'purple' },
+    { scopes: 'string regexp addition', color: 'accent' },
+    { scopes: 'number symbol bullet', color: 'warning' },
+    { scopes: 'title section built_in type', color: 'information' },
+    { scopes: 'attr attribute variable template-variable', color: 'cyan' },
+    { scopes: 'comment quote', color: 'muted' },
+    { scopes: 'meta doctag', color: 'yellow' },
+    { scopes: 'deletion name', color: 'danger' },
+    { scopes: 'link', color: 'information' }
+];
+const syntaxColorKeys = new Map(syntaxColorGroups.flatMap(group =>
+    group.scopes.split(' ').map(scope => [scope, group.color] as const)));
+export function syntaxColor(scope: string, theme: LiterateTheme): string {
+    return theme.colors[syntaxColorKeys.get(scope.split('.')[0]) ?? 'text'];
+}
+function syntaxColorCss(): string {
+    return syntaxColorGroups.map(group => {
+        const selectors = group.scopes.split(' ')
+            .map(scope => `.literate-document .hljs-${scope}`).join(', ');
+        const decoration = group.scopes === 'comment quote' ? ' font-style: italic;'
+            : group.scopes === 'link' ? ' text-decoration: underline;' : '';
+        return `${selectors} { color: var(--literate-${group.color});${decoration} }`;
+    }).join('\n');
+}
 function checkedColors(theme: LiterateTheme): LiterateTheme['colors'] {
     const colors = {} as LiterateTheme['colors'];
     for (const key of colorKeys) {
@@ -236,15 +265,7 @@ ${themeVariables(theme)}
 .literate-document .codefragment > div + div { margin-top: .75em; }
 .literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
 .literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
-.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
-.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
-.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
-.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
-.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
-.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
-.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
-.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
-.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+${syntaxColorCss()}
 .literate-document .hljs-emphasis { font-style: italic; }
 .literate-document .hljs-strong { font-weight: bold; }
 .literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }

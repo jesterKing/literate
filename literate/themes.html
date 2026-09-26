@@ -134,6 +134,8 @@ canonical name although its upstream file is <code>pastelDark.lua</code>.</p>
 <pre><code><span class="literate-tag-name">&lt;&lt;Theme contract&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;Theme palette rows&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;Theme catalogue&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;Theme syntax scope groups&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;Theme syntax adapters&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;Theme serialization&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;Theme Mermaid configuration&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;Theme upstream notice&gt;&gt;</span>
@@ -350,6 +352,60 @@ also makes prototype names such as <code>constructor</code> and <code>__proto__<
 
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">getTheme</span>(<span class="hljs-params">name: <span class="hljs-built_in">string</span></span>): <span class="hljs-title class_">LiterateTheme</span> | <span class="hljs-literal">undefined</span> {
     <span class="hljs-keyword">return</span> themesByName.<span class="hljs-title function_">get</span>(name);
+}
+</code></pre>
+
+</div>
+</div><h2>Shared syntax colors and format policy</h2>
+<p>These ordered groups are the single scope-to-palette source for document CSS and
+publication syntax. Keeping <code>link</code> separate preserves the existing CSS order.
+Only base scopes select colors: highlight.js emits <code>title.function</code> as classes
+<code>hljs-title function_</code>, while publication receives the dotted scope directly.
+Unknown scopes (including prototype names) reset to text. No runtime imports,
+CSS parsing, palette adjustment or language dependency are needed here.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;Theme syntax scope groups&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">interface</span> <span class="hljs-title class_">SyntaxColorGroup</span> {
+    <span class="hljs-attr">scopes</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">color</span>: keyof <span class="hljs-title class_">LiterateTheme</span>[<span class="hljs-string">&#x27;colors&#x27;</span>];
+}
+<span class="hljs-keyword">const</span> <span class="hljs-attr">syntaxColorGroups</span>: <span class="hljs-keyword">readonly</span> <span class="hljs-title class_">SyntaxColorGroup</span>[] = [
+    { <span class="hljs-attr">scopes</span>: <span class="hljs-string">&#x27;keyword selector-tag literal&#x27;</span>, <span class="hljs-attr">color</span>: <span class="hljs-string">&#x27;purple&#x27;</span> },
+    { <span class="hljs-attr">scopes</span>: <span class="hljs-string">&#x27;string regexp addition&#x27;</span>, <span class="hljs-attr">color</span>: <span class="hljs-string">&#x27;accent&#x27;</span> },
+    { <span class="hljs-attr">scopes</span>: <span class="hljs-string">&#x27;number symbol bullet&#x27;</span>, <span class="hljs-attr">color</span>: <span class="hljs-string">&#x27;warning&#x27;</span> },
+    { <span class="hljs-attr">scopes</span>: <span class="hljs-string">&#x27;title section built_in type&#x27;</span>, <span class="hljs-attr">color</span>: <span class="hljs-string">&#x27;information&#x27;</span> },
+    { <span class="hljs-attr">scopes</span>: <span class="hljs-string">&#x27;attr attribute variable template-variable&#x27;</span>, <span class="hljs-attr">color</span>: <span class="hljs-string">&#x27;cyan&#x27;</span> },
+    { <span class="hljs-attr">scopes</span>: <span class="hljs-string">&#x27;comment quote&#x27;</span>, <span class="hljs-attr">color</span>: <span class="hljs-string">&#x27;muted&#x27;</span> },
+    { <span class="hljs-attr">scopes</span>: <span class="hljs-string">&#x27;meta doctag&#x27;</span>, <span class="hljs-attr">color</span>: <span class="hljs-string">&#x27;yellow&#x27;</span> },
+    { <span class="hljs-attr">scopes</span>: <span class="hljs-string">&#x27;deletion name&#x27;</span>, <span class="hljs-attr">color</span>: <span class="hljs-string">&#x27;danger&#x27;</span> },
+    { <span class="hljs-attr">scopes</span>: <span class="hljs-string">&#x27;link&#x27;</span>, <span class="hljs-attr">color</span>: <span class="hljs-string">&#x27;information&#x27;</span> }
+];
+<span class="hljs-keyword">const</span> syntaxColorKeys = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>(syntaxColorGroups.<span class="hljs-title function_">flatMap</span>(<span class="hljs-function"><span class="hljs-params">group</span> =&gt;</span>
+    group.<span class="hljs-property">scopes</span>.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27; &#x27;</span>).<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">scope</span> =&gt;</span> [scope, group.<span class="hljs-property">color</span>] <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span>)));
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">syntaxColor</span>(<span class="hljs-params">scope: <span class="hljs-built_in">string</span>, theme: LiterateTheme</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">return</span> theme.<span class="hljs-property">colors</span>[syntaxColorKeys.<span class="hljs-title function_">get</span>(scope.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;.&#x27;</span>)[<span class="hljs-number">0</span>]) ?? <span class="hljs-string">&#x27;text&#x27;</span>];
+}
+</code></pre>
+
+</div>
+</div><p>Colors are shared; typography remains a format adapter's responsibility.
+Standalone HTML and the live preview both consume <code>themeCss</code> (the preview's
+<code>applyTheme</code> installs it even without diagrams). Preserve screen comment/quote
+italics, link underlines and the separate emphasis/strong rules. Do not add
+publication's keyword/variable bold policy or reset host font inheritance here.
+LaTeX deliberately supplies its own weights and never underlines syntax links.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;Theme syntax adapters&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">syntaxColorCss</span>(<span class="hljs-params"></span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">return</span> syntaxColorGroups.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">group</span> =&gt;</span> {
+        <span class="hljs-keyword">const</span> selectors = group.<span class="hljs-property">scopes</span>.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27; &#x27;</span>)
+            .<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">scope</span> =&gt;</span> <span class="hljs-string">`.literate-document .hljs-<span class="hljs-subst">${scope}</span>`</span>).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;, &#x27;</span>);
+        <span class="hljs-keyword">const</span> decoration = group.<span class="hljs-property">scopes</span> === <span class="hljs-string">&#x27;comment quote&#x27;</span> ? <span class="hljs-string">&#x27; font-style: italic;&#x27;</span>
+            : group.<span class="hljs-property">scopes</span> === <span class="hljs-string">&#x27;link&#x27;</span> ? <span class="hljs-string">&#x27; text-decoration: underline;&#x27;</span> : <span class="hljs-string">&#x27;&#x27;</span>;
+        <span class="hljs-keyword">return</span> <span class="hljs-string">`<span class="hljs-subst">${selectors}</span> { color: var(--literate-<span class="hljs-subst">${group.color}</span>);<span class="hljs-subst">${decoration}</span> }`</span>;
+    }).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;\n&#x27;</span>);
 }
 </code></pre>
 
@@ -586,15 +642,7 @@ host colors cannot override the chosen palette's baseline foreground.</p>
 <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.codefragment</span> &gt; <span class="hljs-selector-tag">div</span> + <span class="hljs-selector-tag">div</span> { <span class="hljs-attribute">margin-top</span>: .<span class="hljs-number">75em</span>; }
 <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-attr">[class*=<span class="hljs-string">&quot;hljs-&quot;</span>]</span> { <span class="hljs-attribute">color</span>: <span class="hljs-built_in">var</span>(--literate-text); <span class="hljs-attribute">background</span>: transparent; }
 <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs</span>, <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-subst</span> { <span class="hljs-attribute">color</span>: <span class="hljs-built_in">var</span>(--literate-text); <span class="hljs-attribute">background</span>: <span class="hljs-built_in">var</span>(--literate-surface); }
-<span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-keyword</span>, <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-selector-tag</span>, <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-literal</span> { <span class="hljs-attribute">color</span>: <span class="hljs-built_in">var</span>(--literate-purple); }
-<span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-string</span>, <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-regexp</span>, <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-addition</span> { <span class="hljs-attribute">color</span>: <span class="hljs-built_in">var</span>(--literate-accent); }
-<span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-number</span>, <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-symbol</span>, <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-bullet</span> { <span class="hljs-attribute">color</span>: <span class="hljs-built_in">var</span>(--literate-warning); }
-<span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-title</span>, <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-section</span>, <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-built_in</span>, <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-type</span> { <span class="hljs-attribute">color</span>: <span class="hljs-built_in">var</span>(--literate-information); }
-<span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-attr</span>, <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-attribute</span>, <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-variable</span>, <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-template-variable</span> { <span class="hljs-attribute">color</span>: <span class="hljs-built_in">var</span>(--literate-cyan); }
-<span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-comment</span>, <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-quote</span> { <span class="hljs-attribute">color</span>: <span class="hljs-built_in">var</span>(--literate-muted); <span class="hljs-attribute">font-style</span>: italic; }
-<span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-meta</span>, <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-doctag</span> { <span class="hljs-attribute">color</span>: <span class="hljs-built_in">var</span>(--literate-yellow); }
-<span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-deletion</span>, <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-name</span> { <span class="hljs-attribute">color</span>: <span class="hljs-built_in">var</span>(--literate-danger); }
-<span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-link</span> { <span class="hljs-attribute">color</span>: <span class="hljs-built_in">var</span>(--literate-information); <span class="hljs-attribute">text-decoration</span>: underline; }
+${syntaxColorCss()}
 <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-emphasis</span> { <span class="hljs-attribute">font-style</span>: italic; }
 <span class="hljs-selector-class">.literate-document</span> <span class="hljs-selector-class">.hljs-strong</span> { <span class="hljs-attribute">font-weight</span>: bold; }
 </code></pre>

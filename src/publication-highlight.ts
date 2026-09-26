@@ -1,5 +1,6 @@
 import hljs from 'highlight.js';
 import type { PublicationContribution } from './engine';
+import { syntaxColor } from './themes';
 import type { LiterateTheme } from './themes';
 
 export interface SyntaxSpan { start: number; end: number; scope: string; }
@@ -91,24 +92,12 @@ export function highlightContribution(part: PublicationContribution): Highlighte
         : display.text.length ? [{ start: 0, end: display.text.length, scope: '' }] : [];
     return display;
 }
-/* eslint-disable @typescript-eslint/naming-convention -- highlight.js scope names are an external contract. */
-const scopeColors: Readonly<Record<string, keyof LiterateTheme['colors']>> = {
-    keyword: 'purple', 'selector-tag': 'purple', literal: 'purple',
-    string: 'accent', regexp: 'accent', addition: 'accent',
-    number: 'warning', symbol: 'warning', bullet: 'warning',
-    title: 'information', section: 'information', built_in: 'information',
-    type: 'information', link: 'information',
-    attr: 'cyan', attribute: 'cyan', variable: 'cyan', 'template-variable': 'cyan',
-    comment: 'muted', quote: 'muted', meta: 'yellow', doctag: 'yellow',
-    deletion: 'danger', name: 'danger'
-};
-/* eslint-enable @typescript-eslint/naming-convention */
+
 export function syntaxStyle(scope: string, theme: LiterateTheme): {
     color: string; bold: boolean; italic: boolean;
 } {
     const base = scope.split('.')[0];
-    const key = Object.prototype.hasOwnProperty.call(scopeColors, base) ? scopeColors[base] : 'text';
-    return { color: theme.colors[key],
+    return { color: syntaxColor(scope, theme),
         bold: ['keyword', 'variable', 'template-variable', 'strong'].includes(base),
         italic: ['comment', 'quote', 'emphasis'].includes(base) };
 }

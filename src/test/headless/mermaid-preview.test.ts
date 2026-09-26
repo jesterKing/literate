@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import * as vm from 'node:vm';
 import * as esbuild from 'esbuild';
 import { generateProject } from '../../engine';
+import { themes, themeCss } from '../../themes';
 
 function chapterSource(filename: string, output: string): string {
     const result = generateProject([{ path: filename,
@@ -153,6 +154,22 @@ test('auto-start is disabled before DOM readiness even without Literate diagrams
     f.events.get('DOMContentLoaded')!();
     f.update();
     await tick();
+    assert.equal(f.renders.length, 0);
+});
+
+test('live preview installs the exact shared stylesheet for all 70 themes without diagrams', async () => {
+    const f = await fixture([], false, themes[0].name);
+    assert.equal(f.styles[0].textContent, themeCss(themes[0]));
+    for (const theme of themes) {
+        f.theme(theme.name);
+        assert.equal(f.styles.length, 1);
+        assert.equal(f.styles[0].textContent, themeCss(theme), theme.name);
+    }
+    for (const theme of themes) {
+        f.replaceWrapper(theme.name);
+        f.update();
+        assert.equal(f.styles[0].textContent, themeCss(theme), theme.name);
+    }
     assert.equal(f.renders.length, 0);
 });
 

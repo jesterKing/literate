@@ -2,7 +2,10 @@ import assert = require('node:assert/strict');
 import { test } from 'node:test';
 import hljs from 'highlight.js';
 import { parseProject } from '../../engine';
-import { themes } from '../../themes';
+import { themes, syntaxColor, themeCss } from '../../themes';
+import { renderLatex } from '../../publication-latex';
+import type { PandocBlock } from '../../publication-pandoc';
+import { createHash } from 'node:crypto';
 import { highlightContribution, syntaxStyle } from '../../publication-highlight';
 const tag = (name: string) => '<' + '<' + name + '>>';
 function part(body: string, language = 'javascript') {
@@ -107,15 +110,15 @@ test('private adapter guards version, shape, cycles and exact reconstruction', (
         assert.throws(() => highlightContribution(part('x')), /reconstruct/);
     });
 });
+const groups = {
+    purple: 'keyword selector-tag literal', accent: 'string regexp addition',
+    warning: 'number symbol bullet', information: 'title section built_in type link',
+    cyan: 'attr attribute variable template-variable', muted: 'comment quote',
+    yellow: 'meta doctag', danger: 'deletion name',
+    text: 'subst unknown emphasis strong constructor __proto__ toString params property operator punctuation'
+};
 test('all 70 palettes retain exact scope colors and publication font policy', () => {
     assert.equal(themes.length, 70);
-    const groups = {
-        purple: 'keyword selector-tag literal', accent: 'string regexp addition',
-        warning: 'number symbol bullet', information: 'title section built_in type link',
-        cyan: 'attr attribute variable template-variable', muted: 'comment quote',
-        yellow: 'meta doctag', danger: 'deletion name',
-        text: 'subst unknown emphasis strong constructor __proto__'
-    };
     for (const theme of themes) {
         for (const [key, scopes] of Object.entries(groups)) {
             for (const scope of scopes.split(' ')) {
@@ -123,10 +126,77 @@ test('all 70 palettes retain exact scope colors and publication font policy', ()
                     bold: ['keyword', 'variable', 'template-variable', 'strong'].includes(scope),
                     italic: ['comment', 'quote', 'emphasis'].includes(scope) };
                 assert.match(expected.color, /^#[0-9a-f]{6}$/i);
+                assert.equal(syntaxColor(scope, theme), expected.color);
+                assert.equal(syntaxColor(scope + '.nested', theme), expected.color);
                 assert.deepEqual(syntaxStyle(scope, theme), expected);
                 assert.deepEqual(syntaxStyle(scope + '.nested', theme), expected);
             }
         }
+        assert.equal(syntaxColor('', theme), theme.colors.text);
         assert.deepEqual(syntaxStyle('', theme), { color: theme.colors.text, bold: false, italic: false });
     }
+});
+test('all screen CSS bytes remain unchanged after scope extraction', () => {
+    const css = themes.map(theme => themeCss(theme)).join('\n');
+    assert.equal(createHash('sha256').update(css).digest('hex'),
+        '51ec8b26a6cd75ce6d62c664370f08dd291ca17168eed60083c6092a74bbbd32');
+});
+function screenStyle(css: string, scope: string): string {
+    let declarations = '';
+    for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const selectors = rule[1].trim().split(', ');
+        if (selectors.includes('.literate-document [class*="hljs-"]') ||
+            selectors.includes('.literate-document .hljs-' + scope)) {
+            declarations += rule[2];
+        }
+    }
+    return declarations;
+}
+test('screen scope colors and format-specific decorations cover every palette', () => {
+    for (const theme of themes) {
+        const css = themeCss(theme);
+        for (const [key, scopes] of Object.entries(groups)) {
+            for (const scope of scopes.split(' ')) {
+                const style = screenStyle(css, scope);
+                const colors = [...style.matchAll(/color: var\(--literate-(\w+)\)/g)];
+                assert.equal(colors[colors.length - 1][1], key, scope);
+                assert.equal(style.includes('font-style: italic;'),
+                    ['comment', 'quote', 'emphasis'].includes(scope), scope);
+                assert.equal(style.includes('font-weight: bold;'), scope === 'strong', scope);
+                assert.equal(style.includes('text-decoration: underline;'), scope === 'link', scope);
+            }
+        }
+    }
+});
+function rawStyles(blocks: PandocBlock[]): string {
+    return blocks.map(block => block.t === 'RawBlock' ? block.c[1]
+        : block.t === 'Div' ? rawStyles(block.c[1]) : '').join('\n');
+}
+test('LaTeX emits every scope with unchanged typography in all themes', async () => {
+    const scopes = Object.values(groups).flatMap(value => value.split(' '))
+        .flatMap(scope => [scope, scope + '.nested']).concat('');
+    const text = scopes.map((_, index) => 'token' + index + '\n').join('');
+    const input = '```javascript: ' + tag('styles') + '=\n' + text + '```\n';
+    const project = parseProject([{ path: 'index.literate', text: input }]);
+    assert.deepEqual(project.diagnostics, []);
+    const original = hljs.highlight;
+    hljs.highlight = (() => ({ _emitter: { rootNode: { children: scopes.map((scope, index) =>
+        ({ scope, children: ['token' + index + '\n'] })) } } })) as unknown as typeof hljs.highlight;
+    try {
+        for (const theme of themes) {
+            const result = await renderLatex(project, { theme: theme.name }, async document =>
+                rawStyles(document.blocks));
+            assert.deepEqual(result.diagnostics, []);
+            scopes.forEach((scope, index) => {
+                const base = scope.split('.')[0];
+                const key = Object.entries(groups).find(([, names]) => names.split(' ').includes(base))?.[0] || 'text';
+                const hex = theme.colors[key as keyof typeof theme.colors].slice(1);
+                const bold = ['keyword', 'variable', 'template-variable', 'strong'].includes(base) ? '\\bfseries' : '';
+                const italic = ['comment', 'quote', 'emphasis'].includes(base) ? '\\itshape' : '';
+                assert.ok(result.latex?.includes(`\\LitStyle{${hex}}{${bold}}{${italic}}{token${index}}`),
+                    theme.name + ': ' + scope);
+            });
+            assert.doesNotMatch(result.latex!, /\\(?:underline|uline)\{/);
+        }
+    } finally { hljs.highlight = original; }
 });

@@ -25,6 +25,7 @@ them when called independently. Invalid segment reconstruction fails closed.
 ```ts : <<publication highlighting contract>>=
 import hljs from 'highlight.js';
 import type { PublicationContribution } from './engine';
+import { syntaxColor } from './themes';
 import type { LiterateTheme } from './themes';
 
 export interface SyntaxSpan { start: number; end: number; scope: string; }
@@ -169,35 +170,21 @@ export function highlightContribution(part: PublicationContribution): Highlighte
 
 ## Palette semantics, without a CSS parser
 
-This small mapping mirrors `themes.literate:452–464`: unknown scopes reset to
-text, and dotted scopes use their base class. The additional publication policy
-makes keywords and variables bold; literals remain purple without forced bold.
-Comments, quotes and emphasis are italic, and strong is bold. Link underlining
-is outside this API. No palette is remapped, including dark palettes.
-
-The theme source is deliberately untouched in this slice. At the next shared
-style-mapping integration, extract these scope groups for both CSS generation
-and publication; do not grow a second palette catalogue or parse CSS at runtime.
+The pure `syntaxColor` lookup in `themes.literate` supplies the same scope colors
+as standalone HTML and live preview CSS. Unknown scopes reset to text, and dotted
+scopes use their base class. This adapter retains explicit publication typography:
+keywords and variables are bold; literals remain purple without forced bold.
+Comments, quotes and emphasis are italic, and strong is bold. Unlike screen CSS,
+LaTeX syntax links are not underlined. No palette is remapped, including dark
+palettes; this cleanup changes neither format's existing output styling.
 
 ```ts : <<publication highlighting styles>>=
-/* eslint-disable @typescript-eslint/naming-convention -- highlight.js scope names are an external contract. */
-const scopeColors: Readonly<Record<string, keyof LiterateTheme['colors']>> = {
-    keyword: 'purple', 'selector-tag': 'purple', literal: 'purple',
-    string: 'accent', regexp: 'accent', addition: 'accent',
-    number: 'warning', symbol: 'warning', bullet: 'warning',
-    title: 'information', section: 'information', built_in: 'information',
-    type: 'information', link: 'information',
-    attr: 'cyan', attribute: 'cyan', variable: 'cyan', 'template-variable': 'cyan',
-    comment: 'muted', quote: 'muted', meta: 'yellow', doctag: 'yellow',
-    deletion: 'danger', name: 'danger'
-};
-/* eslint-enable @typescript-eslint/naming-convention */
+
 export function syntaxStyle(scope: string, theme: LiterateTheme): {
     color: string; bold: boolean; italic: boolean;
 } {
     const base = scope.split('.')[0];
-    const key = Object.prototype.hasOwnProperty.call(scopeColors, base) ? scopeColors[base] : 'text';
-    return { color: theme.colors[key],
+    return { color: syntaxColor(scope, theme),
         bold: ['keyword', 'variable', 'template-variable', 'strong'].includes(base),
         italic: ['comment', 'quote', 'emphasis'].includes(base) };
 }
@@ -217,6 +204,8 @@ have the same meaning as in production.
 <<publication highlighting grammar tests>>
 <<publication highlighting guard tests>>
 <<publication highlighting palette tests>>
+<<publication highlighting CSS tests>>
+<<publication highlighting output tests>>
 ```
 
 Construct delimiters at runtime so the tests themselves do not introduce literate
@@ -227,7 +216,10 @@ import assert = require('node:assert/strict');
 import { test } from 'node:test';
 import hljs from 'highlight.js';
 import { parseProject } from '../../engine';
-import { themes } from '../../themes';
+import { themes, syntaxColor, themeCss } from '../../themes';
+import { renderLatex } from '../../publication-latex';
+import type { PandocBlock } from '../../publication-pandoc';
+import { createHash } from 'node:crypto';
 import { highlightContribution, syntaxStyle } from '../../publication-highlight';
 const tag = (name: string) => '<' + '<' + name + '>>';
 function part(body: string, language = 'javascript') {
@@ -380,15 +372,21 @@ below are independent expectations for every mapped token family, including
 plain resets and dotted forms; weights do not accidentally make booleans bold.
 
 ```ts : <<publication highlighting palette tests>>=
+const groups = {
+    purple: 'keyword selector-tag literal', accent: 'string regexp addition',
+    warning: 'number symbol bullet', information: 'title section built_in type link',
+    cyan: 'attr attribute variable template-variable', muted: 'comment quote',
+    yellow: 'meta doctag', danger: 'deletion name',
+    text: 'subst unknown emphasis strong constructor __proto__ toString params property operator punctuation'
+};
+```
+
+These expectations remain independent of the shared implementation, including
+unmapped highlight.js families and prototype keys.
+
+```ts : <<publication highlighting palette tests>>=+
 test('all 70 palettes retain exact scope colors and publication font policy', () => {
     assert.equal(themes.length, 70);
-    const groups = {
-        purple: 'keyword selector-tag literal', accent: 'string regexp addition',
-        warning: 'number symbol bullet', information: 'title section built_in type link',
-        cyan: 'attr attribute variable template-variable', muted: 'comment quote',
-        yellow: 'meta doctag', danger: 'deletion name',
-        text: 'subst unknown emphasis strong constructor __proto__'
-    };
     for (const theme of themes) {
         for (const [key, scopes] of Object.entries(groups)) {
             for (const scope of scopes.split(' ')) {
@@ -396,11 +394,113 @@ test('all 70 palettes retain exact scope colors and publication font policy', ()
                     bold: ['keyword', 'variable', 'template-variable', 'strong'].includes(scope),
                     italic: ['comment', 'quote', 'emphasis'].includes(scope) };
                 assert.match(expected.color, /^#[0-9a-f]{6}$/i);
+                assert.equal(syntaxColor(scope, theme), expected.color);
+                assert.equal(syntaxColor(scope + '.nested', theme), expected.color);
                 assert.deepEqual(syntaxStyle(scope, theme), expected);
                 assert.deepEqual(syntaxStyle(scope + '.nested', theme), expected);
             }
         }
+        assert.equal(syntaxColor('', theme), theme.colors.text);
         assert.deepEqual(syntaxStyle('', theme), { color: theme.colors.text, bold: false, italic: false });
     }
 });
+```
+
+Screen rules are checked independently of the lookup, including unmapped resets.
+The hash was captured before extraction from all seventy complete stylesheets;
+it pins selector order, whitespace, decorations and all non-syntax styling too.
+
+```ts : <<publication highlighting CSS tests>>=
+test('all screen CSS bytes remain unchanged after scope extraction', () => {
+    const css = themes.map(theme => themeCss(theme)).join('\n');
+    assert.equal(createHash('sha256').update(css).digest('hex'),
+        '51ec8b26a6cd75ce6d62c664370f08dd291ca17168eed60083c6092a74bbbd32');
+});
+function screenStyle(css: string, scope: string): string {
+    let declarations = '';
+    for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const selectors = rule[1].trim().split(', ');
+        if (selectors.includes('.literate-document [class*="hljs-"]') ||
+            selectors.includes('.literate-document .hljs-' + scope)) {
+            declarations += rule[2];
+        }
+    }
+    return declarations;
+}
+```
+
+This small rule reader is test-only, not a runtime CSS parser. It models the flat
+base selectors emitted here, not arbitrary browser cascade or host typography.
+Screen keyword/variable weight inheritance intentionally remains untouched.
+
+```ts : <<publication highlighting CSS tests>>=+
+test('screen scope colors and format-specific decorations cover every palette', () => {
+    for (const theme of themes) {
+        const css = themeCss(theme);
+        for (const [key, scopes] of Object.entries(groups)) {
+            for (const scope of scopes.split(' ')) {
+                const style = screenStyle(css, scope);
+                const colors = [...style.matchAll(/color: var\(--literate-(\w+)\)/g)];
+                assert.equal(colors[colors.length - 1][1], key, scope);
+                assert.equal(style.includes('font-style: italic;'),
+                    ['comment', 'quote', 'emphasis'].includes(scope), scope);
+                assert.equal(style.includes('font-weight: bold;'), scope === 'strong', scope);
+                assert.equal(style.includes('text-decoration: underline;'), scope === 'link', scope);
+            }
+        }
+    }
+});
+```
+
+Inject a complete emitter tree to exercise every scope through the real LaTeX
+renderer, rather than depending on a grammar to emit all possible families.
+Newlines keep identical adjacent styles independently assertable after merging.
+Both dotted and base scopes must produce the approved color/weight/italic macros.
+
+```ts : <<publication highlighting output tests>>=
+function rawStyles(blocks: PandocBlock[]): string {
+    return blocks.map(block => block.t === 'RawBlock' ? block.c[1]
+        : block.t === 'Div' ? rawStyles(block.c[1]) : '').join('\n');
+}
+```
+
+The publication bridge wraps chapters in Divs; retain their trusted raw blocks
+in the test converter just as Pandoc does.
+
+```ts : <<publication highlighting output tests>>=+
+test('LaTeX emits every scope with unchanged typography in all themes', async () => {
+    const scopes = Object.values(groups).flatMap(value => value.split(' '))
+        .flatMap(scope => [scope, scope + '.nested']).concat('');
+    const text = scopes.map((_, index) => 'token' + index + '\n').join('');
+    const input = '```javascript: ' + tag('styles') + '=\n' + text + '```\n';
+    const project = parseProject([{ path: 'index.literate', text: input }]);
+    assert.deepEqual(project.diagnostics, []);
+    const original = hljs.highlight;
+    hljs.highlight = (() => ({ _emitter: { rootNode: { children: scopes.map((scope, index) =>
+        ({ scope, children: ['token' + index + '\n'] })) } } })) as unknown as typeof hljs.highlight;
+    try {
+        for (const theme of themes) {
+            const result = await renderLatex(project, { theme: theme.name }, async document =>
+                rawStyles(document.blocks));
+            assert.deepEqual(result.diagnostics, []);
+            <<publication highlighting macro assertions>>
+        }
+    } finally { hljs.highlight = original; }
+});
+```
+
+Expected macros are derived from independent test groups, not `syntaxStyle`.
+No syntax underline command should appear, even for the link scope.
+
+```ts : <<publication highlighting macro assertions>>=
+scopes.forEach((scope, index) => {
+    const base = scope.split('.')[0];
+    const key = Object.entries(groups).find(([, names]) => names.split(' ').includes(base))?.[0] || 'text';
+    const hex = theme.colors[key as keyof typeof theme.colors].slice(1);
+    const bold = ['keyword', 'variable', 'template-variable', 'strong'].includes(base) ? '\\bfseries' : '';
+    const italic = ['comment', 'quote', 'emphasis'].includes(base) ? '\\itshape' : '';
+    assert.ok(result.latex?.includes(`\\LitStyle{${hex}}{${bold}}{${italic}}{token${index}}`),
+        theme.name + ': ' + scope);
+});
+assert.doesNotMatch(result.latex!, /\\(?:underline|uline)\{/);
 ```
