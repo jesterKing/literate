@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Publication syntax without losing context</h1>
+<p>This chapter owns <code>src/publication-highlight.ts</code> and its headless tests. It does
+not expand fragments: semantic references remain authored display text, with a
+separate overlay for the LaTeX renderer. All offsets are half-open UTF-16 ranges
+in the displayed text, not source coordinates or Unicode code-point counts.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication highlighting.*&gt;&gt;= src/publication-highlight.ts $</div>
+<div class="code">
+<pre><code><span class="literate-tag-name">&lt;&lt;publication highlighting contract&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication highlighting display&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication highlighting emitter&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication highlighting traversal&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication highlighting entry&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication highlighting styles&gt;&gt;</span>
+</code></pre>
+
+</div>
+</div><h2>Display first, syntax second</h2>
+<p>Only literal segments decode escaped openers. Reference text remains unchanged,
+including authored whitespace in the name. Accumulating display lengths maps
+references after unescaping without rescanning them into accidental references.
+The bridge normally rejects missing targets and modifiers; this API also rejects
+them when called independently. Invalid segment reconstruction fails closed.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication highlighting contract&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> hljs <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;highlight.js&#x27;</span>;
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title class_">PublicationContribution</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./engine&#x27;</span>;
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title class_">LiterateTheme</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./themes&#x27;</span>;
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">SyntaxSpan</span> { <span class="hljs-attr">start</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">end</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">scope</span>: <span class="hljs-built_in">string</span>; }
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">HighlightedContribution</span> {
+    <span class="hljs-attr">text</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">spans</span>: <span class="hljs-title class_">SyntaxSpan</span>[];
+    <span class="hljs-attr">references</span>: { <span class="hljs-attr">start</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">end</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span> }[];
+}
+</code></pre>
+
+</div>
+</div><p>Raw offsets are checked before display lengths are substituted. A reference with
+an empty resolved target is just as unusable as an explicitly missing one.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication highlighting display&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">displayContribution</span>(<span class="hljs-params">part: PublicationContribution</span>): <span class="hljs-title class_">HighlightedContribution</span> {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">chunks</span>: <span class="hljs-built_in">string</span>[] = [];
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">references</span>: <span class="hljs-title class_">HighlightedContribution</span>[<span class="hljs-string">&#x27;references&#x27;</span>] = [];
+    <span class="hljs-keyword">let</span> rawOffset = <span class="hljs-number">0</span>, offset = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> segment <span class="hljs-keyword">of</span> part.<span class="hljs-property">segments</span>) {
+        <span class="hljs-keyword">let</span> text = segment.<span class="hljs-property">text</span>;
+        <span class="hljs-keyword">if</span> (segment.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;text&#x27;</span>) {
+            text = text.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\\\x3c\x3c/g</span>, <span class="hljs-function">() =&gt;</span> <span class="hljs-string">&#x27;&lt;&#x27;</span> + <span class="hljs-string">&#x27;&lt;&#x27;</span>);
+        } <span class="hljs-keyword">else</span> {
+            <span class="hljs-keyword">if</span> (segment.<span class="hljs-property">modifier</span> !== <span class="hljs-literal">undefined</span>) {
+                <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Publication reference modifier is unsupported: &#x27;</span> + segment.<span class="hljs-property">name</span>);
+            }
+            <span class="hljs-keyword">if</span> (segment.<span class="hljs-property">resolution</span>.<span class="hljs-property">kind</span> !== <span class="hljs-string">&#x27;resolved&#x27;</span> || !segment.<span class="hljs-property">resolution</span>.<span class="hljs-property">target</span>) {
+                <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Publication reference target is missing: &#x27;</span> + segment.<span class="hljs-property">name</span>);
+            }
+            <span class="hljs-keyword">if</span> (segment.<span class="hljs-property">start</span> !== rawOffset || segment.<span class="hljs-property">end</span> !== rawOffset + text.<span class="hljs-property">length</span>) {
+                <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Publication reference offsets do not match segment text&#x27;</span>);
+            }
+</code></pre>
+
+</div>
+</div><p>Joining raw segments must recover the contribution; joining displayed segments
+instead defines the new coordinate space. No syntax decision affects this map.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication highlighting display&gt;&gt;=+ </div>
+<div class="code">
+<pre><code>            references.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">start</span>: offset, <span class="hljs-attr">end</span>: offset + text.<span class="hljs-property">length</span>,
+                <span class="hljs-attr">name</span>: segment.<span class="hljs-property">name</span>, <span class="hljs-attr">target</span>: segment.<span class="hljs-property">resolution</span>.<span class="hljs-property">target</span> });
+        }
+        chunks.<span class="hljs-title function_">push</span>(text);
+        offset += text.<span class="hljs-property">length</span>;
+        rawOffset += segment.<span class="hljs-property">text</span>.<span class="hljs-property">length</span>;
+    }
+    <span class="hljs-keyword">if</span> (part.<span class="hljs-property">segments</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">segment</span> =&gt;</span> segment.<span class="hljs-property">text</span>).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;&#x27;</span>) !== part.<span class="hljs-property">content</span>) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Publication segments do not reconstruct contribution content&#x27;</span>);
+    }
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">text</span>: chunks.<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;&#x27;</span>), <span class="hljs-attr">spans</span>: [], references };
+}
+</code></pre>
+
+</div>
+</div><h2>A guarded private adapter</h2>
+<p><code>out/publication-probe/highlighting/context-probe.cjs</code> and its README demonstrate
+that splitting around references loses multiline comment and template context.
+We highlight the displayed block once. We never parse highlighted HTML or CSS.
+The installed highlight.js is 11.9.0; its private <code>_emitter.rootNode</code> contract is
+version-gated, shape-checked, and checked for exact reconstruction. Upgrades must
+explicitly revisit this adapter and its regression tests, not silently fall back.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication highlighting emitter&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">record</span>(<span class="hljs-params">value: <span class="hljs-built_in">unknown</span></span>): value is <span class="hljs-title class_">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">unknown</span>&gt; {
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">typeof</span> value === <span class="hljs-string">&#x27;object&#x27;</span> &amp;&amp; value !== <span class="hljs-literal">null</span>;
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">emitterRoot</span>(<span class="hljs-params">text: <span class="hljs-built_in">string</span>, language: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">unknown</span> {
+    <span class="hljs-keyword">if</span> (hljs.<span class="hljs-property">versionString</span> !== <span class="hljs-string">&#x27;11.9.0&#x27;</span>) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Publication highlighting requires highlight.js 11.9.0&#x27;</span>);
+    }
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">result</span>: <span class="hljs-built_in">unknown</span> = hljs.<span class="hljs-title function_">highlight</span>(text, { language, <span class="hljs-attr">ignoreIllegals</span>: <span class="hljs-literal">true</span> });
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title function_">record</span>(result) || !<span class="hljs-title function_">record</span>(result.<span class="hljs-property">_emitter</span>) ||
+        !<span class="hljs-title function_">record</span>(result.<span class="hljs-property">_emitter</span>.<span class="hljs-property">rootNode</span>)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Unsupported highlight.js emitter shape&#x27;</span>);
+    }
+    <span class="hljs-keyword">return</span> result.<span class="hljs-property">_emitter</span>.<span class="hljs-property">rootNode</span>;
+}
+</code></pre>
+
+</div>
+</div><p>The traversal uses an explicit stack, not recursive JavaScript calls. Unscoped
+nodes inherit the nearest token scope. Embedded <code>language:*</code> wrappers are not
+semantic token scopes, so they do not overwrite that inheritance. A real nested
+scope does overwrite it, including <code>subst</code> (plain text) and unknown scopes (the
+CSS text reset). Dotted scope names are retained for consumers; styles use their
+primary class. Empty text creates no zero-width span.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication highlighting traversal&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">syntaxSpans</span>(<span class="hljs-params">text: <span class="hljs-built_in">string</span>, root: <span class="hljs-built_in">unknown</span></span>): <span class="hljs-title class_">SyntaxSpan</span>[] {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">spans</span>: <span class="hljs-title class_">SyntaxSpan</span>[] = [];
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">chunks</span>: <span class="hljs-built_in">string</span>[] = [];
+    <span class="hljs-keyword">const</span> stack = [{ <span class="hljs-attr">node</span>: root, <span class="hljs-attr">scope</span>: <span class="hljs-string">&#x27;&#x27;</span> }];
+    <span class="hljs-keyword">const</span> seen = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">object</span>&gt;();
+    <span class="hljs-keyword">let</span> offset = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">while</span> (stack.<span class="hljs-property">length</span>) {
+        <span class="hljs-keyword">const</span> { node, scope } = stack.<span class="hljs-title function_">pop</span>()!;
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> node === <span class="hljs-string">&#x27;string&#x27;</span>) {
+            <span class="hljs-keyword">if</span> (node.<span class="hljs-property">length</span>) {
+                spans.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">start</span>: offset, <span class="hljs-attr">end</span>: offset + node.<span class="hljs-property">length</span>, scope });
+                chunks.<span class="hljs-title function_">push</span>(node);
+                offset += node.<span class="hljs-property">length</span>;
+            }
+            <span class="hljs-keyword">continue</span>;
+        }
+</code></pre>
+
+</div>
+</div><p>A repeated object is not a tree; rejecting it also prevents cycles from hanging
+this adapter. Reconstruction compares characters, not merely lengths, so a
+changed emitter cannot quietly return plausible but incorrect coordinates.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication highlighting traversal&gt;&gt;=+ </div>
+<div class="code">
+<pre><code>        <span class="hljs-keyword">if</span> (!<span class="hljs-title function_">record</span>(node) || !<span class="hljs-title class_">Array</span>.<span class="hljs-title function_">isArray</span>(node.<span class="hljs-property">children</span>) ||
+            (node.<span class="hljs-property">scope</span> !== <span class="hljs-literal">undefined</span> &amp;&amp; <span class="hljs-keyword">typeof</span> node.<span class="hljs-property">scope</span> !== <span class="hljs-string">&#x27;string&#x27;</span>) || seen.<span class="hljs-title function_">has</span>(node)) {
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Unsupported highlight.js emitter tree&#x27;</span>);
+        }
+        seen.<span class="hljs-title function_">add</span>(node);
+        <span class="hljs-keyword">const</span> inherited = <span class="hljs-keyword">typeof</span> node.<span class="hljs-property">scope</span> === <span class="hljs-string">&#x27;string&#x27;</span> &amp;&amp; node.<span class="hljs-property">scope</span> &amp;&amp;
+            !node.<span class="hljs-property">scope</span>.<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&#x27;language:&#x27;</span>) ? node.<span class="hljs-property">scope</span> : scope;
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = node.<span class="hljs-property">children</span>.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>; index &gt;= <span class="hljs-number">0</span>; index--) {
+            stack.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">node</span>: node.<span class="hljs-property">children</span>[index], <span class="hljs-attr">scope</span>: inherited });
+        }
+    }
+    <span class="hljs-keyword">if</span> (chunks.<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;&#x27;</span>) !== text) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;highlight.js emitter did not reconstruct publication text&#x27;</span>);
+    }
+    <span class="hljs-keyword">return</span> spans;
+}
+</code></pre>
+
+</div>
+</div><p>Unknown or empty language names explicitly mean plain text. There is no automatic
+language detection, and semantic references still work in plain blocks. Syntax
+spans cover the entire nonempty display, including reference characters; the
+renderer intersects these ranges and gives semantic references precedence.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication highlighting entry&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">highlightContribution</span>(<span class="hljs-params">part: PublicationContribution</span>): <span class="hljs-title class_">HighlightedContribution</span> {
+    <span class="hljs-keyword">const</span> display = <span class="hljs-title function_">displayContribution</span>(part);
+    display.<span class="hljs-property">spans</span> = part.<span class="hljs-property">language</span> &amp;&amp; hljs.<span class="hljs-title function_">getLanguage</span>(part.<span class="hljs-property">language</span>)
+        ? <span class="hljs-title function_">syntaxSpans</span>(display.<span class="hljs-property">text</span>, <span class="hljs-title function_">emitterRoot</span>(display.<span class="hljs-property">text</span>, part.<span class="hljs-property">language</span>))
+        : display.<span class="hljs-property">text</span>.<span class="hljs-property">length</span> ? [{ <span class="hljs-attr">start</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">end</span>: display.<span class="hljs-property">text</span>.<span class="hljs-property">length</span>, <span class="hljs-attr">scope</span>: <span class="hljs-string">&#x27;&#x27;</span> }] : [];
+    <span class="hljs-keyword">return</span> display;
+}
+</code></pre>
+
+</div>
+</div><h2>Palette semantics, without a CSS parser</h2>
+<p>This small mapping mirrors <code>themes.literate:452–464</code>: unknown scopes reset to
+text, and dotted scopes use their base class. The additional publication policy
+makes keywords and variables bold; literals remain purple without forced bold.
+Comments, quotes and emphasis are italic, and strong is bold. Link underlining
+is outside this API. No palette is remapped, including dark palettes.</p>
+<p>The theme source is deliberately untouched in this slice. At the next shared
+style-mapping integration, extract these scope groups for both CSS generation
+and publication; do not grow a second palette catalogue or parse CSS at runtime.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication highlighting styles&gt;&gt;= </div>
+<div class="code">
+<pre><code>
+<span class="hljs-keyword">const</span> <span class="hljs-attr">scopeColors</span>: <span class="hljs-title class_">Readonly</span>&lt;<span class="hljs-title class_">Record</span>&lt;<span class="hljs-built_in">string</span>, keyof <span class="hljs-title class_">LiterateTheme</span>[<span class="hljs-string">&#x27;colors&#x27;</span>]&gt;&gt; = {
+    <span class="hljs-attr">keyword</span>: <span class="hljs-string">&#x27;purple&#x27;</span>, <span class="hljs-string">&#x27;selector-tag&#x27;</span>: <span class="hljs-string">&#x27;purple&#x27;</span>, <span class="hljs-attr">literal</span>: <span class="hljs-string">&#x27;purple&#x27;</span>,
+    <span class="hljs-attr">string</span>: <span class="hljs-string">&#x27;accent&#x27;</span>, <span class="hljs-attr">regexp</span>: <span class="hljs-string">&#x27;accent&#x27;</span>, <span class="hljs-attr">addition</span>: <span class="hljs-string">&#x27;accent&#x27;</span>,
+    <span class="hljs-attr">number</span>: <span class="hljs-string">&#x27;warning&#x27;</span>, <span class="hljs-attr">symbol</span>: <span class="hljs-string">&#x27;warning&#x27;</span>, <span class="hljs-attr">bullet</span>: <span class="hljs-string">&#x27;warning&#x27;</span>,
+    <span class="hljs-attr">title</span>: <span class="hljs-string">&#x27;information&#x27;</span>, <span class="hljs-attr">section</span>: <span class="hljs-string">&#x27;information&#x27;</span>, <span class="hljs-attr">built_in</span>: <span class="hljs-string">&#x27;information&#x27;</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;information&#x27;</span>, <span class="hljs-attr">link</span>: <span class="hljs-string">&#x27;information&#x27;</span>,
+    <span class="hljs-attr">attr</span>: <span class="hljs-string">&#x27;cyan&#x27;</span>, <span class="hljs-attr">attribute</span>: <span class="hljs-string">&#x27;cyan&#x27;</span>, <span class="hljs-attr">variable</span>: <span class="hljs-string">&#x27;cyan&#x27;</span>, <span class="hljs-string">&#x27;template-variable&#x27;</span>: <span class="hljs-string">&#x27;cyan&#x27;</span>,
+    <span class="hljs-attr">comment</span>: <span class="hljs-string">&#x27;muted&#x27;</span>, <span class="hljs-attr">quote</span>: <span class="hljs-string">&#x27;muted&#x27;</span>, <span class="hljs-attr">meta</span>: <span class="hljs-string">&#x27;yellow&#x27;</span>, <span class="hljs-attr">doctag</span>: <span class="hljs-string">&#x27;yellow&#x27;</span>,
+    <span class="hljs-attr">deletion</span>: <span class="hljs-string">&#x27;danger&#x27;</span>, <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;danger&#x27;</span>
+};
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">syntaxStyle</span>(<span class="hljs-params">scope: <span class="hljs-built_in">string</span>, theme: LiterateTheme</span>): {
+    <span class="hljs-attr">color</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">bold</span>: <span class="hljs-built_in">boolean</span>; <span class="hljs-attr">italic</span>: <span class="hljs-built_in">boolean</span>;
+} {
+    <span class="hljs-keyword">const</span> base = scope.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;.&#x27;</span>)[<span class="hljs-number">0</span>];
+    <span class="hljs-keyword">const</span> key = <span class="hljs-title class_">Object</span>.<span class="hljs-property"><span class="hljs-keyword">prototype</span></span>.<span class="hljs-property">hasOwnProperty</span>.<span class="hljs-title function_">call</span>(scopeColors, base) ? scopeColors[base] : <span class="hljs-string">&#x27;text&#x27;</span>;
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">color</span>: theme.<span class="hljs-property">colors</span>[key],
+        <span class="hljs-attr">bold</span>: [<span class="hljs-string">&#x27;keyword&#x27;</span>, <span class="hljs-string">&#x27;variable&#x27;</span>, <span class="hljs-string">&#x27;template-variable&#x27;</span>, <span class="hljs-string">&#x27;strong&#x27;</span>].<span class="hljs-title function_">includes</span>(base),
+        <span class="hljs-attr">italic</span>: [<span class="hljs-string">&#x27;comment&#x27;</span>, <span class="hljs-string">&#x27;quote&#x27;</span>, <span class="hljs-string">&#x27;emphasis&#x27;</span>].<span class="hljs-title function_">includes</span>(base) };
+}
+</code></pre>
+
+</div>
+</div><h2>Headless contract tests</h2>
+<p>The test output uses normal generated imports. Parent registration and generation
+are separate work; this chapter can also be tangled and checked in memory. Test
+fixtures go through the real publication parser so escapes and raw UTF-16 offsets
+have the same meaning as in production.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication highlighting tests.*&gt;&gt;= src/test/headless/publication-highlight.test.ts $</div>
+<div class="code">
+<pre><code><span class="literate-tag-name">&lt;&lt;publication highlighting test setup&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication highlighting context tests&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication highlighting display tests&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication highlighting grammar tests&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication highlighting guard tests&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication highlighting palette tests&gt;&gt;</span>
+</code></pre>
+
+</div>
+</div><p>Construct delimiters at runtime so the tests themselves do not introduce literate
+fragment dependencies. Each fixture includes one resolved family named <code>piece</code>.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication highlighting test setup&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> assert = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;node:assert/strict&#x27;</span>);
+<span class="hljs-keyword">import</span> { test } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;node:test&#x27;</span>;
+<span class="hljs-keyword">import</span> hljs <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;highlight.js&#x27;</span>;
+<span class="hljs-keyword">import</span> { parseProject } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;../../engine&#x27;</span>;
+<span class="hljs-keyword">import</span> { themes } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;../../themes&#x27;</span>;
+<span class="hljs-keyword">import</span> { highlightContribution, syntaxStyle } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;../../publication-highlight&#x27;</span>;
+<span class="hljs-keyword">const</span> <span class="hljs-title function_">tag</span> = (<span class="hljs-params">name: <span class="hljs-built_in">string</span></span>) =&gt; <span class="hljs-string">&#x27;&lt;&#x27;</span> + <span class="hljs-string">&#x27;&lt;&#x27;</span> + name + <span class="hljs-string">&#x27;&gt;&gt;&#x27;</span>;
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">part</span>(<span class="hljs-params">body: <span class="hljs-built_in">string</span>, language = <span class="hljs-string">&#x27;javascript&#x27;</span></span>) {
+    <span class="hljs-keyword">const</span> <span class="hljs-title function_">fence</span> = (<span class="hljs-params">header: <span class="hljs-built_in">string</span>, content: <span class="hljs-built_in">string</span></span>) =&gt; <span class="hljs-string">&#x27;```&#x27;</span> + header + <span class="hljs-string">&#x27;\n&#x27;</span> + content + <span class="hljs-string">&#x27;\n```\n&#x27;</span>;
+    <span class="hljs-keyword">const</span> result = <span class="hljs-title function_">parseProject</span>([{ <span class="hljs-attr">path</span>: <span class="hljs-string">&#x27;index.literate&#x27;</span>, <span class="hljs-attr">text</span>:
+        <span class="hljs-title function_">fence</span>(language + <span class="hljs-string">&#x27;: &#x27;</span> + <span class="hljs-title function_">tag</span>(<span class="hljs-string">&#x27;main&#x27;</span>) + <span class="hljs-string">&#x27;=&#x27;</span>, body) + <span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;: &#x27;</span> + <span class="hljs-title function_">tag</span>(<span class="hljs-string">&#x27;piece&#x27;</span>) + <span class="hljs-string">&#x27;=&#x27;</span>, <span class="hljs-string">&#x27;x&#x27;</span>) }]);
+    assert.<span class="hljs-title function_">deepEqual</span>(result.<span class="hljs-property">diagnostics</span>, []);
+    <span class="hljs-keyword">return</span> result.<span class="hljs-property">publication</span>.<span class="hljs-property">contributions</span>[<span class="hljs-number">0</span>];
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">scopeAt</span>(<span class="hljs-params">result: ReturnType&lt;<span class="hljs-keyword">typeof</span> highlightContribution&gt;, marker: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">const</span> offset = result.<span class="hljs-property">text</span>.<span class="hljs-title function_">indexOf</span>(marker);
+    assert.<span class="hljs-title function_">ok</span>(offset &gt;= <span class="hljs-number">0</span>);
+    <span class="hljs-keyword">return</span> result.<span class="hljs-property">spans</span>.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">span</span> =&gt;</span> span.<span class="hljs-property">start</span> &lt;= offset &amp;&amp; offset &lt; span.<span class="hljs-property">end</span>)!.<span class="hljs-property">scope</span>;
+}
+</code></pre>
+
+</div>
+</div><p>Both positive cases deliberately retain text after a reference inside an open
+lexical construct. The split-block negative controls prove that these fixtures
+actually detect loss of context, rather than merely exercising the API.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication highlighting context tests&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-title function_">test</span>(<span class="hljs-string">&#x27;whole-block highlighting preserves comment and template context around references&#x27;</span>, <span class="hljs-function">() =&gt;</span> {
+    <span class="hljs-keyword">const</span> cases = [
+        { <span class="hljs-attr">body</span>: <span class="hljs-string">&#x27;/* before\n&#x27;</span> + <span class="hljs-title function_">tag</span>(<span class="hljs-string">&#x27;piece&#x27;</span>) + <span class="hljs-string">&#x27;\nCOMMENT_AFTER\n*/\nconst ready = true;&#x27;</span>,
+            <span class="hljs-attr">marker</span>: <span class="hljs-string">&#x27;COMMENT_AFTER&#x27;</span>, <span class="hljs-attr">scope</span>: <span class="hljs-string">&#x27;comment&#x27;</span> },
+        { <span class="hljs-attr">body</span>: <span class="hljs-string">&#x27;const message = `before\n&#x27;</span> + <span class="hljs-title function_">tag</span>(<span class="hljs-string">&#x27;piece&#x27;</span>) + <span class="hljs-string">&#x27;\nTEMPLATE_AFTER ${count + 1}`;&#x27;</span>,
+            <span class="hljs-attr">marker</span>: <span class="hljs-string">&#x27;TEMPLATE_AFTER&#x27;</span>, <span class="hljs-attr">scope</span>: <span class="hljs-string">&#x27;string&#x27;</span> }
+    ];
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> fixture <span class="hljs-keyword">of</span> cases) {
+        <span class="hljs-keyword">const</span> result = <span class="hljs-title function_">highlightContribution</span>(<span class="hljs-title function_">part</span>(fixture.<span class="hljs-property">body</span>));
+        assert.<span class="hljs-title function_">equal</span>(<span class="hljs-title function_">scopeAt</span>(result, fixture.<span class="hljs-property">marker</span>), fixture.<span class="hljs-property">scope</span>);
+        assert.<span class="hljs-title function_">equal</span>(result.<span class="hljs-property">references</span>.<span class="hljs-property">length</span>, <span class="hljs-number">1</span>);
+        <span class="hljs-keyword">const</span> suffix = result.<span class="hljs-property">text</span>.<span class="hljs-title function_">slice</span>(result.<span class="hljs-property">references</span>[<span class="hljs-number">0</span>].<span class="hljs-property">end</span>);
+        assert.<span class="hljs-title function_">notEqual</span>(<span class="hljs-title function_">scopeAt</span>(<span class="hljs-title function_">highlightContribution</span>(<span class="hljs-title function_">part</span>(suffix)), fixture.<span class="hljs-property">marker</span>), fixture.<span class="hljs-property">scope</span>);
+        assert.<span class="hljs-title function_">equal</span>(<span class="hljs-title function_">scopeAt</span>(result, <span class="hljs-string">&#x27;const&#x27;</span>), <span class="hljs-string">&#x27;keyword&#x27;</span>);
+    }
+});
+</code></pre>
+
+</div>
+</div><p>An escaped opener before an emoji and two repeated references tests the new
+coordinate space. Escaped references remain literal even though the displayed
+text now looks like a reference. Raw contribution data must not be mutated.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication highlighting display tests&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-title function_">test</span>(<span class="hljs-string">&#x27;literal unescape maps repeated references after emoji in UTF-16&#x27;</span>, <span class="hljs-function">() =&gt;</span> {
+    <span class="hljs-keyword">const</span> input = <span class="hljs-title function_">part</span>(<span class="hljs-string">&#x27;\\&#x27;</span> + <span class="hljs-title function_">tag</span>(<span class="hljs-string">&#x27;literal&#x27;</span>) + <span class="hljs-string">&#x27; 😀 &#x27;</span> + <span class="hljs-title function_">tag</span>(<span class="hljs-string">&#x27;piece&#x27;</span>) + <span class="hljs-string">&#x27;/&#x27;</span> + <span class="hljs-title function_">tag</span>(<span class="hljs-string">&#x27;piece&#x27;</span>), <span class="hljs-string">&#x27;unknown-language&#x27;</span>);
+    <span class="hljs-keyword">const</span> snapshot = <span class="hljs-title class_">JSON</span>.<span class="hljs-title function_">stringify</span>(input);
+    <span class="hljs-keyword">const</span> result = <span class="hljs-title function_">highlightContribution</span>(input);
+    assert.<span class="hljs-title function_">equal</span>(result.<span class="hljs-property">text</span>, <span class="hljs-title function_">tag</span>(<span class="hljs-string">&#x27;literal&#x27;</span>) + <span class="hljs-string">&#x27; 😀 &#x27;</span> + <span class="hljs-title function_">tag</span>(<span class="hljs-string">&#x27;piece&#x27;</span>) + <span class="hljs-string">&#x27;/&#x27;</span> + <span class="hljs-title function_">tag</span>(<span class="hljs-string">&#x27;piece&#x27;</span>) + <span class="hljs-string">&#x27;\n&#x27;</span>);
+    assert.<span class="hljs-title function_">equal</span>(result.<span class="hljs-property">references</span>.<span class="hljs-property">length</span>, <span class="hljs-number">2</span>);
+    assert.<span class="hljs-title function_">equal</span>(result.<span class="hljs-property">references</span>[<span class="hljs-number">0</span>].<span class="hljs-property">start</span>, <span class="hljs-title function_">tag</span>(<span class="hljs-string">&#x27;literal&#x27;</span>).<span class="hljs-property">length</span> + <span class="hljs-number">4</span>);
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> ref <span class="hljs-keyword">of</span> result.<span class="hljs-property">references</span>) {
+        assert.<span class="hljs-title function_">equal</span>(result.<span class="hljs-property">text</span>.<span class="hljs-title function_">slice</span>(ref.<span class="hljs-property">start</span>, ref.<span class="hljs-property">end</span>), <span class="hljs-title function_">tag</span>(<span class="hljs-string">&#x27;piece&#x27;</span>));
+        assert.<span class="hljs-title function_">equal</span>(ref.<span class="hljs-property">name</span>, <span class="hljs-string">&#x27;piece&#x27;</span>);
+        assert.<span class="hljs-title function_">ok</span>(ref.<span class="hljs-property">target</span>);
+    }
+    assert.<span class="hljs-title function_">deepEqual</span>(result.<span class="hljs-property">spans</span>, [{ <span class="hljs-attr">start</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">end</span>: result.<span class="hljs-property">text</span>.<span class="hljs-property">length</span>, <span class="hljs-attr">scope</span>: <span class="hljs-string">&#x27;&#x27;</span> }]);
+    assert.<span class="hljs-title function_">equal</span>(<span class="hljs-title class_">JSON</span>.<span class="hljs-title function_">stringify</span>(input), snapshot);
+});
+</code></pre>
+
+</div>
+</div><p>Standalone callers receive errors for unsupported graph state rather than a
+visually plausible output with broken links. Plain and empty blocks are explicit.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication highlighting display tests&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-title function_">test</span>(<span class="hljs-string">&#x27;standalone validation rejects missing references, modifiers and invalid segments&#x27;</span>, <span class="hljs-function">() =&gt;</span> {
+    assert.<span class="hljs-title function_">throws</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title function_">highlightContribution</span>(<span class="hljs-title function_">part</span>(<span class="hljs-title function_">tag</span>(<span class="hljs-string">&#x27;missing&#x27;</span>))), <span class="hljs-regexp">/target is missing/</span>);
+    assert.<span class="hljs-title function_">throws</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title function_">highlightContribution</span>(<span class="hljs-title function_">part</span>(<span class="hljs-title function_">tag</span>(<span class="hljs-string">&#x27;piece&#x27;</span>) + <span class="hljs-string">&#x27;=+&#x27;</span>)), <span class="hljs-regexp">/modifier/</span>);
+    <span class="hljs-keyword">const</span> input = <span class="hljs-title function_">part</span>(<span class="hljs-title function_">tag</span>(<span class="hljs-string">&#x27;piece&#x27;</span>));
+    input.<span class="hljs-property">content</span> += <span class="hljs-string">&#x27;bad&#x27;</span>;
+    assert.<span class="hljs-title function_">throws</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title function_">highlightContribution</span>(input), <span class="hljs-regexp">/reconstruct/</span>);
+    <span class="hljs-keyword">const</span> invalid = <span class="hljs-title function_">part</span>(<span class="hljs-title function_">tag</span>(<span class="hljs-string">&#x27;piece&#x27;</span>));
+    <span class="hljs-keyword">const</span> ref = invalid.<span class="hljs-property">segments</span>.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">segment</span> =&gt;</span> segment.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;reference&#x27;</span>)!;
+    <span class="hljs-keyword">if</span> (ref.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;reference&#x27;</span>) { ref.<span class="hljs-property">start</span>++; }
+    assert.<span class="hljs-title function_">throws</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title function_">highlightContribution</span>(invalid), <span class="hljs-regexp">/offsets/</span>);
+    <span class="hljs-keyword">const</span> empty = <span class="hljs-title function_">part</span>(<span class="hljs-string">&#x27;&#x27;</span>, <span class="hljs-string">&#x27;&#x27;</span>);
+    empty.<span class="hljs-property">content</span> = <span class="hljs-string">&#x27;&#x27;</span>; empty.<span class="hljs-property">segments</span> = [];
+    assert.<span class="hljs-title function_">deepEqual</span>(<span class="hljs-title function_">highlightContribution</span>(empty), { <span class="hljs-attr">text</span>: <span class="hljs-string">&#x27;&#x27;</span>, <span class="hljs-attr">spans</span>: [], <span class="hljs-attr">references</span>: [] });
+});
+</code></pre>
+
+</div>
+</div><p>Embedded JavaScript inside HTML exercises real language containers and nested
+substitution nodes. Every emitted range is contiguous and exactly reconstructs
+the display; substitution punctuation must not inherit string coloring.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication highlighting grammar tests&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-title function_">test</span>(<span class="hljs-string">&#x27;embedded grammar and nested scopes reconstruct exact display&#x27;</span>, <span class="hljs-function">() =&gt;</span> {
+    <span class="hljs-keyword">const</span> result = <span class="hljs-title function_">highlightContribution</span>(<span class="hljs-title function_">part</span>(
+        <span class="hljs-string">&#x27;&lt;script&gt;const message = `hello ${count + 1}`; function work() { return true; }&lt;/script&gt;&#x27;</span>, <span class="hljs-string">&#x27;xml&#x27;</span>));
+    <span class="hljs-keyword">let</span> offset = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> span <span class="hljs-keyword">of</span> result.<span class="hljs-property">spans</span>) {
+        assert.<span class="hljs-title function_">equal</span>(span.<span class="hljs-property">start</span>, offset);
+        assert.<span class="hljs-title function_">ok</span>(span.<span class="hljs-property">end</span> &gt; span.<span class="hljs-property">start</span>);
+        offset = span.<span class="hljs-property">end</span>;
+    }
+    assert.<span class="hljs-title function_">equal</span>(offset, result.<span class="hljs-property">text</span>.<span class="hljs-property">length</span>);
+    assert.<span class="hljs-title function_">equal</span>(result.<span class="hljs-property">spans</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">span</span> =&gt;</span> result.<span class="hljs-property">text</span>.<span class="hljs-title function_">slice</span>(span.<span class="hljs-property">start</span>, span.<span class="hljs-property">end</span>)).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;&#x27;</span>), result.<span class="hljs-property">text</span>);
+    assert.<span class="hljs-title function_">equal</span>(<span class="hljs-title function_">scopeAt</span>(result, <span class="hljs-string">&#x27;const&#x27;</span>), <span class="hljs-string">&#x27;keyword&#x27;</span>);
+    assert.<span class="hljs-title function_">equal</span>(<span class="hljs-title function_">scopeAt</span>(result, <span class="hljs-string">&#x27;hello&#x27;</span>), <span class="hljs-string">&#x27;string&#x27;</span>);
+    assert.<span class="hljs-title function_">equal</span>(<span class="hljs-title function_">scopeAt</span>(result, <span class="hljs-string">&#x27;count&#x27;</span>), <span class="hljs-string">&#x27;subst&#x27;</span>);
+    assert.<span class="hljs-title function_">equal</span>(<span class="hljs-title function_">scopeAt</span>(result, <span class="hljs-string">&#x27;work&#x27;</span>), <span class="hljs-string">&#x27;title.function&#x27;</span>);
+    assert.<span class="hljs-title function_">equal</span>(<span class="hljs-title function_">syntaxStyle</span>(<span class="hljs-title function_">scopeAt</span>(result, <span class="hljs-string">&#x27;work&#x27;</span>), themes[<span class="hljs-number">0</span>]).<span class="hljs-property">color</span>, themes[<span class="hljs-number">0</span>].<span class="hljs-property">colors</span>.<span class="hljs-property">information</span>);
+});
+</code></pre>
+
+</div>
+</div><p>A synchronous mock isolates the private adapter from highlight.js's own recursive
+HTML emitter. The adapter itself must handle deep trees iteratively, inherit
+through neutral wrappers, reject bad shapes and cycles, and compare characters.
+Every mutation is restored even when an assertion fails.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication highlighting guard tests&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">withEmitter</span>(<span class="hljs-params">root: <span class="hljs-built_in">unknown</span>, run: () =&gt; <span class="hljs-built_in">void</span></span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">const</span> original = hljs.<span class="hljs-property">highlight</span>;
+    hljs.<span class="hljs-property">highlight</span> = (<span class="hljs-function">() =&gt;</span> ({ <span class="hljs-attr">_emitter</span>: { <span class="hljs-attr">rootNode</span>: root } })) <span class="hljs-keyword">as</span> <span class="hljs-built_in">unknown</span> <span class="hljs-keyword">as</span> <span class="hljs-keyword">typeof</span> hljs.<span class="hljs-property">highlight</span>;
+    <span class="hljs-keyword">try</span> { <span class="hljs-title function_">run</span>(); } <span class="hljs-keyword">finally</span> { hljs.<span class="hljs-property">highlight</span> = original; }
+}
+<span class="hljs-title function_">test</span>(<span class="hljs-string">&#x27;private adapter inherits scopes without recursive traversal&#x27;</span>, <span class="hljs-function">() =&gt;</span> {
+    <span class="hljs-keyword">let</span> <span class="hljs-attr">root</span>: <span class="hljs-built_in">unknown</span> = <span class="hljs-string">&#x27;x\n&#x27;</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> depth = <span class="hljs-number">0</span>; depth &lt; <span class="hljs-number">20000</span>; depth++) { root = { <span class="hljs-attr">children</span>: [root] }; }
+    root = { <span class="hljs-attr">scope</span>: <span class="hljs-string">&#x27;comment&#x27;</span>, <span class="hljs-attr">children</span>: [{ <span class="hljs-attr">scope</span>: <span class="hljs-string">&#x27;language:javascript&#x27;</span>, <span class="hljs-attr">children</span>: [root] }] };
+    <span class="hljs-title function_">withEmitter</span>(root, <span class="hljs-function">() =&gt;</span> {
+        assert.<span class="hljs-title function_">deepEqual</span>(<span class="hljs-title function_">highlightContribution</span>(<span class="hljs-title function_">part</span>(<span class="hljs-string">&#x27;x&#x27;</span>)).<span class="hljs-property">spans</span>, [{ <span class="hljs-attr">start</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">end</span>: <span class="hljs-number">2</span>, <span class="hljs-attr">scope</span>: <span class="hljs-string">&#x27;comment&#x27;</span> }]);
+    });
+});
+</code></pre>
+
+</div>
+</div><p>These are hard failures, not plain-text fallbacks. A future library upgrade must
+satisfy the version gate as well as tree and reconstruction requirements.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication highlighting guard tests&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-title function_">test</span>(<span class="hljs-string">&#x27;private adapter guards version, shape, cycles and exact reconstruction&#x27;</span>, <span class="hljs-function">() =&gt;</span> {
+    <span class="hljs-keyword">const</span> version = hljs.<span class="hljs-property">versionString</span>;
+    hljs.<span class="hljs-property">versionString</span> = <span class="hljs-string">&#x27;99.0.0&#x27;</span>;
+    <span class="hljs-keyword">try</span> { assert.<span class="hljs-title function_">throws</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title function_">highlightContribution</span>(<span class="hljs-title function_">part</span>(<span class="hljs-string">&#x27;x&#x27;</span>)), <span class="hljs-regexp">/11\.9\.0/</span>); }
+    <span class="hljs-keyword">finally</span> { hljs.<span class="hljs-property">versionString</span> = version; }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> root <span class="hljs-keyword">of</span> [<span class="hljs-literal">null</span>, {}, { <span class="hljs-attr">children</span>: [<span class="hljs-number">42</span>] }, { <span class="hljs-attr">scope</span>: <span class="hljs-number">1</span>, <span class="hljs-attr">children</span>: [] }]) {
+        <span class="hljs-title function_">withEmitter</span>(root, <span class="hljs-function">() =&gt;</span> assert.<span class="hljs-title function_">throws</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title function_">highlightContribution</span>(<span class="hljs-title function_">part</span>(<span class="hljs-string">&#x27;x&#x27;</span>)), <span class="hljs-regexp">/emitter/</span>));
+    }
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">cycle</span>: { <span class="hljs-attr">children</span>: <span class="hljs-built_in">unknown</span>[] } = { <span class="hljs-attr">children</span>: [] };
+    cycle.<span class="hljs-property">children</span>.<span class="hljs-title function_">push</span>(cycle);
+    <span class="hljs-title function_">withEmitter</span>(cycle, <span class="hljs-function">() =&gt;</span> assert.<span class="hljs-title function_">throws</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title function_">highlightContribution</span>(<span class="hljs-title function_">part</span>(<span class="hljs-string">&#x27;x&#x27;</span>)), <span class="hljs-regexp">/tree/</span>));
+    <span class="hljs-title function_">withEmitter</span>({ <span class="hljs-attr">children</span>: [<span class="hljs-string">&#x27;y\n&#x27;</span>] }, <span class="hljs-function">() =&gt;</span> {
+        assert.<span class="hljs-title function_">throws</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title function_">highlightContribution</span>(<span class="hljs-title function_">part</span>(<span class="hljs-string">&#x27;x&#x27;</span>)), <span class="hljs-regexp">/reconstruct/</span>);
+    });
+});
+</code></pre>
+
+</div>
+</div><p>All seventy palettes are checked without consulting CSS at runtime. The groups
+below are independent expectations for every mapped token family, including
+plain resets and dotted forms; weights do not accidentally make booleans bold.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication highlighting palette tests&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-title function_">test</span>(<span class="hljs-string">&#x27;all 70 palettes retain exact scope colors and publication font policy&#x27;</span>, <span class="hljs-function">() =&gt;</span> {
+    assert.<span class="hljs-title function_">equal</span>(themes.<span class="hljs-property">length</span>, <span class="hljs-number">70</span>);
+    <span class="hljs-keyword">const</span> groups = {
+        <span class="hljs-attr">purple</span>: <span class="hljs-string">&#x27;keyword selector-tag literal&#x27;</span>, <span class="hljs-attr">accent</span>: <span class="hljs-string">&#x27;string regexp addition&#x27;</span>,
+        <span class="hljs-attr">warning</span>: <span class="hljs-string">&#x27;number symbol bullet&#x27;</span>, <span class="hljs-attr">information</span>: <span class="hljs-string">&#x27;title section built_in type link&#x27;</span>,
+        <span class="hljs-attr">cyan</span>: <span class="hljs-string">&#x27;attr attribute variable template-variable&#x27;</span>, <span class="hljs-attr">muted</span>: <span class="hljs-string">&#x27;comment quote&#x27;</span>,
+        <span class="hljs-attr">yellow</span>: <span class="hljs-string">&#x27;meta doctag&#x27;</span>, <span class="hljs-attr">danger</span>: <span class="hljs-string">&#x27;deletion name&#x27;</span>,
+        <span class="hljs-attr">text</span>: <span class="hljs-string">&#x27;subst unknown emphasis strong constructor __proto__&#x27;</span>
+    };
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> theme <span class="hljs-keyword">of</span> themes) {
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [key, scopes] <span class="hljs-keyword">of</span> <span class="hljs-title class_">Object</span>.<span class="hljs-title function_">entries</span>(groups)) {
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> scope <span class="hljs-keyword">of</span> scopes.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27; &#x27;</span>)) {
+                <span class="hljs-keyword">const</span> expected = { <span class="hljs-attr">color</span>: theme.<span class="hljs-property">colors</span>[key <span class="hljs-keyword">as</span> keyof <span class="hljs-keyword">typeof</span> theme.<span class="hljs-property">colors</span>],
+                    <span class="hljs-attr">bold</span>: [<span class="hljs-string">&#x27;keyword&#x27;</span>, <span class="hljs-string">&#x27;variable&#x27;</span>, <span class="hljs-string">&#x27;template-variable&#x27;</span>, <span class="hljs-string">&#x27;strong&#x27;</span>].<span class="hljs-title function_">includes</span>(scope),
+                    <span class="hljs-attr">italic</span>: [<span class="hljs-string">&#x27;comment&#x27;</span>, <span class="hljs-string">&#x27;quote&#x27;</span>, <span class="hljs-string">&#x27;emphasis&#x27;</span>].<span class="hljs-title function_">includes</span>(scope) };
+                assert.<span class="hljs-title function_">match</span>(expected.<span class="hljs-property">color</span>, <span class="hljs-regexp">/^#[0-9a-f]{6}$/i</span>);
+                assert.<span class="hljs-title function_">deepEqual</span>(<span class="hljs-title function_">syntaxStyle</span>(scope, theme), expected);
+                assert.<span class="hljs-title function_">deepEqual</span>(<span class="hljs-title function_">syntaxStyle</span>(scope + <span class="hljs-string">&#x27;.nested&#x27;</span>, theme), expected);
+            }
+        }
+        assert.<span class="hljs-title function_">deepEqual</span>(<span class="hljs-title function_">syntaxStyle</span>(<span class="hljs-string">&#x27;&#x27;</span>, theme), { <span class="hljs-attr">color</span>: theme.<span class="hljs-property">colors</span>.<span class="hljs-property">text</span>, <span class="hljs-attr">bold</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">italic</span>: <span class="hljs-literal">false</span> });
+    }
+});
+</code></pre>
+
+</div>
+</div></div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

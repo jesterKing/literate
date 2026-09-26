@@ -1,0 +1,237 @@
+import assert = require('node:assert/strict');
+import { spawnSync } from 'node:child_process';
+import { test } from 'node:test';
+import { parseProject } from '../../engine';
+import { renderLatex, LatexOptions, LatexConverter } from '../../publication-latex';
+import { PandocBlock } from '../../publication-pandoc';
+import { themes } from '../../themes';
+
+function fence(name: string, body: string, append = ''): string {
+    return `\`\`\`js: <<${name}>>=${append}\n${body}\n\`\`\`\n`;
+}
+const parse = (text: string) => parseProject([{ path: 'book.literate', text }]);
+function raw(blocks: PandocBlock[]): string {
+    return blocks.map(block => {
+        if (block.t === 'RawBlock') { return block.c[1]; }
+        if (block.t === 'Div') { return raw(block.c[1]); }
+        if (block.t === 'BlockQuote') { return raw(block.c); }
+        if (block.t === 'BulletList') { return block.c.map(raw).join('\n'); }
+        if (block.t === 'OrderedList') { return block.c[1].map(raw).join('\n'); }
+        return '';
+    }).join('\n');
+}
+const convert: LatexConverter = async (document, options) => {
+    assert.deepEqual(options, { standalone: false, syntaxHighlighting: 'none', topLevelDivision: 'chapter' });
+    return raw(document.blocks);
+};
+
+for (const theme of themes) {
+    test(`LaTeX accepts catalogue theme ${theme.name} without print remapping`, async () => {
+        const result = await renderLatex(parse(fence('part', 'const n = 1; // comment')), { theme: theme.name }, convert);
+        assert.deepEqual(result.diagnostics, []);
+        assert.ok(result.latex);
+        assert.ok(result.latex.includes(`{publicationBackground}{HTML}{${theme.colors.background.slice(1)}}`));
+        assert.ok(result.latex.includes('\\pagecolor{publicationBackground}'));
+        assert.ok(result.latex.includes('Copyright © 2019 Ashkan Kiani'));
+        assert.ok(result.latex.includes('THE SOFTWARE IS PROVIDED "AS IS"'));
+        assert.match(result.latex, /\\LitStyle\{[A-Fa-f0-9]+\}\{\\bfseries\}/);
+        assert.match(result.latex, /\\LitStyle\{[A-Fa-f0-9]+\}\{\}\{\\itshape\}/);
+    });
+}
+
+test('LaTeX defaults are portable, borderless, ligature-enabled and explicitly slanted', async () => {
+    const result = await renderLatex(parse(''), {}, convert);
+    assert.deepEqual(result.diagnostics, []);
+    for (const expected of ['a4paper,margin=20mm', 'Latin Modern Roman', 'Monofur Nerd Font',
+        'D2CodingLigature Nerd Font Propo', 'Ligatures=Common,Contextuals=Alternate', 'FakeSlant=0.2',
+        'frame=none', '\\FancyVerbBreakStart#4\\FancyVerbBreakStop', 'breakanywheresymbolpre={}']) {
+        assert.ok(result.latex?.includes(expected), expected);
+    }
+    assert.doesNotMatch(result.latex!, /Path=|\/home\/|RawFeature=\{-calt/);
+});
+
+test('LaTeX links full hanging names, distinct contribution labels and navigation', async () => {
+    const name = 'AccumulateWeightedRadiance'.repeat(6);
+    const project = parse(fence('caller', `before <<${name}>> after`) + fence(name, 'base') + fence(name, 'addition', '+'));
+    const before = JSON.stringify(project);
+    const result = await renderLatex(project, {}, convert);
+    assert.deepEqual(result.diagnostics, []);
+    assert.equal(JSON.stringify(project), before);
+    const latex = result.latex!;
+    assert.ok(latex.includes(Array.from(name).join('\\allowbreak{}')));
+    assert.match(latex, /\\newcommand\{\\LitReferenceA\}\{\\par\\begingroup/);
+    assert.match(latex, /\\textsuperscript\{\\pageref\*/);
+    assert.match(latex, /Previous /); assert.match(latex, /Next /); assert.match(latex, /Base /);
+    assert.match(latex, /\\ensuremath\{\+\\equiv\}/);
+    const labels = [...latex.matchAll(/\\label\{([^}]+)\}/g)].map(match => match[1]);
+    assert.equal(labels.length, 5); assert.equal(new Set(labels).size, 5);
+    assert.ok(latex.indexOf('before') < latex.indexOf('\\LitReferenceA{}'));
+    assert.ok(latex.indexOf('\\LitReferenceA{}') < latex.indexOf('after'));
+    assert.doesNotMatch(latex, /\\parbox/);
+});
+
+test('LaTeX keeps TeX-looking code as data and escaped openers literal', async () => {
+    const project = parse(fence('safe', '\\end{Verbatim} % # $ & _ ^ ~ { }\n\\<<not a reference>>'));
+    const result = await renderLatex(project, {}, convert);
+    assert.deepEqual(result.diagnostics, []);
+    assert.ok(result.latex?.includes('\\textbackslash{}end'));
+    assert.ok(result.latex?.includes('\\textbraceleft{}'));
+    assert.ok(result.latex?.includes('<<not a reference>>'));
+    assert.doesNotMatch(result.latex!, /\\newcommand\{\\LitReference/);
+});
+
+test('LaTeX encodes every fragment-name TeX metacharacter', async () => {
+    const result = await renderLatex(parse(fence('a # $ % & _ ^ ~ { } \\ z', '1')), {}, convert);
+    assert.deepEqual(result.diagnostics, []);
+    for (const escaped of ['\\#', '\\$', '\\%', '\\&', '\\_', '\\textasciicircum{}',
+        '\\textasciitilde{}', '\\{', '\\}', '\\textbackslash{}']) {
+        assert.ok(result.latex?.includes(escaped), escaped);
+    }
+});
+
+test('LaTeX merges adjacent equivalent scopes instead of splitting operators into groups', async () => {
+    const result = await renderLatex(parse(fence('ops', 'left !== right && left <= right;')), {}, convert);
+    assert.deepEqual(result.diagnostics, []);
+    assert.ok(result.latex?.includes('{left !== right && left <= right;}'));
+});
+
+const invalidOptions: LatexOptions[] = [
+    { theme: 'unknown' }, { paper: 'a4' as LatexOptions['paper'] },
+    ...[NaN, Infinity, -1, 0, 4.9, 50.1].map(marginMm => ({ marginMm })),
+    { paper: 'A5', marginMm: 35 },
+    ...['', 'bad\\input', 'font[Path=x]', 'font{foo}', 'font%comment', 'font\nname', '../font', 'é'].map(codeFont => ({ codeFont }))
+];
+for (const [index, options] of invalidOptions.entries()) {
+    test(`LaTeX rejects unsafe options before conversion ${index}`, async () => {
+        let calls = 0;
+        const result = await renderLatex(parse(''), options, async () => { calls++; return ''; });
+        assert.equal(calls, 0); assert.equal(result.latex, undefined);
+        assert.equal(result.diagnostics[0].code, 'latex-options');
+        assert.equal(result.diagnostics[0].line, 0); assert.equal(result.diagnostics[0].column, 0);
+    });
+}
+for (const paper of ['A4', 'A5', 'letter', 'legal'] as const) {
+    test(`LaTeX accepts guarded paper ${paper}`, async () => {
+        const result = await renderLatex(parse(''), { paper, marginMm: 20.5 }, convert);
+        assert.deepEqual(result.diagnostics, []); assert.ok(result.latex?.includes('margin=20.5mm'));
+    });
+}
+
+for (const source of [fence('a', '<<missing>>'), fence('a', '<<a>>'),
+    fence('a', 'ok') + '\n![image](image.png)\n', fence('a'.repeat(513), 'ok')]) {
+    test(`LaTeX preparation failures suppress converter and output: ${source.slice(0, 35)}`, async () => {
+        let calls = 0;
+        const result = await renderLatex(parse(source), {}, async () => { calls++; return ''; });
+        assert.equal(calls, 0); assert.equal(result.latex, undefined); assert.ok(result.diagnostics.length);
+    });
+}
+
+test('LaTeX catches synchronous/asynchronous converter failures and invalid return values', async () => {
+    const converters: LatexConverter[] = [() => { throw new Error('sync'); },
+        async () => { throw new Error('async'); }, async () => 7 as unknown as string];
+    for (const converter of converters) {
+        const result = await renderLatex(parse(''), {}, converter);
+        assert.equal(result.latex, undefined); assert.equal(result.diagnostics[0].code, 'latex-conversion');
+        assert.equal(result.diagnostics[0].line, 0); assert.equal(result.diagnostics[0].column, 0);
+    }
+});
+
+test('LaTeX propagates highlighter reconstruction failures atomically', async () => {
+    const project = parse(fence('broken', 'const x = 1;'));
+    project.publication.contributions[0].segments = [];
+    let calls = 0;
+    const result = await renderLatex(project, {}, async () => { calls++; return ''; });
+    assert.equal(calls, 0); assert.equal(result.latex, undefined);
+    assert.equal(result.diagnostics[0].code, 'contribution-render-failed');
+    assert.match(result.diagnostics[0].message, /reconstruct/);
+});
+
+test('LaTeX rejects reference modifiers before converter invocation', async () => {
+    let calls = 0;
+    const project = parse(fence('leaf', 'ok') + fence('caller', '<<leaf>>=+'));
+    const result = await renderLatex(project, {}, async () => { calls++; return ''; });
+    assert.equal(calls, 0); assert.equal(result.latex, undefined);
+    assert.equal(result.diagnostics[0].code, 'invalid-reference-modifier');
+});
+
+const spacingCases = [
+    { name: 'consecutive references', body: '<<leaf>>\n<<leaf>>', blocks: 0, blanks: 0 },
+    { name: 'final reference', body: '<<leaf>>', blocks: 0, blanks: 0 },
+    { name: 'indented references', body: '  <<leaf>>\n\t<<leaf>>', blocks: 0, blanks: 0 },
+    { name: 'authored blank lines', body: '\n<<leaf>>\n\n  <<leaf>>\n', blocks: 3, blanks: 3 },
+    { name: 'prefix and final reference', body: 'BEFORE\n  <<leaf>>', blocks: 1, blanks: 0 },
+    { name: 'inline prefix and suffix', body: 'BEFORE <<leaf>> AFTER', blocks: 2, blanks: 0 },
+    { name: 'reference before next code line', body: 'BEFORE <<leaf>>\nAFTER', blocks: 2, blanks: 0 }
+];
+for (const fixture of spacingCases) {
+    test(`LaTeX reference spacing preserves only authored blank lines: ${fixture.name}`, async () => {
+        let caller = '';
+        const result = await renderLatex(parse(fence('caller', fixture.body) + fence('leaf', 'value')), {}, async document => {
+            const chapter = document.blocks[0];
+            assert.equal(chapter.t, 'Div');
+            if (chapter.t !== 'Div') { throw new Error('Expected document'); }
+            caller = raw(chapter.c[1].slice(0, 1));
+            return raw(document.blocks);
+        });
+        assert.deepEqual(result.diagnostics, []);
+        const blocks = [...caller.matchAll(/\\begin\{Verbatim\}[^\n]*\n([\s\S]*?)\\end\{Verbatim\}\n/g)].map(match => match[1]);
+        assert.equal(blocks.length, fixture.blocks, caller);
+        assert.equal(blocks.filter(block => block === '\n').length, fixture.blanks, caller);
+        if (fixture.body.includes('BEFORE')) { assert.ok(caller.indexOf('BEFORE') < caller.indexOf('\\LitReferenceA{}')); }
+        if (fixture.body.includes('AFTER')) { assert.ok(caller.indexOf('AFTER') > caller.indexOf('\\LitReferenceA{}')); }
+    });
+}
+
+const ordinaryLiteral = '\\end{verbatim}\n\\end{Verbatim}\n\\<<literal>> % # $ & _ ^ ~ { }';
+for (const [kind, source] of [
+    ['fenced', '```text\n' + ordinaryLiteral + '\n```\n'],
+    ['indented', ordinaryLiteral.split('\n').map(line => '    ' + line).join('\n') + '\n']
+]) {
+    test(`LaTeX safely owns ordinary ${kind} code before Pandoc`, async () => {
+        const project = parse(source);
+        const before = JSON.stringify(project);
+        const result = await renderLatex(project, {}, async document => {
+            assert.doesNotMatch(JSON.stringify(document), /"t":"CodeBlock"/);
+            return raw(document.blocks);
+        });
+        assert.deepEqual(result.diagnostics, []);
+        assert.equal(JSON.stringify(project), before);
+        assert.ok(result.latex?.includes('\\textbackslash{}end\\textbraceleft{}verbatim\\textbraceright{}'));
+        assert.ok(result.latex?.includes('\\textbackslash{}<<literal>>'));
+        assert.doesNotMatch(result.latex!, /\\NormalTok|\\begin\{Shaded\}/);
+    });
+}
+
+test('LaTeX ordinary-code walk retains nested containers and prose/inline code', async () => {
+    const project = parse('Prose `inline`\n\n> - ```text\n>   \\end{verbatim}\n>   ```\n\n' +
+        '1. ```text\n   \\end{verbatim}\n   ```\n');
+    const result = await renderLatex(project, {}, async document => {
+        const json = JSON.stringify(document);
+        for (const type of ['Para', 'Code', 'Div', 'BlockQuote', 'BulletList', 'OrderedList']) {
+            assert.ok(json.includes(`"t":"${type}"`), type);
+        }
+        assert.doesNotMatch(json, /"t":"CodeBlock"/);
+        assert.equal((raw(document.blocks).match(/\\begin\{Verbatim\}/g) ?? []).length, 2);
+        return raw(document.blocks);
+    });
+    assert.deepEqual(result.diagnostics, []);
+});
+
+test('LaTeX supports real Pandoc prose, ordinary code and nested contribution conversion',
+    { skip: process.env.LITERATE_TEST_PANDOC !== '1' }, async () => {
+        const source = '# Heading\n\n~~strike~~ **bold**\n\n- item\n\n```text\n' + ordinaryLiteral + '\n```\n\n' +
+                    ordinaryLiteral.split('\n').map(line => '    ' + line).join('\n') + '\n\n' +
+            fence('nested', 'const n = 1;').trimEnd().split('\n').map(line => '> ' + line).join('\n');
+        const result = await renderLatex(parse(source), {}, async document => {
+            const converted = spawnSync('pandoc', ['-f', 'json', '-t', 'latex', '--no-highlight',
+                '--top-level-division=chapter'], { input: JSON.stringify(document), encoding: 'utf8', timeout: 10000 });
+            assert.equal(converted.status, 0, converted.stderr);
+            return converted.stdout;
+        });
+        assert.deepEqual(result.diagnostics, []);
+        assert.doesNotMatch(result.latex!, /\\NormalTok|\\begin\{Shaded\}/);
+        assert.equal((result.latex!.match(/\\textbackslash\{\}end\\textbraceleft\{\}verbatim/g) ?? []).length, 2);
+        for (const expected of ['\\chapter{Heading}', '\\begin{quote}', '\\begin{Verbatim}', '\\begin{itemize}']) {
+            assert.ok(result.latex?.includes(expected), expected);
+        }
+    });

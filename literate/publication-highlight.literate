@@ -1,0 +1,406 @@
+# Publication syntax without losing context
+
+This chapter owns `src/publication-highlight.ts` and its headless tests. It does
+not expand fragments: semantic references remain authored display text, with a
+separate overlay for the LaTeX renderer. All offsets are half-open UTF-16 ranges
+in the displayed text, not source coordinates or Unicode code-point counts.
+
+```ts : <<publication highlighting.*>>= ./src/publication-highlight.ts $
+<<publication highlighting contract>>
+<<publication highlighting display>>
+<<publication highlighting emitter>>
+<<publication highlighting traversal>>
+<<publication highlighting entry>>
+<<publication highlighting styles>>
+```
+
+## Display first, syntax second
+
+Only literal segments decode escaped openers. Reference text remains unchanged,
+including authored whitespace in the name. Accumulating display lengths maps
+references after unescaping without rescanning them into accidental references.
+The bridge normally rejects missing targets and modifiers; this API also rejects
+them when called independently. Invalid segment reconstruction fails closed.
+
+```ts : <<publication highlighting contract>>=
+import hljs from 'highlight.js';
+import type { PublicationContribution } from './engine';
+import type { LiterateTheme } from './themes';
+
+export interface SyntaxSpan { start: number; end: number; scope: string; }
+export interface HighlightedContribution {
+    text: string;
+    spans: SyntaxSpan[];
+    references: { start: number; end: number; name: string; target: string }[];
+}
+```
+
+Raw offsets are checked before display lengths are substituted. A reference with
+an empty resolved target is just as unusable as an explicitly missing one.
+
+```ts : <<publication highlighting display>>=
+function displayContribution(part: PublicationContribution): HighlightedContribution {
+    const chunks: string[] = [];
+    const references: HighlightedContribution['references'] = [];
+    let rawOffset = 0, offset = 0;
+    for (const segment of part.segments) {
+        let text = segment.text;
+        if (segment.kind === 'text') {
+            text = text.replace(/\\\x3c\x3c/g, () => '<' + '<');
+        } else {
+            if (segment.modifier !== undefined) {
+                throw new Error('Publication reference modifier is unsupported: ' + segment.name);
+            }
+            if (segment.resolution.kind !== 'resolved' || !segment.resolution.target) {
+                throw new Error('Publication reference target is missing: ' + segment.name);
+            }
+            if (segment.start !== rawOffset || segment.end !== rawOffset + text.length) {
+                throw new Error('Publication reference offsets do not match segment text');
+            }
+```
+
+Joining raw segments must recover the contribution; joining displayed segments
+instead defines the new coordinate space. No syntax decision affects this map.
+
+```ts : <<publication highlighting display>>=+
+            references.push({ start: offset, end: offset + text.length,
+                name: segment.name, target: segment.resolution.target });
+        }
+        chunks.push(text);
+        offset += text.length;
+        rawOffset += segment.text.length;
+    }
+    if (part.segments.map(segment => segment.text).join('') !== part.content) {
+        throw new Error('Publication segments do not reconstruct contribution content');
+    }
+    return { text: chunks.join(''), spans: [], references };
+}
+```
+
+## A guarded private adapter
+
+`out/publication-probe/highlighting/context-probe.cjs` and its README demonstrate
+that splitting around references loses multiline comment and template context.
+We highlight the displayed block once. We never parse highlighted HTML or CSS.
+The installed highlight.js is 11.9.0; its private `_emitter.rootNode` contract is
+version-gated, shape-checked, and checked for exact reconstruction. Upgrades must
+explicitly revisit this adapter and its regression tests, not silently fall back.
+
+```ts : <<publication highlighting emitter>>=
+function record(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+}
+function emitterRoot(text: string, language: string): unknown {
+    if (hljs.versionString !== '11.9.0') {
+        throw new Error('Publication highlighting requires highlight.js 11.9.0');
+    }
+    const result: unknown = hljs.highlight(text, { language, ignoreIllegals: true });
+    if (!record(result) || !record(result._emitter) ||
+        !record(result._emitter.rootNode)) {
+        throw new Error('Unsupported highlight.js emitter shape');
+    }
+    return result._emitter.rootNode;
+}
+```
+
+The traversal uses an explicit stack, not recursive JavaScript calls. Unscoped
+nodes inherit the nearest token scope. Embedded `language:*` wrappers are not
+semantic token scopes, so they do not overwrite that inheritance. A real nested
+scope does overwrite it, including `subst` (plain text) and unknown scopes (the
+CSS text reset). Dotted scope names are retained for consumers; styles use their
+primary class. Empty text creates no zero-width span.
+
+```ts : <<publication highlighting traversal>>=
+function syntaxSpans(text: string, root: unknown): SyntaxSpan[] {
+    const spans: SyntaxSpan[] = [];
+    const chunks: string[] = [];
+    const stack = [{ node: root, scope: '' }];
+    const seen = new Set<object>();
+    let offset = 0;
+    while (stack.length) {
+        const { node, scope } = stack.pop()!;
+        if (typeof node === 'string') {
+            if (node.length) {
+                spans.push({ start: offset, end: offset + node.length, scope });
+                chunks.push(node);
+                offset += node.length;
+            }
+            continue;
+        }
+```
+
+A repeated object is not a tree; rejecting it also prevents cycles from hanging
+this adapter. Reconstruction compares characters, not merely lengths, so a
+changed emitter cannot quietly return plausible but incorrect coordinates.
+
+```ts : <<publication highlighting traversal>>=+
+        if (!record(node) || !Array.isArray(node.children) ||
+            (node.scope !== undefined && typeof node.scope !== 'string') || seen.has(node)) {
+            throw new Error('Unsupported highlight.js emitter tree');
+        }
+        seen.add(node);
+        const inherited = typeof node.scope === 'string' && node.scope &&
+            !node.scope.startsWith('language:') ? node.scope : scope;
+        for (let index = node.children.length - 1; index >= 0; index--) {
+            stack.push({ node: node.children[index], scope: inherited });
+        }
+    }
+    if (chunks.join('') !== text) {
+        throw new Error('highlight.js emitter did not reconstruct publication text');
+    }
+    return spans;
+}
+```
+
+Unknown or empty language names explicitly mean plain text. There is no automatic
+language detection, and semantic references still work in plain blocks. Syntax
+spans cover the entire nonempty display, including reference characters; the
+renderer intersects these ranges and gives semantic references precedence.
+
+```ts : <<publication highlighting entry>>=
+export function highlightContribution(part: PublicationContribution): HighlightedContribution {
+    const display = displayContribution(part);
+    display.spans = part.language && hljs.getLanguage(part.language)
+        ? syntaxSpans(display.text, emitterRoot(display.text, part.language))
+        : display.text.length ? [{ start: 0, end: display.text.length, scope: '' }] : [];
+    return display;
+}
+```
+
+## Palette semantics, without a CSS parser
+
+This small mapping mirrors `themes.literate:452–464`: unknown scopes reset to
+text, and dotted scopes use their base class. The additional publication policy
+makes keywords and variables bold; literals remain purple without forced bold.
+Comments, quotes and emphasis are italic, and strong is bold. Link underlining
+is outside this API. No palette is remapped, including dark palettes.
+
+The theme source is deliberately untouched in this slice. At the next shared
+style-mapping integration, extract these scope groups for both CSS generation
+and publication; do not grow a second palette catalogue or parse CSS at runtime.
+
+```ts : <<publication highlighting styles>>=
+/* eslint-disable @typescript-eslint/naming-convention -- highlight.js scope names are an external contract. */
+const scopeColors: Readonly<Record<string, keyof LiterateTheme['colors']>> = {
+    keyword: 'purple', 'selector-tag': 'purple', literal: 'purple',
+    string: 'accent', regexp: 'accent', addition: 'accent',
+    number: 'warning', symbol: 'warning', bullet: 'warning',
+    title: 'information', section: 'information', built_in: 'information',
+    type: 'information', link: 'information',
+    attr: 'cyan', attribute: 'cyan', variable: 'cyan', 'template-variable': 'cyan',
+    comment: 'muted', quote: 'muted', meta: 'yellow', doctag: 'yellow',
+    deletion: 'danger', name: 'danger'
+};
+/* eslint-enable @typescript-eslint/naming-convention */
+export function syntaxStyle(scope: string, theme: LiterateTheme): {
+    color: string; bold: boolean; italic: boolean;
+} {
+    const base = scope.split('.')[0];
+    const key = Object.prototype.hasOwnProperty.call(scopeColors, base) ? scopeColors[base] : 'text';
+    return { color: theme.colors[key],
+        bold: ['keyword', 'variable', 'template-variable', 'strong'].includes(base),
+        italic: ['comment', 'quote', 'emphasis'].includes(base) };
+}
+```
+
+## Headless contract tests
+
+The test output uses normal generated imports. Parent registration and generation
+are separate work; this chapter can also be tangled and checked in memory. Test
+fixtures go through the real publication parser so escapes and raw UTF-16 offsets
+have the same meaning as in production.
+
+```ts : <<publication highlighting tests.*>>= ./src/test/headless/publication-highlight.test.ts $
+<<publication highlighting test setup>>
+<<publication highlighting context tests>>
+<<publication highlighting display tests>>
+<<publication highlighting grammar tests>>
+<<publication highlighting guard tests>>
+<<publication highlighting palette tests>>
+```
+
+Construct delimiters at runtime so the tests themselves do not introduce literate
+fragment dependencies. Each fixture includes one resolved family named `piece`.
+
+```ts : <<publication highlighting test setup>>=
+import assert = require('node:assert/strict');
+import { test } from 'node:test';
+import hljs from 'highlight.js';
+import { parseProject } from '../../engine';
+import { themes } from '../../themes';
+import { highlightContribution, syntaxStyle } from '../../publication-highlight';
+const tag = (name: string) => '<' + '<' + name + '>>';
+function part(body: string, language = 'javascript') {
+    const fence = (header: string, content: string) => '```' + header + '\n' + content + '\n```\n';
+    const result = parseProject([{ path: 'index.literate', text:
+        fence(language + ': ' + tag('main') + '=', body) + fence(': ' + tag('piece') + '=', 'x') }]);
+    assert.deepEqual(result.diagnostics, []);
+    return result.publication.contributions[0];
+}
+function scopeAt(result: ReturnType<typeof highlightContribution>, marker: string): string {
+    const offset = result.text.indexOf(marker);
+    assert.ok(offset >= 0);
+    return result.spans.find(span => span.start <= offset && offset < span.end)!.scope;
+}
+```
+
+Both positive cases deliberately retain text after a reference inside an open
+lexical construct. The split-block negative controls prove that these fixtures
+actually detect loss of context, rather than merely exercising the API.
+
+```ts : <<publication highlighting context tests>>=
+test('whole-block highlighting preserves comment and template context around references', () => {
+    const cases = [
+        { body: '/* before\n' + tag('piece') + '\nCOMMENT_AFTER\n*/\nconst ready = true;',
+            marker: 'COMMENT_AFTER', scope: 'comment' },
+        { body: 'const message = `before\n' + tag('piece') + '\nTEMPLATE_AFTER ${count + 1}`;',
+            marker: 'TEMPLATE_AFTER', scope: 'string' }
+    ];
+    for (const fixture of cases) {
+        const result = highlightContribution(part(fixture.body));
+        assert.equal(scopeAt(result, fixture.marker), fixture.scope);
+        assert.equal(result.references.length, 1);
+        const suffix = result.text.slice(result.references[0].end);
+        assert.notEqual(scopeAt(highlightContribution(part(suffix)), fixture.marker), fixture.scope);
+        assert.equal(scopeAt(result, 'const'), 'keyword');
+    }
+});
+```
+
+An escaped opener before an emoji and two repeated references tests the new
+coordinate space. Escaped references remain literal even though the displayed
+text now looks like a reference. Raw contribution data must not be mutated.
+
+```ts : <<publication highlighting display tests>>=
+test('literal unescape maps repeated references after emoji in UTF-16', () => {
+    const input = part('\\' + tag('literal') + ' 😀 ' + tag('piece') + '/' + tag('piece'), 'unknown-language');
+    const snapshot = JSON.stringify(input);
+    const result = highlightContribution(input);
+    assert.equal(result.text, tag('literal') + ' 😀 ' + tag('piece') + '/' + tag('piece') + '\n');
+    assert.equal(result.references.length, 2);
+    assert.equal(result.references[0].start, tag('literal').length + 4);
+    for (const ref of result.references) {
+        assert.equal(result.text.slice(ref.start, ref.end), tag('piece'));
+        assert.equal(ref.name, 'piece');
+        assert.ok(ref.target);
+    }
+    assert.deepEqual(result.spans, [{ start: 0, end: result.text.length, scope: '' }]);
+    assert.equal(JSON.stringify(input), snapshot);
+});
+```
+
+Standalone callers receive errors for unsupported graph state rather than a
+visually plausible output with broken links. Plain and empty blocks are explicit.
+
+```ts : <<publication highlighting display tests>>=+
+test('standalone validation rejects missing references, modifiers and invalid segments', () => {
+    assert.throws(() => highlightContribution(part(tag('missing'))), /target is missing/);
+    assert.throws(() => highlightContribution(part(tag('piece') + '=+')), /modifier/);
+    const input = part(tag('piece'));
+    input.content += 'bad';
+    assert.throws(() => highlightContribution(input), /reconstruct/);
+    const invalid = part(tag('piece'));
+    const ref = invalid.segments.find(segment => segment.kind === 'reference')!;
+    if (ref.kind === 'reference') { ref.start++; }
+    assert.throws(() => highlightContribution(invalid), /offsets/);
+    const empty = part('', '');
+    empty.content = ''; empty.segments = [];
+    assert.deepEqual(highlightContribution(empty), { text: '', spans: [], references: [] });
+});
+```
+
+Embedded JavaScript inside HTML exercises real language containers and nested
+substitution nodes. Every emitted range is contiguous and exactly reconstructs
+the display; substitution punctuation must not inherit string coloring.
+
+```ts : <<publication highlighting grammar tests>>=
+test('embedded grammar and nested scopes reconstruct exact display', () => {
+    const result = highlightContribution(part(
+        '<script>const message = `hello ${count + 1}`; function work() { return true; }</script>', 'xml'));
+    let offset = 0;
+    for (const span of result.spans) {
+        assert.equal(span.start, offset);
+        assert.ok(span.end > span.start);
+        offset = span.end;
+    }
+    assert.equal(offset, result.text.length);
+    assert.equal(result.spans.map(span => result.text.slice(span.start, span.end)).join(''), result.text);
+    assert.equal(scopeAt(result, 'const'), 'keyword');
+    assert.equal(scopeAt(result, 'hello'), 'string');
+    assert.equal(scopeAt(result, 'count'), 'subst');
+    assert.equal(scopeAt(result, 'work'), 'title.function');
+    assert.equal(syntaxStyle(scopeAt(result, 'work'), themes[0]).color, themes[0].colors.information);
+});
+```
+
+A synchronous mock isolates the private adapter from highlight.js's own recursive
+HTML emitter. The adapter itself must handle deep trees iteratively, inherit
+through neutral wrappers, reject bad shapes and cycles, and compare characters.
+Every mutation is restored even when an assertion fails.
+
+```ts : <<publication highlighting guard tests>>=
+function withEmitter(root: unknown, run: () => void): void {
+    const original = hljs.highlight;
+    hljs.highlight = (() => ({ _emitter: { rootNode: root } })) as unknown as typeof hljs.highlight;
+    try { run(); } finally { hljs.highlight = original; }
+}
+test('private adapter inherits scopes without recursive traversal', () => {
+    let root: unknown = 'x\n';
+    for (let depth = 0; depth < 20000; depth++) { root = { children: [root] }; }
+    root = { scope: 'comment', children: [{ scope: 'language:javascript', children: [root] }] };
+    withEmitter(root, () => {
+        assert.deepEqual(highlightContribution(part('x')).spans, [{ start: 0, end: 2, scope: 'comment' }]);
+    });
+});
+```
+
+These are hard failures, not plain-text fallbacks. A future library upgrade must
+satisfy the version gate as well as tree and reconstruction requirements.
+
+```ts : <<publication highlighting guard tests>>=+
+test('private adapter guards version, shape, cycles and exact reconstruction', () => {
+    const version = hljs.versionString;
+    hljs.versionString = '99.0.0';
+    try { assert.throws(() => highlightContribution(part('x')), /11\.9\.0/); }
+    finally { hljs.versionString = version; }
+    for (const root of [null, {}, { children: [42] }, { scope: 1, children: [] }]) {
+        withEmitter(root, () => assert.throws(() => highlightContribution(part('x')), /emitter/));
+    }
+    const cycle: { children: unknown[] } = { children: [] };
+    cycle.children.push(cycle);
+    withEmitter(cycle, () => assert.throws(() => highlightContribution(part('x')), /tree/));
+    withEmitter({ children: ['y\n'] }, () => {
+        assert.throws(() => highlightContribution(part('x')), /reconstruct/);
+    });
+});
+```
+
+All seventy palettes are checked without consulting CSS at runtime. The groups
+below are independent expectations for every mapped token family, including
+plain resets and dotted forms; weights do not accidentally make booleans bold.
+
+```ts : <<publication highlighting palette tests>>=
+test('all 70 palettes retain exact scope colors and publication font policy', () => {
+    assert.equal(themes.length, 70);
+    const groups = {
+        purple: 'keyword selector-tag literal', accent: 'string regexp addition',
+        warning: 'number symbol bullet', information: 'title section built_in type link',
+        cyan: 'attr attribute variable template-variable', muted: 'comment quote',
+        yellow: 'meta doctag', danger: 'deletion name',
+        text: 'subst unknown emphasis strong constructor __proto__'
+    };
+    for (const theme of themes) {
+        for (const [key, scopes] of Object.entries(groups)) {
+            for (const scope of scopes.split(' ')) {
+                const expected = { color: theme.colors[key as keyof typeof theme.colors],
+                    bold: ['keyword', 'variable', 'template-variable', 'strong'].includes(scope),
+                    italic: ['comment', 'quote', 'emphasis'].includes(scope) };
+                assert.match(expected.color, /^#[0-9a-f]{6}$/i);
+                assert.deepEqual(syntaxStyle(scope, theme), expected);
+                assert.deepEqual(syntaxStyle(scope + '.nested', theme), expected);
+            }
+        }
+        assert.deepEqual(syntaxStyle('', theme), { color: theme.colors.text, bold: false, italic: false });
+    }
+});
+```

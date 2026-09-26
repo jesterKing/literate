@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>An in-memory LaTeX book</h1>
+<p>This chapter owns <code>src/publication-latex.ts</code>. It consumes the controlled Pandoc
+bridge, not a second Markdown parser. No files, processes, browser APIs, root
+SETTINGS, or publishing commands are involved. The injected converter is trusted:
+it must convert JSON to a LaTeX <strong>body</strong>, preserve raw LaTeX, use top-level chapters,
+and disable Pandoc syntax highlighting (<code>--no-highlight</code>, tested on Pandoc 3.7.0.2).
+The options passed to it make that contract explicit; they are not CLI arguments.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX.*&gt;&gt;= src/publication-latex.ts $</div>
+<div class="code">
+<pre><code><span class="literate-tag-name">&lt;&lt;publication LaTeX imports&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication LaTeX API&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication LaTeX options&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication LaTeX encoding&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication LaTeX template&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication LaTeX code&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication LaTeX contributions&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication LaTeX render&gt;&gt;</span>
+</code></pre>
+
+</div>
+</div><p>Highlighting is a separate full-context adapter. Its UTF-16 spans address display
+text with escaped literal openers already unescaped, and actual references still
+spelled with their original delimiters. Exceptions pass through the bridge gate.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX imports&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title class_">ParsedProject</span>, <span class="hljs-title class_">PublicationContribution</span>, <span class="hljs-title class_">GenerationDiagnostic</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./engine&#x27;</span>;
+<span class="hljs-keyword">import</span> { preparePandoc } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./publication-pandoc&#x27;</span>;
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title class_">PandocDocument</span>, <span class="hljs-title class_">PandocBlock</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./publication-pandoc&#x27;</span>;
+<span class="hljs-keyword">import</span> { defaultThemeName, getTheme } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./themes&#x27;</span>;
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title class_">LiterateTheme</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./themes&#x27;</span>;
+<span class="hljs-keyword">import</span> { highlightContribution, syntaxStyle } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./publication-highlight&#x27;</span>;
+</code></pre>
+
+</div>
+</div><p>The callback must not run after a preparation error. Results are atomic: diagnostics
+never accompany partial LaTeX. Font resolution and PDF compilation are caller work.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX API&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">LatexOptions</span> {
+    theme?: <span class="hljs-built_in">string</span>;
+    paper?: <span class="hljs-string">&#x27;A4&#x27;</span> | <span class="hljs-string">&#x27;A5&#x27;</span> | <span class="hljs-string">&#x27;letter&#x27;</span> | <span class="hljs-string">&#x27;legal&#x27;</span>;
+    marginMm?: <span class="hljs-built_in">number</span>;
+    bodyFont?: <span class="hljs-built_in">string</span>;
+    headingFont?: <span class="hljs-built_in">string</span>;
+    codeFont?: <span class="hljs-built_in">string</span>;
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">LatexConversionOptions</span> {
+    <span class="hljs-attr">standalone</span>: <span class="hljs-literal">false</span>;
+    <span class="hljs-attr">syntaxHighlighting</span>: <span class="hljs-string">&#x27;none&#x27;</span>;
+    <span class="hljs-attr">topLevelDivision</span>: <span class="hljs-string">&#x27;chapter&#x27;</span>;
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title class_">LatexConverter</span> = <span class="hljs-function">(<span class="hljs-params"><span class="hljs-variable language_">document</span>: PandocDocument,
+    options: LatexConversionOptions</span>) =&gt;</span> <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">string</span>&gt;;
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">LatexResult</span> { latex?: <span class="hljs-built_in">string</span>; <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">GenerationDiagnostic</span>[]; }
+<span class="hljs-keyword">interface</span> <span class="hljs-title class_">CheckedOptions</span> {
+    <span class="hljs-attr">theme</span>: <span class="hljs-title class_">LiterateTheme</span>; <span class="hljs-attr">paper</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">margin</span>: <span class="hljs-built_in">number</span>;
+    <span class="hljs-attr">bodyFont</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">headingFont</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">codeFont</span>: <span class="hljs-built_in">string</span>;
+}
+</code></pre>
+
+</div>
+</div><p>Only catalogue palettes are accepted, with no print remapping. Symmetric margins
+are finite millimetres in [5, 50], leaving at least 80 mm width and 100 mm height.
+Family names deliberately exclude fontspec options, paths, and TeX metacharacters.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX options&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">fontName</span>(<span class="hljs-params">value: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> value !== <span class="hljs-string">&#x27;string&#x27;</span> || !<span class="hljs-regexp">/^[A-Za-z0-9][A-Za-z0-9 .-]{0,99}$/</span>.<span class="hljs-title function_">test</span>(value)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Font must be a simple family name (1–100 ASCII characters)&#x27;</span>);
+    }
+    <span class="hljs-keyword">return</span> value;
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">checkOptions</span>(<span class="hljs-params">options: LatexOptions</span>): <span class="hljs-title class_">CheckedOptions</span> {
+    <span class="hljs-keyword">const</span> theme = <span class="hljs-title function_">getTheme</span>(options.<span class="hljs-property">theme</span> ?? defaultThemeName);
+    <span class="hljs-keyword">if</span> (!theme) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Unknown publication theme&#x27;</span>); }
+    <span class="hljs-keyword">const</span> papers = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, [<span class="hljs-built_in">string</span>, <span class="hljs-built_in">number</span>, <span class="hljs-built_in">number</span>]&gt;([
+        [<span class="hljs-string">&#x27;A4&#x27;</span>, [<span class="hljs-string">&#x27;a4paper&#x27;</span>, <span class="hljs-number">210</span>, <span class="hljs-number">297</span>]], [<span class="hljs-string">&#x27;A5&#x27;</span>, [<span class="hljs-string">&#x27;a5paper&#x27;</span>, <span class="hljs-number">148</span>, <span class="hljs-number">210</span>]],
+        [<span class="hljs-string">&#x27;letter&#x27;</span>, [<span class="hljs-string">&#x27;letterpaper&#x27;</span>, <span class="hljs-number">215.9</span>, <span class="hljs-number">279.4</span>]], [<span class="hljs-string">&#x27;legal&#x27;</span>, [<span class="hljs-string">&#x27;legalpaper&#x27;</span>, <span class="hljs-number">215.9</span>, <span class="hljs-number">355.6</span>]]
+    ]);
+    <span class="hljs-keyword">const</span> paper = papers.<span class="hljs-title function_">get</span>(options.<span class="hljs-property">paper</span> ?? <span class="hljs-string">&#x27;A4&#x27;</span>);
+    <span class="hljs-keyword">const</span> margin = options.<span class="hljs-property">marginMm</span> ?? <span class="hljs-number">20</span>;
+    <span class="hljs-keyword">if</span> (!paper || !<span class="hljs-title class_">Number</span>.<span class="hljs-built_in">isFinite</span>(margin) || margin &lt; <span class="hljs-number">5</span> || margin &gt; <span class="hljs-number">50</span> ||
+        paper[<span class="hljs-number">1</span>] - <span class="hljs-number">2</span> * margin &lt; <span class="hljs-number">80</span> || paper[<span class="hljs-number">2</span>] - <span class="hljs-number">2</span> * margin &lt; <span class="hljs-number">100</span>) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Invalid paper or margin; require 5–50 mm and an 80 × 100 mm body&#x27;</span>);
+    }
+    <span class="hljs-keyword">return</span> { theme, <span class="hljs-attr">paper</span>: paper[<span class="hljs-number">0</span>], margin,
+        <span class="hljs-attr">bodyFont</span>: <span class="hljs-title function_">fontName</span>(options.<span class="hljs-property">bodyFont</span> ?? <span class="hljs-string">&#x27;Latin Modern Roman&#x27;</span>),
+        <span class="hljs-attr">headingFont</span>: <span class="hljs-title function_">fontName</span>(options.<span class="hljs-property">headingFont</span> ?? <span class="hljs-string">&#x27;Monofur Nerd Font&#x27;</span>),
+        <span class="hljs-attr">codeFont</span>: <span class="hljs-title function_">fontName</span>(options.<span class="hljs-property">codeFont</span> ?? <span class="hljs-string">&#x27;D2CodingLigature Nerd Font Propo&#x27;</span>) };
+}
+</code></pre>
+
+</div>
+</div><p>Data is never interpolated as commands. Destination identifiers are encoded again
+in a private namespace so even a manually constructed snapshot cannot inject TeX.
+Name wrapping inserts discretionary breaks, not per-character font groups. We cap
+names at 512 Unicode code points; larger names fail explicitly, never abbreviate.
+Control characters are rejected rather than interpreted by TeX.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX encoding&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">checkText</span>(<span class="hljs-params">text: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">if</span> (<span class="hljs-regexp">/[\u0000-\u0008\u000b-\u001f\u007f]/u</span>.<span class="hljs-title function_">test</span>(text)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Unsupported control character in publication text&#x27;</span>);
+    }
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">tex</span>(<span class="hljs-params">text: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-title function_">checkText</span>(text);
+    <span class="hljs-keyword">const</span> escapes = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>([
+        [<span class="hljs-string">&#x27;\\&#x27;</span>, <span class="hljs-string">&#x27;\\textbackslash{}&#x27;</span>], [<span class="hljs-string">&#x27;{&#x27;</span>, <span class="hljs-string">&#x27;\\{&#x27;</span>], [<span class="hljs-string">&#x27;}&#x27;</span>, <span class="hljs-string">&#x27;\\}&#x27;</span>], [<span class="hljs-string">&#x27;#&#x27;</span>, <span class="hljs-string">&#x27;\\#&#x27;</span>],
+        [<span class="hljs-string">&#x27;$&#x27;</span>, <span class="hljs-string">&#x27;\\$&#x27;</span>], [<span class="hljs-string">&#x27;%&#x27;</span>, <span class="hljs-string">&#x27;\\%&#x27;</span>], [<span class="hljs-string">&#x27;&amp;&#x27;</span>, <span class="hljs-string">&#x27;\\&amp;&#x27;</span>], [<span class="hljs-string">&#x27;_&#x27;</span>, <span class="hljs-string">&#x27;\\_&#x27;</span>],
+        [<span class="hljs-string">&#x27;^&#x27;</span>, <span class="hljs-string">&#x27;\\textasciicircum{}&#x27;</span>], [<span class="hljs-string">&#x27;~&#x27;</span>, <span class="hljs-string">&#x27;\\textasciitilde{}&#x27;</span>]
+    ]);
+    <span class="hljs-keyword">return</span> text.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/[\\{}#$%&amp;_^~]/g</span>, <span class="hljs-function"><span class="hljs-params">character</span> =&gt;</span> escapes.<span class="hljs-title function_">get</span>(character)!);
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">target</span>(<span class="hljs-params">value: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">let</span> result = <span class="hljs-string">&#x27;lit-&#x27;</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = <span class="hljs-number">0</span>; index &lt; value.<span class="hljs-property">length</span>; index++) {
+        result += value.<span class="hljs-title function_">charCodeAt</span>(index).<span class="hljs-title function_">toString</span>(<span class="hljs-number">16</span>).<span class="hljs-title function_">padStart</span>(<span class="hljs-number">4</span>, <span class="hljs-string">&#x27;0&#x27;</span>);
+    }
+    <span class="hljs-keyword">return</span> result;
+}
+</code></pre>
+
+</div>
+</div><p>Display names use independent break opportunities without altering destinations.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX encoding&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">nameText</span>(<span class="hljs-params">name: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">if</span> (<span class="hljs-title class_">Array</span>.<span class="hljs-title function_">from</span>(name).<span class="hljs-property">length</span> &gt; <span class="hljs-number">512</span> || <span class="hljs-regexp">/[\r\n\t]/</span>.<span class="hljs-title function_">test</span>(name)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Fragment names must be single-line and at most 512 code points&#x27;</span>);
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-title class_">Array</span>.<span class="hljs-title function_">from</span>(name, <span class="hljs-function"><span class="hljs-params">character</span> =&gt;</span> <span class="hljs-title function_">tex</span>(character)).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;\\allowbreak{}&#x27;</span>);
+}
+</code></pre>
+
+</div>
+</div><p>Colours are validated even though the catalogue and style adapter are trusted.
+The code font retains common/contextual ligatures. D2Coding has no italic face:
+fontspec explicitly synthesizes slanted regular and bold faces with FakeSlant.
+The same policy applies to an overridden code family; no implicit italic lookup.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX encoding&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">color</span>(<span class="hljs-params">value: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">if</span> (!<span class="hljs-regexp">/^#[0-9a-fA-F]{6}$/</span>.<span class="hljs-title function_">test</span>(value)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Invalid syntax/theme colour&#x27;</span>); }
+    <span class="hljs-keyword">return</span> value.<span class="hljs-title function_">slice</span>(<span class="hljs-number">1</span>);
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">pageLink</span>(<span class="hljs-params">id: <span class="hljs-built_in">string</span>, label: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">const</span> destination = <span class="hljs-title function_">target</span>(id);
+    <span class="hljs-keyword">return</span> <span class="hljs-string">`\\hyperref[<span class="hljs-subst">${destination}</span>]{<span class="hljs-subst">${label}</span>\\textsuperscript{\\pageref*{<span class="hljs-subst">${destination}</span>}}}`</span>;
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">anchor</span>(<span class="hljs-params">id: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> { <span class="hljs-keyword">return</span> <span class="hljs-string">`\\phantomsection\\label{<span class="hljs-subst">${target(id)}</span>}`</span>; }
+</code></pre>
+
+</div>
+</div><p>The book is borderless and the entire page uses the selected background. Ordinary
+code uses the renderer's escaped <code>Verbatim</code> blocks. The <code>verbatim</code> and <code>Highlighting</code>
+environments remain compatibility aliases, not support for Skylighting token commands. Strikeout and tight lists are
+supported. The converter must not emit a standalone preamble or highlighted prose
+code. LuaLaTeX is the intended compiler, with installed fonts and packages.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX template&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">template</span>(<span class="hljs-params">body: <span class="hljs-built_in">string</span>, options: CheckedOptions, definitions: <span class="hljs-built_in">string</span>[]</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">const</span> c = options.<span class="hljs-property">theme</span>.<span class="hljs-property">colors</span>;
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_">themeNotice</span>() + <span class="hljs-title class_">String</span>.<span class="hljs-property">raw</span><span class="hljs-string">`\documentclass[11pt,oneside,openany]{scrbook}
+<span class="hljs-subst">${<span class="hljs-string">&#x27;\\usepackage&#x27;</span>}</span>{fontspec}
+\setmainfont{<span class="hljs-subst">${options.bodyFont}</span>}
+\newfontfamily\fragmentfont{<span class="hljs-subst">${options.headingFont}</span>}
+\setmonofont[Ligatures=Common,Contextuals=Alternate,
+ItalicFont={<span class="hljs-subst">${options.codeFont}</span>},ItalicFeatures={FakeSlant=0.2},
+BoldItalicFont={<span class="hljs-subst">${options.codeFont}</span>},BoldItalicFeatures={FakeSlant=0.2,FakeBold=1.5}]{<span class="hljs-subst">${options.codeFont}</span>}
+<span class="hljs-subst">${<span class="hljs-string">&#x27;\\usepackage&#x27;</span>}</span>[<span class="hljs-subst">${options.paper}</span>,margin=<span class="hljs-subst">${options.margin}</span>mm]{geometry}
+<span class="hljs-subst">${<span class="hljs-string">&#x27;\\usepackage&#x27;</span>}</span>{fvextra,needspace,xcolor,microtype,amssymb,amsmath}
+<span class="hljs-subst">${<span class="hljs-string">&#x27;\\usepackage&#x27;</span>}</span>[normalem]{ulem}
+<span class="hljs-subst">${<span class="hljs-string">&#x27;\\usepackage&#x27;</span>}</span>[hidelinks]{hyperref}
+\definecolor{publicationBackground}{HTML}{<span class="hljs-subst">${color(c.background)}</span>}
+\definecolor{publicationText}{HTML}{<span class="hljs-subst">${color(c.text)}</span>}
+\definecolor{publicationAccent}{HTML}{<span class="hljs-subst">${color(c.accent)}</span>}
+\pagecolor{publicationBackground}\color{publicationText}
+\setkomafont{disposition}{\fragmentfont\bfseries\color{publicationAccent}}
+\setkomafont{pageheadfoot}{\normalfont\color{publicationText}}
+\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\providecommand{\passthrough}[1]{#1}
+\providecommand{\pandocbounded}[1]{#1}
+`</span> + <span class="hljs-title function_">templateCodeSettings</span>() + <span class="hljs-string">&#x27;\n&#x27;</span> + definitions.<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;\n&#x27;</span>) +
+        <span class="hljs-string">&#x27;\n\\begin{document}\n\\tableofcontents\n&#x27;</span> + body + <span class="hljs-string">&#x27;\n\\end{document}\n&#x27;</span>;
+}
+</code></pre>
+
+</div>
+</div><p><code>FancyVerbBreakStart/Stop</code> lets fvextra inspect the contents of a styled run.
+Styles group runs rather than glyphs. This retains shaping within a run; a style
+boundary can still split a ligature. PDF copying is not a source-code transport.
+The renderer harness validates styled-run wrapping and contextual glyph substitution
+on three A5 palettes. Ligatures ON deliberately changes operator PDF extraction;
+this is not an exact-copy guarantee, even when long plain tokens reconstruct.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX template&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">templateCodeSettings</span>(<span class="hljs-params"></span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-title class_">String</span>.<span class="hljs-property">raw</span><span class="hljs-string">`\fvset{fontsize=\small,breaklines=true,breakanywhere=true,
+breakautoindent=false,breaksymbolleft={},breaksymbolright={},
+breakanywheresymbolpre={},breakanywheresymbolpost={},frame=none}
+\providecommand{\st}[1]{\sout{#1}}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{}
+\RecustomVerbatimEnvironment{verbatim}{Verbatim}{}
+\newcommand{\LitStyle}[4]{{\color[HTML]{#1}#2#3\FancyVerbBreakStart#4\FancyVerbBreakStop}}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\pagestyle{headings}`</span>;
+}
+</code></pre>
+
+</div>
+</div><p>Only the three command characters need escaping inside Verbatim. Other TeX
+metacharacters keep verbatim catcodes. Escaping the backslash also prevents a
+literal end-environment string from ending the environment. Each style run is
+split at physical newlines so no macro argument crosses a Verbatim line.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX code&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">type</span> <span class="hljs-title class_">Highlighted</span> = <span class="hljs-title class_">ReturnType</span>&lt;<span class="hljs-keyword">typeof</span> highlightContribution&gt;;
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">verbatimText</span>(<span class="hljs-params">text: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-title function_">checkText</span>(text);
+    <span class="hljs-keyword">return</span> text.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/[\\{}]/g</span>, <span class="hljs-function"><span class="hljs-params">character</span> =&gt;</span> {
+        <span class="hljs-keyword">if</span> (character === <span class="hljs-string">&#x27;\\&#x27;</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;\\textbackslash{}&#x27;</span>; }
+        <span class="hljs-keyword">return</span> character === <span class="hljs-string">&#x27;{&#x27;</span> ? <span class="hljs-string">&#x27;\\textbraceleft{}&#x27;</span> : <span class="hljs-string">&#x27;\\textbraceright{}&#x27;</span>;
+    });
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">styled</span>(<span class="hljs-params">text: <span class="hljs-built_in">string</span>, scope: <span class="hljs-built_in">string</span>, theme: LiterateTheme</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">const</span> style = <span class="hljs-title function_">syntaxStyle</span>(scope, theme);
+    <span class="hljs-keyword">return</span> text.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;\n&#x27;</span>).<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">line</span> =&gt;</span> line.<span class="hljs-property">length</span> ?
+        <span class="hljs-string">`\\LitStyle{<span class="hljs-subst">${color(style.color)}</span>}{<span class="hljs-subst">${style.bold ? <span class="hljs-string">&#x27;\\bfseries&#x27;</span> : <span class="hljs-string">&#x27;&#x27;</span>}</span>}`</span> +
+        <span class="hljs-string">`{<span class="hljs-subst">${style.italic ? <span class="hljs-string">&#x27;\\itshape&#x27;</span> : <span class="hljs-string">&#x27;&#x27;</span>}</span>}{<span class="hljs-subst">${verbatimText(line)}</span>}`</span> : <span class="hljs-string">&#x27;&#x27;</span>).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;\n&#x27;</span>);
+}
+</code></pre>
+
+</div>
+</div><p>Literal slices retain whitespace and intersect full-context style ranges.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX code&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">literal</span>(<span class="hljs-params">data: Highlighted, start: <span class="hljs-built_in">number</span>, end: <span class="hljs-built_in">number</span>, theme: LiterateTheme</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">if</span> (start === end) { <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;&#x27;</span>; }
+    <span class="hljs-keyword">let</span> cursor = start;
+    <span class="hljs-keyword">let</span> result = <span class="hljs-string">&#x27;&#x27;</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> span <span class="hljs-keyword">of</span> data.<span class="hljs-property">spans</span>) {
+        <span class="hljs-keyword">const</span> left = <span class="hljs-title class_">Math</span>.<span class="hljs-title function_">max</span>(start, span.<span class="hljs-property">start</span>), right = <span class="hljs-title class_">Math</span>.<span class="hljs-title function_">min</span>(end, span.<span class="hljs-property">end</span>);
+        <span class="hljs-keyword">if</span> (left &gt;= right) { <span class="hljs-keyword">continue</span>; }
+        result += <span class="hljs-title function_">verbatimText</span>(data.<span class="hljs-property">text</span>.<span class="hljs-title function_">slice</span>(cursor, left));
+        result += <span class="hljs-title function_">styled</span>(data.<span class="hljs-property">text</span>.<span class="hljs-title function_">slice</span>(left, right), span.<span class="hljs-property">scope</span>, theme);
+        cursor = right;
+    }
+    result += <span class="hljs-title function_">verbatimText</span>(data.<span class="hljs-property">text</span>.<span class="hljs-title function_">slice</span>(cursor, end));
+    <span class="hljs-keyword">return</span> <span class="hljs-string">&#x27;\\begin{Verbatim}[commandchars=\\\\\\{\\}]\n&#x27;</span> + result +
+        (result.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;\n&#x27;</span>) ? <span class="hljs-string">&#x27;&#x27;</span> : <span class="hljs-string">&#x27;\n&#x27;</span>) + <span class="hljs-string">&#x27;\\end{Verbatim}\n&#x27;</span>;
+}
+</code></pre>
+
+</div>
+</div><p>The adapter must return ordered, disjoint ranges within the UTF-16 string. Reject
+bad ranges rather than silently dropping or repeating source. References take
+precedence over syntax styles and preserve the order of all surrounding literals.
+Every reference gets a display-only line break and a modest hanging indent. Its
+macro is argument-free, defined outside Verbatim, and invoked outside it as well.
+The unboxed paragraph can break across pages, unlike the probe's parbox.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX code&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">validateHighlight</span>(<span class="hljs-params">data: Highlighted</span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-title function_">checkText</span>(data.<span class="hljs-property">text</span>);
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> ranges <span class="hljs-keyword">of</span> [data.<span class="hljs-property">spans</span>, data.<span class="hljs-property">references</span>]) {
+        <span class="hljs-keyword">let</span> end = <span class="hljs-number">0</span>;
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> range <span class="hljs-keyword">of</span> ranges) {
+            <span class="hljs-keyword">if</span> (!<span class="hljs-title class_">Number</span>.<span class="hljs-title function_">isInteger</span>(range.<span class="hljs-property">start</span>) || !<span class="hljs-title class_">Number</span>.<span class="hljs-title function_">isInteger</span>(range.<span class="hljs-property">end</span>) ||
+                range.<span class="hljs-property">start</span> &lt; end || range.<span class="hljs-property">end</span> &lt;= range.<span class="hljs-property">start</span> || range.<span class="hljs-property">end</span> &gt; data.<span class="hljs-property">text</span>.<span class="hljs-property">length</span>) {
+                <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Invalid highlighting ranges&#x27;</span>);
+            }
+            end = range.<span class="hljs-property">end</span>;
+        }
+    }
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">macroName</span>(<span class="hljs-params">index: <span class="hljs-built_in">number</span></span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">let</span> suffix = <span class="hljs-string">&#x27;&#x27;</span>;
+    <span class="hljs-keyword">do</span> { suffix = <span class="hljs-title class_">String</span>.<span class="hljs-title function_">fromCharCode</span>(<span class="hljs-number">65</span> + index % <span class="hljs-number">26</span>) + suffix;
+        index = <span class="hljs-title class_">Math</span>.<span class="hljs-title function_">floor</span>(index / <span class="hljs-number">26</span>) - <span class="hljs-number">1</span>;
+    } <span class="hljs-keyword">while</span> (index &gt;= <span class="hljs-number">0</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-string">`LitReference<span class="hljs-subst">${suffix}</span>`</span>;
+}
+</code></pre>
+
+</div>
+</div><p>Adjacent spans with identical visual styles must form one run even if highlight.js
+split them into different unstyled nodes. This keeps operator shaping independent
+of emitter tree boundaries.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX code&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">mergeStyles</span>(<span class="hljs-params">data: Highlighted, theme: LiterateTheme</span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">merged</span>: <span class="hljs-title class_">Highlighted</span>[<span class="hljs-string">&#x27;spans&#x27;</span>] = [];
+    <span class="hljs-keyword">let</span> previousStyle = <span class="hljs-string">&#x27;&#x27;</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> span <span class="hljs-keyword">of</span> data.<span class="hljs-property">spans</span>) {
+        <span class="hljs-keyword">const</span> style = <span class="hljs-title class_">JSON</span>.<span class="hljs-title function_">stringify</span>(<span class="hljs-title function_">syntaxStyle</span>(span.<span class="hljs-property">scope</span>, theme));
+        <span class="hljs-keyword">const</span> previous = merged[merged.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>];
+        <span class="hljs-keyword">if</span> (previous &amp;&amp; previous.<span class="hljs-property">end</span> === span.<span class="hljs-property">start</span> &amp;&amp; style === previousStyle) {
+            previous.<span class="hljs-property">end</span> = span.<span class="hljs-property">end</span>;
+        } <span class="hljs-keyword">else</span> { merged.<span class="hljs-title function_">push</span>({ ...span }); }
+        previousStyle = style;
+    }
+    data.<span class="hljs-property">spans</span> = merged;
+}
+</code></pre>
+
+</div>
+</div><p>Family destinations live on base definitions; each contribution also has its own
+label. Previous/next links point at contribution pages, not merely the family.
+The heading requests room for its start and code, but no entire code block is boxed.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX contributions&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">contribution</span>(<span class="hljs-params">part: PublicationContribution, project: ParsedProject,
+    theme: LiterateTheme, definitions: <span class="hljs-built_in">string</span>[]</span>): <span class="hljs-title class_">PandocBlock</span>[] {
+    <span class="hljs-keyword">const</span> family = project.<span class="hljs-property">publication</span>.<span class="hljs-property">fragments</span>.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span> item.<span class="hljs-property">target</span> === part.<span class="hljs-property">fragmentTarget</span>);
+    <span class="hljs-keyword">if</span> (!family) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Contribution has no fragment family&#x27;</span>); }
+    <span class="hljs-keyword">const</span> position = family.<span class="hljs-property">contributions</span>.<span class="hljs-title function_">indexOf</span>(part.<span class="hljs-property">target</span>);
+    <span class="hljs-keyword">if</span> (position &lt; <span class="hljs-number">0</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Contribution is absent from its family&#x27;</span>); }
+    <span class="hljs-keyword">const</span> data = <span class="hljs-title function_">highlightContribution</span>(part);
+    <span class="hljs-title function_">validateHighlight</span>(data);
+    <span class="hljs-title function_">mergeStyles</span>(data, theme);
+    <span class="hljs-keyword">let</span> output = <span class="hljs-string">&#x27;\\par\\Needspace{5\\baselineskip}\n&#x27;</span> + <span class="hljs-title function_">anchor</span>(part.<span class="hljs-property">target</span>);
+    <span class="hljs-keyword">if</span> (part.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;definition&#x27;</span>) { output += <span class="hljs-title function_">anchor</span>(family.<span class="hljs-property">target</span>); }
+    output += <span class="hljs-string">`{\\fragmentfont\\raggedright\\color{publicationAccent} <span class="hljs-subst">${nameText(family.name)}</span>`</span> +
+        <span class="hljs-string">`\\enspace\\ensuremath{<span class="hljs-subst">${part.kind === <span class="hljs-string">&#x27;definition&#x27;</span> ? <span class="hljs-string">&#x27;\\equiv&#x27;</span> : <span class="hljs-string">&#x27;+\\equiv&#x27;</span>}</span>}\\par}\n`</span>;
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">navigation</span>: <span class="hljs-built_in">string</span>[] = [];
+    <span class="hljs-keyword">if</span> (position &gt; <span class="hljs-number">0</span>) { navigation.<span class="hljs-title function_">push</span>(<span class="hljs-title function_">pageLink</span>(family.<span class="hljs-property">contributions</span>[position - <span class="hljs-number">1</span>], <span class="hljs-string">&#x27;Previous &#x27;</span>)); }
+    <span class="hljs-keyword">if</span> (part.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;append&#x27;</span>) { navigation.<span class="hljs-title function_">push</span>(<span class="hljs-title function_">pageLink</span>(family.<span class="hljs-property">target</span>, <span class="hljs-string">&#x27;Base &#x27;</span>)); }
+    <span class="hljs-keyword">if</span> (position + <span class="hljs-number">1</span> &lt; family.<span class="hljs-property">contributions</span>.<span class="hljs-property">length</span>) {
+        navigation.<span class="hljs-title function_">push</span>(<span class="hljs-title function_">pageLink</span>(family.<span class="hljs-property">contributions</span>[position + <span class="hljs-number">1</span>], <span class="hljs-string">&#x27;Next &#x27;</span>));
+    }
+    <span class="hljs-keyword">if</span> (navigation.<span class="hljs-property">length</span>) { output += <span class="hljs-string">`{\\small <span class="hljs-subst">${navigation.join(<span class="hljs-string">&#x27;\\quad &#x27;</span>)}</span>\\par}\n`</span>; }
+    output += <span class="hljs-title function_">contributionBody</span>(data, project, theme, definitions);
+    <span class="hljs-keyword">return</span> [{ <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;RawBlock&#x27;</span>, <span class="hljs-attr">c</span>: [<span class="hljs-string">&#x27;latex&#x27;</span>, output] }];
+}
+</code></pre>
+
+</div>
+</div><p>Reference names remain complete, with superscript family-definition pages. The
+highlighter cannot invent a destination: returned names/targets are checked against
+the publication families. The existing bridge independently validates source
+references, missing targets, modifiers, and cycles before calling this renderer.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX contributions&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">contributionBody</span>(<span class="hljs-params">data: Highlighted, project: ParsedProject,
+    theme: LiterateTheme, definitions: <span class="hljs-built_in">string</span>[]</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">let</span> cursor = <span class="hljs-number">0</span>, output = <span class="hljs-string">&#x27;&#x27;</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> reference <span class="hljs-keyword">of</span> data.<span class="hljs-property">references</span>) {
+        <span class="hljs-keyword">if</span> (!project.<span class="hljs-property">publication</span>.<span class="hljs-property">fragments</span>.<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">family</span> =&gt;</span>
+            family.<span class="hljs-property">target</span> === reference.<span class="hljs-property">target</span> &amp;&amp; family.<span class="hljs-property">name</span> === reference.<span class="hljs-property">name</span>)) {
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Unknown highlighted reference destination&#x27;</span>);
+        }
+        output += <span class="hljs-title function_">literal</span>(data, cursor, <span class="hljs-title function_">referencePrefixEnd</span>(data.<span class="hljs-property">text</span>, cursor, reference.<span class="hljs-property">start</span>), theme);
+        <span class="hljs-keyword">const</span> command = <span class="hljs-title function_">macroName</span>(definitions.<span class="hljs-property">length</span>);
+        <span class="hljs-keyword">const</span> label = <span class="hljs-string">&#x27;\\textless{}\\textless{}&#x27;</span> + <span class="hljs-title function_">nameText</span>(reference.<span class="hljs-property">name</span>) +
+            <span class="hljs-string">&#x27;\\textgreater{}\\textgreater{}&#x27;</span>;
+        definitions.<span class="hljs-title function_">push</span>(<span class="hljs-string">`\\newcommand{\\<span class="hljs-subst">${command}</span>}{\\par\\begingroup`</span> +
+            <span class="hljs-string">&#x27;\\leftskip=1.5em\\rightskip=0pt plus 1fil\\parindent=0pt&#x27;</span> +
+            <span class="hljs-string">&#x27;\\fragmentfont\\small\\noindent &#x27;</span> + <span class="hljs-title function_">pageLink</span>(reference.<span class="hljs-property">target</span>, label) +
+            <span class="hljs-string">&#x27;\\par\\endgroup}&#x27;</span>);
+        output += <span class="hljs-string">`\\<span class="hljs-subst">${command}</span>{}\n`</span>;
+        cursor = reference.<span class="hljs-property">end</span> + (data.<span class="hljs-property">text</span>[reference.<span class="hljs-property">end</span>] === <span class="hljs-string">&#x27;\n&#x27;</span> ? <span class="hljs-number">1</span> : <span class="hljs-number">0</span>);
+    }
+    <span class="hljs-keyword">return</span> output + <span class="hljs-title function_">literal</span>(data, cursor, data.<span class="hljs-property">text</span>.<span class="hljs-property">length</span>, theme);
+}
+</code></pre>
+
+</div>
+</div><p>The reference paragraph supplies its own terminating line break. Consume exactly
+one immediately following newline, leaving any authored blank lines intact. On a
+standalone reference line, discard only its indentation, not earlier blank lines;
+the reference still uses the common 1.5em hanging display indent.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX contributions&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">referencePrefixEnd</span>(<span class="hljs-params">text: <span class="hljs-built_in">string</span>, cursor: <span class="hljs-built_in">number</span>, start: <span class="hljs-built_in">number</span></span>): <span class="hljs-built_in">number</span> {
+    <span class="hljs-keyword">const</span> lineStart = text.<span class="hljs-title function_">lastIndexOf</span>(<span class="hljs-string">&#x27;\n&#x27;</span>, start - <span class="hljs-number">1</span>) + <span class="hljs-number">1</span>;
+    <span class="hljs-keyword">return</span> <span class="hljs-regexp">/^[ \t]*$/</span>.<span class="hljs-title function_">test</span>(text.<span class="hljs-title function_">slice</span>(lineStart, start)) ? <span class="hljs-title class_">Math</span>.<span class="hljs-title function_">max</span>(cursor, lineStart) : start;
+}
+</code></pre>
+
+</div>
+</div><p>Ordinary fenced and indented code is literal data, never fragment syntax. Render
+it ourselves before conversion: even with highlighting disabled, Pandoc switches
+to unsupported highlighting macros when code contains a verbatim terminator.
+The walker replaces only CodeBlock leaves, retaining prose, inline code and their
+containers. No opener unescaping or semantic reference/highlight adapter runs here.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX code&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">ordinaryCode</span>(<span class="hljs-params">blocks: PandocBlock[], theme: LiterateTheme</span>): <span class="hljs-title class_">PandocBlock</span>[] {
+    <span class="hljs-keyword">return</span> blocks.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">block</span> =&gt;</span> {
+        <span class="hljs-keyword">switch</span> (block.<span class="hljs-property">t</span>) {
+            <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;CodeBlock&#x27;</span>: {
+                <span class="hljs-keyword">const</span> text = block.<span class="hljs-property">c</span>[<span class="hljs-number">1</span>];
+                <span class="hljs-keyword">const</span> <span class="hljs-attr">data</span>: <span class="hljs-title class_">Highlighted</span> = { text, <span class="hljs-attr">references</span>: [],
+                    <span class="hljs-attr">spans</span>: text ? [{ <span class="hljs-attr">start</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">end</span>: text.<span class="hljs-property">length</span>, <span class="hljs-attr">scope</span>: <span class="hljs-string">&#x27;&#x27;</span> }] : [] };
+                <span class="hljs-keyword">return</span> { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;RawBlock&#x27;</span>, <span class="hljs-attr">c</span>: [<span class="hljs-string">&#x27;latex&#x27;</span>, <span class="hljs-title function_">literal</span>(data, <span class="hljs-number">0</span>, text.<span class="hljs-property">length</span>, theme)] };
+            }
+            <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;Div&#x27;</span>: <span class="hljs-keyword">return</span> { ...block, <span class="hljs-attr">c</span>: [block.<span class="hljs-property">c</span>[<span class="hljs-number">0</span>], <span class="hljs-title function_">ordinaryCode</span>(block.<span class="hljs-property">c</span>[<span class="hljs-number">1</span>], theme)] };
+            <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;BlockQuote&#x27;</span>: <span class="hljs-keyword">return</span> { ...block, <span class="hljs-attr">c</span>: <span class="hljs-title function_">ordinaryCode</span>(block.<span class="hljs-property">c</span>, theme) };
+            <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;BulletList&#x27;</span>: <span class="hljs-keyword">return</span> { ...block, <span class="hljs-attr">c</span>: block.<span class="hljs-property">c</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span> <span class="hljs-title function_">ordinaryCode</span>(item, theme)) };
+            <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;OrderedList&#x27;</span>: <span class="hljs-keyword">return</span> { ...block,
+                <span class="hljs-attr">c</span>: [block.<span class="hljs-property">c</span>[<span class="hljs-number">0</span>], block.<span class="hljs-property">c</span>[<span class="hljs-number">1</span>].<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span> <span class="hljs-title function_">ordinaryCode</span>(item, theme))] };
+            <span class="hljs-attr">default</span>: <span class="hljs-keyword">return</span> block;
+        }
+    });
+}
+</code></pre>
+
+</div>
+</div><p>Only a successful bridge result reaches the injected converter. Converter rejection,
+invalid output, or template failure produces a diagnostic and no <code>latex</code> property.
+The first document provides a stable location for non-source-specific failures.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX render&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">renderLatex</span>(<span class="hljs-params">parsed: ParsedProject, options: LatexOptions,
+    convert: LatexConverter</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-title class_">LatexResult</span>&gt; {
+    <span class="hljs-keyword">let</span> stage = <span class="hljs-string">&#x27;latex-options&#x27;</span>;
+    <span class="hljs-keyword">try</span> {
+        <span class="hljs-keyword">const</span> checked = <span class="hljs-title function_">checkOptions</span>(options);
+        <span class="hljs-keyword">const</span> <span class="hljs-attr">definitions</span>: <span class="hljs-built_in">string</span>[] = [];
+        stage = <span class="hljs-string">&#x27;latex-preparation&#x27;</span>;
+        <span class="hljs-keyword">const</span> prepared = <span class="hljs-title function_">preparePandoc</span>(parsed, <span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span>
+            <span class="hljs-title function_">contribution</span>(part, parsed, checked.<span class="hljs-property">theme</span>, definitions));
+        <span class="hljs-keyword">if</span> (!prepared.<span class="hljs-property">document</span>) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">diagnostics</span>: prepared.<span class="hljs-property">diagnostics</span> }; }
+        prepared.<span class="hljs-property">document</span>.<span class="hljs-property">blocks</span> = <span class="hljs-title function_">ordinaryCode</span>(prepared.<span class="hljs-property">document</span>.<span class="hljs-property">blocks</span>, checked.<span class="hljs-property">theme</span>);
+        stage = <span class="hljs-string">&#x27;latex-conversion&#x27;</span>;
+        <span class="hljs-keyword">const</span> body = <span class="hljs-keyword">await</span> <span class="hljs-title function_">convert</span>(prepared.<span class="hljs-property">document</span>, {
+            <span class="hljs-attr">standalone</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">syntaxHighlighting</span>: <span class="hljs-string">&#x27;none&#x27;</span>, <span class="hljs-attr">topLevelDivision</span>: <span class="hljs-string">&#x27;chapter&#x27;</span>
+        });
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> body !== <span class="hljs-string">&#x27;string&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Converter must return a LaTeX body string&#x27;</span>); }
+        stage = <span class="hljs-string">&#x27;latex-template&#x27;</span>;
+        <span class="hljs-keyword">return</span> { <span class="hljs-attr">latex</span>: <span class="hljs-title function_">template</span>(body, checked, definitions), <span class="hljs-attr">diagnostics</span>: [] };
+    } <span class="hljs-keyword">catch</span> (error) {
+        <span class="hljs-keyword">return</span> { <span class="hljs-attr">diagnostics</span>: [{ <span class="hljs-attr">path</span>: parsed.<span class="hljs-property">documents</span>[<span class="hljs-number">0</span>]?.<span class="hljs-property">path</span> ?? <span class="hljs-string">&#x27;&#x27;</span>, <span class="hljs-attr">line</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span>,
+            <span class="hljs-attr">code</span>: stage, <span class="hljs-attr">message</span>: error <span class="hljs-keyword">instanceof</span> <span class="hljs-title class_">Error</span> ? error.<span class="hljs-property">message</span> : <span class="hljs-title class_">String</span>(error) }] };
+    }
+}
+</code></pre>
+
+</div>
+</div><h2>Theme redistribution notice</h2>
+<p>The palette notice is retained in every emitted TeX document without filesystem
+access. This bounded duplication can move to a shared themes export later.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX template&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">themeNotice</span>(<span class="hljs-params"></span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">return</span> [
+        <span class="hljs-string">&#x27;Theme palette snapshot: HErmonica drawing defaults (hermonica),&#x27;</span>,
+        <span class="hljs-string">&#x27;and NvChad/base46 v2.5 themes; see THIRD_PARTY_NOTICES.md.&#x27;</span>,
+        <span class="hljs-string">&#x27;nvim-base16.lua is a library for modifying themes with Lua&#x27;</span>,
+        <span class="hljs-string">&#x27;Copyright © 2019 Ashkan Kiani&#x27;</span>,
+        <span class="hljs-string">&#x27;&#x27;</span>,
+        <span class="hljs-string">&#x27;Permission is hereby granted, free of charge, to any person obtaining&#x27;</span>,
+        <span class="hljs-string">&#x27;a copy of this software and associated documentation files (the &quot;Software&quot;),&#x27;</span>,
+        <span class="hljs-string">&#x27;to deal in the Software without restriction, including without limitation&#x27;</span>,
+        <span class="hljs-string">&#x27;the rights to use, copy, modify, merge, publish, distribute, sublicense,&#x27;</span>,
+        <span class="hljs-string">&#x27;and/or sell copies of the Software, and to permit persons to whom the&#x27;</span>,
+        <span class="hljs-string">&#x27;Software is furnished to do so, subject to the following conditions:&#x27;</span>,
+        <span class="hljs-string">&#x27;The above copyright notice and this permission notice shall be included&#x27;</span>,
+        <span class="hljs-string">&#x27;in all copies or substantial portions of the Software.&#x27;</span>,
+        <span class="hljs-string">&#x27;THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND,&#x27;</span>,
+        <span class="hljs-string">&#x27;EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES&#x27;</span>,
+        <span class="hljs-string">&#x27;OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.&#x27;</span>,
+        <span class="hljs-string">&#x27;IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,&#x27;</span>,
+        <span class="hljs-string">&#x27;DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,&#x27;</span>,
+        <span class="hljs-string">&#x27;TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE&#x27;</span>,
+        <span class="hljs-string">&#x27;OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.&#x27;</span>
+    ].<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">line</span> =&gt;</span> <span class="hljs-string">&#x27;% &#x27;</span> + line).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;\n&#x27;</span>) + <span class="hljs-string">&#x27;\n&#x27;</span>;
+}
+</code></pre>
+
+</div>
+</div><h2>Deliberate boundaries</h2>
+<p>Images, raw author markup, tables, Mermaid, and unsupported links still fail in
+<code>preparePandoc</code>; this is not yet a whole-project book exporter. No assets are
+copied, fonts downloaded, or TeX files compiled. The caller must install Latin
+Modern, Monofur Nerd Font and D2CodingLigature Nerd Font Propo (or supply safe
+family overrides), and the listed TeX packages. Missing glyphs remain compiler
+errors/warnings to check, not a claim of universal Unicode coverage.</p>
+<p>Prose and inline-code escaping remain the trusted Pandoc writer's responsibility;
+ordinary block code is escaped by this renderer before conversion. Converters must
+preserve trusted RawBlocks, without filters, external includes, or highlighting. The ignored <code>out/publication-renderer</code> harness
+compiles rosepine-dawn, hermonica and flexoki-light A5 fixtures, including nested
+containers, full references and long styled tokens. It retains logs, glyph traces,
+link/bounds checks and previews. Headless tests cover every catalogue theme, but
+all palettes, fonts, arbitrary container depths and pagination are not PDF-validated.
+References introduce display-only line breaks; executable copying must use original
+or tangled source. CLI adapters, root SETTINGS, heading identity, packaging,
+transactions and generation belong to their separate integration slices.</p>
+</div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>
