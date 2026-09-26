@@ -14,6 +14,9 @@ ordered accepted documents, sorted normalized referenced templates (even missing
 ones), and fragments in encounter order. Definitions include append fences;
 references exclude escaped tags and use original part offsets, not expanded text.
 All inspection coordinates are zero-based JavaScript string positions.
+`GenerationResult.publication` retains ordered accepted contributions, stable
+logical targets, and unexpanded code segments for future publication renderers.
+It survives diagnostics without changing existing source or HTML emission.
 
 The root fragment assembles the implementation in dependency order. The final
 fragment describes the generation phases; the preceding fragments provide
@@ -21,6 +24,7 @@ shared contracts and helpers for both generation and its adapters.
 
 ```ts : <<headless generation engine.*>>= ./src/engine.ts $
 <<engine interfaces and dependencies>>
+<<engine publication identity>>
 <<engine path and source validation>>
 <<engine shared fragment scanning>>
 <<engine shared header parsing>>
@@ -77,8 +81,49 @@ export interface GenerationResult {
     files: GeneratedFile[];
     diagnostics: GenerationDiagnostic[];
     inspection: ProjectInspection;
+    publication: PublicationModel;
 }
 
+```
+
+Publication is a renderer-neutral snapshot of accepted graph parts, available
+alongside inspection even when diagnostics suppress every output. Documents and
+contributions follow project encounter order; families follow definition order.
+Target lists refer to contribution targets, while references resolve to families.
+No Markdown tokens or renderer-specific destinations cross this boundary.
+
+```ts : <<engine interfaces and dependencies>>=+
+export interface PublicationLocation { path: string; line: number; column: number; }
+export interface PublicationModel {
+    documents: { path: string; contributions: string[] }[];
+    fragments: { name: string; target: string; contributions: string[] }[];
+    contributions: PublicationContribution[];
+}
+export interface PublicationContribution {
+    target: string;
+    fragmentTarget: string;
+    kind: 'definition' | 'append';
+    language: string;
+    definition: PublicationLocation;
+    tokenIndex: number;
+    content: string;
+    segments: PublicationSegment[];
+}
+```
+
+Content and segment text retain Markdown-normalized code, including escapes.
+Joining segment text reconstructs content exactly. Reference offsets are UTF-16
+positions within that content; `end` excludes any definition operator, matching
+the scanner. Reference text includes that operator when present. Source locations
+are zero-based UTF-16 coordinates, not visual columns. A missing target is data,
+not a new diagnostic; expansion remains responsible for validation.
+
+```ts : <<engine interfaces and dependencies>>=+
+export type PublicationSegment =
+    | { kind: 'text'; text: string }
+    | { kind: 'reference'; text: string; name: string;
+        start: number; end: number; at: PublicationLocation; modifier?: string;
+        resolution: { kind: 'resolved'; target: string } | { kind: 'missing' } };
 ```
 
 Internal parts pair Markdown-normalized code with original source coordinates.
@@ -89,12 +134,38 @@ export const discoveryExcludedDirectories: readonly string[] = Object.freeze([
     '.git', 'node_modules', 'out', 'dist', '.yarn', '.vscode-test'
 ]);
 
-interface Location { path: string; line: number; column: number; }
+type Location = PublicationLocation;
 interface Header { name: string; language: string; append: boolean; output?: string; template?: string; }
 interface Part { content: string; location: Location; definition: Location; columns: number[]; }
 interface Fragment { header: Header; parts: Part[]; location: Location; }
 
 ```
+
+## Publication identities do not depend on presentation
+
+Encode each UTF-16 code unit as four hexadecimal digits, preserving exact names,
+including case and Unicode distinctions. Hyphen separators cannot occur inside
+encoded components. Family targets use `f-` plus the encoded name; contributions
+use `c-`, the encoded name, canonical document path, and a one-based accepted
+ordinal local to that family and document. These namespaces need no Node APIs.
+
+```ts : <<engine publication identity>>=
+function publicationEncode(value: string): string {
+    let encoded = '';
+    for (let index = 0; index < value.length; index++) {
+        encoded += value.charCodeAt(index).toString(16).padStart(4, '0');
+    }
+    return encoded;
+}
+```
+
+Prose edits, shifted source lines, and unrelated contributions leave targets
+unchanged. Inserting or removing an earlier contribution of the same family in
+the same document can renumber later contributions. Renaming a family changes
+its targets; moving a contribution between documents changes its target. This
+policy promises deterministic collision-free identities, not arbitrary
+edit-stability, which would require explicit author IDs. Token indexes connect
+contributions to the existing document token stream but never define identity.
 
 ## Paths and source text must survive parsing unchanged
 
@@ -582,6 +653,7 @@ collisions are found before any output is returned.
 ```ts : <<engine fragment collection and output reservation>>=
     const fragments = new Map<string, Fragment>();
     const headers = new Map<Token, Header>();
+    const accepted: { header: Header; part: Part; tokenIndex: number }[] = [];
     const sourceTemplates = new Map<string, string>();
     const outputs = new Set<string>();
     const inputKeys = new Set([...sourceKeys, ...templateKeys]);
@@ -610,7 +682,7 @@ this lets inspection and diagnostics refer to the same declaration.
     for (const path of order) {
         const sourceLines = sources.get(path)!.text.split(/\r\n|\r|\n/);
         reserve(path.replace(/\.literate$/, '.html'), { path, line: 0, column: 0 });
-        for (const token of tokens.get(path) || []) {
+        for (const [tokenIndex, token] of (tokens.get(path) || []).entries()) {
             if (token.type !== 'fence' || token.info.trim() === 'SETTINGS' || !token.info.includes('\<<')) { continue; }
             const line = token.map?.[0] || 0;
             const location = { path, line, column: Math.max(0, sourceLines[line].indexOf(token.markup)) };
@@ -663,19 +735,31 @@ location separately so appends appear as definitions in their own documents.
                 if (header.output !== undefined || header.template !== undefined) { report(location, 'Append fragments cannot specify output or template'); }
                 const fragment = fragments.get(header.name);
                 if (!fragment) { report(location, `Cannot append to missing fragment: ${header.name}`); }
-                else { fragment.parts.push(part); }
+                else {
+                    fragment.parts.push(part);
+                    accepted.push({ header, part, tokenIndex });
+                }
                 continue;
             }
-            if (fragments.has(header.name)) { report(location, `Duplicate fragment: ${header.name}`); continue; }
-            if (header.name.endsWith('.*')) {
-                if (!header.output) { report(location, `Missing filename for top-level fragment: ${header.name}`); }
-                else { header.output = reserve(header.output, location); }
-            } else if (header.output !== undefined || header.template !== undefined) {
-                report(location, `Only top-level fragments may specify output or template: ${header.name}`);
-            }
-            <<engine register collected fragment>>
+            <<engine accept initial fragment>>
         }
     }
+```
+
+Record contributions only at graph insertion, not from the header map, which
+also contains rejected declarations. Diagnosed-but-retained definitions and
+appends remain visible; duplicate definitions and orphan appends never acquire
+a destination. Each append retains its own language and document token index.
+
+```ts : <<engine accept initial fragment>>=
+if (fragments.has(header.name)) { report(location, `Duplicate fragment: ${header.name}`); continue; }
+if (header.name.endsWith('.*')) {
+    if (!header.output) { report(location, `Missing filename for top-level fragment: ${header.name}`); }
+    else { header.output = reserve(header.output, location); }
+} else if (header.output !== undefined || header.template !== undefined) {
+    report(location, `Only top-level fragments may specify output or template: ${header.name}`);
+}
+<<engine register collected fragment>>
 ```
 
 Registration follows append, duplicate, and output checks. A source template is
@@ -688,6 +772,7 @@ if (header.template !== undefined) {
     if (template !== undefined) { sourceTemplates.set(header.name, template); }
 }
 fragments.set(header.name, { header, parts: [part], location });
+accepted.push({ header, part, tokenIndex });
 ```
 
 ### Expand dependencies while keeping literal text literal
@@ -761,6 +846,71 @@ references; rejected duplicate definitions and orphan appends do not.
     }
 ```
 
+### Snapshot publication before expansion
+
+Create every family target before resolving references, so forward references
+resolve just like earlier definitions. A cycle still has resolved destinations;
+only an absent family is missing. This snapshot neither reports diagnostics nor
+changes the graph used for expansion or the tokens used for HTML rendering.
+
+```ts : <<engine dependency expansion and validation barrier>>=+
+    const publication: PublicationModel = {
+        documents: order.map(path => ({ path, contributions: [] })),
+        fragments: Array.from(fragments.keys(), name => ({
+            name, target: 'f-' + publicationEncode(name), contributions: []
+        })),
+        contributions: []
+    };
+    const publicationDocuments = new Map(publication.documents.map(document => [document.path, document]));
+    const publicationFamilies = new Map(publication.fragments.map(fragment => [fragment.name, fragment]));
+    const contributionOrdinals = new Map<string, number>();
+    <<engine snapshot accepted contributions>>
+```
+
+Walk the insertion log rather than grouping graph parts by family: interleaved
+families must preserve their authored order. Encoded name/path pairs provide
+unambiguous counter keys. Rejected declarations cannot consume ordinals.
+
+```ts : <<engine snapshot accepted contributions>>=
+for (const { header, part, tokenIndex } of accepted) {
+    const family = publicationFamilies.get(header.name)!;
+    const key = publicationEncode(header.name) + '-' + publicationEncode(part.definition.path);
+    const ordinal = (contributionOrdinals.get(key) || 0) + 1;
+    contributionOrdinals.set(key, ordinal);
+    const target = 'c-' + key + '-' + ordinal;
+    const segments: PublicationSegment[] = [];
+    <<engine segment publication content>>
+    publication.contributions.push({
+        target, fragmentTarget: family.target, kind: header.append ? 'append' : 'definition',
+        language: header.language, definition: { ...part.definition }, tokenIndex,
+        content: part.content, segments
+    });
+    family.contributions.push(target);
+    publicationDocuments.get(part.definition.path)!.contributions.push(target);
+}
+```
+
+Segment the original normalized body before unescaping or highlighting. The
+shared scanner excludes escaped openers. Operators belong to reference text,
+while `end` retains the scanner's tag-only boundary; advancing past the operator
+prevents duplicating it in the next literal segment. Empty bodies need no segments.
+
+```ts : <<engine segment publication content>>=
+let cursor = 0;
+for (const { name, start, end, modifier, at } of references(part)) {
+    if (start > cursor) { segments.push({ kind: 'text', text: part.content.slice(cursor, start) }); }
+    const target = publicationFamilies.get(name)?.target;
+    const textEnd = end + (modifier?.length || 0);
+    segments.push({
+        kind: 'reference', text: part.content.slice(start, textEnd), name, start, end, at,
+        ...(modifier === undefined ? {} : { modifier }),
+        resolution: target === undefined ? { kind: 'missing' } : { kind: 'resolved', target }
+    });
+    cursor = textEnd;
+}
+if (cursor < part.content.length) { segments.push({ kind: 'text', text: part.content.slice(cursor) }); }
+```
+
 Expansion consumes the same occurrences, but suspends each fragment's generator
 at a dependency instead of calling expansion recursively. The explicit frame
 stack preserves depth-first encounter order without consuming the JavaScript
@@ -814,7 +964,7 @@ so invalid operators are reported once per occurrence, not once per resume.
         frames.push({ name, expansion, step: expansion.next() });
     };
     <<engine drive expansion frames>>
-    if (diagnostics.length) { return { files: [], diagnostics, inspection }; }
+    if (diagnostics.length) { return { files: [], diagnostics, inspection, publication }; }
 ```
 
 Every collected fragment enters the driver, including unused ones. A frame stays
@@ -895,7 +1045,7 @@ hosts without adding or removing a final newline.
     <<engine install fence renderer>>
     <<engine render documentation pages>>
     for (const file of files) { file.content = file.content.replace(/\r\n|\r/g, '\n'); }
-    return { files, diagnostics, inspection };
+    return { files, diagnostics, inspection, publication };
 }
 ```
 

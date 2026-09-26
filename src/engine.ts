@@ -19,17 +19,46 @@ export interface GenerationResult {
     files: GeneratedFile[];
     diagnostics: GenerationDiagnostic[];
     inspection: ProjectInspection;
+    publication: PublicationModel;
 }
 
+export interface PublicationLocation { path: string; line: number; column: number; }
+export interface PublicationModel {
+    documents: { path: string; contributions: string[] }[];
+    fragments: { name: string; target: string; contributions: string[] }[];
+    contributions: PublicationContribution[];
+}
+export interface PublicationContribution {
+    target: string;
+    fragmentTarget: string;
+    kind: 'definition' | 'append';
+    language: string;
+    definition: PublicationLocation;
+    tokenIndex: number;
+    content: string;
+    segments: PublicationSegment[];
+}
+export type PublicationSegment =
+    | { kind: 'text'; text: string }
+    | { kind: 'reference'; text: string; name: string;
+        start: number; end: number; at: PublicationLocation; modifier?: string;
+        resolution: { kind: 'resolved'; target: string } | { kind: 'missing' } };
 export const discoveryExcludedDirectories: readonly string[] = Object.freeze([
     '.git', 'node_modules', 'out', 'dist', '.yarn', '.vscode-test'
 ]);
 
-interface Location { path: string; line: number; column: number; }
+type Location = PublicationLocation;
 interface Header { name: string; language: string; append: boolean; output?: string; template?: string; }
 interface Part { content: string; location: Location; definition: Location; columns: number[]; }
 interface Fragment { header: Header; parts: Part[]; location: Location; }
 
+function publicationEncode(value: string): string {
+    let encoded = '';
+    for (let index = 0; index < value.length; index++) {
+        encoded += value.charCodeAt(index).toString(16).padStart(4, '0');
+    }
+    return encoded;
+}
 /** Canonical workspace-relative POSIX path; never permits escaping the workspace. */
 export function safeRelativePath(value: string): string | undefined {
     if (!value || /^(?:\/|[a-zA-Z]:)/.test(value) || /[\\\x00-\x1f]/.test(value)) { return undefined; }
@@ -275,6 +304,7 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
     }
     const fragments = new Map<string, Fragment>();
     const headers = new Map<Token, Header>();
+    const accepted: { header: Header; part: Part; tokenIndex: number }[] = [];
     const sourceTemplates = new Map<string, string>();
     const outputs = new Set<string>();
     const inputKeys = new Set([...sourceKeys, ...templateKeys]);
@@ -296,7 +326,7 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
     for (const path of order) {
         const sourceLines = sources.get(path)!.text.split(/\r\n|\r|\n/);
         reserve(path.replace(/\.literate$/, '.html'), { path, line: 0, column: 0 });
-        for (const token of tokens.get(path) || []) {
+        for (const [tokenIndex, token] of (tokens.get(path) || []).entries()) {
             if (token.type !== 'fence' || token.info.trim() === 'SETTINGS' || !token.info.includes('<<')) { continue; }
             const line = token.map?.[0] || 0;
             const location = { path, line, column: Math.max(0, sourceLines[line].indexOf(token.markup)) };
@@ -332,7 +362,10 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
                 if (header.output !== undefined || header.template !== undefined) { report(location, 'Append fragments cannot specify output or template'); }
                 const fragment = fragments.get(header.name);
                 if (!fragment) { report(location, `Cannot append to missing fragment: ${header.name}`); }
-                else { fragment.parts.push(part); }
+                else {
+                    fragment.parts.push(part);
+                    accepted.push({ header, part, tokenIndex });
+                }
                 continue;
             }
             if (fragments.has(header.name)) { report(location, `Duplicate fragment: ${header.name}`); continue; }
@@ -347,6 +380,7 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
                 if (template !== undefined) { sourceTemplates.set(header.name, template); }
             }
             fragments.set(header.name, { header, parts: [part], location });
+            accepted.push({ header, part, tokenIndex });
         }
     }
     function* references(part: Part) {
@@ -378,6 +412,44 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
             }
         }
         inspection.fragments.push(entry);
+    }
+    const publication: PublicationModel = {
+        documents: order.map(path => ({ path, contributions: [] })),
+        fragments: Array.from(fragments.keys(), name => ({
+            name, target: 'f-' + publicationEncode(name), contributions: []
+        })),
+        contributions: []
+    };
+    const publicationDocuments = new Map(publication.documents.map(document => [document.path, document]));
+    const publicationFamilies = new Map(publication.fragments.map(fragment => [fragment.name, fragment]));
+    const contributionOrdinals = new Map<string, number>();
+    for (const { header, part, tokenIndex } of accepted) {
+        const family = publicationFamilies.get(header.name)!;
+        const key = publicationEncode(header.name) + '-' + publicationEncode(part.definition.path);
+        const ordinal = (contributionOrdinals.get(key) || 0) + 1;
+        contributionOrdinals.set(key, ordinal);
+        const target = 'c-' + key + '-' + ordinal;
+        const segments: PublicationSegment[] = [];
+        let cursor = 0;
+        for (const { name, start, end, modifier, at } of references(part)) {
+            if (start > cursor) { segments.push({ kind: 'text', text: part.content.slice(cursor, start) }); }
+            const target = publicationFamilies.get(name)?.target;
+            const textEnd = end + (modifier?.length || 0);
+            segments.push({
+                kind: 'reference', text: part.content.slice(start, textEnd), name, start, end, at,
+                ...(modifier === undefined ? {} : { modifier }),
+                resolution: target === undefined ? { kind: 'missing' } : { kind: 'resolved', target }
+            });
+            cursor = textEnd;
+        }
+        if (cursor < part.content.length) { segments.push({ kind: 'text', text: part.content.slice(cursor) }); }
+        publication.contributions.push({
+            target, fragmentTarget: family.target, kind: header.append ? 'append' : 'definition',
+            language: header.language, definition: { ...part.definition }, tokenIndex,
+            content: part.content, segments
+        });
+        family.contributions.push(target);
+        publicationDocuments.get(part.definition.path)!.contributions.push(target);
     }
     type Reference = ReturnType<typeof references> extends Generator<infer T> ? T : never;
     function* expandParts(parts: Part[]): Generator<Reference, string, string> {
@@ -437,7 +509,7 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
             }
         }
     }
-    if (diagnostics.length) { return { files: [], diagnostics, inspection }; }
+    if (diagnostics.length) { return { files: [], diagnostics, inspection, publication }; }
     for (const fragment of fragments.values()) {
         if (!fragment.header.output) { continue; }
         const code = expanded.get(fragment.header.name)!.replace(/\\<</g, () => '<<');
@@ -471,5 +543,5 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
         files.push({ path: safeRelativePath(path.replace(/\.literate$/, '.html'))!, content: substitute(htmlTemplate, { content, authors: metaAuthors, theme }) });
     }
     for (const file of files) { file.content = file.content.replace(/\r\n|\r/g, '\n'); }
-    return { files, diagnostics, inspection };
+    return { files, diagnostics, inspection, publication };
 }

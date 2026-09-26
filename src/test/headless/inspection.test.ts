@@ -150,7 +150,8 @@ test('diagnostics preserve accepted parser metadata without inventing rejected d
 
 test('ordinary fences are not fragments and empty projects still provide inspection', () => {
     assert.deepEqual(generateProject([]), {
-        files: [], diagnostics: [], inspection: { documents: [], templates: [], fragments: [] }
+        files: [], diagnostics: [], inspection: { documents: [], templates: [], fragments: [] },
+                publication: { documents: [], fragments: [], contributions: [] }
     });
     const result = generateProject([{ path: 'only.literate', text: fence('text', '<<not a reference>>') }]);
     assert.deepEqual(result.diagnostics, []);
