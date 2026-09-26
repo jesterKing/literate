@@ -44,13 +44,19 @@ project fails rather than passing vacuously.
 
 ```typescript: <<cli usage>>=
 const commands = ['generate', 'check', 'inspect', 'self-check', 'latex'];
-const latexUsage = 'latex [root] --output path.tex [--paper a4|a5|letter|legal] [--margin 20mm] [--json]';
+const latexMarginOptions = [
+    ['--margin', 'marginMm'], ['--margin-top', 'marginTopMm'], ['--margin-right', 'marginRightMm'],
+    ['--margin-bottom', 'marginBottomMm'], ['--margin-left', 'marginLeftMm']
+] as const;
+const latexValueFlags = ['--output', '--paper', ...latexMarginOptions.map(([flag]) => flag)];
+const latexUsage = 'latex [root] --output path.tex [--paper a4|a5|letter|legal] [--margin 20mm]'
+    + ' [--margin-top Nmm] [--margin-right Nmm] [--margin-bottom Nmm] [--margin-left Nmm] [--json]';
 const usage = 'Usage: node out/cli.js generate|check|inspect|self-check [root] [--json]\n'
     + `       node out/cli.js ${latexUsage}\n`
     + '       node out/cli.js <command> --help [--json]\n       node out/cli.js --help [--json]\n';
 const descriptions: Record<string, string> = Object.fromEntries([
     ['generate', 'Write missing or changed generated files.'],
-    ['latex', 'Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving an 80 × 100 mm body. No TeX/PDF execution or bundled fonts.'],
+    ['latex', 'Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving at least an 80 × 100 mm body. Each side overrides --margin; unspecified sides use --margin or 20mm. Fonts resolve from root index.literate SETTINGS. No TeX/PDF execution or bundled fonts.'],
     ['check', 'Report missing or stale generated files without writing.'],
     ['inspect', 'Report documents, templates, and fragment definitions and dependencies without reading outputs or writing.'],
     ['self-check', 'Verify this repository’s trusted self-hosting code without generating files; all outputs must already be current.']
@@ -352,14 +358,16 @@ source chapter. Absolute paths, parent traversal, and non-`.tex` destinations
 are usage errors. Options take separate values, not `--name=value`. Paper defaults
 to `a4`, margin to `20mm`. The existing root `index.literate` SETTINGS `theme` key
 selects the publication palette through `resolveProjectTheme`; invalid themes
-report its diagnostics before conversion. No new settings or theme flag are
-introduced. Decimal millimetres are the only accepted margin unit, subject to the
-renderer's page/body constraints.
+report its diagnostics before conversion. Decimal millimetres are the only accepted
+margin unit, subject to the renderer's page/body constraints. `--margin-top`,
+`--margin-right`, `--margin-bottom`, and `--margin-left` override individual sides;
+each unspecified side falls back to `--margin`, or `20mm` when it is omitted.
 
-The renderer names installed font families: Latin Modern Roman, Monofur Nerd Font,
-and D2CodingLigature Nerd Font Propo. Export does not resolve, install, or bundle
-fonts. Those families and the template's TeX packages are dependencies for later
-compilation by the user, not prerequisites checked or installed by this command.
+The renderer automatically resolves font settings from the root `index.literate`
+SETTINGS through its publication-settings dependency. There are no font CLI flags.
+Export does not install or bundle fonts. The resolved families and the template's
+TeX packages are dependencies for later compilation by the user, not prerequisites
+checked or installed by this command.
 
 ### A bounded production converter
 
@@ -552,7 +560,7 @@ rather than silently changing which project is processed.
 ```typescript: <<cli argument parsing>>=
 for (let index = 0; index < args.length; index++) {
     const arg = args[index];
-    if (['--output', '--paper', '--margin'].includes(arg)) {
+    if (latexValueFlags.includes(arg)) {
         if (flags.has(arg)) { response.errors.push(`Duplicate flag: ${arg}`); }
         flags.add(arg);
         const value = args[index + 1];
@@ -604,12 +612,15 @@ if (help) {
 
 Reject these options on other commands, even help for another command. Help for
 LaTeX does not require an output, but supplied values must still be valid. Usage
-validation happens before discovery or spawning Pandoc. A5 permits at most 34 mm
-uniform margins so the text body remains at least 80 mm wide.
+validation happens before discovery or spawning Pandoc. All supplied margins must
+be finite and within 5–50 mm, including the uniform fallback even when every side
+is overridden. Opposite effective sides must leave at least an 80 × 100 mm body.
+A5 therefore permits a uniform margin above 34 mm only when explicit side overrides
+leave enough width.
 
 ```typescript: <<cli LaTeX argument validation>>=
-if (topic !== 'latex' && ['--output', '--paper', '--margin'].some(flag => flags.has(flag))) {
-    response.errors.push('--output, --paper and --margin are only valid for latex');
+if (topic !== 'latex' && latexValueFlags.some(flag => flags.has(flag))) {
+    response.errors.push(`${latexValueFlags.join(', ')} are only valid for latex`);
 }
 if (topic === 'latex') {
     const output = values.get('--output');
@@ -622,13 +633,41 @@ if (topic === 'latex') {
         response.errors.push('--paper must be a4, a5, letter or legal');
     }
     latexOptions.paper = (paper === 'a4' ? 'A4' : paper === 'a5' ? 'A5' : paper) as LatexOptions['paper'];
-    const margin = values.get('--margin') ?? '20mm';
+    <<cli LaTeX margin validation>>
+    <<cli LaTeX body validation>>
+}
+```
+
+Validate each supplied value with the same decimal-mm syntax. Keep absent side
+options absent so the renderer applies the same uniform fallback as the CLI.
+
+```typescript: <<cli LaTeX margin validation>>=
+for (const [flag, option] of latexMarginOptions) {
+    const margin = values.get(flag) ?? (flag === '--margin' ? '20mm' : undefined);
+    if (margin === undefined) { continue; }
     const mm = Number(margin.slice(0, -2));
-    if (!/^\d+(?:\.\d+)?mm$/.test(margin) || !Number.isFinite(mm) || mm < 5 || mm > 50 ||
-        (paper === 'a5' && mm > 34)) {
-        response.errors.push('--margin requires numeric mm, 5–50 (at most 34 for a5)');
+    if (!/^\d+(?:\.\d+)?mm$/.test(margin) || !Number.isFinite(mm) || mm < 5 || mm > 50) {
+        response.errors.push(`${flag} requires numeric mm, 5–50`);
     }
-    latexOptions.marginMm = mm;
+    latexOptions[option] = mm;
+}
+```
+
+Check page dimensions against effective sides, not the uniform value alone. Skip
+this dependent check when argument errors already prevent execution.
+
+```typescript: <<cli LaTeX body validation>>=
+const paperSizes: Record<string, [number, number]> = {
+    a4: [210, 297], a5: [148, 210], letter: [215.9, 279.4], legal: [215.9, 355.6]
+};
+if (!response.errors.length) {
+    const [width, height] = paperSizes[paper];
+    const uniform = latexOptions.marginMm ?? 20;
+    const horizontal = (latexOptions.marginLeftMm ?? uniform) + (latexOptions.marginRightMm ?? uniform);
+    const vertical = (latexOptions.marginTopMm ?? uniform) + (latexOptions.marginBottomMm ?? uniform);
+    if (width - horizontal < 80 || height - vertical < 100) {
+        response.errors.push('Margins must leave at least an 80 × 100 mm body for the selected paper');
+    }
 }
 ```
 

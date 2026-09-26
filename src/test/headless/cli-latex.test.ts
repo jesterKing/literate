@@ -91,7 +91,8 @@ for (const args of invalidArguments) {
 for (const name of ['generate', 'check', 'inspect', 'self-check']) {
     test(`${name} rejects all latex-only options, including help`, async t => {
         const root = fixture(t);
-        for (const option of [['--output', 'book.tex'], ['--paper', 'a4'], ['--margin', '20mm']]) {
+        for (const option of [['--output', 'book.tex'], ['--paper', 'a4'], ['--margin', '20mm'],
+                    ...['top', 'right', 'bottom', 'left'].map(side => ['--margin-' + side, '20mm'])]) {
             for (const help of [[], ['--help']]) {
                 let calls = 0;
                 const result = await command([name, path.join(root, 'absent'), ...option, ...help], async () => {
@@ -147,6 +148,64 @@ for (const [paper, margin] of [['a4', '50mm'], ['a5', '34mm'], ['letter', '5mm']
         assert.ok(tex.includes(`${paper}paper,margin=${margin}`));
     });
 }
+
+test('latex applies asymmetric CLI margins with uniform fallback and root font settings', async t => {
+    const root = fixture(t);
+    write(root, 'index.literate', '```SETTINGS\nfont-body=Body Font\nfont-heading=Heading Font\n'
+        + 'font-code=Code Font\nfont-fragment=Fragment Font\nfont-note=Note Font\nfont-code-ligatures=off\n```\n' + source);
+    write(root, 'chapter.literate', '```SETTINGS\nfont-code=bad/path\n```\n');
+    const result = await command([...latex(root), '--paper', 'a5', '--margin', '22mm',
+        '--margin-top', '18mm', '--margin-left', '20mm', '--margin-right', '16mm']);
+    assert.equal(result.code, 0, failureText(result.response));
+    const tex = fs.readFileSync(path.join(root, 'books/book.tex'), 'utf8');
+    for (const value of ['a5paper,top=18mm,right=16mm,bottom=22mm,left=20mm',
+        'Body Font', 'Heading Font', 'Code Font', 'Fragment Font', 'Note Font', 'RawFeature={-calt}']) {
+        assert.ok(tex.includes(value), value);
+    }
+});
+
+test('latex invalid font setting preserves output even when followed by a valid repeated value', async t => {
+    const root = fixture(t);
+    write(root, 'index.literate', '```SETTINGS\nfont-code=bad/path\nfont-code=Safe Font\n```\n' + source);
+    write(root, 'books/book.tex', 'previous book');
+    const before = snapshot(root);
+    let calls = 0;
+    const result = await command(latex(root), async () => { calls++; return body; });
+    assert.equal(result.code, 1);
+    assert.equal(calls, 0);
+    assert.match(result.response.diagnostics[0].message, /Invalid font-code/);
+    assert.equal(result.response.diagnostics[0].line, 1);
+    assert.deepEqual(snapshot(root), before);
+});
+
+for (const side of ['top', 'right', 'bottom', 'left']) {
+    test(`latex validates ${side} margin before discovery or conversion`, async t => {
+        const root = fixture(t);
+        for (const args of [[`--margin-${side}`], [`--margin-${side}`, 'NaNmm'],
+            [`--margin-${side}`, '4mm'], [`--margin-${side}`, '51mm'], [`--margin-${side}`, '2cm'],
+            [`--margin-${side}`, '20mm', `--margin-${side}`, '21mm']]) {
+            let calls = 0;
+            const result = await command([...latex(path.join(root, 'absent')), ...args], async () => {
+                calls++; return body;
+            });
+            assert.equal(result.code, 2, JSON.stringify(args));
+            assert.equal(calls, 0);
+            assert.doesNotMatch(failureText(result.response), /ENOENT/);
+        }
+    });
+}
+
+test('latex validates effective margin sums rather than rejecting overridden A5 defaults', async t => {
+    const root = fixture(t);
+    write(root, 'index.literate', source);
+    const valid = await command([...latex(root), '--paper', 'a5', '--margin', '50mm',
+        '--margin-left', '18mm']);
+    assert.equal(valid.code, 0, failureText(valid.response));
+    const before = snapshot(root);
+    const invalid = await command([...latex(root), '--paper', 'a5', '--margin-left', '34mm', '--margin-right', '34.1mm']);
+    assert.equal(invalid.code, 2);
+    assert.deepEqual(snapshot(root), before);
+});
 
 test('latex JSON writes only the selected-root book and preserves identical bytes and mtime', async t => {
     const base = fixture(t);

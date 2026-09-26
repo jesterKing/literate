@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Publication font settings</h1>
+<p>This chapter owns <code>src/publication-settings.ts</code> and its headless tests. It reads
+only root <code>index.literate</code> SETTINGS tokens from a <code>ParsedProject</code>; <code>parseProject</code>
+has already canonicalized paths with <code>safeRelativePath</code>. Chapter settings and
+unrelated keys (including theme) are not ours. Keys and <code>on</code>/<code>off</code> are case-sensitive.</p>
+<p>This is font selection, <strong>not font bundling</strong>. There is no filesystem access,
+font lookup, global installation, or runtime dependency. Renderers remain
+responsible for applying the selected families and ligature policy. In particular,
+<code>off</code> calls for disabling <code>calt</code> (<code>-calt</code>), verified for the actual D2 font, rather
+than merely disabling <code>liga</code>. This chapter does not change a renderer or CLI.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication settings.*&gt;&gt;= src/publication-settings.ts $</div>
+<div class="code">
+<pre><code><span class="literate-tag-name">&lt;&lt;publication settings contract&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication settings resolver&gt;&gt;</span>
+</code></pre>
+
+</div>
+</div><h2>Public contract</h2>
+<p>All five families are resolved strings. Omitted notes inherit the final selected
+body family, whereas fragments default independently to Monofur. Diagnostics
+here describe settings only: they do not copy <code>project.diagnostics</code>. Callers must
+still gate rendering on source diagnostics through preparation (<code>preparePandoc</code>);
+a settings result alone is not permission to render. Source NUL rejection belongs
+to the existing parser, before Markdown can replace NUL with a replacement glyph.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication settings contract&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title class_">GenerationDiagnostic</span>, <span class="hljs-title class_">ParsedProject</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./engine&#x27;</span>;
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">PublicationFonts</span> {
+    <span class="hljs-attr">body</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">heading</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">code</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">fragment</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">note</span>: <span class="hljs-built_in">string</span>;
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">PublicationSettingsResult</span> {
+    <span class="hljs-attr">fonts</span>: <span class="hljs-title class_">PublicationFonts</span>;
+    <span class="hljs-attr">codeLigatures</span>: <span class="hljs-built_in">boolean</span>;
+    <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">GenerationDiagnostic</span>[];
+}
+</code></pre>
+
+</div>
+</div><h2>Scan in authored order</h2>
+<p>Each call starts fresh. A missing root is valid and yields defaults. We consume
+the existing fence tokens, including fences inside Markdown containers, without
+reparsing source or treating ordinary code blocks as settings.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication settings resolver&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">resolvePublicationSettings</span>(<span class="hljs-params">project: ParsedProject</span>): <span class="hljs-title class_">PublicationSettingsResult</span> {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">fonts</span>: <span class="hljs-title class_">PublicationFonts</span> = {
+        <span class="hljs-attr">body</span>: <span class="hljs-string">&#x27;Latin Modern Roman&#x27;</span>, <span class="hljs-attr">heading</span>: <span class="hljs-string">&#x27;Monofur Nerd Font&#x27;</span>,
+        <span class="hljs-attr">code</span>: <span class="hljs-string">&#x27;D2CodingLigature Nerd Font Propo&#x27;</span>, <span class="hljs-attr">fragment</span>: <span class="hljs-string">&#x27;Monofur Nerd Font&#x27;</span>, <span class="hljs-attr">note</span>: <span class="hljs-string">&#x27;&#x27;</span>
+    };
+    <span class="hljs-keyword">let</span> codeLigatures = <span class="hljs-literal">true</span>;
+    <span class="hljs-keyword">let</span> explicitNote = <span class="hljs-literal">false</span>;
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">GenerationDiagnostic</span>[] = [];
+    <span class="hljs-keyword">const</span> <span class="hljs-variable language_">document</span> = project.<span class="hljs-property">documents</span>.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">value</span> =&gt;</span> value.<span class="hljs-property">path</span> === <span class="hljs-string">&#x27;index.literate&#x27;</span>);
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> <span class="hljs-variable language_">document</span>?.<span class="hljs-property">tokens</span> ?? []) {
+        <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> !== <span class="hljs-string">&#x27;fence&#x27;</span> || token.<span class="hljs-property">info</span>.<span class="hljs-title function_">trim</span>() !== <span class="hljs-string">&#x27;SETTINGS&#x27;</span>) { <span class="hljs-keyword">continue</span>; }
+        token.<span class="hljs-property">content</span>.<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;\n&#x27;</span>).<span class="hljs-title function_">forEach</span>(<span class="hljs-function">(<span class="hljs-params">line: <span class="hljs-built_in">string</span>, index: <span class="hljs-built_in">number</span></span>) =&gt;</span> {
+            <span class="hljs-keyword">const</span> match = <span class="hljs-regexp">/^\s*(font-body|font-heading|font-code|font-fragment|font-note|font-code-ligatures)\s*=(.*)$/</span>.<span class="hljs-title function_">exec</span>(line);
+            <span class="hljs-keyword">if</span> (!match) { <span class="hljs-keyword">return</span>; }
+            <span class="hljs-keyword">const</span> key = match[<span class="hljs-number">1</span>];
+            <span class="hljs-keyword">const</span> value = match[<span class="hljs-number">2</span>].<span class="hljs-title function_">trim</span>();
+</code></pre>
+
+</div>
+</div><p>Family values use the same simple ASCII grammar as the existing LaTeX <code>fontName</code>:
+1–100 letters, digits, spaces, dots or hyphens, starting with a letter or digit.
+Whitespace around values is trimmed; empty names, paths and TeX syntax are rejected.
+Last valid wins, but every invalid occurrence remains a diagnostic, just as for
+theme settings. Coordinates are zero-based: the fence map starts at its opener,
+so content line zero is source line <code>map[0] + 1</code>, also within lists and quotes.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication settings resolver&gt;&gt;=+ </div>
+<div class="code">
+<pre><code>            <span class="hljs-keyword">const</span> report = (<span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>): <span class="hljs-function"><span class="hljs-params">void</span> =&gt;</span> {
+                diagnostics.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">path</span>: <span class="hljs-variable language_">document</span>!.<span class="hljs-property">path</span>,
+                    <span class="hljs-attr">line</span>: (token.<span class="hljs-property">map</span>?.[<span class="hljs-number">0</span>] ?? <span class="hljs-number">0</span>) + index + <span class="hljs-number">1</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span>, message });
+            };
+            <span class="hljs-keyword">if</span> (key === <span class="hljs-string">&#x27;font-code-ligatures&#x27;</span>) {
+                <span class="hljs-keyword">if</span> (value === <span class="hljs-string">&#x27;on&#x27;</span> || value === <span class="hljs-string">&#x27;off&#x27;</span>) { codeLigatures = value === <span class="hljs-string">&#x27;on&#x27;</span>; }
+                <span class="hljs-keyword">else</span> { <span class="hljs-title function_">report</span>(<span class="hljs-string">`Invalid <span class="hljs-subst">${key}</span>: expected on or off`</span>); }
+            } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (<span class="hljs-regexp">/^[A-Za-z0-9][A-Za-z0-9 .-]{0,99}$/</span>.<span class="hljs-title function_">test</span>(value)) {
+                <span class="hljs-keyword">const</span> role = key.<span class="hljs-title function_">slice</span>(<span class="hljs-number">5</span>) <span class="hljs-keyword">as</span> keyof <span class="hljs-title class_">PublicationFonts</span>;
+                fonts[role] = value;
+                <span class="hljs-keyword">if</span> (role === <span class="hljs-string">&#x27;note&#x27;</span>) { explicitNote = <span class="hljs-literal">true</span>; }
+            } <span class="hljs-keyword">else</span> {
+                <span class="hljs-title function_">report</span>(<span class="hljs-string">`Invalid <span class="hljs-subst">${key}</span>: font must be a simple family name (1–100 ASCII characters)`</span>);
+            }
+        });
+    }
+    <span class="hljs-keyword">if</span> (!explicitNote) { fonts.<span class="hljs-property">note</span> = fonts.<span class="hljs-property">body</span>; }
+    <span class="hljs-keyword">return</span> { fonts, codeLigatures, diagnostics };
+}
+</code></pre>
+
+</div>
+</div><h2>Headless contract tests</h2>
+<p>These tests parse real Markdown rather than constructing tokens. They cover root
+normalization, containers and newline maps as well as invalid-value retention.
+Neither resolving settings nor testing them requires an installed font.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication settings tests.*&gt;&gt;= src/test/headless/publication-settings.test.ts $</div>
+<div class="code">
+<pre><code><span class="literate-tag-name">&lt;&lt;publication settings test setup&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication settings default tests&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication settings validation tests&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication settings source tests&gt;&gt;</span>
+</code></pre>
+
+</div>
+</div><p>The helper rejects unexpected parse diagnostics so settings validation is tested
+independently of source validation.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication settings test setup&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> assert = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;node:assert/strict&#x27;</span>);
+<span class="hljs-keyword">import</span> { test } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;node:test&#x27;</span>;
+<span class="hljs-keyword">import</span> { parseProject } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;../../engine&#x27;</span>;
+<span class="hljs-keyword">import</span> { preparePandoc } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;../../publication-pandoc&#x27;</span>;
+<span class="hljs-keyword">import</span> { resolvePublicationSettings } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;../../publication-settings&#x27;</span>;
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title class_">PublicationFonts</span>, <span class="hljs-title class_">PublicationSettingsResult</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;../../publication-settings&#x27;</span>;
+
+<span class="hljs-keyword">const</span> <span class="hljs-attr">defaults</span>: <span class="hljs-title class_">PublicationFonts</span> = {
+    <span class="hljs-attr">body</span>: <span class="hljs-string">&#x27;Latin Modern Roman&#x27;</span>, <span class="hljs-attr">heading</span>: <span class="hljs-string">&#x27;Monofur Nerd Font&#x27;</span>,
+    <span class="hljs-attr">code</span>: <span class="hljs-string">&#x27;D2CodingLigature Nerd Font Propo&#x27;</span>, <span class="hljs-attr">fragment</span>: <span class="hljs-string">&#x27;Monofur Nerd Font&#x27;</span>, <span class="hljs-attr">note</span>: <span class="hljs-string">&#x27;Latin Modern Roman&#x27;</span>
+};
+<span class="hljs-keyword">const</span> <span class="hljs-title function_">fence</span> = (<span class="hljs-params">content: <span class="hljs-built_in">string</span>, info = <span class="hljs-string">&#x27;SETTINGS&#x27;</span></span>) =&gt; <span class="hljs-string">&#x27;```&#x27;</span> + info + <span class="hljs-string">&#x27;\n&#x27;</span> + content + <span class="hljs-string">&#x27;\n```\n&#x27;</span>;
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">resolve</span>(<span class="hljs-params">text: <span class="hljs-built_in">string</span>, path = <span class="hljs-string">&#x27;index.literate&#x27;</span></span>): <span class="hljs-title class_">PublicationSettingsResult</span> {
+    <span class="hljs-keyword">const</span> project = <span class="hljs-title function_">parseProject</span>([{ path, text }]);
+    assert.<span class="hljs-title function_">deepEqual</span>(project.<span class="hljs-property">diagnostics</span>, []);
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_">resolvePublicationSettings</span>(project);
+}
+</code></pre>
+
+</div>
+</div><p>Defaults are per-call values, and only the canonical, exact-case root participates.
+A chapter named <code>index.literate</code> is still not the root.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication settings default tests&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-title function_">test</span>(<span class="hljs-string">&#x27;publication settings defaults and root-only scope&#x27;</span>, <span class="hljs-function">() =&gt;</span> {
+    <span class="hljs-keyword">const</span> expected = { <span class="hljs-attr">fonts</span>: defaults, <span class="hljs-attr">codeLigatures</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">diagnostics</span>: [] };
+    assert.<span class="hljs-title function_">deepEqual</span>(<span class="hljs-title function_">resolvePublicationSettings</span>(<span class="hljs-title function_">parseProject</span>([])), expected);
+    assert.<span class="hljs-title function_">deepEqual</span>(<span class="hljs-title function_">resolve</span>(<span class="hljs-string">&#x27;&#x27;</span>), expected);
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> path <span class="hljs-keyword">of</span> [<span class="hljs-string">&#x27;chapter.literate&#x27;</span>, <span class="hljs-string">&#x27;chapters/index.literate&#x27;</span>, <span class="hljs-string">&#x27;Index.literate&#x27;</span>]) {
+        assert.<span class="hljs-title function_">deepEqual</span>(<span class="hljs-title function_">resolve</span>(<span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;font-body=Other\nfont-code-ligatures=bad&#x27;</span>), path), expected);
+    }
+    <span class="hljs-keyword">const</span> project = <span class="hljs-title function_">parseProject</span>([
+        { <span class="hljs-attr">path</span>: <span class="hljs-string">&#x27;chapter.literate&#x27;</span>, <span class="hljs-attr">text</span>: <span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;font-body=Chapter\nfont-note=&#x27;</span>) },
+        { <span class="hljs-attr">path</span>: <span class="hljs-string">&#x27;./parts/../index.literate&#x27;</span>, <span class="hljs-attr">text</span>: <span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;font-body=Root&#x27;</span>) }
+    ]);
+    assert.<span class="hljs-title function_">deepEqual</span>(project.<span class="hljs-property">diagnostics</span>, []);
+    assert.<span class="hljs-title function_">equal</span>(<span class="hljs-title function_">resolvePublicationSettings</span>(project).<span class="hljs-property">fonts</span>.<span class="hljs-property">body</span>, <span class="hljs-string">&#x27;Root&#x27;</span>);
+    assert.<span class="hljs-title function_">deepEqual</span>(<span class="hljs-title function_">resolvePublicationSettings</span>(project).<span class="hljs-property">diagnostics</span>, []);
+    <span class="hljs-keyword">const</span> rejected = <span class="hljs-title function_">parseProject</span>([{ <span class="hljs-attr">path</span>: <span class="hljs-string">&#x27;.\\index.literate&#x27;</span>, <span class="hljs-attr">text</span>: <span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;font-body=Wrong&#x27;</span>) }]);
+    assert.<span class="hljs-title function_">ok</span>(rejected.<span class="hljs-property">diagnostics</span>.<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">d</span> =&gt;</span> d.<span class="hljs-property">message</span> === <span class="hljs-string">&#x27;Invalid source path&#x27;</span>));
+    assert.<span class="hljs-title function_">deepEqual</span>(<span class="hljs-title function_">resolvePublicationSettings</span>(rejected), expected);
+    <span class="hljs-keyword">const</span> changed = <span class="hljs-title function_">resolve</span>(<span class="hljs-string">&#x27;&#x27;</span>);
+    changed.<span class="hljs-property">fonts</span>.<span class="hljs-property">body</span> = <span class="hljs-string">&#x27;Changed&#x27;</span>;
+    assert.<span class="hljs-title function_">deepEqual</span>(<span class="hljs-title function_">resolve</span>(<span class="hljs-string">&#x27;&#x27;</span>), expected);
+});
+</code></pre>
+
+</div>
+</div><p>Every role accepts trimmed names. Note inheritance is delayed across SETTINGS
+blocks, but an explicit valid note survives subsequent invalid note values.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication settings default tests&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-title function_">test</span>(<span class="hljs-string">&#x27;publication settings select all roles and delay note inheritance&#x27;</span>, <span class="hljs-function">() =&gt;</span> {
+    <span class="hljs-keyword">const</span> result = <span class="hljs-title function_">resolve</span>(<span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;font-body = Body 2.0\nfont-heading= Heading-Font \n&#x27;</span> +
+        <span class="hljs-string">&#x27;font-code= Code Font \nfont-fragment= Fragment Font\nfont-code-ligatures= off &#x27;</span>));
+    assert.<span class="hljs-title function_">deepEqual</span>(result, { <span class="hljs-attr">fonts</span>: { <span class="hljs-attr">body</span>: <span class="hljs-string">&#x27;Body 2.0&#x27;</span>, <span class="hljs-attr">heading</span>: <span class="hljs-string">&#x27;Heading-Font&#x27;</span>,
+        <span class="hljs-attr">code</span>: <span class="hljs-string">&#x27;Code Font&#x27;</span>, <span class="hljs-attr">fragment</span>: <span class="hljs-string">&#x27;Fragment Font&#x27;</span>, <span class="hljs-attr">note</span>: <span class="hljs-string">&#x27;Body 2.0&#x27;</span> },
+        <span class="hljs-attr">codeLigatures</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">diagnostics</span>: [] });
+    <span class="hljs-keyword">const</span> inherited = <span class="hljs-title function_">resolve</span>(<span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;font-note=\nfont-body=First&#x27;</span>) + <span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;font-body=Last&#x27;</span>));
+    assert.<span class="hljs-title function_">equal</span>(inherited.<span class="hljs-property">fonts</span>.<span class="hljs-property">note</span>, <span class="hljs-string">&#x27;Last&#x27;</span>);
+    assert.<span class="hljs-title function_">equal</span>(inherited.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>, <span class="hljs-number">1</span>);
+    <span class="hljs-keyword">const</span> explicit = <span class="hljs-title function_">resolve</span>(<span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;font-note=Notes&#x27;</span>) + <span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;font-body=Last\nfont-note=bad/path&#x27;</span>));
+    assert.<span class="hljs-title function_">equal</span>(explicit.<span class="hljs-property">fonts</span>.<span class="hljs-property">note</span>, <span class="hljs-string">&#x27;Notes&#x27;</span>);
+    assert.<span class="hljs-title function_">equal</span>(explicit.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>, <span class="hljs-number">1</span>);
+});
+</code></pre>
+
+</div>
+</div><p>Invalid repetitions never erase a valid value or an earlier diagnostic. Valid
+ligature values likewise override only the selected value, not diagnostic history.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication settings validation tests&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-title function_">test</span>(<span class="hljs-string">&#x27;publication settings retain every invalid repetition&#x27;</span>, <span class="hljs-function">() =&gt;</span> {
+    <span class="hljs-keyword">const</span> result = <span class="hljs-title function_">resolve</span>(<span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;font-body=\nfont-body=First\nfont-body=bad/path\n&#x27;</span> +
+        <span class="hljs-string">&#x27;font-body=Last\nfont-body=\\input{x}\nfont-code-ligatures=no\n&#x27;</span> +
+        <span class="hljs-string">&#x27;font-code-ligatures=off\nfont-code-ligatures=ON&#x27;</span>) +
+        <span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;font-code-ligatures=on\nfont-code-ligatures=&#x27;</span>));
+    assert.<span class="hljs-title function_">equal</span>(result.<span class="hljs-property">fonts</span>.<span class="hljs-property">body</span>, <span class="hljs-string">&#x27;Last&#x27;</span>);
+    assert.<span class="hljs-title function_">equal</span>(result.<span class="hljs-property">fonts</span>.<span class="hljs-property">note</span>, <span class="hljs-string">&#x27;Last&#x27;</span>);
+    assert.<span class="hljs-title function_">equal</span>(result.<span class="hljs-property">codeLigatures</span>, <span class="hljs-literal">true</span>);
+    assert.<span class="hljs-title function_">deepEqual</span>(result.<span class="hljs-property">diagnostics</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">d</span> =&gt;</span> d.<span class="hljs-property">line</span>), [<span class="hljs-number">1</span>, <span class="hljs-number">3</span>, <span class="hljs-number">5</span>, <span class="hljs-number">6</span>, <span class="hljs-number">8</span>, <span class="hljs-number">12</span>]);
+    assert.<span class="hljs-title function_">ok</span>(result.<span class="hljs-property">diagnostics</span>.<span class="hljs-title function_">every</span>(<span class="hljs-function"><span class="hljs-params">d</span> =&gt;</span> d.<span class="hljs-property">path</span> === <span class="hljs-string">&#x27;index.literate&#x27;</span> &amp;&amp; d.<span class="hljs-property">column</span> === <span class="hljs-number">0</span>));
+    assert.<span class="hljs-title function_">match</span>(result.<span class="hljs-property">diagnostics</span>[<span class="hljs-number">0</span>].<span class="hljs-property">message</span>, <span class="hljs-regexp">/font-body.*simple family name/</span>);
+    assert.<span class="hljs-title function_">match</span>(result.<span class="hljs-property">diagnostics</span>[<span class="hljs-number">3</span>].<span class="hljs-property">message</span>, <span class="hljs-regexp">/font-code-ligatures.*on or off/</span>);
+});
+</code></pre>
+
+</div>
+</div><p>The grammar is deliberately narrower than fontspec input; no TeX escaping or path
+interpretation is attempted. All five family keys share this validation.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication settings validation tests&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-title function_">test</span>(<span class="hljs-string">&#x27;publication settings enforce the simple ASCII family grammar&#x27;</span>, <span class="hljs-function">() =&gt;</span> {
+    <span class="hljs-keyword">const</span> invalid = [<span class="hljs-string">&#x27;&#x27;</span>, <span class="hljs-string">&#x27;   &#x27;</span>, <span class="hljs-string">&#x27;A&#x27;</span>.<span class="hljs-title function_">repeat</span>(<span class="hljs-number">101</span>), <span class="hljs-string">&#x27;.Font&#x27;</span>, <span class="hljs-string">&#x27;-Font&#x27;</span>, <span class="hljs-string">&#x27;École&#x27;</span>, <span class="hljs-string">&#x27;A_B&#x27;</span>,
+        <span class="hljs-string">&#x27;A/B&#x27;</span>, <span class="hljs-string">&#x27;A\\B&#x27;</span>, <span class="hljs-string">&#x27;A{B}&#x27;</span>, <span class="hljs-string">&#x27;A%B&#x27;</span>, <span class="hljs-string">&#x27;A#B&#x27;</span>, <span class="hljs-string">&#x27;A$B&#x27;</span>, <span class="hljs-string">&#x27;A&amp;B&#x27;</span>, <span class="hljs-string">&#x27;A~B&#x27;</span>, <span class="hljs-string">&#x27;A^B&#x27;</span>, <span class="hljs-string">&#x27;A[B]&#x27;</span>, <span class="hljs-string">&#x27;A\tB&#x27;</span>];
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> role <span class="hljs-keyword">of</span> [<span class="hljs-string">&#x27;body&#x27;</span>, <span class="hljs-string">&#x27;heading&#x27;</span>, <span class="hljs-string">&#x27;code&#x27;</span>, <span class="hljs-string">&#x27;fragment&#x27;</span>, <span class="hljs-string">&#x27;note&#x27;</span>] <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span>) {
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> value <span class="hljs-keyword">of</span> invalid) {
+            <span class="hljs-keyword">const</span> result = <span class="hljs-title function_">resolve</span>(<span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;font-&#x27;</span> + role + <span class="hljs-string">&#x27;=&#x27;</span> + value));
+            assert.<span class="hljs-title function_">equal</span>(result.<span class="hljs-property">fonts</span>[role], defaults[role], role + <span class="hljs-string">&#x27;: &#x27;</span> + value);
+            assert.<span class="hljs-title function_">equal</span>(result.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>, <span class="hljs-number">1</span>, role + <span class="hljs-string">&#x27;: &#x27;</span> + value);
+        }
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> value <span class="hljs-keyword">of</span> [<span class="hljs-string">&#x27;A&#x27;</span>, <span class="hljs-string">&#x27;0&#x27;</span>, <span class="hljs-string">&#x27;A&#x27;</span>.<span class="hljs-title function_">repeat</span>(<span class="hljs-number">100</span>), <span class="hljs-string">&#x27;Family 2.0-Pro&#x27;</span>]) {
+            <span class="hljs-keyword">const</span> result = <span class="hljs-title function_">resolve</span>(<span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;font-&#x27;</span> + role + <span class="hljs-string">&#x27;=  &#x27;</span> + value + <span class="hljs-string">&#x27;  &#x27;</span>));
+            assert.<span class="hljs-title function_">equal</span>(result.<span class="hljs-property">fonts</span>[role], value);
+            assert.<span class="hljs-title function_">deepEqual</span>(result.<span class="hljs-property">diagnostics</span>, []);
+        }
+    }
+});
+</code></pre>
+
+</div>
+</div><p>Unrelated SETTINGS and non-SETTINGS text are ignored, including differently cased
+keys, ordinary fences and indented code. Container fences remain ordinary settings.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication settings source tests&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-title function_">test</span>(<span class="hljs-string">&#x27;publication settings ignore unrelated keys and non-settings text&#x27;</span>, <span class="hljs-function">() =&gt;</span> {
+    <span class="hljs-keyword">const</span> text = <span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;theme=unknown\nFont-body=\nfont-body-extra=\nfont-note-other=\nauthors=X&#x27;</span>) +
+        <span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;font-body=Wrong&#x27;</span>, <span class="hljs-string">&#x27;settings&#x27;</span>) + <span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;font-body=Wrong&#x27;</span>, <span class="hljs-string">&#x27;text&#x27;</span>) +
+        <span class="hljs-string">&#x27;font-body=Wrong\n\n    font-body=Wrong\n&#x27;</span>;
+    assert.<span class="hljs-title function_">deepEqual</span>(<span class="hljs-title function_">resolve</span>(text), { <span class="hljs-attr">fonts</span>: defaults, <span class="hljs-attr">codeLigatures</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">diagnostics</span>: [] });
+});
+
+<span class="hljs-title function_">test</span>(<span class="hljs-string">&#x27;publication settings map zero-based lines across newlines and containers&#x27;</span>, <span class="hljs-function">() =&gt;</span> {
+    <span class="hljs-keyword">const</span> lines = [<span class="hljs-string">&#x27;# Title&#x27;</span>, <span class="hljs-string">&#x27;&#x27;</span>, <span class="hljs-string">&#x27;&gt; ```SETTINGS&#x27;</span>, <span class="hljs-string">&#x27;&gt; font-body=Quoted&#x27;</span>, <span class="hljs-string">&#x27;&gt; font-heading=&#x27;</span>,
+        <span class="hljs-string">&#x27;&gt; ```&#x27;</span>, <span class="hljs-string">&#x27;&#x27;</span>, <span class="hljs-string">&#x27;- item&#x27;</span>, <span class="hljs-string">&#x27;&#x27;</span>, <span class="hljs-string">&#x27;  ```SETTINGS&#x27;</span>, <span class="hljs-string">&#x27;  font-code-ligatures=off&#x27;</span>,
+        <span class="hljs-string">&#x27;  font-note=bad/path&#x27;</span>, <span class="hljs-string">&#x27;  ```&#x27;</span>];
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> newline <span class="hljs-keyword">of</span> [<span class="hljs-string">&#x27;\n&#x27;</span>, <span class="hljs-string">&#x27;\r\n&#x27;</span>, <span class="hljs-string">&#x27;\r&#x27;</span>]) {
+        <span class="hljs-keyword">const</span> result = <span class="hljs-title function_">resolve</span>(lines.<span class="hljs-title function_">join</span>(newline));
+        assert.<span class="hljs-title function_">equal</span>(result.<span class="hljs-property">fonts</span>.<span class="hljs-property">body</span>, <span class="hljs-string">&#x27;Quoted&#x27;</span>);
+        assert.<span class="hljs-title function_">equal</span>(result.<span class="hljs-property">fonts</span>.<span class="hljs-property">note</span>, <span class="hljs-string">&#x27;Quoted&#x27;</span>);
+        assert.<span class="hljs-title function_">equal</span>(result.<span class="hljs-property">codeLigatures</span>, <span class="hljs-literal">false</span>);
+        assert.<span class="hljs-title function_">deepEqual</span>(result.<span class="hljs-property">diagnostics</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">d</span> =&gt;</span> [d.<span class="hljs-property">line</span>, d.<span class="hljs-property">column</span>]), [[<span class="hljs-number">4</span>, <span class="hljs-number">0</span>], [<span class="hljs-number">11</span>, <span class="hljs-number">0</span>]]);
+    }
+    assert.<span class="hljs-title function_">equal</span>(<span class="hljs-title function_">resolve</span>(<span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;font-body=&#x27;</span>)).<span class="hljs-property">diagnostics</span>[<span class="hljs-number">0</span>].<span class="hljs-property">line</span>, <span class="hljs-number">1</span>);
+});
+</code></pre>
+
+</div>
+</div><p>Source diagnostics remain owned by the parser and the preparation gate. Resolving
+settings neither duplicates nor mutates them, even when a rejected source is NUL-bearing.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication settings source tests&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-title function_">test</span>(<span class="hljs-string">&#x27;publication settings leave source diagnostics to the preparation gate&#x27;</span>, <span class="hljs-function">() =&gt;</span> {
+    <span class="hljs-keyword">const</span> project = <span class="hljs-title function_">parseProject</span>([{ <span class="hljs-attr">path</span>: <span class="hljs-string">&#x27;index.literate&#x27;</span>, <span class="hljs-attr">text</span>: <span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;font-body=A\0B&#x27;</span>) }]);
+    assert.<span class="hljs-title function_">ok</span>(project.<span class="hljs-property">diagnostics</span>.<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">d</span> =&gt;</span> <span class="hljs-regexp">/NUL/</span>.<span class="hljs-title function_">test</span>(d.<span class="hljs-property">message</span>)));
+    <span class="hljs-keyword">const</span> before = <span class="hljs-title class_">JSON</span>.<span class="hljs-title function_">stringify</span>(project);
+    assert.<span class="hljs-title function_">deepEqual</span>(<span class="hljs-title function_">resolvePublicationSettings</span>(project), {
+        <span class="hljs-attr">fonts</span>: defaults, <span class="hljs-attr">codeLigatures</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">diagnostics</span>: []
+    });
+    <span class="hljs-keyword">const</span> prepared = <span class="hljs-title function_">preparePandoc</span>(project, <span class="hljs-function">() =&gt;</span> { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;must not render&#x27;</span>); });
+    assert.<span class="hljs-title function_">equal</span>(prepared.<span class="hljs-property">document</span>, <span class="hljs-literal">undefined</span>);
+    assert.<span class="hljs-title function_">deepEqual</span>(prepared.<span class="hljs-property">diagnostics</span>, project.<span class="hljs-property">diagnostics</span>);
+    assert.<span class="hljs-title function_">equal</span>(<span class="hljs-title class_">JSON</span>.<span class="hljs-title function_">stringify</span>(project), before);
+});
+</code></pre>
+
+</div>
+</div></div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

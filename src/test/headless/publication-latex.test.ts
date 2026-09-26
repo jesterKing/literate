@@ -60,7 +60,7 @@ test('LaTeX links full hanging names, distinct contribution labels and navigatio
     const latex = result.latex!;
     assert.ok(latex.includes(Array.from(name).join('\\allowbreak{}')));
     assert.match(latex, /\\newcommand\{\\LitReferenceA\}\{\\par\\begingroup/);
-    assert.match(latex, /\\textsuperscript\{\\pageref\*/);
+    assert.match(latex, /\\textsuperscript\{\\notefont\\pageref\*/);
     assert.match(latex, /Previous /); assert.match(latex, /Next /); assert.match(latex, /Base /);
     assert.match(latex, /\\ensuremath\{\+\\equiv\}/);
     const labels = [...latex.matchAll(/\\label\{([^}]+)\}/g)].map(match => match[1]);
@@ -95,7 +95,15 @@ test('LaTeX merges adjacent equivalent scopes instead of splitting operators int
     assert.ok(result.latex?.includes('{left !== right && left <= right;}'));
 });
 
+const marginSides = ['marginTopMm', 'marginRightMm', 'marginBottomMm', 'marginLeftMm'] as const;
 const invalidOptions: LatexOptions[] = [
+    ...marginSides.flatMap(side => [NaN, Infinity, -Infinity, 4.9, 50.1, '20'].map(value =>
+        ({ [side]: value } as LatexOptions))),
+    { paper: 'A5', marginLeftMm: 50, marginRightMm: 19 },
+    { paper: 'A5', marginLeftMm: 19, marginRightMm: 50 },
+    { codeLigatures: 'off' as unknown as boolean },
+    ...['bodyFont', 'headingFont', 'fragmentFont', 'noteFont'].flatMap(role =>
+        ['', '../font', 'bad\\input', 'A'.repeat(101)].map(value => ({ [role]: value }))),
     { theme: 'unknown' }, { paper: 'a4' as LatexOptions['paper'] },
     ...[NaN, Infinity, -1, 0, 4.9, 50.1].map(marginMm => ({ marginMm })),
     { paper: 'A5', marginMm: 35 },
@@ -116,6 +124,94 @@ for (const paper of ['A4', 'A5', 'letter', 'legal'] as const) {
         assert.deepEqual(result.diagnostics, []); assert.ok(result.latex?.includes('margin=20.5mm'));
     });
 }
+
+for (const side of marginSides) {
+    test(`LaTeX applies individual ${side} and falls back per side`, async () => {
+        for (const marginMm of [undefined, 21]) {
+            const result = await renderLatex(parse(''), { marginMm, [side]: 5 }, convert);
+            assert.deepEqual(result.diagnostics, []);
+            const expected = marginSides.map((key, index) =>
+                `${['top', 'right', 'bottom', 'left'][index]}=${key === side ? 5 : marginMm ?? 20}mm`).join(',');
+            assert.ok(result.latex?.includes(`[a4paper,${expected}]{geometry}`));
+        }
+    });
+}
+
+test('LaTeX validates opposite-side sums and keeps inclusive margin bounds', async () => {
+    const result = await renderLatex(parse(''), { paper: 'A5', marginTopMm: 50,
+        marginRightMm: 18, marginBottomMm: 50, marginLeftMm: 50 }, convert);
+    assert.deepEqual(result.diagnostics, []); // 80 mm wide, 110 mm high (smallest paper).
+    assert.ok(result.latex?.includes('top=50mm,right=18mm,bottom=50mm,left=50mm'));
+    const invalid = await renderLatex(parse(''), { marginMm: NaN, marginTopMm: 20,
+        marginRightMm: 20, marginBottomMm: 20, marginLeftMm: 20 }, convert);
+    assert.equal(invalid.latex, undefined);
+});
+
+const rootSettings = (settings: string, text = '') => parseProject([
+    { path: 'index.literate', text: '```SETTINGS\n' + settings + '\n```\n' + text }
+]);
+
+test('LaTeX root settings select independent font roles and their command sites', async () => {
+    const project = rootSettings('font-body=Body\nfont-heading=Heading\nfont-code=Code\n' +
+        'font-fragment=Fragment\nfont-note=Note\nfont-code-ligatures=off',
+        fence('leaf', 'x') + fence('leaf', 'y', '+') + fence('caller', '<<leaf>>'));
+    const before = JSON.stringify(project);
+    const result = await renderLatex(project, {}, convert);
+    assert.deepEqual(result.diagnostics, []);
+    for (const expected of ['\\setmainfont{Body}', '\\newfontfamily\\headingfont{Heading}',
+        '\\newfontfamily\\fragmentfont{Fragment}', '\\newfontfamily\\notefont{Note}',
+        ']{Code}', '\\setkomafont{disposition}{\\headingfont',
+        '\\setkomafont{pageheadfoot}{\\notefont', '\\setkomafont{footnote}{\\notefont}',
+        '{\\notefont\\small ', '\\fragmentfont\\small\\noindent',
+        '\\fragmentfont\\raggedright', 'RawFeature={-calt}']) {
+        assert.ok(result.latex?.includes(expected), expected);
+    }
+    assert.equal(JSON.stringify(project), before);
+});
+
+test('LaTeX resolves root note inheritance before per-role programmatic overrides', async () => {
+    for (const note of ['', '\nfont-note=Root']) {
+        const result = await renderLatex(rootSettings('font-body=Root' + note), { bodyFont: 'Override' }, convert);
+        assert.deepEqual(result.diagnostics, []);
+        assert.ok(result.latex?.includes('\\setmainfont{Override}'));
+        assert.ok(result.latex?.includes('\\newfontfamily\\notefont{Root}'));
+    }
+    const result = await renderLatex(rootSettings('font-body=Root\nfont-heading=Root\nfont-code=Root\n' +
+        'font-fragment=Root\nfont-note=Root\nfont-code-ligatures=off'), {
+        bodyFont: 'Body', headingFont: 'Heading', codeFont: 'Code', fragmentFont: 'Fragment',
+        noteFont: 'Note', codeLigatures: true
+    }, convert);
+    assert.deepEqual(result.diagnostics, []);
+    for (const value of ['{Body}', '{Heading}', '{Code}', '{Fragment}', '{Note}']) {
+        assert.ok(result.latex?.includes(value), value);
+    }
+    assert.doesNotMatch(result.latex!, /RawFeature/);
+});
+
+test('LaTeX ligature options override settings in either direction', async () => {
+    for (const configured of ['on', 'off']) {
+        for (const codeLigatures of [undefined, true, false]) {
+            const result = await renderLatex(rootSettings('font-code-ligatures=' + configured), { codeLigatures }, convert);
+            assert.deepEqual(result.diagnostics, []);
+            assert.equal(result.latex?.includes('RawFeature={-calt}'), !(codeLigatures ?? configured === 'on'));
+            assert.ok(result.latex?.includes('Ligatures=Common,Contextuals=Alternate'));
+            assert.ok(result.latex?.includes('FakeSlant=0.2'));
+        }
+    }
+});
+
+test('LaTeX retains all invalid root settings before preparation and option overrides', async () => {
+    const project = rootSettings('font-body=bad/path\nfont-body=Valid\nfont-note=\nfont-code-ligatures=no',
+        fence('broken', 'const x = 1;'));
+    project.publication.contributions[0].segments = []; // Would fail if preparation rendered it.
+    let calls = 0;
+    const result = await renderLatex(project, { bodyFont: 'Safe', noteFont: 'Safe', codeLigatures: true },
+        async () => { calls++; return ''; });
+    assert.equal(calls, 0);
+    assert.equal(result.latex, undefined);
+    assert.deepEqual(result.diagnostics.map(d => [d.path, d.line, d.column]),
+        [['index.literate', 1, 0], ['index.literate', 3, 0], ['index.literate', 4, 0]]);
+});
 
 for (const source of [fence('a', '<<missing>>'), fence('a', '<<a>>'),
     fence('a', 'ok') + '\n![image](image.png)\n', fence('a'.repeat(513), 'ok')]) {

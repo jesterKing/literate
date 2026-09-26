@@ -32,7 +32,9 @@ sorted path order; the index controls ordering, not exclusion.
 The `index.literate` can contain a fence with `SETTINGS` on its info line. This
 fence will be hidden from HTML, but hosts settings for controlling some aspects
 of processing. Key=value pairs are given each on their own line. The recognized
-keys are `template`, `authors`, and `theme`. The `template` should point to an
+keys for source/HTML processing are `template`, `authors`, and `theme`.
+LaTeX export additionally reads the publication font settings described below.
+The `template` should point to an
 existing file containing an HTML template. The string `[CONTENT]` will be
 replaced with the rendered HTML from the literate document. The string
 `[AUTHORS]` will be replaced with `<meta />` tags for author information.
@@ -160,7 +162,17 @@ yarn literate latex path/to/project --output books/book.tex --paper a4 --margin 
 Omit `path/to/project` to use the current directory. The `.tex` destination is
 relative to the selected project root; absolute paths and paths outside it are
 rejected. Paper choices are `a4`, `a5`, `letter`, and `legal`; defaults are A4 and
-20 mm uniform margins. Margins currently accept decimal millimetres only. Run
+20 mm uniform margins. Override individual sides with `--margin-top`,
+`--margin-right`, `--margin-bottom`, and `--margin-left`; unspecified sides use
+`--margin`. Values accept decimal millimetres only, each from 5 to 50 mm, leaving
+at least an 80 × 100 mm text area. For example:
+
+```sh
+yarn literate latex path/to/project --output books/book.tex --paper a5 \
+  --margin 20mm --margin-top 18mm --margin-right 16mm --margin-bottom 22mm
+```
+
+Run
 `yarn literate latex --help` for bounds, or add `--json` for machine-readable
 results. Arguments use separate values rather than `--option=value`.
 
@@ -175,8 +187,34 @@ The existing root `SETTINGS` `theme` selects from all 70 palettes; the default i
 `rosepine-dawn`. Fonts default to Latin Modern Roman for prose, Monofur Nerd Font
 for headings/references, and D2CodingLigature Nerd Font Propo for code. Ligatures
 remain enabled; copying code from PDF may change operators, so use original or
-tangled source for executable code. Font SETTINGS and font-file bundling are not
-yet implemented, and export does not check whether these fonts are installed.
+tangled source for executable code.
+
+Select publication font roles in the root `index.literate` SETTINGS fence:
+
+````markdown
+```SETTINGS
+theme=rosepine-dawn
+font-body=Latin Modern Roman
+font-heading=Monofur Nerd Font
+font-code=D2CodingLigature Nerd Font Propo
+font-fragment=Monofur Nerd Font
+font-note=Latin Modern Roman
+font-code-ligatures=on
+```
+````
+
+These are the defaults. `font-fragment` covers both declarations and references;
+`font-note` covers running matter, navigation, and reference page numbers. If
+`font-note` is omitted it inherits the selected `font-body`. Font roles currently
+apply to LaTeX only—not HTML or VS Code preview. Chapter-local settings cannot
+change them. Use `font-code-ligatures=off` to disable D2Coding's contextual
+programming ligatures; other font families may use different features.
+
+Family names accept 1–100 ASCII letters, digits, spaces, dots, or hyphens,
+starting with a letter or digit. Paths and TeX options are not accepted. Repeated
+settings keep the last valid value, but any invalid occurrence blocks export.
+**Font-file bundling and installed-font checks are not implemented yet**: selecting
+a family does not install it or guarantee that the exported document will compile.
 
 To compile later, install the named fonts and LuaLaTeX packages `fontspec`,
 `geometry`, `fvextra`, `needspace`, `xcolor`, `microtype`, `amsmath`, `amssymb`,

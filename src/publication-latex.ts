@@ -1,5 +1,7 @@
 import type { ParsedProject, PublicationContribution, GenerationDiagnostic } from './engine';
 import { preparePandoc } from './publication-pandoc';
+import { resolvePublicationSettings } from './publication-settings';
+import type { PublicationSettingsResult } from './publication-settings';
 import type { PandocDocument, PandocBlock } from './publication-pandoc';
 import { defaultThemeName, getTheme } from './themes';
 import type { LiterateTheme } from './themes';
@@ -8,9 +10,16 @@ export interface LatexOptions {
     theme?: string;
     paper?: 'A4' | 'A5' | 'letter' | 'legal';
     marginMm?: number;
+    marginTopMm?: number;
+    marginRightMm?: number;
+    marginBottomMm?: number;
+    marginLeftMm?: number;
     bodyFont?: string;
     headingFont?: string;
     codeFont?: string;
+    fragmentFont?: string;
+    noteFont?: string;
+    codeLigatures?: boolean;
 }
 export interface LatexConversionOptions {
     standalone: false;
@@ -21,8 +30,9 @@ export type LatexConverter = (document: PandocDocument,
     options: LatexConversionOptions) => Promise<string>;
 export interface LatexResult { latex?: string; diagnostics: GenerationDiagnostic[]; }
 interface CheckedOptions {
-    theme: LiterateTheme; paper: string; margin: number;
+    theme: LiterateTheme; paper: string; geometry: string;
     bodyFont: string; headingFont: string; codeFont: string;
+    fragmentFont: string; noteFont: string; codeLigatures: boolean;
 }
 function fontName(value: string): string {
     if (typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9 .-]{0,99}$/.test(value)) {
@@ -30,7 +40,7 @@ function fontName(value: string): string {
     }
     return value;
 }
-function checkOptions(options: LatexOptions): CheckedOptions {
+function checkOptions(options: LatexOptions, settings: PublicationSettingsResult): CheckedOptions {
     const theme = getTheme(options.theme ?? defaultThemeName);
     if (!theme) { throw new Error('Unknown publication theme'); }
     const papers = new Map<string, [string, number, number]>([
@@ -39,14 +49,25 @@ function checkOptions(options: LatexOptions): CheckedOptions {
     ]);
     const paper = papers.get(options.paper ?? 'A4');
     const margin = options.marginMm ?? 20;
-    if (!paper || !Number.isFinite(margin) || margin < 5 || margin > 50 ||
-        paper[1] - 2 * margin < 80 || paper[2] - 2 * margin < 100) {
+    const overrides = [options.marginTopMm, options.marginRightMm,
+        options.marginBottomMm, options.marginLeftMm];
+    const [top, right, bottom, left] = overrides.map(value => value ?? margin);
+    if (!paper || [margin, top, right, bottom, left].some(value =>
+        !Number.isFinite(value) || value < 5 || value > 50) ||
+        paper[1] - left - right < 80 || paper[2] - top - bottom < 100) {
         throw new Error('Invalid paper or margin; require 5–50 mm and an 80 × 100 mm body');
     }
-    return { theme, paper: paper[0], margin,
-        bodyFont: fontName(options.bodyFont ?? 'Latin Modern Roman'),
-        headingFont: fontName(options.headingFont ?? 'Monofur Nerd Font'),
-        codeFont: fontName(options.codeFont ?? 'D2CodingLigature Nerd Font Propo') };
+    const geometry = overrides.some(value => value !== undefined)
+        ? `top=${top}mm,right=${right}mm,bottom=${bottom}mm,left=${left}mm`
+        : `margin=${margin}mm`;
+    const codeLigatures = options.codeLigatures ?? settings.codeLigatures;
+    if (typeof codeLigatures !== 'boolean') { throw new Error('Code ligatures must be boolean'); }
+    return { theme, paper: paper[0], geometry, codeLigatures,
+        bodyFont: fontName(options.bodyFont ?? settings.fonts.body),
+        headingFont: fontName(options.headingFont ?? settings.fonts.heading),
+        codeFont: fontName(options.codeFont ?? settings.fonts.code),
+        fragmentFont: fontName(options.fragmentFont ?? settings.fonts.fragment),
+        noteFont: fontName(options.noteFont ?? settings.fonts.note) };
 }
 function checkText(text: string): void {
     if (/[\u0000-\u0008\u000b-\u001f\u007f]/u.test(text)) {
@@ -81,7 +102,7 @@ function color(value: string): string {
 }
 function pageLink(id: string, label: string): string {
     const destination = target(id);
-    return `\\hyperref[${destination}]{${label}\\textsuperscript{\\pageref*{${destination}}}}`;
+    return `\\hyperref[${destination}]{${label}\\textsuperscript{\\notefont\\pageref*{${destination}}}}`;
 }
 function anchor(id: string): string { return `\\phantomsection\\label{${target(id)}}`; }
 function template(body: string, options: CheckedOptions, definitions: string[]): string {
@@ -89,11 +110,13 @@ function template(body: string, options: CheckedOptions, definitions: string[]):
     return themeNotice() + String.raw`\documentclass[11pt,oneside,openany]{scrbook}
 ${'\\usepackage'}{fontspec}
 \setmainfont{${options.bodyFont}}
-\newfontfamily\fragmentfont{${options.headingFont}}
-\setmonofont[Ligatures=Common,Contextuals=Alternate,
+\newfontfamily\headingfont{${options.headingFont}}
+\newfontfamily\fragmentfont{${options.fragmentFont}}
+\newfontfamily\notefont{${options.noteFont}}
+\setmonofont[Ligatures=Common,Contextuals=Alternate,${options.codeLigatures ? '' : 'RawFeature={-calt},'}
 ItalicFont={${options.codeFont}},ItalicFeatures={FakeSlant=0.2},
 BoldItalicFont={${options.codeFont}},BoldItalicFeatures={FakeSlant=0.2,FakeBold=1.5}]{${options.codeFont}}
-${'\\usepackage'}[${options.paper},margin=${options.margin}mm]{geometry}
+${'\\usepackage'}[${options.paper},${options.geometry}]{geometry}
 ${'\\usepackage'}{fvextra,needspace,xcolor,microtype,amssymb,amsmath}
 ${'\\usepackage'}[normalem]{ulem}
 ${'\\usepackage'}[hidelinks]{hyperref}
@@ -101,8 +124,9 @@ ${'\\usepackage'}[hidelinks]{hyperref}
 \definecolor{publicationText}{HTML}{${color(c.text)}}
 \definecolor{publicationAccent}{HTML}{${color(c.accent)}}
 \pagecolor{publicationBackground}\color{publicationText}
-\setkomafont{disposition}{\fragmentfont\bfseries\color{publicationAccent}}
-\setkomafont{pageheadfoot}{\normalfont\color{publicationText}}
+\setkomafont{disposition}{\headingfont\bfseries\color{publicationAccent}}
+\setkomafont{pageheadfoot}{\notefont\color{publicationText}}
+\setkomafont{footnote}{\notefont}
 \providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 \providecommand{\passthrough}[1]{#1}
 \providecommand{\pandocbounded}[1]{#1}
@@ -244,7 +268,7 @@ function contribution(part: PublicationContribution, project: ParsedProject,
     if (position + 1 < family.contributions.length) {
         navigation.push(pageLink(family.contributions[position + 1], 'Next '));
     }
-    if (navigation.length) { output += `{\\small ${navigation.join('\\quad ')}\\par}\n`; }
+    if (navigation.length) { output += `{\\notefont\\small ${navigation.join('\\quad ')}\\par}\n`; }
     output += contributionBody(data, project, theme, definitions);
     return [{ t: 'RawBlock', c: ['latex', output] }];
 }
@@ -277,7 +301,11 @@ export async function renderLatex(parsed: ParsedProject, options: LatexOptions,
     convert: LatexConverter): Promise<LatexResult> {
     let stage = 'latex-options';
     try {
-        const checked = checkOptions(options);
+        const settings = resolvePublicationSettings(parsed);
+        if (settings.diagnostics.length) {
+            return { diagnostics: [...parsed.diagnostics, ...settings.diagnostics] };
+        }
+        const checked = checkOptions(options, settings);
         const definitions: string[] = [];
         stage = 'latex-preparation';
         const prepared = preparePandoc(parsed, part =>

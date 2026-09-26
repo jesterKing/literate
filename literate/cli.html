@@ -168,13 +168,19 @@ project fails rather than passing vacuously.</p>
 <div class="fragmentname">&lt;&lt;cli usage&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">const</span> commands = [<span class="hljs-string">&#x27;generate&#x27;</span>, <span class="hljs-string">&#x27;check&#x27;</span>, <span class="hljs-string">&#x27;inspect&#x27;</span>, <span class="hljs-string">&#x27;self-check&#x27;</span>, <span class="hljs-string">&#x27;latex&#x27;</span>];
-<span class="hljs-keyword">const</span> latexUsage = <span class="hljs-string">&#x27;latex [root] --output path.tex [--paper a4|a5|letter|legal] [--margin 20mm] [--json]&#x27;</span>;
+<span class="hljs-keyword">const</span> latexMarginOptions = [
+    [<span class="hljs-string">&#x27;--margin&#x27;</span>, <span class="hljs-string">&#x27;marginMm&#x27;</span>], [<span class="hljs-string">&#x27;--margin-top&#x27;</span>, <span class="hljs-string">&#x27;marginTopMm&#x27;</span>], [<span class="hljs-string">&#x27;--margin-right&#x27;</span>, <span class="hljs-string">&#x27;marginRightMm&#x27;</span>],
+    [<span class="hljs-string">&#x27;--margin-bottom&#x27;</span>, <span class="hljs-string">&#x27;marginBottomMm&#x27;</span>], [<span class="hljs-string">&#x27;--margin-left&#x27;</span>, <span class="hljs-string">&#x27;marginLeftMm&#x27;</span>]
+] <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span>;
+<span class="hljs-keyword">const</span> latexValueFlags = [<span class="hljs-string">&#x27;--output&#x27;</span>, <span class="hljs-string">&#x27;--paper&#x27;</span>, ...latexMarginOptions.<span class="hljs-title function_">map</span>(<span class="hljs-function">(<span class="hljs-params">[flag]</span>) =&gt;</span> flag)];
+<span class="hljs-keyword">const</span> latexUsage = <span class="hljs-string">&#x27;latex [root] --output path.tex [--paper a4|a5|letter|legal] [--margin 20mm]&#x27;</span>
+    + <span class="hljs-string">&#x27; [--margin-top Nmm] [--margin-right Nmm] [--margin-bottom Nmm] [--margin-left Nmm] [--json]&#x27;</span>;
 <span class="hljs-keyword">const</span> usage = <span class="hljs-string">&#x27;Usage: node out/cli.js generate|check|inspect|self-check [root] [--json]\n&#x27;</span>
     + <span class="hljs-string">`       node out/cli.js <span class="hljs-subst">${latexUsage}</span>\n`</span>
     + <span class="hljs-string">&#x27;       node out/cli.js &lt;command&gt; --help [--json]\n       node out/cli.js --help [--json]\n&#x27;</span>;
 <span class="hljs-keyword">const</span> <span class="hljs-attr">descriptions</span>: <span class="hljs-title class_">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; = <span class="hljs-title class_">Object</span>.<span class="hljs-title function_">fromEntries</span>([
     [<span class="hljs-string">&#x27;generate&#x27;</span>, <span class="hljs-string">&#x27;Write missing or changed generated files.&#x27;</span>],
-    [<span class="hljs-string">&#x27;latex&#x27;</span>, <span class="hljs-string">&#x27;Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving an 80 × 100 mm body. No TeX/PDF execution or bundled fonts.&#x27;</span>],
+    [<span class="hljs-string">&#x27;latex&#x27;</span>, <span class="hljs-string">&#x27;Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving at least an 80 × 100 mm body. Each side overrides --margin; unspecified sides use --margin or 20mm. Fonts resolve from root index.literate SETTINGS. No TeX/PDF execution or bundled fonts.&#x27;</span>],
     [<span class="hljs-string">&#x27;check&#x27;</span>, <span class="hljs-string">&#x27;Report missing or stale generated files without writing.&#x27;</span>],
     [<span class="hljs-string">&#x27;inspect&#x27;</span>, <span class="hljs-string">&#x27;Report documents, templates, and fragment definitions and dependencies without reading outputs or writing.&#x27;</span>],
     [<span class="hljs-string">&#x27;self-check&#x27;</span>, <span class="hljs-string">&#x27;Verify this repository’s trusted self-hosting code without generating files; all outputs must already be current.&#x27;</span>]
@@ -494,13 +500,15 @@ source chapter. Absolute paths, parent traversal, and non-<code>.tex</code> dest
 are usage errors. Options take separate values, not <code>--name=value</code>. Paper defaults
 to <code>a4</code>, margin to <code>20mm</code>. The existing root <code>index.literate</code> SETTINGS <code>theme</code> key
 selects the publication palette through <code>resolveProjectTheme</code>; invalid themes
-report its diagnostics before conversion. No new settings or theme flag are
-introduced. Decimal millimetres are the only accepted margin unit, subject to the
-renderer's page/body constraints.</p>
-<p>The renderer names installed font families: Latin Modern Roman, Monofur Nerd Font,
-and D2CodingLigature Nerd Font Propo. Export does not resolve, install, or bundle
-fonts. Those families and the template's TeX packages are dependencies for later
-compilation by the user, not prerequisites checked or installed by this command.</p>
+report its diagnostics before conversion. Decimal millimetres are the only accepted
+margin unit, subject to the renderer's page/body constraints. <code>--margin-top</code>,
+<code>--margin-right</code>, <code>--margin-bottom</code>, and <code>--margin-left</code> override individual sides;
+each unspecified side falls back to <code>--margin</code>, or <code>20mm</code> when it is omitted.</p>
+<p>The renderer automatically resolves font settings from the root <code>index.literate</code>
+SETTINGS through its publication-settings dependency. There are no font CLI flags.
+Export does not install or bundle fonts. The resolved families and the template's
+TeX packages are dependencies for later compilation by the user, not prerequisites
+checked or installed by this command.</p>
 <h3>A bounded production converter</h3>
 <p><code>runPandoc</code> implements the injected <code>LatexConverter</code> contract. Only the fixed
 executable <code>pandoc</code> on PATH is spawned, with an argument array and no shell. JSON
@@ -702,7 +710,7 @@ rather than silently changing which project is processed.</p>
 <div class="code">
 <pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = <span class="hljs-number">0</span>; index &lt; args.<span class="hljs-property">length</span>; index++) {
     <span class="hljs-keyword">const</span> arg = args[index];
-    <span class="hljs-keyword">if</span> ([<span class="hljs-string">&#x27;--output&#x27;</span>, <span class="hljs-string">&#x27;--paper&#x27;</span>, <span class="hljs-string">&#x27;--margin&#x27;</span>].<span class="hljs-title function_">includes</span>(arg)) {
+    <span class="hljs-keyword">if</span> (latexValueFlags.<span class="hljs-title function_">includes</span>(arg)) {
         <span class="hljs-keyword">if</span> (flags.<span class="hljs-title function_">has</span>(arg)) { response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">`Duplicate flag: <span class="hljs-subst">${arg}</span>`</span>); }
         flags.<span class="hljs-title function_">add</span>(arg);
         <span class="hljs-keyword">const</span> value = args[index + <span class="hljs-number">1</span>];
@@ -755,13 +763,16 @@ them distinct from valid commands whose project fails validation.</p>
 </div><h3>Validate LaTeX-only options</h3>
 <p>Reject these options on other commands, even help for another command. Help for
 LaTeX does not require an output, but supplied values must still be valid. Usage
-validation happens before discovery or spawning Pandoc. A5 permits at most 34 mm
-uniform margins so the text body remains at least 80 mm wide.</p>
+validation happens before discovery or spawning Pandoc. All supplied margins must
+be finite and within 5–50 mm, including the uniform fallback even when every side
+is overridden. Opposite effective sides must leave at least an 80 × 100 mm body.
+A5 therefore permits a uniform margin above 34 mm only when explicit side overrides
+leave enough width.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;cli LaTeX argument validation&gt;&gt;= </div>
 <div class="code">
-<pre><code><span class="hljs-keyword">if</span> (topic !== <span class="hljs-string">&#x27;latex&#x27;</span> &amp;&amp; [<span class="hljs-string">&#x27;--output&#x27;</span>, <span class="hljs-string">&#x27;--paper&#x27;</span>, <span class="hljs-string">&#x27;--margin&#x27;</span>].<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">flag</span> =&gt;</span> flags.<span class="hljs-title function_">has</span>(flag))) {
-    response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">&#x27;--output, --paper and --margin are only valid for latex&#x27;</span>);
+<pre><code><span class="hljs-keyword">if</span> (topic !== <span class="hljs-string">&#x27;latex&#x27;</span> &amp;&amp; latexValueFlags.<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">flag</span> =&gt;</span> flags.<span class="hljs-title function_">has</span>(flag))) {
+    response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">`<span class="hljs-subst">${latexValueFlags.join(<span class="hljs-string">&#x27;, &#x27;</span>)}</span> are only valid for latex`</span>);
 }
 <span class="hljs-keyword">if</span> (topic === <span class="hljs-string">&#x27;latex&#x27;</span>) {
     <span class="hljs-keyword">const</span> output = values.<span class="hljs-title function_">get</span>(<span class="hljs-string">&#x27;--output&#x27;</span>);
@@ -774,13 +785,45 @@ uniform margins so the text body remains at least 80 mm wide.</p>
         response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">&#x27;--paper must be a4, a5, letter or legal&#x27;</span>);
     }
     latexOptions.<span class="hljs-property">paper</span> = (paper === <span class="hljs-string">&#x27;a4&#x27;</span> ? <span class="hljs-string">&#x27;A4&#x27;</span> : paper === <span class="hljs-string">&#x27;a5&#x27;</span> ? <span class="hljs-string">&#x27;A5&#x27;</span> : paper) <span class="hljs-keyword">as</span> <span class="hljs-title class_">LatexOptions</span>[<span class="hljs-string">&#x27;paper&#x27;</span>];
-    <span class="hljs-keyword">const</span> margin = values.<span class="hljs-title function_">get</span>(<span class="hljs-string">&#x27;--margin&#x27;</span>) ?? <span class="hljs-string">&#x27;20mm&#x27;</span>;
+    <span class="literate-tag-name">&lt;&lt;cli LaTeX margin validation&gt;&gt;</span>
+    <span class="literate-tag-name">&lt;&lt;cli LaTeX body validation&gt;&gt;</span>
+}
+</code></pre>
+
+</div>
+</div><p>Validate each supplied value with the same decimal-mm syntax. Keep absent side
+options absent so the renderer applies the same uniform fallback as the CLI.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli LaTeX margin validation&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [flag, option] <span class="hljs-keyword">of</span> latexMarginOptions) {
+    <span class="hljs-keyword">const</span> margin = values.<span class="hljs-title function_">get</span>(flag) ?? (flag === <span class="hljs-string">&#x27;--margin&#x27;</span> ? <span class="hljs-string">&#x27;20mm&#x27;</span> : <span class="hljs-literal">undefined</span>);
+    <span class="hljs-keyword">if</span> (margin === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">continue</span>; }
     <span class="hljs-keyword">const</span> mm = <span class="hljs-title class_">Number</span>(margin.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, -<span class="hljs-number">2</span>));
-    <span class="hljs-keyword">if</span> (!<span class="hljs-regexp">/^\d+(?:\.\d+)?mm$/</span>.<span class="hljs-title function_">test</span>(margin) || !<span class="hljs-title class_">Number</span>.<span class="hljs-built_in">isFinite</span>(mm) || mm &lt; <span class="hljs-number">5</span> || mm &gt; <span class="hljs-number">50</span> ||
-        (paper === <span class="hljs-string">&#x27;a5&#x27;</span> &amp;&amp; mm &gt; <span class="hljs-number">34</span>)) {
-        response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">&#x27;--margin requires numeric mm, 5–50 (at most 34 for a5)&#x27;</span>);
+    <span class="hljs-keyword">if</span> (!<span class="hljs-regexp">/^\d+(?:\.\d+)?mm$/</span>.<span class="hljs-title function_">test</span>(margin) || !<span class="hljs-title class_">Number</span>.<span class="hljs-built_in">isFinite</span>(mm) || mm &lt; <span class="hljs-number">5</span> || mm &gt; <span class="hljs-number">50</span>) {
+        response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">`<span class="hljs-subst">${flag}</span> requires numeric mm, 5–50`</span>);
     }
-    latexOptions.<span class="hljs-property">marginMm</span> = mm;
+    latexOptions[option] = mm;
+}
+</code></pre>
+
+</div>
+</div><p>Check page dimensions against effective sides, not the uniform value alone. Skip
+this dependent check when argument errors already prevent execution.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli LaTeX body validation&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> <span class="hljs-attr">paperSizes</span>: <span class="hljs-title class_">Record</span>&lt;<span class="hljs-built_in">string</span>, [<span class="hljs-built_in">number</span>, <span class="hljs-built_in">number</span>]&gt; = {
+    <span class="hljs-attr">a4</span>: [<span class="hljs-number">210</span>, <span class="hljs-number">297</span>], <span class="hljs-attr">a5</span>: [<span class="hljs-number">148</span>, <span class="hljs-number">210</span>], <span class="hljs-attr">letter</span>: [<span class="hljs-number">215.9</span>, <span class="hljs-number">279.4</span>], <span class="hljs-attr">legal</span>: [<span class="hljs-number">215.9</span>, <span class="hljs-number">355.6</span>]
+};
+<span class="hljs-keyword">if</span> (!response.<span class="hljs-property">errors</span>.<span class="hljs-property">length</span>) {
+    <span class="hljs-keyword">const</span> [width, height] = paperSizes[paper];
+    <span class="hljs-keyword">const</span> uniform = latexOptions.<span class="hljs-property">marginMm</span> ?? <span class="hljs-number">20</span>;
+    <span class="hljs-keyword">const</span> horizontal = (latexOptions.<span class="hljs-property">marginLeftMm</span> ?? uniform) + (latexOptions.<span class="hljs-property">marginRightMm</span> ?? uniform);
+    <span class="hljs-keyword">const</span> vertical = (latexOptions.<span class="hljs-property">marginTopMm</span> ?? uniform) + (latexOptions.<span class="hljs-property">marginBottomMm</span> ?? uniform);
+    <span class="hljs-keyword">if</span> (width - horizontal &lt; <span class="hljs-number">80</span> || height - vertical &lt; <span class="hljs-number">100</span>) {
+        response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">&#x27;Margins must leave at least an 80 × 100 mm body for the selected paper&#x27;</span>);
+    }
 }
 </code></pre>
 

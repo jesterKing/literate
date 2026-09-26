@@ -123,8 +123,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 <body>
 <div class="literate-document" data-literate-theme="rosepine-dawn"><h1>An in-memory LaTeX book</h1>
 <p>This chapter owns <code>src/publication-latex.ts</code>. It consumes the controlled Pandoc
-bridge, not a second Markdown parser. No files, processes, browser APIs, root
-SETTINGS, or publishing commands are involved. The injected converter is trusted:
+bridge, not a second Markdown parser. Root SETTINGS use the shared resolver;
+no files, processes, browser APIs, or publishing commands are involved. The injected converter is trusted:
 it must convert JSON to a LaTeX <strong>body</strong>, preserve raw LaTeX, use top-level chapters,
 and disable Pandoc syntax highlighting (<code>--no-highlight</code>, tested on Pandoc 3.7.0.2).
 The options passed to it make that contract explicit; they are not CLI arguments.</p>
@@ -150,6 +150,8 @@ spelled with their original delimiters. Exceptions pass through the bridge gate.
 <div class="code">
 <pre><code><span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title class_">ParsedProject</span>, <span class="hljs-title class_">PublicationContribution</span>, <span class="hljs-title class_">GenerationDiagnostic</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./engine&#x27;</span>;
 <span class="hljs-keyword">import</span> { preparePandoc } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./publication-pandoc&#x27;</span>;
+<span class="hljs-keyword">import</span> { resolvePublicationSettings } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./publication-settings&#x27;</span>;
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title class_">PublicationSettingsResult</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./publication-settings&#x27;</span>;
 <span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title class_">PandocDocument</span>, <span class="hljs-title class_">PandocBlock</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./publication-pandoc&#x27;</span>;
 <span class="hljs-keyword">import</span> { defaultThemeName, getTheme } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./themes&#x27;</span>;
 <span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title class_">LiterateTheme</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./themes&#x27;</span>;
@@ -158,7 +160,7 @@ spelled with their original delimiters. Exceptions pass through the bridge gate.
 
 </div>
 </div><p>The callback must not run after a preparation error. Results are atomic: diagnostics
-never accompany partial LaTeX. Font resolution and PDF compilation are caller work.</p>
+never accompany partial LaTeX. Installed-font lookup and PDF compilation are caller work.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;publication LaTeX API&gt;&gt;= </div>
 <div class="code">
@@ -166,9 +168,16 @@ never accompany partial LaTeX. Font resolution and PDF compilation are caller wo
     theme?: <span class="hljs-built_in">string</span>;
     paper?: <span class="hljs-string">&#x27;A4&#x27;</span> | <span class="hljs-string">&#x27;A5&#x27;</span> | <span class="hljs-string">&#x27;letter&#x27;</span> | <span class="hljs-string">&#x27;legal&#x27;</span>;
     marginMm?: <span class="hljs-built_in">number</span>;
+    marginTopMm?: <span class="hljs-built_in">number</span>;
+    marginRightMm?: <span class="hljs-built_in">number</span>;
+    marginBottomMm?: <span class="hljs-built_in">number</span>;
+    marginLeftMm?: <span class="hljs-built_in">number</span>;
     bodyFont?: <span class="hljs-built_in">string</span>;
     headingFont?: <span class="hljs-built_in">string</span>;
     codeFont?: <span class="hljs-built_in">string</span>;
+    fragmentFont?: <span class="hljs-built_in">string</span>;
+    noteFont?: <span class="hljs-built_in">string</span>;
+    codeLigatures?: <span class="hljs-built_in">boolean</span>;
 }
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">LatexConversionOptions</span> {
     <span class="hljs-attr">standalone</span>: <span class="hljs-literal">false</span>;
@@ -179,15 +188,22 @@ never accompany partial LaTeX. Font resolution and PDF compilation are caller wo
     options: LatexConversionOptions</span>) =&gt;</span> <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">string</span>&gt;;
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">LatexResult</span> { latex?: <span class="hljs-built_in">string</span>; <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">GenerationDiagnostic</span>[]; }
 <span class="hljs-keyword">interface</span> <span class="hljs-title class_">CheckedOptions</span> {
-    <span class="hljs-attr">theme</span>: <span class="hljs-title class_">LiterateTheme</span>; <span class="hljs-attr">paper</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">margin</span>: <span class="hljs-built_in">number</span>;
+    <span class="hljs-attr">theme</span>: <span class="hljs-title class_">LiterateTheme</span>; <span class="hljs-attr">paper</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">geometry</span>: <span class="hljs-built_in">string</span>;
     <span class="hljs-attr">bodyFont</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">headingFont</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">codeFont</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">fragmentFont</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">noteFont</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">codeLigatures</span>: <span class="hljs-built_in">boolean</span>;
 }
 </code></pre>
 
 </div>
-</div><p>Only catalogue palettes are accepted, with no print remapping. Symmetric margins
-are finite millimetres in [5, 50], leaving at least 80 mm width and 100 mm height.
+</div><p>Only catalogue palettes are accepted, with no print remapping. Each side falls
+back to <code>marginMm</code>, then 20 mm. All supplied margins must be finite in [5, 50],
+leaving at least 80 mm width and 100 mm height after subtracting opposite sides.
 Family names deliberately exclude fontspec options, paths, and TeX metacharacters.</p>
+<p>Root settings resolve first, including note inheritance from the root body.
+Per-role programmatic overrides apply next: <code>bodyFont</code> does not retroactively
+change the resolved note family; use <code>noteFont</code> to override that role. This avoids
+mistaking an explicit root note equal to its body for an inherited value.
+Invalid root settings remain errors even when an option overrides that role.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;publication LaTeX options&gt;&gt;= </div>
 <div class="code">
@@ -197,7 +213,7 @@ Family names deliberately exclude fontspec options, paths, and TeX metacharacter
     }
     <span class="hljs-keyword">return</span> value;
 }
-<span class="hljs-keyword">function</span> <span class="hljs-title function_">checkOptions</span>(<span class="hljs-params">options: LatexOptions</span>): <span class="hljs-title class_">CheckedOptions</span> {
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">checkOptions</span>(<span class="hljs-params">options: LatexOptions, settings: PublicationSettingsResult</span>): <span class="hljs-title class_">CheckedOptions</span> {
     <span class="hljs-keyword">const</span> theme = <span class="hljs-title function_">getTheme</span>(options.<span class="hljs-property">theme</span> ?? defaultThemeName);
     <span class="hljs-keyword">if</span> (!theme) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Unknown publication theme&#x27;</span>); }
     <span class="hljs-keyword">const</span> papers = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, [<span class="hljs-built_in">string</span>, <span class="hljs-built_in">number</span>, <span class="hljs-built_in">number</span>]&gt;([
@@ -206,14 +222,33 @@ Family names deliberately exclude fontspec options, paths, and TeX metacharacter
     ]);
     <span class="hljs-keyword">const</span> paper = papers.<span class="hljs-title function_">get</span>(options.<span class="hljs-property">paper</span> ?? <span class="hljs-string">&#x27;A4&#x27;</span>);
     <span class="hljs-keyword">const</span> margin = options.<span class="hljs-property">marginMm</span> ?? <span class="hljs-number">20</span>;
-    <span class="hljs-keyword">if</span> (!paper || !<span class="hljs-title class_">Number</span>.<span class="hljs-built_in">isFinite</span>(margin) || margin &lt; <span class="hljs-number">5</span> || margin &gt; <span class="hljs-number">50</span> ||
-        paper[<span class="hljs-number">1</span>] - <span class="hljs-number">2</span> * margin &lt; <span class="hljs-number">80</span> || paper[<span class="hljs-number">2</span>] - <span class="hljs-number">2</span> * margin &lt; <span class="hljs-number">100</span>) {
+    <span class="hljs-keyword">const</span> overrides = [options.<span class="hljs-property">marginTopMm</span>, options.<span class="hljs-property">marginRightMm</span>,
+        options.<span class="hljs-property">marginBottomMm</span>, options.<span class="hljs-property">marginLeftMm</span>];
+    <span class="hljs-keyword">const</span> [top, right, bottom, left] = overrides.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">value</span> =&gt;</span> value ?? margin);
+    <span class="hljs-keyword">if</span> (!paper || [margin, top, right, bottom, left].<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">value</span> =&gt;</span>
+        !<span class="hljs-title class_">Number</span>.<span class="hljs-built_in">isFinite</span>(value) || value &lt; <span class="hljs-number">5</span> || value &gt; <span class="hljs-number">50</span>) ||
+        paper[<span class="hljs-number">1</span>] - left - right &lt; <span class="hljs-number">80</span> || paper[<span class="hljs-number">2</span>] - top - bottom &lt; <span class="hljs-number">100</span>) {
         <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Invalid paper or margin; require 5–50 mm and an 80 × 100 mm body&#x27;</span>);
     }
-    <span class="hljs-keyword">return</span> { theme, <span class="hljs-attr">paper</span>: paper[<span class="hljs-number">0</span>], margin,
-        <span class="hljs-attr">bodyFont</span>: <span class="hljs-title function_">fontName</span>(options.<span class="hljs-property">bodyFont</span> ?? <span class="hljs-string">&#x27;Latin Modern Roman&#x27;</span>),
-        <span class="hljs-attr">headingFont</span>: <span class="hljs-title function_">fontName</span>(options.<span class="hljs-property">headingFont</span> ?? <span class="hljs-string">&#x27;Monofur Nerd Font&#x27;</span>),
-        <span class="hljs-attr">codeFont</span>: <span class="hljs-title function_">fontName</span>(options.<span class="hljs-property">codeFont</span> ?? <span class="hljs-string">&#x27;D2CodingLigature Nerd Font Propo&#x27;</span>) };
+    <span class="hljs-keyword">const</span> geometry = overrides.<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">value</span> =&gt;</span> value !== <span class="hljs-literal">undefined</span>)
+        ? <span class="hljs-string">`top=<span class="hljs-subst">${top}</span>mm,right=<span class="hljs-subst">${right}</span>mm,bottom=<span class="hljs-subst">${bottom}</span>mm,left=<span class="hljs-subst">${left}</span>mm`</span>
+        : <span class="hljs-string">`margin=<span class="hljs-subst">${margin}</span>mm`</span>;
+</code></pre>
+
+</div>
+</div><p>The boolean policy is checked at runtime too; callers need not be TypeScript.
+Defaults come only from the shared settings resolver, not a second catalogue.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX options&gt;&gt;=+ </div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">const</span> codeLigatures = options.<span class="hljs-property">codeLigatures</span> ?? settings.<span class="hljs-property">codeLigatures</span>;
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> codeLigatures !== <span class="hljs-string">&#x27;boolean&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Code ligatures must be boolean&#x27;</span>); }
+    <span class="hljs-keyword">return</span> { theme, <span class="hljs-attr">paper</span>: paper[<span class="hljs-number">0</span>], geometry, codeLigatures,
+        <span class="hljs-attr">bodyFont</span>: <span class="hljs-title function_">fontName</span>(options.<span class="hljs-property">bodyFont</span> ?? settings.<span class="hljs-property">fonts</span>.<span class="hljs-property">body</span>),
+        <span class="hljs-attr">headingFont</span>: <span class="hljs-title function_">fontName</span>(options.<span class="hljs-property">headingFont</span> ?? settings.<span class="hljs-property">fonts</span>.<span class="hljs-property">heading</span>),
+        <span class="hljs-attr">codeFont</span>: <span class="hljs-title function_">fontName</span>(options.<span class="hljs-property">codeFont</span> ?? settings.<span class="hljs-property">fonts</span>.<span class="hljs-property">code</span>),
+        <span class="hljs-attr">fragmentFont</span>: <span class="hljs-title function_">fontName</span>(options.<span class="hljs-property">fragmentFont</span> ?? settings.<span class="hljs-property">fonts</span>.<span class="hljs-property">fragment</span>),
+        <span class="hljs-attr">noteFont</span>: <span class="hljs-title function_">fontName</span>(options.<span class="hljs-property">noteFont</span> ?? settings.<span class="hljs-property">fonts</span>.<span class="hljs-property">note</span>) };
 }
 </code></pre>
 
@@ -264,7 +299,8 @@ Control characters are rejected rather than interpreted by TeX.</p>
 
 </div>
 </div><p>Colours are validated even though the catalogue and style adapter are trusted.
-The code font retains common/contextual ligatures. D2Coding has no italic face:
+The code font retains common/contextual ligatures by default; disabling them
+adds <code>RawFeature={-calt}</code> for D2's contextual substitutions. D2Coding has no italic face:
 fontspec explicitly synthesizes slanted regular and bold faces with FakeSlant.
 The same policy applies to an overridden code family; no implicit italic lookup.</p>
 <div class="codefragment">
@@ -276,7 +312,7 @@ The same policy applies to an overridden code family; no implicit italic lookup.
 }
 <span class="hljs-keyword">function</span> <span class="hljs-title function_">pageLink</span>(<span class="hljs-params">id: <span class="hljs-built_in">string</span>, label: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> {
     <span class="hljs-keyword">const</span> destination = <span class="hljs-title function_">target</span>(id);
-    <span class="hljs-keyword">return</span> <span class="hljs-string">`\\hyperref[<span class="hljs-subst">${destination}</span>]{<span class="hljs-subst">${label}</span>\\textsuperscript{\\pageref*{<span class="hljs-subst">${destination}</span>}}}`</span>;
+    <span class="hljs-keyword">return</span> <span class="hljs-string">`\\hyperref[<span class="hljs-subst">${destination}</span>]{<span class="hljs-subst">${label}</span>\\textsuperscript{\\notefont\\pageref*{<span class="hljs-subst">${destination}</span>}}}`</span>;
 }
 <span class="hljs-keyword">function</span> <span class="hljs-title function_">anchor</span>(<span class="hljs-params">id: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> { <span class="hljs-keyword">return</span> <span class="hljs-string">`\\phantomsection\\label{<span class="hljs-subst">${target(id)}</span>}`</span>; }
 </code></pre>
@@ -295,11 +331,13 @@ code. LuaLaTeX is the intended compiler, with installed fonts and packages.</p>
     <span class="hljs-keyword">return</span> <span class="hljs-title function_">themeNotice</span>() + <span class="hljs-title class_">String</span>.<span class="hljs-property">raw</span><span class="hljs-string">`\documentclass[11pt,oneside,openany]{scrbook}
 <span class="hljs-subst">${<span class="hljs-string">&#x27;\\usepackage&#x27;</span>}</span>{fontspec}
 \setmainfont{<span class="hljs-subst">${options.bodyFont}</span>}
-\newfontfamily\fragmentfont{<span class="hljs-subst">${options.headingFont}</span>}
-\setmonofont[Ligatures=Common,Contextuals=Alternate,
+\newfontfamily\headingfont{<span class="hljs-subst">${options.headingFont}</span>}
+\newfontfamily\fragmentfont{<span class="hljs-subst">${options.fragmentFont}</span>}
+\newfontfamily\notefont{<span class="hljs-subst">${options.noteFont}</span>}
+\setmonofont[Ligatures=Common,Contextuals=Alternate,<span class="hljs-subst">${options.codeLigatures ? <span class="hljs-string">&#x27;&#x27;</span> : <span class="hljs-string">&#x27;RawFeature={-calt},&#x27;</span>}</span>
 ItalicFont={<span class="hljs-subst">${options.codeFont}</span>},ItalicFeatures={FakeSlant=0.2},
 BoldItalicFont={<span class="hljs-subst">${options.codeFont}</span>},BoldItalicFeatures={FakeSlant=0.2,FakeBold=1.5}]{<span class="hljs-subst">${options.codeFont}</span>}
-<span class="hljs-subst">${<span class="hljs-string">&#x27;\\usepackage&#x27;</span>}</span>[<span class="hljs-subst">${options.paper}</span>,margin=<span class="hljs-subst">${options.margin}</span>mm]{geometry}
+<span class="hljs-subst">${<span class="hljs-string">&#x27;\\usepackage&#x27;</span>}</span>[<span class="hljs-subst">${options.paper}</span>,<span class="hljs-subst">${options.geometry}</span>]{geometry}
 <span class="hljs-subst">${<span class="hljs-string">&#x27;\\usepackage&#x27;</span>}</span>{fvextra,needspace,xcolor,microtype,amssymb,amsmath}
 <span class="hljs-subst">${<span class="hljs-string">&#x27;\\usepackage&#x27;</span>}</span>[normalem]{ulem}
 <span class="hljs-subst">${<span class="hljs-string">&#x27;\\usepackage&#x27;</span>}</span>[hidelinks]{hyperref}
@@ -307,8 +345,9 @@ BoldItalicFont={<span class="hljs-subst">${options.codeFont}</span>},BoldItalicF
 \definecolor{publicationText}{HTML}{<span class="hljs-subst">${color(c.text)}</span>}
 \definecolor{publicationAccent}{HTML}{<span class="hljs-subst">${color(c.accent)}</span>}
 \pagecolor{publicationBackground}\color{publicationText}
-\setkomafont{disposition}{\fragmentfont\bfseries\color{publicationAccent}}
-\setkomafont{pageheadfoot}{\normalfont\color{publicationText}}
+\setkomafont{disposition}{\headingfont\bfseries\color{publicationAccent}}
+\setkomafont{pageheadfoot}{\notefont\color{publicationText}}
+\setkomafont{footnote}{\notefont}
 \providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 \providecommand{\passthrough}[1]{#1}
 \providecommand{\pandocbounded}[1]{#1}
@@ -467,7 +506,7 @@ The heading requests room for its start and code, but no entire code block is bo
     <span class="hljs-keyword">if</span> (position + <span class="hljs-number">1</span> &lt; family.<span class="hljs-property">contributions</span>.<span class="hljs-property">length</span>) {
         navigation.<span class="hljs-title function_">push</span>(<span class="hljs-title function_">pageLink</span>(family.<span class="hljs-property">contributions</span>[position + <span class="hljs-number">1</span>], <span class="hljs-string">&#x27;Next &#x27;</span>));
     }
-    <span class="hljs-keyword">if</span> (navigation.<span class="hljs-property">length</span>) { output += <span class="hljs-string">`{\\small <span class="hljs-subst">${navigation.join(<span class="hljs-string">&#x27;\\quad &#x27;</span>)}</span>\\par}\n`</span>; }
+    <span class="hljs-keyword">if</span> (navigation.<span class="hljs-property">length</span>) { output += <span class="hljs-string">`{\\notefont\\small <span class="hljs-subst">${navigation.join(<span class="hljs-string">&#x27;\\quad &#x27;</span>)}</span>\\par}\n`</span>; }
     output += <span class="hljs-title function_">contributionBody</span>(data, project, theme, definitions);
     <span class="hljs-keyword">return</span> [{ <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;RawBlock&#x27;</span>, <span class="hljs-attr">c</span>: [<span class="hljs-string">&#x27;latex&#x27;</span>, output] }];
 }
@@ -558,7 +597,11 @@ The first document provides a stable location for non-source-specific failures.<
     convert: LatexConverter</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-title class_">LatexResult</span>&gt; {
     <span class="hljs-keyword">let</span> stage = <span class="hljs-string">&#x27;latex-options&#x27;</span>;
     <span class="hljs-keyword">try</span> {
-        <span class="hljs-keyword">const</span> checked = <span class="hljs-title function_">checkOptions</span>(options);
+        <span class="hljs-keyword">const</span> settings = <span class="hljs-title function_">resolvePublicationSettings</span>(parsed);
+        <span class="hljs-keyword">if</span> (settings.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) {
+            <span class="hljs-keyword">return</span> { <span class="hljs-attr">diagnostics</span>: [...parsed.<span class="hljs-property">diagnostics</span>, ...settings.<span class="hljs-property">diagnostics</span>] };
+        }
+        <span class="hljs-keyword">const</span> checked = <span class="hljs-title function_">checkOptions</span>(options, settings);
         <span class="hljs-keyword">const</span> <span class="hljs-attr">definitions</span>: <span class="hljs-built_in">string</span>[] = [];
         stage = <span class="hljs-string">&#x27;latex-preparation&#x27;</span>;
         <span class="hljs-keyword">const</span> prepared = <span class="hljs-title function_">preparePandoc</span>(parsed, <span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span>
@@ -628,7 +671,7 @@ containers, full references and long styled tokens. It retains logs, glyph trace
 link/bounds checks and previews. Headless tests cover every catalogue theme, but
 all palettes, fonts, arbitrary container depths and pagination are not PDF-validated.
 References introduce display-only line breaks; executable copying must use original
-or tangled source. CLI adapters, root SETTINGS, heading identity, packaging,
+or tangled source. CLI adapters, heading identity, packaging,
 transactions and generation belong to their separate integration slices.</p>
 </div>
 <script type="module">
