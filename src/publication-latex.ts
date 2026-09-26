@@ -1,6 +1,7 @@
 import type { ParsedProject, PublicationContribution, GenerationDiagnostic } from './engine';
 import { preparePandoc } from './publication-pandoc';
 import { resolvePublicationSettings } from './publication-settings';
+import { checkFontFace, fontFaces, fontFile, PortableFont } from './publication-fonts';
 import type { PublicationSettingsResult } from './publication-settings';
 import type { PandocDocument, PandocBlock } from './publication-pandoc';
 import { defaultThemeName, getTheme } from './themes';
@@ -20,6 +21,7 @@ export interface LatexOptions {
     fragmentFont?: string;
     noteFont?: string;
     codeLigatures?: boolean;
+    portableFonts?: Record<string, PortableFont>;
 }
 export interface LatexConversionOptions {
     standalone: false;
@@ -33,6 +35,7 @@ interface CheckedOptions {
     theme: LiterateTheme; paper: string; geometry: string;
     bodyFont: string; headingFont: string; codeFont: string;
     fragmentFont: string; noteFont: string; codeLigatures: boolean;
+    portableFonts?: Record<string, PortableFont>;
 }
 function fontName(value: string): string {
     if (typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9 .-]{0,99}$/.test(value)) {
@@ -62,7 +65,7 @@ function checkOptions(options: LatexOptions, settings: PublicationSettingsResult
         : `margin=${margin}mm`;
     const codeLigatures = options.codeLigatures ?? settings.codeLigatures;
     if (typeof codeLigatures !== 'boolean') { throw new Error('Code ligatures must be boolean'); }
-    return { theme, paper: paper[0], geometry, codeLigatures,
+    return { theme, paper: paper[0], geometry, codeLigatures, portableFonts: options.portableFonts,
         bodyFont: fontName(options.bodyFont ?? settings.fonts.body),
         headingFont: fontName(options.headingFont ?? settings.fonts.heading),
         codeFont: fontName(options.codeFont ?? settings.fonts.code),
@@ -105,17 +108,59 @@ function pageLink(id: string, label: string): string {
     return `\\hyperref[${destination}]{${label}\\textsuperscript{\\notefont\\pageref*{${destination}}}}`;
 }
 function anchor(id: string): string { return `\\phantomsection\\label{${target(id)}}`; }
+function fontCommand(command: string, family: string, options: CheckedOptions, code = false): string {
+    const features = code ? `Ligatures=Common,Contextuals=Alternate,${options.codeLigatures ? '' : 'RawFeature={-calt},'}` : '';
+    if (options.portableFonts !== undefined) {
+        const font = Object.prototype.hasOwnProperty.call(options.portableFonts, family)
+            ? options.portableFonts[family] : undefined;
+        if (!font) { throw new Error(`Invalid or missing portable font companions for ${family}`); }
+        return portableFontCommand(command, family, font, features);
+    }
+    if (!code) { return `${command}{${family}}`; }
+    if (family !== 'D2CodingLigature Nerd Font Propo') {
+        return `${command}[${features.slice(0, -1)}]{${family}}`;
+    }
+    return `${command}[${features}\nItalicFont={${family}},ItalicFeatures={FakeSlant=0.2},\nBoldItalicFont={${family}},BoldItalicFeatures={FakeSlant=0.2,FakeBold=1.5}]{${family}}`;
+}
+function companionPath(value: unknown, where: string): string {
+    if (typeof value !== 'string' ||
+        !/^lit-fonts-[a-f0-9]{64}\/[a-f0-9]{64}\.(ttf|otf)$/.test(value)) {
+        throw new Error(`Invalid or missing portable font companions for ${where}`);
+    }
+    return value;
+}
+function portableFontCommand(command: string, family: string, font: PortableFont, features: string): string {
+    const checked = {} as PortableFont;
+    for (const face of fontFaces) {
+        checked[face] = checkFontFace(font[face], face, `${family}.${face}`, companionPath);
+    }
+    const regular = fontFile(checked.regular);
+    const directory = regular.slice(0, regular.lastIndexOf('/') + 1);
+    if (fontFaces.some(face => !fontFile(checked[face]).startsWith(directory))) {
+        throw new Error(`Portable font faces must share one companion directory for ${family}`);
+    }
+    const name = (face: keyof PortableFont): string => fontFile(checked[face]).slice(directory.length);
+    return `${command}[${features}Path={${directory}},BoldFont={${name('bold')}},` +
+        `ItalicFont={${name('italic')}},BoldItalicFont={${name('boldItalic')}}` +
+        `${slantFeatures(checked)}]{${name('regular')}}`;
+}
+function slantFeatures(font: PortableFont): string {
+    let features = '';
+    for (const [face, option] of [['italic', 'ItalicFeatures'], ['boldItalic', 'BoldItalicFeatures']] as const) {
+        const choice = font[face];
+        if (typeof choice !== 'string') { features += `,${option}={FakeSlant=${choice.slant}}`; }
+    }
+    return features;
+}
 function template(body: string, options: CheckedOptions, definitions: string[]): string {
     const c = options.theme.colors;
     return themeNotice() + String.raw`\documentclass[11pt,oneside,openany]{scrbook}
 ${'\\usepackage'}{fontspec}
-\setmainfont{${options.bodyFont}}
-\newfontfamily\headingfont{${options.headingFont}}
-\newfontfamily\fragmentfont{${options.fragmentFont}}
-\newfontfamily\notefont{${options.noteFont}}
-\setmonofont[Ligatures=Common,Contextuals=Alternate,${options.codeLigatures ? '' : 'RawFeature={-calt},'}
-ItalicFont={${options.codeFont}},ItalicFeatures={FakeSlant=0.2},
-BoldItalicFont={${options.codeFont}},BoldItalicFeatures={FakeSlant=0.2,FakeBold=1.5}]{${options.codeFont}}
+${fontCommand('\\setmainfont', options.bodyFont, options)}
+${fontCommand('\\newfontfamily\\headingfont', options.headingFont, options)}
+${fontCommand('\\newfontfamily\\fragmentfont', options.fragmentFont, options)}
+${fontCommand('\\newfontfamily\\notefont', options.noteFont, options)}
+${fontCommand('\\setmonofont', options.codeFont, options, true)}
 ${'\\usepackage'}[${options.paper},${options.geometry}]{geometry}
 ${'\\usepackage'}{fvextra,needspace,xcolor,microtype,amssymb,amsmath}
 ${'\\usepackage'}[normalem]{ulem}

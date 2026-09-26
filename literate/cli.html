@@ -172,15 +172,15 @@ project fails rather than passing vacuously.</p>
     [<span class="hljs-string">&#x27;--margin&#x27;</span>, <span class="hljs-string">&#x27;marginMm&#x27;</span>], [<span class="hljs-string">&#x27;--margin-top&#x27;</span>, <span class="hljs-string">&#x27;marginTopMm&#x27;</span>], [<span class="hljs-string">&#x27;--margin-right&#x27;</span>, <span class="hljs-string">&#x27;marginRightMm&#x27;</span>],
     [<span class="hljs-string">&#x27;--margin-bottom&#x27;</span>, <span class="hljs-string">&#x27;marginBottomMm&#x27;</span>], [<span class="hljs-string">&#x27;--margin-left&#x27;</span>, <span class="hljs-string">&#x27;marginLeftMm&#x27;</span>]
 ] <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span>;
-<span class="hljs-keyword">const</span> latexValueFlags = [<span class="hljs-string">&#x27;--output&#x27;</span>, <span class="hljs-string">&#x27;--paper&#x27;</span>, ...latexMarginOptions.<span class="hljs-title function_">map</span>(<span class="hljs-function">(<span class="hljs-params">[flag]</span>) =&gt;</span> flag)];
+<span class="hljs-keyword">const</span> latexValueFlags = [<span class="hljs-string">&#x27;--output&#x27;</span>, <span class="hljs-string">&#x27;--paper&#x27;</span>, <span class="hljs-string">&#x27;--font-manifest&#x27;</span>, ...latexMarginOptions.<span class="hljs-title function_">map</span>(<span class="hljs-function">(<span class="hljs-params">[flag]</span>) =&gt;</span> flag)];
 <span class="hljs-keyword">const</span> latexUsage = <span class="hljs-string">&#x27;latex [root] --output path.tex [--paper a4|a5|letter|legal] [--margin 20mm]&#x27;</span>
-    + <span class="hljs-string">&#x27; [--margin-top Nmm] [--margin-right Nmm] [--margin-bottom Nmm] [--margin-left Nmm] [--json]&#x27;</span>;
+    + <span class="hljs-string">&#x27; [--margin-top Nmm] [--margin-right Nmm] [--margin-bottom Nmm] [--margin-left Nmm] [--font-manifest path.json] [--json]&#x27;</span>;
 <span class="hljs-keyword">const</span> usage = <span class="hljs-string">&#x27;Usage: node out/cli.js generate|check|inspect|self-check [root] [--json]\n&#x27;</span>
     + <span class="hljs-string">`       node out/cli.js <span class="hljs-subst">${latexUsage}</span>\n`</span>
     + <span class="hljs-string">&#x27;       node out/cli.js &lt;command&gt; --help [--json]\n       node out/cli.js --help [--json]\n&#x27;</span>;
 <span class="hljs-keyword">const</span> <span class="hljs-attr">descriptions</span>: <span class="hljs-title class_">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; = <span class="hljs-title class_">Object</span>.<span class="hljs-title function_">fromEntries</span>([
     [<span class="hljs-string">&#x27;generate&#x27;</span>, <span class="hljs-string">&#x27;Write missing or changed generated files.&#x27;</span>],
-    [<span class="hljs-string">&#x27;latex&#x27;</span>, <span class="hljs-string">&#x27;Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving at least an 80 × 100 mm body. Each side overrides --margin; unspecified sides use --margin or 20mm. Fonts resolve from root index.literate SETTINGS. No TeX/PDF execution or bundled fonts.&#x27;</span>],
+    [<span class="hljs-string">&#x27;latex&#x27;</span>, <span class="hljs-string">&#x27;Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving at least an 80 × 100 mm body. Each side overrides --margin; unspecified sides use --margin or 20mm. Fonts resolve from root index.literate SETTINGS. No TeX/PDF execution. --font-manifest opts into explicit font/license companions.&#x27;</span>],
     [<span class="hljs-string">&#x27;check&#x27;</span>, <span class="hljs-string">&#x27;Report missing or stale generated files without writing.&#x27;</span>],
     [<span class="hljs-string">&#x27;inspect&#x27;</span>, <span class="hljs-string">&#x27;Report documents, templates, and fragment definitions and dependencies without reading outputs or writing.&#x27;</span>],
     [<span class="hljs-string">&#x27;self-check&#x27;</span>, <span class="hljs-string">&#x27;Verify this repository’s trusted self-hosting code without generating files; all outputs must already be current.&#x27;</span>]
@@ -233,6 +233,8 @@ load compiler tooling until verification is requested.</p>
 <span class="hljs-keyword">import</span> { randomUUID } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;crypto&#x27;</span>;
 <span class="hljs-keyword">import</span> { spawn } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;child_process&#x27;</span>;
 <span class="hljs-keyword">import</span> { renderLatex, <span class="hljs-title class_">LatexConverter</span>, <span class="hljs-title class_">LatexOptions</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./publication-latex&#x27;</span>;
+<span class="hljs-keyword">import</span> { planFonts } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./publication-fonts&#x27;</span>;
+<span class="hljs-keyword">import</span> { resolvePublicationSettings } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./publication-settings&#x27;</span>;
 <span class="hljs-keyword">import</span> { commitOutputs, <span class="hljs-title class_">OutputTransactionError</span>, <span class="hljs-title class_">TransactionIO</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./output-transactions&#x27;</span>;
 <span class="hljs-keyword">import</span> { discoveryExcludedDirectories, generateProject, parseProject, resolveProjectTheme, safeRelativePath, templateReferences, <span class="hljs-title class_">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./engine&#x27;</span>;
 
@@ -613,34 +615,52 @@ rendering. Protect every discovered document and every declared template path,
 including missing templates, not only chapters selected for publication. Compare
 case-insensitively and reject equality and ancestor collisions in both directions.
 Filesystem inspection additionally rejects links and non-file destinations. The
-single complete book then joins the existing byte comparison and transaction flow;
+complete book and opt-in font/license companions join the existing byte comparison
+and transaction flow. Manifest inputs (even unselected families) are also protected;
+no Fonts discovery occurs. Binary contents never pass through UTF-8 decoding;
 preparation/conversion failures never create output directories or staged files.
 Transaction failures retain the recovery/committed-cleanup semantics above.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;cli LaTeX plan&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">planLatex</span>(<span class="hljs-params">root: <span class="hljs-built_in">string</span>, documents: SourceDocument[], output: <span class="hljs-built_in">string</span>,
-    options: LatexOptions, convert: LatexConverter</span>): <span class="hljs-title class_">Promise</span>&lt;{
-        <span class="hljs-attr">files</span>: <span class="hljs-title class_">Generation</span>[<span class="hljs-string">&#x27;files&#x27;</span>]; <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">Generation</span>[<span class="hljs-string">&#x27;diagnostics&#x27;</span>];
+    options: LatexOptions, convert: LatexConverter, manifest?: <span class="hljs-built_in">string</span></span>): <span class="hljs-title class_">Promise</span>&lt;{
+        <span class="hljs-attr">files</span>: { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span> | <span class="hljs-title class_">Uint8Array</span> }[]; <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">Generation</span>[<span class="hljs-string">&#x27;diagnostics&#x27;</span>];
         inspection?: <span class="hljs-title class_">Generation</span>[<span class="hljs-string">&#x27;inspection&#x27;</span>];
     }&gt; {
     <span class="hljs-keyword">const</span> theme = <span class="hljs-title function_">resolveProjectTheme</span>(documents);
     <span class="hljs-keyword">if</span> (theme.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">files</span>: [], <span class="hljs-attr">diagnostics</span>: theme.<span class="hljs-property">diagnostics</span> }; }
-    <span class="hljs-keyword">const</span> target = output.<span class="hljs-title function_">toLowerCase</span>();
-    <span class="hljs-keyword">const</span> inputs = [...documents.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">document</span> =&gt;</span> <span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>), ...<span class="hljs-title function_">templateReferences</span>(documents)];
-    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> input <span class="hljs-keyword">of</span> inputs) {
-        <span class="hljs-keyword">const</span> source = <span class="hljs-title function_">relative</span>(input).<span class="hljs-title function_">toLowerCase</span>();
-        <span class="hljs-keyword">if</span> (target === source || target.<span class="hljs-title function_">startsWith</span>(source + <span class="hljs-string">&#x27;/&#x27;</span>) || source.<span class="hljs-title function_">startsWith</span>(target + <span class="hljs-string">&#x27;/&#x27;</span>)) {
-            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`LaTeX output conflicts with input: <span class="hljs-subst">${input}</span>`</span>);
+    <span class="hljs-keyword">const</span> project = <span class="hljs-title function_">parseProject</span>(documents);
+    <span class="hljs-keyword">const</span> settings = <span class="hljs-title function_">resolvePublicationSettings</span>(project);
+    <span class="hljs-keyword">if</span> (settings.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">files</span>: [], <span class="hljs-attr">diagnostics</span>: settings.<span class="hljs-property">diagnostics</span> }; }
+    <span class="hljs-keyword">const</span> companions = manifest ? <span class="hljs-keyword">await</span> <span class="hljs-title function_">planFonts</span>(manifest, output, <span class="hljs-title class_">Object</span>.<span class="hljs-title function_">values</span>(settings.<span class="hljs-property">fonts</span>), {
+        <span class="hljs-keyword">async</span> <span class="hljs-title function_">requireFile</span>(<span class="hljs-params">value</span>) {
+            <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, value)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Missing file: <span class="hljs-subst">${value}</span>`</span>); }
+        },
+        <span class="hljs-keyword">async</span> <span class="hljs-title function_">read</span>(<span class="hljs-params">value</span>) {
+            <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, value)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Input disappeared: <span class="hljs-subst">${value}</span>`</span>); }
+            <span class="hljs-keyword">return</span> fs.<span class="hljs-title function_">readFile</span>(path.<span class="hljs-title function_">join</span>(root, value));
         }
+    }) : <span class="hljs-literal">undefined</span>;
+    <span class="hljs-keyword">const</span> inputs = [...documents.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">document</span> =&gt;</span> <span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>), ...<span class="hljs-title function_">templateReferences</span>(documents),
+        ...(companions?.<span class="hljs-property">inputs</span> ?? [])];
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> destination <span class="hljs-keyword">of</span> [output, ...(companions?.<span class="hljs-property">files</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">file</span> =&gt;</span> file.<span class="hljs-property">path</span>) ?? [])]) {
+        <span class="hljs-keyword">const</span> target = destination.<span class="hljs-title function_">toLowerCase</span>();
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> input <span class="hljs-keyword">of</span> inputs) {
+            <span class="hljs-keyword">const</span> source = <span class="hljs-title function_">relative</span>(input).<span class="hljs-title function_">toLowerCase</span>();
+            <span class="hljs-keyword">if</span> (target === source || target.<span class="hljs-title function_">startsWith</span>(source + <span class="hljs-string">&#x27;/&#x27;</span>) || source.<span class="hljs-title function_">startsWith</span>(target + <span class="hljs-string">&#x27;/&#x27;</span>)) {
+                <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`LaTeX output conflicts with input: <span class="hljs-subst">${input}</span> (output <span class="hljs-subst">${destination}</span>)`</span>);
+            }
+        }
+        <span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, destination);
     }
-    <span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, output);
-    <span class="hljs-keyword">const</span> rendered = <span class="hljs-keyword">await</span> <span class="hljs-title function_">renderLatex</span>(<span class="hljs-title function_">parseProject</span>(documents), { ...options, <span class="hljs-attr">theme</span>: theme.<span class="hljs-property">name</span> }, convert);
+    <span class="hljs-keyword">const</span> rendered = <span class="hljs-keyword">await</span> <span class="hljs-title function_">renderLatex</span>(project, { ...options, <span class="hljs-attr">theme</span>: theme.<span class="hljs-property">name</span>,
+        <span class="hljs-attr">portableFonts</span>: companions?.<span class="hljs-property">fonts</span> }, convert);
     <span class="hljs-keyword">if</span> (!rendered.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span> &amp;&amp; rendered.<span class="hljs-property">latex</span> === <span class="hljs-literal">undefined</span>) {
         <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;LaTeX renderer returned no document&#x27;</span>);
     }
     <span class="hljs-keyword">return</span> { <span class="hljs-attr">diagnostics</span>: rendered.<span class="hljs-property">diagnostics</span>, <span class="hljs-attr">files</span>: rendered.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span> ? []
-        : [{ <span class="hljs-attr">path</span>: output, <span class="hljs-attr">content</span>: rendered.<span class="hljs-property">latex</span>! }] };
+        : [{ <span class="hljs-attr">path</span>: output, <span class="hljs-attr">content</span>: rendered.<span class="hljs-property">latex</span>! }, ...(companions?.<span class="hljs-property">files</span> ?? [])] };
 }
 </code></pre>
 
@@ -775,6 +795,10 @@ leave enough width.</p>
     response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">`<span class="hljs-subst">${latexValueFlags.join(<span class="hljs-string">&#x27;, &#x27;</span>)}</span> are only valid for latex`</span>);
 }
 <span class="hljs-keyword">if</span> (topic === <span class="hljs-string">&#x27;latex&#x27;</span>) {
+    <span class="hljs-keyword">const</span> manifest = values.<span class="hljs-title function_">get</span>(<span class="hljs-string">&#x27;--font-manifest&#x27;</span>);
+    <span class="hljs-keyword">if</span> (manifest !== <span class="hljs-literal">undefined</span> &amp;&amp; !<span class="hljs-title function_">safeRelativePath</span>(manifest)) {
+        response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">&#x27;--font-manifest requires a safe root-relative JSON file path&#x27;</span>);
+    }
     <span class="hljs-keyword">const</span> output = values.<span class="hljs-title function_">get</span>(<span class="hljs-string">&#x27;--output&#x27;</span>);
     latexOutput = output ? <span class="hljs-title function_">safeRelativePath</span>(output) || <span class="hljs-string">&#x27;&#x27;</span> : <span class="hljs-string">&#x27;&#x27;</span>;
     <span class="hljs-keyword">if</span> ((!help || output !== <span class="hljs-literal">undefined</span>) &amp;&amp; (!latexOutput || !latexOutput.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;.tex&#x27;</span>))) {
@@ -857,7 +881,8 @@ Other commands stop on any diagnostic before examining or writing output files.<
 <div class="fragmentname">&lt;&lt;cli validate and inspect project&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">const</span> result = command === <span class="hljs-string">&#x27;latex&#x27;</span>
-    ? <span class="hljs-keyword">await</span> <span class="hljs-title function_">planLatex</span>(root, documents, latexOutput, latexOptions, convert)
+    ? <span class="hljs-keyword">await</span> <span class="hljs-title function_">planLatex</span>(root, documents, latexOutput, latexOptions, convert,
+        values.<span class="hljs-title function_">has</span>(<span class="hljs-string">&#x27;--font-manifest&#x27;</span>) ? <span class="hljs-title function_">relative</span>(values.<span class="hljs-title function_">get</span>(<span class="hljs-string">&#x27;--font-manifest&#x27;</span>)!) : <span class="hljs-literal">undefined</span>)
     : <span class="hljs-title function_">generateProject</span>(documents, templates);
 response.<span class="hljs-property">diagnostics</span> = result.<span class="hljs-property">diagnostics</span>;
 <span class="hljs-keyword">if</span> (command === <span class="hljs-string">&#x27;inspect&#x27;</span>) {
@@ -906,10 +931,10 @@ entry so a completed write can change only that entry to <code>written</code>.</
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;cli compare output bytes&gt;&gt;= </div>
 <div class="code">
-<pre><code><span class="hljs-keyword">const</span> <span class="hljs-attr">changes</span>: { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">output</span>: <span class="hljs-title class_">CliResponse</span>[<span class="hljs-string">&#x27;outputs&#x27;</span>][<span class="hljs-built_in">number</span>] }[] = [];
+<pre><code><span class="hljs-keyword">const</span> <span class="hljs-attr">changes</span>: { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span> | <span class="hljs-title class_">Uint8Array</span>; <span class="hljs-attr">output</span>: <span class="hljs-title class_">CliResponse</span>[<span class="hljs-string">&#x27;outputs&#x27;</span>][<span class="hljs-built_in">number</span>] }[] = [];
 <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> files) {
     <span class="hljs-keyword">const</span> exists = <span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, file.<span class="hljs-property">path</span>);
-    <span class="hljs-keyword">const</span> content = <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(file.<span class="hljs-property">content</span>, <span class="hljs-string">&#x27;utf8&#x27;</span>);
+    <span class="hljs-keyword">const</span> content = <span class="hljs-keyword">typeof</span> file.<span class="hljs-property">content</span> === <span class="hljs-string">&#x27;string&#x27;</span> ? <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(file.<span class="hljs-property">content</span>, <span class="hljs-string">&#x27;utf8&#x27;</span>) : <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(file.<span class="hljs-property">content</span>);
     <span class="hljs-keyword">const</span> <span class="hljs-attr">status</span>: <span class="hljs-title class_">OutputStatus</span> = !exists ? <span class="hljs-string">&#x27;missing&#x27;</span>
         : (<span class="hljs-keyword">await</span> fs.<span class="hljs-title function_">readFile</span>(path.<span class="hljs-title function_">join</span>(root, file.<span class="hljs-property">path</span>))).<span class="hljs-title function_">equals</span>(content) ? <span class="hljs-string">&#x27;current&#x27;</span> : <span class="hljs-string">&#x27;stale&#x27;</span>;
     <span class="hljs-keyword">const</span> output = { <span class="hljs-attr">path</span>: file.<span class="hljs-property">path</span>, status };
@@ -934,7 +959,10 @@ it does not claim to test the rebuilt CLI's runtime behavior.</p>
     <span class="hljs-keyword">if</span> (changes.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> <span class="hljs-title function_">finish</span>(<span class="hljs-number">1</span>); }
     <span class="hljs-keyword">if</span> (command === <span class="hljs-string">&#x27;self-check&#x27;</span>) {
         <span class="hljs-keyword">const</span> { verifySelfHosting } = <span class="hljs-keyword">await</span> <span class="hljs-keyword">import</span>(<span class="hljs-string">&#x27;./self-hosting&#x27;</span>);
-        response.<span class="hljs-property">selfHosting</span> = <span class="hljs-keyword">await</span> <span class="hljs-title function_">verifySelfHosting</span>(root, documents, templates, files);
+        response.<span class="hljs-property">selfHosting</span> = <span class="hljs-keyword">await</span> <span class="hljs-title function_">verifySelfHosting</span>(root, documents, templates, files.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">file</span> =&gt;</span> {
+            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> file.<span class="hljs-property">content</span> !== <span class="hljs-string">&#x27;string&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Self-hosting requires text outputs&#x27;</span>); }
+            <span class="hljs-keyword">return</span> { <span class="hljs-attr">path</span>: file.<span class="hljs-property">path</span>, <span class="hljs-attr">content</span>: file.<span class="hljs-property">content</span> };
+        }));
         <span class="hljs-keyword">if</span> (!json) {
             <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> check <span class="hljs-keyword">of</span> response.<span class="hljs-property">selfHosting</span>.<span class="hljs-property">checks</span>) {
                 io.<span class="hljs-title function_">stdout</span>(<span class="hljs-string">`<span class="hljs-subst">${check.ok ? <span class="hljs-string">&#x27;ok&#x27;</span> : <span class="hljs-string">&#x27;failed&#x27;</span>}</span>: <span class="hljs-subst">${check.name}</span><span class="hljs-subst">${check.message ? <span class="hljs-string">&#x27;: &#x27;</span> + check.message : <span class="hljs-string">&#x27;&#x27;</span>}</span>\n`</span>);
@@ -966,7 +994,7 @@ Other failures never claim writes succeeded. Obsolete outputs are not deleted.</
 };
 <span class="hljs-keyword">try</span> {
     <span class="hljs-keyword">const</span> written = <span class="hljs-keyword">await</span> <span class="hljs-title function_">commitOutputs</span>(files.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">file</span> =&gt;</span> ({
-        <span class="hljs-attr">path</span>: file.<span class="hljs-property">path</span>, <span class="hljs-attr">content</span>: <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(file.<span class="hljs-property">content</span>, <span class="hljs-string">&#x27;utf8&#x27;</span>)
+        <span class="hljs-attr">path</span>: file.<span class="hljs-property">path</span>, <span class="hljs-attr">content</span>: <span class="hljs-keyword">typeof</span> file.<span class="hljs-property">content</span> === <span class="hljs-string">&#x27;string&#x27;</span> ? <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">from</span>(file.<span class="hljs-property">content</span>, <span class="hljs-string">&#x27;utf8&#x27;</span>) : file.<span class="hljs-property">content</span>
     })), <span class="hljs-title function_">transactionIO</span>(root));
     <span class="hljs-title function_">markWritten</span>(written);
 } <span class="hljs-keyword">catch</span> (error) {

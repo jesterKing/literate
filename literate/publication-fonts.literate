@@ -1,0 +1,806 @@
+# Explicit portable font companions
+
+This chapter owns `src/publication-fonts.ts` and its headless tests. A manifest is
+an explicit publishing allowlist, never a request to scan Fonts or query installed
+families. Version 1 requires regular, bold, italic and boldItalic mappings plus a
+nonempty licenses array for every family. String mappings select real files with
+no synthesis. Italic faces alone may explicitly request bounded synthetic slant.
+
+```ts : <<portable fonts.*>>= ./src/publication-fonts.ts $
+<<portable font contract>>
+<<portable font object validation>>
+<<portable font field validation>>
+<<portable font path validation>>
+<<portable font face validation>>
+<<portable font plan>>
+```
+
+## Files and face choices
+
+The filesystem adapter rejects symbolic links in every component and requires
+regular files. Validation covers even unselected entries, but only selected
+families' bytes are copied. All declared inputs remain protected from outputs.
+A synthesized face still names an explicit file: there is no implicit fallback.
+
+```ts : <<portable font contract>>=
+import { createHash } from 'crypto';
+import { posix } from 'path';
+import { safeRelativePath } from './engine';
+
+export const fontFaces = ['regular', 'bold', 'italic', 'boldItalic'] as const;
+export type FontFace = string | { file: string; slant: number };
+export type PortableFont = Record<typeof fontFaces[number], FontFace>;
+export interface FontPlan {
+    fonts: Record<string, PortableFont>;
+    inputs: string[];
+    files: { path: string; content: Uint8Array }[];
+}
+export interface FontInputIO {
+    requireFile(path: string): Promise<void>;
+    read(path: string): Promise<Uint8Array>;
+}
+export const fontFile = (face: FontFace): string => typeof face === 'string' ? face : face.file;
+const digest = (text: string): string => createHash('sha256').update(text).digest('hex');
+```
+
+## Strict schema helpers
+
+JSON containers must be objects, never arrays or null. We retain the contextual
+field location in errors rather than letting a later property access fail.
+
+```ts : <<portable font object validation>>=
+function object(value: unknown, where: string): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw new Error(`${where}: expected a JSON object`);
+    }
+    return value as Record<string, unknown>;
+}
+```
+
+Unknown fields are errors so misspelled face, synthesis and license declarations
+cannot silently disappear. Required fields are checked by their value validators.
+
+```ts : <<portable font field validation>>=
+function keys(value: Record<string, unknown>, allowed: readonly string[], where: string): void {
+    for (const key of Object.keys(value)) {
+        if (!allowed.includes(key)) { throw new Error(`${where}: unknown field ${key}`); }
+    }
+}
+```
+
+Paths use the shared portable root-relative policy. Font containers are limited
+to .ttf and .otf; validation does not parse font binaries or determine whether a
+license legally permits redistribution. License contents remain opaque bytes.
+
+```ts : <<portable font path validation>>=
+function inputPath(value: unknown, where: string, font = false): string {
+    const result = typeof value === 'string' ? safeRelativePath(value) : undefined;
+    if (!result) { throw new Error(`${where}: expected a safe root-relative file path`); }
+    if (font && !/\.(ttf|otf)$/i.test(result)) {
+        throw new Error(`${where}: expected a .ttf or .otf font file`);
+    }
+    return result;
+}
+```
+
+Only italic and boldItalic accept `{file, slant}`. The slant must be a finite
+number from 0.01 through 0.3; 0.2 matches the approved D2 code-comment
+style. There is no synthetic weight, no arbitrary fontspec feature string and no
+coercion from strings. The renderer reuses this validator with a stricter companion
+path grammar, so programmatic callers cannot bypass synthesis checks.
+
+```ts : <<portable font face validation>>=
+export function checkFontFace(value: unknown, face: typeof fontFaces[number], where: string,
+    filePath: (value: unknown, where: string) => string): FontFace {
+    if (!value || typeof value !== 'object') { return filePath(value, where); }
+    if (face !== 'italic' && face !== 'boldItalic') {
+        throw new Error(`${where}: synthesis is only supported for italic and boldItalic`);
+    }
+    const choice = object(value, where);
+    keys(choice, ['file', 'slant'], where);
+    if (typeof choice.slant !== 'number' || !Number.isFinite(choice.slant) ||
+        choice.slant < 0.01 || choice.slant > 0.3) {
+        throw new Error(`${where}.slant: expected a finite number from 0.01 through 0.3`);
+    }
+    return { file: filePath(choice.file, `${where}.file`), slant: choice.slant };
+}
+```
+
+## Plan before publishing
+
+The traversal separates decoding, validation and copying. Its order is unchanged:
+all entries are validated and checked for existence before any selected bytes are
+copied. The caller preflights collisions and publishes the in-memory plan through
+its existing transaction, not through separate writes.
+
+```ts : <<portable font plan>>=
+export async function planFonts(manifestPath: string, output: string,
+    selected: readonly string[], io: FontInputIO): Promise<FontPlan> {
+    const context = `Font manifest ${manifestPath}`;
+    <<decode portable font manifest>>
+    const entries = new Map<string, { faces: PortableFont; licenses: string[] }>();
+    const inputs = new Set([manifestPath]);
+    <<validate portable font families>>
+    <<require portable font inputs>>
+    const directory = `lit-fonts-${digest(posix.basename(output))}`;
+    const plan: FontPlan = { fonts: Object.create(null), inputs: [...inputs], files: [] };
+    <<copy selected portable fonts>>
+    return plan;
+}
+```
+
+The manifest is itself a protected input. Malformed JSON gets the manifest path
+in its error; unsupported versions fail before interpreting any family entries.
+
+```ts : <<decode portable font manifest>>=
+await io.requireFile(manifestPath);
+let parsed: unknown;
+try { parsed = JSON.parse(Buffer.from(await io.read(manifestPath)).toString('utf8')); }
+catch (error) { throw new Error(`${context}: cannot read JSON: ${String(error)}`); }
+const manifest = object(parsed, context);
+keys(manifest, ['version', 'families'], context);
+if (manifest.version !== 1) { throw new Error(`${context}: version must be 1`); }
+const families = object(manifest.families, `${context}.families`);
+```
+
+Family names use the same simple grammar as root settings. Sorted traversal keeps
+output order independent of JSON property order. Every face must name a file,
+including the file underlying an explicitly synthesized italic face.
+
+```ts : <<validate portable font families>>=
+for (const family of Object.keys(families).sort()) {
+    const where = `${context}.families[${JSON.stringify(family)}]`;
+    if (!/^[A-Za-z0-9][A-Za-z0-9 .-]{0,99}$/.test(family)) {
+        throw new Error(`${where}: expected a simple family name`);
+    }
+    const entry = object(families[family], where);
+    keys(entry, [...fontFaces, 'licenses'], where);
+    const faces = {} as PortableFont;
+    for (const face of fontFaces) {
+        faces[face] = checkFontFace(entry[face], face, `${where}.${face}`,
+            (value, location) => inputPath(value, location, true));
+        inputs.add(fontFile(faces[face]));
+    }
+    <<validate portable font licenses>>
+    entries.set(family, { faces, licenses });
+}
+```
+
+A nonempty license list is mandatory for each family. Unselected licenses are
+validated and protected too, even though they will not be exported.
+
+```ts : <<validate portable font licenses>>=
+if (!Array.isArray(entry.licenses) || !entry.licenses.length) {
+    throw new Error(`${where}.licenses: expected a nonempty array of license file paths`);
+}
+const licenses = entry.licenses.map((value, index) => inputPath(value, `${where}.licenses[${index}]`));
+licenses.forEach(value => inputs.add(value));
+```
+
+Completeness is checked before copying anything. There is no installed-family
+fallback in manifest mode. Filesystem diagnostics identify the failing input
+regardless of whether that input belongs to a selected family.
+
+```ts : <<require portable font inputs>>=
+for (const family of selected) {
+    if (!entries.has(family)) {
+        throw new Error(`${context}: selected family ${JSON.stringify(family)} is missing; add all four faces and licenses`);
+    }
+}
+for (const input of inputs) {
+    try { await io.requireFile(input); }
+    catch (error) { throw new Error(`${context}: input ${JSON.stringify(input)}: ${String(error)}`); }
+}
+```
+
+The output basename is hashed into a private sibling directory. Family and face
+identities are hashed as well: no source path, family text or output basename is
+interpolated into TeX. Names remain stable across file and synthesis-setting
+updates. Move the book and this directory together; compile from their parent.
+
+```ts : <<copy selected portable fonts>>=
+for (const family of [...new Set(selected)].sort()) {
+    const entry = entries.get(family)!;
+    const faces = {} as PortableFont;
+    const copy = async (source: string, identity: string, extension: string): Promise<string> => {
+        const name = `${directory}/${digest(family + ':' + identity)}${extension}`;
+        plan.files.push({ path: posix.join(posix.dirname(output), name), content: await io.read(source) });
+        return name;
+    };
+    <<copy portable font faces>>
+    for (const [index, license] of entry.licenses.entries()) {
+        await copy(license, `license-${index}`, '.license.txt');
+    }
+    plan.fonts[family] = faces;
+}
+```
+
+Copying preserves bytes, not just decoded text. A synthesized face retains only
+its validated numeric slant alongside the new safe companion path; it never
+carries a raw source path into rendering.
+
+```ts : <<copy portable font faces>>=
+for (const face of fontFaces) {
+    const choice = entry.faces[face];
+    const source = fontFile(choice);
+    const file = await copy(source, face, posix.extname(source).toLowerCase());
+    faces[face] = typeof choice === 'string' ? file : { file, slant: choice.slant };
+}
+```
+
+## Self-hosted headless tests
+
+These tests are tangled from this chapter, just like the settings tests. They do not require installed fonts, Pandoc or TeX.
+
+```ts : <<portable font tests.*>>= ./src/test/headless/publication-fonts.test.ts $
+<<portable font test setup>>
+<<portable font test fixture>>
+<<portable font test helpers>>
+<<portable font test byte preservation>>
+<<portable font test invalid schema data>>
+<<portable font test invalid schema assertions>>
+<<portable font test input links>>
+<<portable font test missing inputs>>
+<<portable font test family mode>>
+<<portable font test tex collisions>>
+<<portable font test companion collisions>>
+<<portable font test rollback>>
+<<portable font test selection>>
+<<portable font test output links>>
+<<portable font test default roles>>
+<<portable font test path data>>
+<<portable font test conversion failure>>
+<<portable font test renderer boundary>>
+<<portable font synthesis tests>>
+```
+
+The tests use binary sentinels that cannot survive a UTF-8 round trip. Family keys are case-sensitive manifest data, not TypeScript naming conventions.
+
+```ts : <<portable font test setup>>=
+/* eslint-disable @typescript-eslint/naming-convention -- Manifest dictionary keys are case-sensitive font family names. */
+import assert = require('node:assert/strict');
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { test } from 'node:test';
+import { createTransactionIO, run } from '../../cli';
+import { checkFontFace, fontFaces, planFonts, PortableFont } from '../../publication-fonts';
+import { parseProject } from '../../engine';
+import { renderLatex } from '../../publication-latex';
+
+const bytes = Buffer.from([0, 255, 254, 128, 13, 10, 1, 0]);
+const source = '```SETTINGS\nfont-body=Example\nfont-heading=Example\nfont-code=Example\nfont-fragment=Example\n```\n# Book\n';
+const entry = () => ({ regular: 'inputs/r.ttf', bold: 'inputs/b.otf', italic: 'inputs/i.ttf',
+    boldItalic: 'inputs/bi.otf', licenses: ['inputs/license.txt'] });
+const manifest = () => ({ version: 1, families: { Example: entry(), Unselected: entry() } });
+function write(root: string, name: string, content: string | Uint8Array): void {
+    fs.mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
+    fs.writeFileSync(path.join(root, name), content);
+}
+```
+
+Each fixture owns a temporary project and distinct face bytes; cleanup runs even on assertion failure.
+
+```ts : <<portable font test fixture>>=
+function fixture(t: { after(callback: () => void): void }): string {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'literate fonts '));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    write(root, 'index.literate', source);
+    write(root, 'config/fonts.json', JSON.stringify(manifest()));
+    for (const [index, file] of [...fontFaces.map(face => entry()[face]), 'inputs/license.txt'].entries()) {
+        write(root, file, Buffer.concat([bytes, Buffer.from([index])]));
+    }
+    return root;
+}
+```
+
+The CLI helper records conversion calls. Tree snapshots retain file contents and mtimes while ignoring directory mtimes, which rollback need not restore.
+
+```ts : <<portable font test helpers>>=
+async function command(root: string, factory = createTransactionIO, output = 'books/book.tex',
+    manifestPath = 'config/fonts.json') {
+    let stdout = '', calls = 0;
+    const code = await run(['latex', root, '--output', output, '--font-manifest', manifestPath, '--json'], {
+        stdout: text => { stdout += text; }, stderr: text => assert.fail(text)
+    }, factory, async () => { calls++; return 'Book body'; });
+    const response = JSON.parse(stdout) as { errors: string[]; outputs: { path: string; status: string }[] };
+    return { code, response, calls };
+}
+function tree(root: string): unknown {
+    return fs.readdirSync(root).sort().map(name => {
+        const file = path.join(root, name), stat = fs.lstatSync(file);
+        return [name, stat.isDirectory() ? null : stat.mtimeMs, stat.isSymbolicLink() ? fs.readlinkSync(file)
+            : stat.isDirectory() ? tree(file) : fs.readFileSync(file).toString('hex')];
+    });
+}
+```
+
+A successful export must contain exactly four selected faces and one license. A repeated export must preserve file mtimes as well as bytes.
+
+```ts : <<portable font test byte preservation>>=
+test('portable CLI preserves binary bytes, emits only selected families and is repeatable', async t => {
+    const root = fixture(t);
+    const first = await command(root);
+    assert.equal(first.code, 0, first.response.errors.join('\n'));
+    assert.equal(first.calls, 1);
+    assert.equal(first.response.outputs.length, 6);
+    const tex = fs.readFileSync(path.join(root, 'books/book.tex'), 'utf8');
+    assert.doesNotMatch(tex, /inputs\/|Example|Unselected|FakeSlant|FakeBold/);
+    const directory = /Path=\{(lit-fonts-[a-f0-9]{64}\/)\}/.exec(tex)![1];
+    for (const [index, face] of fontFaces.entries()) {
+        const option = face === 'regular' ? /\]\{([a-f0-9]{64}\.(?:ttf|otf))\}/ :
+            new RegExp(`${face === 'boldItalic' ? 'BoldItalic' : face === 'bold' ? 'Bold' : 'Italic'}Font=\\{([^}]+)\\}`);
+        const name = directory + option.exec(tex)![1];
+        assert.match(name, /^lit-fonts-[a-f0-9]{64}\/[a-f0-9]{64}\.(ttf|otf)$/);
+        assert.deepEqual(fs.readFileSync(path.join(root, 'books', name)), Buffer.concat([bytes, Buffer.from([index])]));
+    }
+    const license = first.response.outputs.find(file => file.path.endsWith('.license.txt'))!;
+    assert.deepEqual(fs.readFileSync(path.join(root, license.path)), Buffer.concat([bytes, Buffer.from([4])]));
+    const before = tree(root);
+    const second = await command(root);
+    assert.equal(second.code, 0);
+    assert.ok(second.response.outputs.every(file => file.status === 'current'));
+    assert.deepEqual(tree(root), before);
+});
+```
+
+Malformed manifests exercise schema, completeness and root-relative path failures, including unselected inputs.
+
+```ts : <<portable font test invalid schema data>>=
+const invalid: [string, unknown, RegExp][] = [
+    ['version', { ...manifest(), version: 2 }, /version must be 1/],
+    ['array', [], /JSON object/],
+    ['extra top field', { ...manifest(), discovery: true }, /unknown field discovery/],
+    ['missing selected family', { version: 1, families: {} }, /selected family "Example" is missing/],
+    ['missing face', { version: 1, families: { Example: { ...entry(), italic: undefined } } }, /italic.*root-relative/],
+    ['unknown face', { version: 1, families: { Example: { ...entry(), bolditalic: 'inputs/bi.otf' } } }, /unknown field bolditalic/],
+    ['empty licenses', { version: 1, families: { Example: { ...entry(), licenses: [] } } }, /nonempty array/],
+    ['wrong licenses', { version: 1, families: { Example: { ...entry(), licenses: 'inputs/license.txt' } } }, /nonempty array/],
+    ['unsupported format', { version: 1, families: { Example: { ...entry(), regular: 'inputs/r.woff' } } }, /ttf or .otf/],
+    ...['../r.ttf', '/tmp/r.ttf', 'C:\\r.ttf', 'x\u0000.ttf'].map(value =>
+        [`unsafe ${value}`, { version: 1, families: { Example: { ...entry(), regular: value } } }, /root-relative/] as [string, unknown, RegExp]),
+    ['missing unselected input', { version: 1, families: { Example: entry(), Other: { ...entry(), regular: 'absent.ttf' } } }, /absent.ttf.*Missing file/]
+];
+```
+
+Every invalid manifest must fail before conversion and leave the existing book and inputs untouched.
+
+```ts : <<portable font test invalid schema assertions>>=
+for (const [name, value, error] of invalid) {
+    test(`manifest rejects ${name} before conversion or output`, async t => {
+        const root = fixture(t);
+        write(root, 'config/fonts.json', JSON.stringify(value));
+        write(root, 'books/book.tex', 'old');
+        const before = tree(root), result = await command(root);
+        assert.equal(result.code, 1);
+        assert.equal(result.calls, 0);
+        assert.match(result.response.errors.join('\n'), error);
+        assert.deepEqual(tree(root), before);
+    });
+}
+```
+
+Links are rejected at the manifest, face, license and ancestor-directory boundaries.
+
+```ts : <<portable font test input links>>=
+for (const name of ['config/fonts.json', 'inputs/r.ttf', 'inputs/license.txt', 'inputs']) {
+    test(`manifest rejects symlink at ${name}`, async t => {
+        const root = fixture(t), target = path.join(root, name);
+        fs.renameSync(target, target + '-real');
+        fs.symlinkSync(target + '-real', target);
+        const before = tree(root), result = await command(root);
+        assert.equal(result.code, 1);
+        assert.equal(result.calls, 0);
+        assert.match(result.response.errors.join('\n'), /Symbolic link/);
+        assert.deepEqual(tree(root), before);
+    });
+}
+```
+
+Missing paths and directories cannot masquerade as regular font or license files.
+
+```ts : <<portable font test missing inputs>>=
+for (const name of ['config/fonts.json', 'inputs/r.ttf', 'inputs/license.txt']) {
+    for (const kind of ['missing', 'directory']) {
+        test(`manifest rejects ${kind} ${name}`, async t => {
+            const root = fixture(t), target = path.join(root, name);
+            fs.unlinkSync(target);
+            if (kind === 'directory') { fs.mkdirSync(target); }
+            const result = await command(root);
+            assert.equal(result.code, 1);
+            assert.equal(result.calls, 0);
+            assert.match(result.response.errors.join('\n'), /Missing file|not a regular file/);
+        });
+    }
+}
+```
+
+A malformed manifest is actionable when requested, but is never consulted without the flag. Legacy family declarations stay unchanged.
+
+```ts : <<portable font test family mode>>=
+test('invalid JSON is contextual and no flag leaves family mode unchanged', async t => {
+    const root = fixture(t);
+    write(root, 'config/fonts.json', '{broken');
+    const failed = await command(root);
+    assert.match(failed.response.errors.join('\n'), /Font manifest config\/fonts.json: cannot read JSON/);
+    const code = await run(['latex', root, '--output', 'book.tex'], { stdout() {}, stderr: assert.fail },
+        createTransactionIO, async () => 'body');
+    assert.equal(code, 0);
+    assert.match(fs.readFileSync(path.join(root, 'book.tex'), 'utf8'), /\\setmainfont\{Example\}/);
+    assert.ok(!fs.readdirSync(root).some(name => name.startsWith('lit-fonts-')));
+});
+```
+
+Manifest and license inputs cannot become the book output, even through case aliases or ancestor conflicts.
+
+```ts : <<portable font test tex collisions>>=
+test('manifest and selected/unselected license paths cannot collide with tex output', async t => {
+    for (const kind of ['manifest', 'selected', 'unselected', 'case-alias', 'ancestor']) {
+        const root = fixture(t), data = manifest();
+        let manifestPath = 'config/fonts.json';
+        if (kind === 'manifest') { manifestPath = 'books/book.tex'; }
+        else {
+            const name = kind === 'case-alias' ? 'books/BOOK.tex' : kind === 'ancestor' ? 'books/book.tex/license' : 'books/book.tex';
+            data.families[kind === 'selected' ? 'Example' : 'Unselected'].licenses = [name];
+            write(root, name, 'license');
+        }
+        write(root, manifestPath, JSON.stringify(data));
+        const before = tree(root), result = await command(root, createTransactionIO, 'books/book.tex', manifestPath);
+        assert.equal(result.code, 1);
+        assert.equal(result.calls, 0);
+        assert.match(result.response.errors.join('\n'), /conflicts with input/);
+        assert.deepEqual(tree(root), before);
+    }
+});
+```
+
+Companions receive the same protections as the book. Declared inputs include fonts, licenses, manifests, source documents and templates.
+
+```ts : <<portable font test companion collisions>>=
+test('companion outputs protect font, license, manifest, source and template inputs', async t => {
+    for (const kind of ['font', 'license', 'manifest', 'template', 'source']) {
+        const root = fixture(t);
+        const success = await command(root);
+        const target = success.response.outputs.find(file => file.path.endsWith('.ttf'))!.path;
+        const data = manifest();
+        let manifestPath = 'config/fonts.json';
+        if (kind === 'font') { data.families.Unselected.regular = target; }
+        if (kind === 'license') { data.families.Unselected.licenses = [target]; }
+        if (kind === 'manifest') { manifestPath = target; }
+        if (kind === 'template') { write(root, 'index.literate', source + `\n\`\`\`SETTINGS\ntemplate=${target}\n\`\`\`\n`); }
+        if (kind === 'source') {
+            fs.unlinkSync(path.join(root, target));
+            write(root, target + '/hidden.literate', '# Protected');
+        }
+        write(root, manifestPath, JSON.stringify(data));
+        const before = tree(root), failed = await command(root, createTransactionIO, 'books/book.tex', manifestPath);
+        assert.equal(failed.code, 1);
+        assert.equal(failed.calls, 0);
+        assert.match(failed.response.errors.join('\n'), /conflicts with input/);
+        assert.deepEqual(tree(root), before);
+    }
+});
+```
+
+An injected companion-install failure must restore both binary fonts and the previous text document.
+
+```ts : <<portable font test rollback>>=
+test('mixed binary/text transaction rolls back after a companion install fails', async t => {
+    const root = fixture(t);
+    await command(root);
+    write(root, 'inputs/r.ttf', Buffer.from([255, 0, 254, 4]));
+    write(root, 'books/book.tex', 'old tex');
+    const before = tree(root);
+    const failed = await command(root, directory => {
+        const io = createTransactionIO(directory);
+        return { ...io, async rename(from, to) {
+            if (from.endsWith('.stage') && to.endsWith('.ttf')) { throw new Error('injected font install failure'); }
+            return io.rename(from, to);
+        } };
+    });
+    assert.equal(failed.code, 1);
+    assert.match(failed.response.errors.join('\n'), /injected font install failure/);
+    assert.deepEqual(tree(root), before);
+});
+```
+
+Unselected families are validated but never read for copying. Sorting and role deduplication make the plan independent of manifest key order.
+
+```ts : <<portable font test selection>>=
+test('planner reads no unselected family bytes and is stable across key ordering', async () => {
+    const data = manifest();
+    data.families.Unselected.regular = 'private.ttf';
+    const reads: string[] = [];
+    const io = { async requireFile() {}, async read(name: string) {
+        reads.push(name);
+        return name === 'manifest.json' ? Buffer.from(JSON.stringify(data)) : bytes;
+    } };
+    const first = await planFonts('manifest.json', 'books/unsafe % name.tex', ['Example', 'Example'], io);
+    assert.ok(!reads.includes('private.ttf'));
+    assert.ok(first.inputs.includes('private.ttf'));
+    data.families = { Unselected: data.families.Unselected, Example: data.families.Example };
+    assert.deepEqual(await planFonts('manifest.json', 'books/unsafe % name.tex', ['Example'], io), first);
+});
+```
+
+Existing companion symlinks fail preflight before Pandoc rather than redirecting output to an input.
+
+```ts : <<portable font test output links>>=
+test('companion output symlinks fail preflight without invoking conversion', async t => {
+    const root = fixture(t), first = await command(root);
+    const target = path.join(root, first.response.outputs.find(file => file.path.endsWith('.otf'))!.path);
+    fs.unlinkSync(target);
+    fs.symlinkSync(path.join(root, 'inputs/b.otf'), target);
+    const before = tree(root), failed = await command(root);
+    assert.equal(failed.code, 1);
+    assert.equal(failed.calls, 0);
+    assert.match(failed.response.errors.join('\n'), /Symbolic link/);
+    assert.deepEqual(tree(root), before);
+});
+```
+
+Default families and inherited roles share one copy per distinct family; extra manifest families do not grow the distribution.
+
+```ts : <<portable font test default roles>>=
+test('portable planner requires defaults, deduplicates inherited roles and excludes extra families', async () => {
+    const families = Object.fromEntries(['Latin Modern Roman', 'Monofur Nerd Font',
+        'Lilex Nerd Font', 'Unused'].map(name => [name, entry()]));
+    const { resolvePublicationSettings } = await import('../../publication-settings');
+    const selected = Object.values(resolvePublicationSettings(parseProject([{ path: 'index.literate', text: '# Book' }])).fonts);
+    const plan = await planFonts('fonts.json', 'book.tex', selected, {
+        async requireFile() {}, async read(name) {
+            return name === 'fonts.json' ? Buffer.from(JSON.stringify({ version: 1, families })) : bytes;
+        }
+    });
+    assert.deepEqual(Object.keys(plan.fonts), ['Latin Modern Roman', 'Lilex Nerd Font', 'Monofur Nerd Font']);
+    assert.equal(plan.files.length, 15);
+    assert.equal(new Set(plan.files.map(file => file.path)).size, 15);
+});
+```
+
+Source metacharacters remain data. Normalized path aliases still participate in collision checks.
+
+```ts : <<portable font test path data>>=
+test('source path metacharacters remain data and normalized aliases remain protected', async t => {
+    const root = fixture(t), data = manifest();
+    data.families.Example.regular = 'inputs/font {name}% #.ttf';
+    write(root, data.families.Example.regular, bytes);
+    write(root, 'config/fonts.json', JSON.stringify(data));
+    const result = await command(root);
+    assert.equal(result.code, 0, result.response.errors.join('\n'));
+    assert.doesNotMatch(fs.readFileSync(path.join(root, 'books/book.tex'), 'utf8'), /font \{name\}|inputs\//);
+    data.families.Unselected.licenses = ['books/../books/book.tex'];
+    write(root, 'config/fonts.json', JSON.stringify(data));
+    const before = tree(root), failed = await command(root);
+    assert.equal(failed.code, 1);
+    assert.equal(failed.calls, 0);
+    assert.match(failed.response.errors.join('\n'), /conflicts with input/);
+    assert.deepEqual(tree(root), before);
+});
+```
+
+Conversion failure cannot publish a partial companion set.
+
+```ts : <<portable font test conversion failure>>=
+test('converter failure publishes no font companions', async t => {
+    const root = fixture(t), before = tree(root);
+    const code = await run(['latex', root, '--output', 'books/book.tex', '--font-manifest', 'config/fonts.json'],
+        { stdout() {}, stderr() {} }, () => { throw new Error('Transaction must not run'); },
+        async () => { throw new Error('Conversion failed'); });
+    assert.equal(code, 1);
+    assert.deepEqual(tree(root), before);
+});
+```
+
+Programmatic callers cannot inject a raw path through the portable renderer options.
+
+```ts : <<portable font test renderer boundary>>=
+test('renderer rejects manually injected unsafe companion paths without emitting tex', async () => {
+    const result = await renderLatex(parseProject([{ path: 'index.literate', text: source }]), {
+        portableFonts: { Example: { regular: 'evil}\\input{x}.ttf', bold: 'x', italic: 'x', boldItalic: 'x' } }
+    }, async () => 'body');
+    assert.equal(result.latex, undefined);
+    assert.match(result.diagnostics.map(value => value.message).join('\n'), /Invalid or missing portable font/);
+});
+```
+
+## Explicit synthesis regressions
+
+The synthesis contract is exercised through the CLI, the planner and the renderer.
+Malformed objects fail before conversion; hostile programmatic inputs also fail
+without any partial TeX. No installed fonts are needed for these checks.
+
+```ts : <<portable font synthesis tests>>=
+<<portable font synthesis helpers>>
+<<portable font synthesis export test>>
+<<portable font synthesis invalid data>>
+<<portable font synthesis rejection test>>
+<<portable font synthesis path test>>
+<<portable font synthesis planner test>>
+<<portable font synthesis renderer test>>
+<<portable font native family test>>
+<<portable font legacy D2 test>>
+```
+
+One helper replaces exactly one face without weakening the fixture's ordinary
+string-only entries. Another provides realistic safe names at the renderer API.
+
+```ts : <<portable font synthesis helpers>>=
+function faceManifest(value: unknown, face = 'italic'): string {
+    return JSON.stringify({ version: 1, families: { Example: { ...entry(), [face]: value } } });
+}
+const companion = `lit-fonts-${'a'.repeat(64)}/${'b'.repeat(64)}.ttf`;
+const portableEntry = (): PortableFont => ({
+    regular: companion, bold: companion, italic: companion, boldItalic: companion
+});
+```
+
+D2's regular and bold files can explicitly back synthesized italic variants. The
+CLI must preserve their bytes and emit separate bounded face features, never
+FakeBold or source filenames. Unrequested faces remain strict file mappings.
+
+```ts : <<portable font synthesis export test>>=
+test('explicit italic and boldItalic synthesis exports safe per-face features', async t => {
+    const root = fixture(t);
+    write(root, 'config/fonts.json', JSON.stringify({ version: 1, families: { Example: {
+        ...entry(), italic: { file: 'inputs/r.ttf', slant: 0.2 },
+        boldItalic: { file: 'inputs/b.otf', slant: 0.15 }
+    } } }));
+    const result = await command(root);
+    assert.equal(result.code, 0, result.response.errors.join('\n'));
+    const tex = fs.readFileSync(path.join(root, 'books/book.tex'), 'utf8');
+    assert.match(tex, /ItalicFeatures=\{FakeSlant=0\.2\}/);
+    assert.match(tex, /BoldItalicFeatures=\{FakeSlant=0\.15\}/);
+    assert.doesNotMatch(tex, /FakeBold|inputs\//);
+    const directory = /Path=\{([^}]+)\}/.exec(tex)![1];
+    for (const [option, file] of [['ItalicFont', 'inputs/r.ttf'], ['BoldItalicFont', 'inputs/b.otf']]) {
+        const name = new RegExp(`${option}=\\{([^}]+)\\}`).exec(tex)![1];
+        assert.deepEqual(fs.readFileSync(path.join(root, 'books', directory, name)), fs.readFileSync(path.join(root, file)));
+    }
+});
+```
+
+The allowed slant interval is closed, numeric and deliberately narrow. Neither
+JSON strings nor arbitrary feature fields are allowed, even for unselected faces.
+Required file mapping and supported container checks still apply inside objects.
+
+```ts : <<portable font synthesis invalid data>>=
+const invalidSynthesis: [string, string, unknown, RegExp][] = [
+    ...[0, -0.2, 0.009, 0.301, '0.2', null, true, '0.2},RawFeature={evil}'].map(slant =>
+        [`slant ${String(slant)}`, 'italic', { file: 'inputs/r.ttf', slant }, /italic.slant.*0.01 through 0.3/] as [string, string, unknown, RegExp]),
+    ['missing slant', 'italic', { file: 'inputs/r.ttf' }, /italic.slant/],
+    ['missing file', 'italic', { slant: 0.2 }, /italic.file.*root-relative/],
+    ['unsafe file', 'italic', { file: '../escape.ttf', slant: 0.2 }, /italic.file.*root-relative/],
+    ['missing input', 'italic', { file: 'missing.ttf', slant: 0.2 }, /Missing file/],
+    ['wrong container', 'italic', { file: 'font.woff', slant: 0.2 }, /ttf or .otf/],
+    ['extra feature', 'boldItalic', { file: 'inputs/b.otf', slant: 0.2, fakeBold: 1.5 }, /unknown field fakeBold/],
+    ['regular object', 'regular', { file: 'inputs/r.ttf', slant: 0.2 }, /only supported for italic and boldItalic/],
+    ['bold object', 'bold', { file: 'inputs/b.otf', slant: 0.2 }, /only supported for italic and boldItalic/],
+    ['array', 'italic', [], /JSON object/]
+];
+```
+
+These failures preserve a pre-existing output and must not even call the injected
+converter. The ordinary schema tests continue to prove string-only behavior.
+
+```ts : <<portable font synthesis rejection test>>=
+for (const [name, face, value, error] of invalidSynthesis) {
+    test(`explicit synthesis rejects ${name} before conversion`, async t => {
+        const root = fixture(t);
+        write(root, 'config/fonts.json', faceManifest(value, face));
+        write(root, 'books/book.tex', 'previous book');
+        const before = tree(root), failed = await command(root);
+        assert.equal(failed.code, 1);
+        assert.equal(failed.calls, 0);
+        assert.match(failed.response.errors.join('\n'), error);
+        assert.deepEqual(tree(root), before);
+    });
+}
+```
+
+A file inside a synthesis object remains a protected input. Both links and output
+collisions must be rejected rather than hidden by the extra schema layer.
+
+```ts : <<portable font synthesis path test>>=
+test('synthesized face paths reject links and companion collisions', async t => {
+    const root = fixture(t), first = await command(root);
+    const target = first.response.outputs.find(file => file.path.endsWith('.ttf'))!.path;
+    write(root, 'config/fonts.json', faceManifest({ file: target, slant: 0.2 }));
+    const collision = await command(root);
+    assert.equal(collision.calls, 0);
+    assert.match(collision.response.errors.join('\n'), /conflicts with input/);
+    fs.symlinkSync(path.join(root, 'inputs/r.ttf'), path.join(root, 'inputs/link.ttf'));
+    write(root, 'config/fonts.json', faceManifest({ file: 'inputs/link.ttf', slant: 0.2 }));
+    const before = tree(root), linked = await command(root);
+    assert.equal(linked.calls, 0);
+    assert.match(linked.response.errors.join('\n'), /Symbolic link/);
+    assert.deepEqual(tree(root), before);
+});
+```
+
+The planner retains the opt-in slant but replaces its source path. Bounds are
+inclusive, and a single synthesized face does not opt its partner into synthesis.
+Programmatic nonfinite values are checked without JSON's conversion to null.
+
+```ts : <<portable font synthesis planner test>>=
+test('synthesis bounds and selective features survive planning', async () => {
+    for (const slant of [0.01, 0.2, 0.3]) {
+        const plan = await planFonts('fonts.json', 'book.tex', ['Example'], {
+            async requireFile() {}, async read(name) {
+                return name === 'fonts.json' ? Buffer.from(faceManifest({ file: 'inputs/r.ttf', slant })) : bytes;
+            }
+        });
+        assert.deepEqual(plan.fonts.Example.italic, { file: plan.files[2].path, slant });
+        assert.equal(typeof plan.fonts.Example.boldItalic, 'string');
+        assert.ok(plan.inputs.includes('inputs/r.ttf'));
+        const result = await renderLatex(parseProject([{ path: 'index.literate', text: source }]),
+            { portableFonts: plan.fonts }, async () => 'body');
+        assert.match(result.latex!, new RegExp(`ItalicFeatures=\\{FakeSlant=${slant}\\}`));
+        assert.doesNotMatch(result.latex!, /BoldItalicFeatures|FakeBold/);
+    }
+    for (const slant of [NaN, Infinity, -Infinity]) {
+        assert.throws(() => checkFontFace({ file: companion, slant }, 'italic', 'face', String), /finite number/);
+    }
+});
+```
+
+The renderer boundary is independent of the CLI's validation. Forged slants,
+unknown features, unsupported regular synthesis and unsafe object paths all fail
+with diagnostics instead of emitting a partially usable document.
+
+```ts : <<portable font synthesis renderer test>>=
+test('renderer revalidates explicit synthesis from programmatic callers', async () => {
+    const invalid: [string, unknown][] = [
+        ...[NaN, Infinity, -Infinity, 0, 0.31, '0.2'].map(slant => ['italic', { file: companion, slant }] as [string, unknown]),
+        ['italic', { file: companion, slant: 0.2, features: 'evil' }],
+        ['italic', { file: 'evil}\\input{x}.ttf', slant: 0.2 }],
+        ['regular', { file: companion, slant: 0.2 }]
+    ];
+    for (const [face, choice] of invalid) {
+        const font = { ...portableEntry(), [face]: choice } as PortableFont;
+        const result = await renderLatex(parseProject([{ path: 'index.literate', text: source }]),
+            { portableFonts: { Example: font } }, async () => 'body');
+        assert.equal(result.latex, undefined);
+        assert.ok(result.diagnostics.length, `${face}: ${String(choice)}`);
+    }
+});
+```
+
+Lilex and arbitrary normal families must use native styles in family-name mode.
+A lookalike D2 name must not accidentally inherit the narrow legacy exception.
+Ligature policy is independent of italic style selection.
+
+```ts : <<portable font native family test>>=
+test('Lilex and normal family overrides use native italic lookup', async () => {
+    for (const codeFont of ['Lilex Nerd Font', 'Fira Code', 'Other Font', 'D2CodingLigature Nerd Font Propo Extra']) {
+        for (const codeLigatures of [true, false]) {
+            const result = await renderLatex(parseProject([{ path: 'index.literate', text: source }]),
+                { codeFont, codeLigatures }, async () => 'body');
+            assert.deepEqual(result.diagnostics, []);
+            assert.ok(result.latex!.includes(`]{${codeFont}}`));
+            assert.doesNotMatch(result.latex!, /FakeSlant|FakeBold|ItalicFont=/);
+            assert.equal(result.latex!.includes('RawFeature={-calt}'), !codeLigatures);
+        }
+    }
+});
+```
+
+The exact former D2 default retains its family-mode compatibility declaration.
+Even that family must not receive synthesis in portable mode unless its face
+objects request it; string mappings are always authoritative.
+
+```ts : <<portable font legacy D2 test>>=
+test('legacy D2 synthesis is family-specific and never overrides manifest faces', async () => {
+    const codeFont = 'D2CodingLigature Nerd Font Propo';
+    const project = parseProject([{ path: 'index.literate', text: source }]);
+    const familyMode = await renderLatex(project, { codeFont }, async () => 'body');
+    assert.deepEqual(familyMode.diagnostics, []);
+    assert.match(familyMode.latex!, /ItalicFeatures=\{FakeSlant=0\.2\}/);
+    assert.match(familyMode.latex!, /BoldItalicFeatures=\{FakeSlant=0\.2,FakeBold=1\.5\}/);
+    const portableMode = await renderLatex(project, {
+        codeFont, portableFonts: { Example: portableEntry(), [codeFont]: portableEntry() }
+    }, async () => 'body');
+    assert.deepEqual(portableMode.diagnostics, []);
+    assert.doesNotMatch(portableMode.latex!, /FakeSlant|FakeBold/);
+});
+```

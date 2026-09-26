@@ -177,15 +177,15 @@ Run
 results. Arguments use separate values rather than `--option=value`.
 
 Export requires **Pandoc on PATH** (tested with 3.7.0.2), but does not require or
-run a TeX engine. It writes only the requested LaTeX file, not tangled source,
-HTML, or PDF. Export is always explicit; extension activation and saves do not
+run a TeX engine. It writes the requested LaTeX file and, only with
+`--font-manifest`, font/license companions—not tangled source, HTML, or PDF. Export is always explicit; extension activation and saves do not
 publish books. Existing source/template paths are protected, and writes use the
 same transaction/recovery mechanism as generation. Re-exporting identical content
 leaves the output unchanged. Do not run concurrent writers.
 
 The existing root `SETTINGS` `theme` selects from all 70 palettes; the default is
 `rosepine-dawn`. Fonts default to Latin Modern Roman for prose, Monofur Nerd Font
-for headings/references, and D2CodingLigature Nerd Font Propo for code. Ligatures
+for headings/references, and Lilex Nerd Font for code. Ligatures
 remain enabled; copying code from PDF may change operators, so use original or
 tangled source for executable code.
 
@@ -196,7 +196,7 @@ Select publication font roles in the root `index.literate` SETTINGS fence:
 theme=rosepine-dawn
 font-body=Latin Modern Roman
 font-heading=Monofur Nerd Font
-font-code=D2CodingLigature Nerd Font Propo
+font-code=Lilex Nerd Font
 font-fragment=Monofur Nerd Font
 font-note=Latin Modern Roman
 font-code-ligatures=on
@@ -207,21 +207,92 @@ These are the defaults. `font-fragment` covers both declarations and references;
 `font-note` covers running matter, navigation, and reference page numbers. If
 `font-note` is omitted it inherits the selected `font-body`. Font roles currently
 apply to LaTeX only—not HTML or VS Code preview. Chapter-local settings cannot
-change them. Use `font-code-ligatures=off` to disable D2Coding's contextual
-programming ligatures; other font families may use different features.
+change them. Use `font-code-ligatures=off` to disable contextual substitutions
+(`calt`); font families may implement other ligatures through different features.
+Lilex has native regular, bold, italic and bold-italic faces, so default code
+comments use real italics rather than synthetic slant.
 
 Family names accept 1–100 ASCII letters, digits, spaces, dots, or hyphens,
 starting with a letter or digit. Paths and TeX options are not accepted. Repeated
 settings keep the last valid value, but any invalid occurrence blocks export.
-**Font-file bundling and installed-font checks are not implemented yet**: selecting
-a family does not install it or guarantee that the exported document will compile.
+Without `--font-manifest`, selecting a family does not install it or verify that
+it is available. Lilex and ordinary family overrides use native style lookup.
+Only the exact legacy `D2CodingLigature Nerd Font Propo` code family retains its
+automatic slant declaration. To keep that former default, explicitly set
+`font-code=D2CodingLigature Nerd Font Propo`.
 
-To compile later, install the named fonts and LuaLaTeX packages `fontspec`,
+### Opt-in portable fonts
+
+Add `--font-manifest publication-fonts.json` to `latex`. The manifest filename,
+font paths, and license paths are all relative to the project root, **not** the
+manifest directory. No Fonts directory or installed-font discovery occurs.
+For example, a manifest entry looks like:
+
+```json
+{"version": 1, "families": {"Example Serif": {
+  "regular": "fonts/serif-regular.otf", "bold": "fonts/serif-bold.otf",
+  "italic": "fonts/serif-italic.otf", "boldItalic": "fonts/serif-bolditalic.otf",
+  "licenses": ["fonts/OFL.txt"]
+}}}
+```
+
+Map every distinct family selected by the root settings (including defaults and
+inherited note fonts). Keys match family names exactly. Each entry requires all
+four faces and one or more license paths; unknown fields, missing faces, unsafe
+paths, missing/non-regular files, and symlink components are errors. Only `.ttf`
+and `.otf` containers are supported. There is no automatic synthesis or fallback;
+string mappings always use the supplied files without FakeSlant/FakeBold.
+Mapping several string faces to one file does not synthesize styles.
+
+For Lilex, map `LilexNerdFont-Regular.ttf`, `LilexNerdFont-Bold.ttf`,
+`LilexNerdFont-Italic.ttf`, and `LilexNerdFont-BoldItalic.ttf` as plain strings under
+`Lilex Nerd Font`; no synthesis is needed.
+
+For families without italic faces, `italic` and `boldItalic` may instead explicitly
+request slant. If you explicitly select D2 instead of Lilex, its family entry can use:
+
+```json
+"D2CodingLigature Nerd Font Propo": {
+  "regular": "fonts/D2-Regular.ttf", "bold": "fonts/D2-Bold.ttf",
+  "italic": {"file": "fonts/D2-Regular.ttf", "slant": 0.2},
+  "boldItalic": {"file": "fonts/D2-Bold.ttf", "slant": 0.2},
+  "licenses": ["fonts/D2-LICENSE.txt"]
+}
+```
+
+Place that entry in the version-1 manifest's `families` object, alongside explicit
+Latin Modern and Monofur mappings for the other default roles. Synthesis objects
+require exactly `file` and `slant`; the latter must be a finite JSON number from
+**0.01 through 0.3**, inclusive. Regular and bold remain string-only mappings.
+The exporter copies each explicit file and emits `ItalicFeatures={FakeSlant=0.2}`
+and/or `BoldItalicFeatures={FakeSlant=0.2}` only for opted-in faces. This preserves
+italic D2 code comments without an automatic fallback. Bold-italic slant should
+normally use the actual bold file: synthetic weight and arbitrary fontspec features
+are not supported. The renderer revalidates paths and slants for API callers too.
+
+All entries are validated and all declared paths are protected from output
+collisions, including unselected entries; **only selected families are copied**.
+Font and license bytes are preserved exactly. Companions receive deterministic
+ASCII names under a `lit-fonts-<hash>` directory beside the `.tex`; raw input paths
+never enter TeX. The book, fonts, and licenses use one recoverable transaction.
+Re-export preserves unchanged files' mtimes. Old companions from previous selections
+are not pruned: use a fresh export directory for a minimal distribution.
+
+Move the `.tex` and its companion directory together. Compile from the `.tex`
+directory (or use `latexmk -cd` as below). Providing licenses is an explicit author
+responsibility: export does not check redistribution rights, parse font binaries,
+verify family/face metadata, or guarantee glyph coverage. Font/package installation,
+PDF compilation, font collections, variable-font axes, and synthesis other than
+explicit italic-face slant are outside this slice. As with the existing filesystem
+transaction, concurrent changes to inputs are not sandboxed; use a trusted,
+quiescent project.
+
+To compile later, install the named fonts (or export companions) and LuaLaTeX packages `fontspec`,
 `geometry`, `fvextra`, `needspace`, `xcolor`, `microtype`, `amsmath`, `amssymb`,
 `ulem`, `hyperref`, and KOMA-Script (`scrbook`), then explicitly run, for example:
 
 ```sh
-latexmk -lualatex -interaction=nonstopmode -halt-on-error -no-shell-escape books/book.tex
+latexmk -cd -lualatex -interaction=nonstopmode -halt-on-error -no-shell-escape books/book.tex
 ```
 
 Compile trusted projects only: disabling shell escape is not a complete TeX

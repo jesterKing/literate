@@ -26,6 +26,7 @@ spelled with their original delimiters. Exceptions pass through the bridge gate.
 import type { ParsedProject, PublicationContribution, GenerationDiagnostic } from './engine';
 import { preparePandoc } from './publication-pandoc';
 import { resolvePublicationSettings } from './publication-settings';
+import { checkFontFace, fontFaces, fontFile, PortableFont } from './publication-fonts';
 import type { PublicationSettingsResult } from './publication-settings';
 import type { PandocDocument, PandocBlock } from './publication-pandoc';
 import { defaultThemeName, getTheme } from './themes';
@@ -51,6 +52,7 @@ export interface LatexOptions {
     fragmentFont?: string;
     noteFont?: string;
     codeLigatures?: boolean;
+    portableFonts?: Record<string, PortableFont>;
 }
 export interface LatexConversionOptions {
     standalone: false;
@@ -64,6 +66,7 @@ interface CheckedOptions {
     theme: LiterateTheme; paper: string; geometry: string;
     bodyFont: string; headingFont: string; codeFont: string;
     fragmentFont: string; noteFont: string; codeLigatures: boolean;
+    portableFonts?: Record<string, PortableFont>;
 }
 ```
 
@@ -113,7 +116,7 @@ Defaults come only from the shared settings resolver, not a second catalogue.
 ```ts : <<publication LaTeX options>>=+
     const codeLigatures = options.codeLigatures ?? settings.codeLigatures;
     if (typeof codeLigatures !== 'boolean') { throw new Error('Code ligatures must be boolean'); }
-    return { theme, paper: paper[0], geometry, codeLigatures,
+    return { theme, paper: paper[0], geometry, codeLigatures, portableFonts: options.portableFonts,
         bodyFont: fontName(options.bodyFont ?? settings.fonts.body),
         headingFont: fontName(options.headingFont ?? settings.fonts.heading),
         codeFont: fontName(options.codeFont ?? settings.fonts.code),
@@ -165,9 +168,11 @@ function nameText(name: string): string {
 
 Colours are validated even though the catalogue and style adapter are trusted.
 The code font retains common/contextual ligatures by default; disabling them
-adds `RawFeature={-calt}` for D2's contextual substitutions. D2Coding has no italic face:
-fontspec explicitly synthesizes slanted regular and bold faces with FakeSlant.
-The same policy applies to an overridden code family; no implicit italic lookup.
+adds `RawFeature={-calt}` to disable contextual substitutions. Lilex and ordinary
+family overrides use their native italic faces. Only the exact legacy
+D2CodingLigature Nerd Font Propo family retains automatic slant in family-name
+mode, since it has no italic files. Manifest mode always requires explicit faces
+or an explicit per-face slant request.
 
 ```ts : <<publication LaTeX encoding>>=+
 function color(value: string): string {
@@ -188,17 +193,94 @@ supported. The converter must not emit a standalone preamble or highlighted pros
 code. LuaLaTeX is the intended compiler, with installed fonts and packages.
 
 ```ts : <<publication LaTeX template>>=
+<<publication LaTeX font command>>
+<<publication LaTeX companion path>>
+<<publication LaTeX portable font command>>
+<<publication LaTeX slant features>>
+```
+
+Family-name mode lets fontspec resolve native styles for Lilex and other ordinary
+families; only the known legacy D2 family keeps its prior synthetic declaration.
+Portable mode has no installed-family fallback and no automatic synthesis: only
+a manifest's explicit italic-face object can request FakeSlant.
+
+```ts : <<publication LaTeX font command>>=
+function fontCommand(command: string, family: string, options: CheckedOptions, code = false): string {
+    const features = code ? `Ligatures=Common,Contextuals=Alternate,${options.codeLigatures ? '' : 'RawFeature={-calt},'}` : '';
+    if (options.portableFonts !== undefined) {
+        const font = Object.prototype.hasOwnProperty.call(options.portableFonts, family)
+            ? options.portableFonts[family] : undefined;
+        if (!font) { throw new Error(`Invalid or missing portable font companions for ${family}`); }
+        return portableFontCommand(command, family, font, features);
+    }
+    if (!code) { return `${command}{${family}}`; }
+    if (family !== 'D2CodingLigature Nerd Font Propo') {
+        return `${command}[${features.slice(0, -1)}]{${family}}`;
+    }
+    return `${command}[${features}\nItalicFont={${family}},ItalicFeatures={FakeSlant=0.2},\nBoldItalicFont={${family}},BoldItalicFeatures={FakeSlant=0.2,FakeBold=1.5}]{${family}}`;
+}
+```
+
+The renderer validates companion names even for programmatic callers. Source
+paths and arbitrary TeX options cannot cross this boundary.
+
+```ts : <<publication LaTeX companion path>>=
+function companionPath(value: unknown, where: string): string {
+    if (typeof value !== 'string' ||
+        !/^lit-fonts-[a-f0-9]{64}\/[a-f0-9]{64}\.(ttf|otf)$/.test(value)) {
+        throw new Error(`Invalid or missing portable font companions for ${where}`);
+    }
+    return value;
+}
+```
+
+Fontspec receives a separate Path and basename-only face names: slashes in its
+main font argument would otherwise leak into LaTeX's internal family identifier.
+Shared validation checks synthesis fields before any face is interpolated.
+
+```ts : <<publication LaTeX portable font command>>=
+function portableFontCommand(command: string, family: string, font: PortableFont, features: string): string {
+    const checked = {} as PortableFont;
+    for (const face of fontFaces) {
+        checked[face] = checkFontFace(font[face], face, `${family}.${face}`, companionPath);
+    }
+    const regular = fontFile(checked.regular);
+    const directory = regular.slice(0, regular.lastIndexOf('/') + 1);
+    if (fontFaces.some(face => !fontFile(checked[face]).startsWith(directory))) {
+        throw new Error(`Portable font faces must share one companion directory for ${family}`);
+    }
+    const name = (face: keyof PortableFont): string => fontFile(checked[face]).slice(directory.length);
+    return `${command}[${features}Path={${directory}},BoldFont={${name('bold')}},` +
+        `ItalicFont={${name('italic')}},BoldItalicFont={${name('boldItalic')}}` +
+        `${slantFeatures(checked)}]{${name('regular')}}`;
+}
+```
+
+Only explicitly synthesized faces receive a feature. Plain string mappings remain
+strict file mappings, and a boldItalic synthesis uses its supplied bold file rather
+than silently applying FakeBold. The bounded numbers stringify as TeX decimals.
+
+```ts : <<publication LaTeX slant features>>=
+function slantFeatures(font: PortableFont): string {
+    let features = '';
+    for (const [face, option] of [['italic', 'ItalicFeatures'], ['boldItalic', 'BoldItalicFeatures']] as const) {
+        const choice = font[face];
+        if (typeof choice !== 'string') { features += `,${option}={FakeSlant=${choice.slant}}`; }
+    }
+    return features;
+}
+```
+
+```ts : <<publication LaTeX template>>=+
 function template(body: string, options: CheckedOptions, definitions: string[]): string {
     const c = options.theme.colors;
     return themeNotice() + String.raw`\documentclass[11pt,oneside,openany]{scrbook}
 ${'\\usepackage'}{fontspec}
-\setmainfont{${options.bodyFont}}
-\newfontfamily\headingfont{${options.headingFont}}
-\newfontfamily\fragmentfont{${options.fragmentFont}}
-\newfontfamily\notefont{${options.noteFont}}
-\setmonofont[Ligatures=Common,Contextuals=Alternate,${options.codeLigatures ? '' : 'RawFeature={-calt},'}
-ItalicFont={${options.codeFont}},ItalicFeatures={FakeSlant=0.2},
-BoldItalicFont={${options.codeFont}},BoldItalicFeatures={FakeSlant=0.2,FakeBold=1.5}]{${options.codeFont}}
+${fontCommand('\\setmainfont', options.bodyFont, options)}
+${fontCommand('\\newfontfamily\\headingfont', options.headingFont, options)}
+${fontCommand('\\newfontfamily\\fragmentfont', options.fragmentFont, options)}
+${fontCommand('\\newfontfamily\\notefont', options.noteFont, options)}
+${fontCommand('\\setmonofont', options.codeFont, options, true)}
 ${'\\usepackage'}[${options.paper},${options.geometry}]{geometry}
 ${'\\usepackage'}{fvextra,needspace,xcolor,microtype,amssymb,amsmath}
 ${'\\usepackage'}[normalem]{ulem}
@@ -501,8 +583,8 @@ function themeNotice(): string {
 Images, raw author markup, tables, Mermaid, and unsupported links still fail in
 `preparePandoc`; this is not yet a whole-project book exporter. No assets are
 copied, fonts downloaded, or TeX files compiled. The caller must install Latin
-Modern, Monofur Nerd Font and D2CodingLigature Nerd Font Propo (or supply safe
-family overrides), and the listed TeX packages. Missing glyphs remain compiler
+Modern, Monofur Nerd Font and Lilex Nerd Font (or supply safe family overrides or
+portable companions), and the listed TeX packages. Missing glyphs remain compiler
 errors/warnings to check, not a claim of universal Unicode coverage.
 
 Prose and inline-code escaping remain the trusted Pandoc writer's responsibility;

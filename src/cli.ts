@@ -3,6 +3,8 @@ import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { spawn } from 'child_process';
 import { renderLatex, LatexConverter, LatexOptions } from './publication-latex';
+import { planFonts } from './publication-fonts';
+import { resolvePublicationSettings } from './publication-settings';
 import { commitOutputs, OutputTransactionError, TransactionIO } from './output-transactions';
 import { discoveryExcludedDirectories, generateProject, parseProject, resolveProjectTheme, safeRelativePath, templateReferences, SourceDocument } from './engine';
 
@@ -31,15 +33,15 @@ const latexMarginOptions = [
     ['--margin', 'marginMm'], ['--margin-top', 'marginTopMm'], ['--margin-right', 'marginRightMm'],
     ['--margin-bottom', 'marginBottomMm'], ['--margin-left', 'marginLeftMm']
 ] as const;
-const latexValueFlags = ['--output', '--paper', ...latexMarginOptions.map(([flag]) => flag)];
+const latexValueFlags = ['--output', '--paper', '--font-manifest', ...latexMarginOptions.map(([flag]) => flag)];
 const latexUsage = 'latex [root] --output path.tex [--paper a4|a5|letter|legal] [--margin 20mm]'
-    + ' [--margin-top Nmm] [--margin-right Nmm] [--margin-bottom Nmm] [--margin-left Nmm] [--json]';
+    + ' [--margin-top Nmm] [--margin-right Nmm] [--margin-bottom Nmm] [--margin-left Nmm] [--font-manifest path.json] [--json]';
 const usage = 'Usage: node out/cli.js generate|check|inspect|self-check [root] [--json]\n'
     + `       node out/cli.js ${latexUsage}\n`
     + '       node out/cli.js <command> --help [--json]\n       node out/cli.js --help [--json]\n';
 const descriptions: Record<string, string> = Object.fromEntries([
     ['generate', 'Write missing or changed generated files.'],
-    ['latex', 'Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving at least an 80 × 100 mm body. Each side overrides --margin; unspecified sides use --margin or 20mm. Fonts resolve from root index.literate SETTINGS. No TeX/PDF execution or bundled fonts.'],
+    ['latex', 'Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving at least an 80 × 100 mm body. Each side overrides --margin; unspecified sides use --margin or 20mm. Fonts resolve from root index.literate SETTINGS. No TeX/PDF execution. --font-manifest opts into explicit font/license companions.'],
     ['check', 'Report missing or stale generated files without writing.'],
     ['inspect', 'Report documents, templates, and fragment definitions and dependencies without reading outputs or writing.'],
     ['self-check', 'Verify this repository’s trusted self-hosting code without generating files; all outputs must already be current.']
@@ -223,27 +225,43 @@ export const runPandoc: LatexConverter = async document => {
     });
 };
 async function planLatex(root: string, documents: SourceDocument[], output: string,
-    options: LatexOptions, convert: LatexConverter): Promise<{
-        files: Generation['files']; diagnostics: Generation['diagnostics'];
+    options: LatexOptions, convert: LatexConverter, manifest?: string): Promise<{
+        files: { path: string; content: string | Uint8Array }[]; diagnostics: Generation['diagnostics'];
         inspection?: Generation['inspection'];
     }> {
     const theme = resolveProjectTheme(documents);
     if (theme.diagnostics.length) { return { files: [], diagnostics: theme.diagnostics }; }
-    const target = output.toLowerCase();
-    const inputs = [...documents.map(document => document.path), ...templateReferences(documents)];
-    for (const input of inputs) {
-        const source = relative(input).toLowerCase();
-        if (target === source || target.startsWith(source + '/') || source.startsWith(target + '/')) {
-            throw new Error(`LaTeX output conflicts with input: ${input}`);
+    const project = parseProject(documents);
+    const settings = resolvePublicationSettings(project);
+    if (settings.diagnostics.length) { return { files: [], diagnostics: settings.diagnostics }; }
+    const companions = manifest ? await planFonts(manifest, output, Object.values(settings.fonts), {
+        async requireFile(value) {
+            if (!await inspect(root, value)) { throw new Error(`Missing file: ${value}`); }
+        },
+        async read(value) {
+            if (!await inspect(root, value)) { throw new Error(`Input disappeared: ${value}`); }
+            return fs.readFile(path.join(root, value));
         }
+    }) : undefined;
+    const inputs = [...documents.map(document => document.path), ...templateReferences(documents),
+        ...(companions?.inputs ?? [])];
+    for (const destination of [output, ...(companions?.files.map(file => file.path) ?? [])]) {
+        const target = destination.toLowerCase();
+        for (const input of inputs) {
+            const source = relative(input).toLowerCase();
+            if (target === source || target.startsWith(source + '/') || source.startsWith(target + '/')) {
+                throw new Error(`LaTeX output conflicts with input: ${input} (output ${destination})`);
+            }
+        }
+        await inspect(root, destination);
     }
-    await inspect(root, output);
-    const rendered = await renderLatex(parseProject(documents), { ...options, theme: theme.name }, convert);
+    const rendered = await renderLatex(project, { ...options, theme: theme.name,
+        portableFonts: companions?.fonts }, convert);
     if (!rendered.diagnostics.length && rendered.latex === undefined) {
         throw new Error('LaTeX renderer returned no document');
     }
     return { diagnostics: rendered.diagnostics, files: rendered.diagnostics.length ? []
-        : [{ path: output, content: rendered.latex! }] };
+        : [{ path: output, content: rendered.latex! }, ...(companions?.files ?? [])] };
 }
 export async function run(args: string[], io: CliIO = defaultIO,
     transactionIO: (root: string) => TransactionIO = createTransactionIO,
@@ -293,6 +311,10 @@ export async function run(args: string[], io: CliIO = defaultIO,
         response.errors.push(`${latexValueFlags.join(', ')} are only valid for latex`);
     }
     if (topic === 'latex') {
+        const manifest = values.get('--font-manifest');
+        if (manifest !== undefined && !safeRelativePath(manifest)) {
+            response.errors.push('--font-manifest requires a safe root-relative JSON file path');
+        }
         const output = values.get('--output');
         latexOutput = output ? safeRelativePath(output) || '' : '';
         if ((!help || output !== undefined) && (!latexOutput || !latexOutput.endsWith('.tex'))) {
@@ -350,7 +372,8 @@ export async function run(args: string[], io: CliIO = defaultIO,
             }
         }
         const result = command === 'latex'
-            ? await planLatex(root, documents, latexOutput, latexOptions, convert)
+            ? await planLatex(root, documents, latexOutput, latexOptions, convert,
+                values.has('--font-manifest') ? relative(values.get('--font-manifest')!) : undefined)
             : generateProject(documents, templates);
         response.diagnostics = result.diagnostics;
         if (command === 'inspect') {
@@ -379,10 +402,10 @@ export async function run(args: string[], io: CliIO = defaultIO,
                 if (targets.has(parent)) { throw new Error(`Output is also a parent directory: ${parent}`); }
             }
         }
-        const changes: { path: string; content: string; output: CliResponse['outputs'][number] }[] = [];
+        const changes: { path: string; content: string | Uint8Array; output: CliResponse['outputs'][number] }[] = [];
         for (const file of files) {
             const exists = await inspect(root, file.path);
-            const content = Buffer.from(file.content, 'utf8');
+            const content = typeof file.content === 'string' ? Buffer.from(file.content, 'utf8') : Buffer.from(file.content);
             const status: OutputStatus = !exists ? 'missing'
                 : (await fs.readFile(path.join(root, file.path))).equals(content) ? 'current' : 'stale';
             const output = { path: file.path, status };
@@ -396,7 +419,10 @@ export async function run(args: string[], io: CliIO = defaultIO,
             if (changes.length) { return finish(1); }
             if (command === 'self-check') {
                 const { verifySelfHosting } = await import('./self-hosting');
-                response.selfHosting = await verifySelfHosting(root, documents, templates, files);
+                response.selfHosting = await verifySelfHosting(root, documents, templates, files.map(file => {
+                    if (typeof file.content !== 'string') { throw new Error('Self-hosting requires text outputs'); }
+                    return { path: file.path, content: file.content };
+                }));
                 if (!json) {
                     for (const check of response.selfHosting.checks) {
                         io.stdout(`${check.ok ? 'ok' : 'failed'}: ${check.name}${check.message ? ': ' + check.message : ''}\n`);
@@ -416,7 +442,7 @@ export async function run(args: string[], io: CliIO = defaultIO,
         };
         try {
             const written = await commitOutputs(files.map(file => ({
-                path: file.path, content: Buffer.from(file.content, 'utf8')
+                path: file.path, content: typeof file.content === 'string' ? Buffer.from(file.content, 'utf8') : file.content
             })), transactionIO(root));
             markWritten(written);
         } catch (error) {

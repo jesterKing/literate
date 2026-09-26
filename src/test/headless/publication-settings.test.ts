@@ -7,7 +7,7 @@ import type { PublicationFonts, PublicationSettingsResult } from '../../publicat
 
 const defaults: PublicationFonts = {
     body: 'Latin Modern Roman', heading: 'Monofur Nerd Font',
-    code: 'D2CodingLigature Nerd Font Propo', fragment: 'Monofur Nerd Font', note: 'Latin Modern Roman'
+    code: 'Lilex Nerd Font', fragment: 'Monofur Nerd Font', note: 'Latin Modern Roman'
 };
 const fence = (content: string, info = 'SETTINGS') => '```' + info + '\n' + content + '\n```\n';
 function resolve(text: string, path = 'index.literate'): PublicationSettingsResult {

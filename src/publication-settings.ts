@@ -15,7 +15,7 @@ export interface PublicationSettingsResult {
 export function resolvePublicationSettings(project: ParsedProject): PublicationSettingsResult {
     const fonts: PublicationFonts = {
         body: 'Latin Modern Roman', heading: 'Monofur Nerd Font',
-        code: 'D2CodingLigature Nerd Font Propo', fragment: 'Monofur Nerd Font', note: ''
+        code: 'Lilex Nerd Font', fragment: 'Monofur Nerd Font', note: ''
     };
     let codeLigatures = true;
     let explicitNote = false;

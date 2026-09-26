@@ -151,6 +151,7 @@ spelled with their original delimiters. Exceptions pass through the bridge gate.
 <pre><code><span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title class_">ParsedProject</span>, <span class="hljs-title class_">PublicationContribution</span>, <span class="hljs-title class_">GenerationDiagnostic</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./engine&#x27;</span>;
 <span class="hljs-keyword">import</span> { preparePandoc } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./publication-pandoc&#x27;</span>;
 <span class="hljs-keyword">import</span> { resolvePublicationSettings } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./publication-settings&#x27;</span>;
+<span class="hljs-keyword">import</span> { checkFontFace, fontFaces, fontFile, <span class="hljs-title class_">PortableFont</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./publication-fonts&#x27;</span>;
 <span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title class_">PublicationSettingsResult</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./publication-settings&#x27;</span>;
 <span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title class_">PandocDocument</span>, <span class="hljs-title class_">PandocBlock</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./publication-pandoc&#x27;</span>;
 <span class="hljs-keyword">import</span> { defaultThemeName, getTheme } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./themes&#x27;</span>;
@@ -178,6 +179,7 @@ never accompany partial LaTeX. Installed-font lookup and PDF compilation are cal
     fragmentFont?: <span class="hljs-built_in">string</span>;
     noteFont?: <span class="hljs-built_in">string</span>;
     codeLigatures?: <span class="hljs-built_in">boolean</span>;
+    portableFonts?: <span class="hljs-title class_">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">PortableFont</span>&gt;;
 }
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">LatexConversionOptions</span> {
     <span class="hljs-attr">standalone</span>: <span class="hljs-literal">false</span>;
@@ -191,6 +193,7 @@ never accompany partial LaTeX. Installed-font lookup and PDF compilation are cal
     <span class="hljs-attr">theme</span>: <span class="hljs-title class_">LiterateTheme</span>; <span class="hljs-attr">paper</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">geometry</span>: <span class="hljs-built_in">string</span>;
     <span class="hljs-attr">bodyFont</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">headingFont</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">codeFont</span>: <span class="hljs-built_in">string</span>;
     <span class="hljs-attr">fragmentFont</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">noteFont</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">codeLigatures</span>: <span class="hljs-built_in">boolean</span>;
+    portableFonts?: <span class="hljs-title class_">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">PortableFont</span>&gt;;
 }
 </code></pre>
 
@@ -243,7 +246,7 @@ Defaults come only from the shared settings resolver, not a second catalogue.</p
 <div class="code">
 <pre><code>    <span class="hljs-keyword">const</span> codeLigatures = options.<span class="hljs-property">codeLigatures</span> ?? settings.<span class="hljs-property">codeLigatures</span>;
     <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> codeLigatures !== <span class="hljs-string">&#x27;boolean&#x27;</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Code ligatures must be boolean&#x27;</span>); }
-    <span class="hljs-keyword">return</span> { theme, <span class="hljs-attr">paper</span>: paper[<span class="hljs-number">0</span>], geometry, codeLigatures,
+    <span class="hljs-keyword">return</span> { theme, <span class="hljs-attr">paper</span>: paper[<span class="hljs-number">0</span>], geometry, codeLigatures, <span class="hljs-attr">portableFonts</span>: options.<span class="hljs-property">portableFonts</span>,
         <span class="hljs-attr">bodyFont</span>: <span class="hljs-title function_">fontName</span>(options.<span class="hljs-property">bodyFont</span> ?? settings.<span class="hljs-property">fonts</span>.<span class="hljs-property">body</span>),
         <span class="hljs-attr">headingFont</span>: <span class="hljs-title function_">fontName</span>(options.<span class="hljs-property">headingFont</span> ?? settings.<span class="hljs-property">fonts</span>.<span class="hljs-property">heading</span>),
         <span class="hljs-attr">codeFont</span>: <span class="hljs-title function_">fontName</span>(options.<span class="hljs-property">codeFont</span> ?? settings.<span class="hljs-property">fonts</span>.<span class="hljs-property">code</span>),
@@ -300,9 +303,11 @@ Control characters are rejected rather than interpreted by TeX.</p>
 </div>
 </div><p>Colours are validated even though the catalogue and style adapter are trusted.
 The code font retains common/contextual ligatures by default; disabling them
-adds <code>RawFeature={-calt}</code> for D2's contextual substitutions. D2Coding has no italic face:
-fontspec explicitly synthesizes slanted regular and bold faces with FakeSlant.
-The same policy applies to an overridden code family; no implicit italic lookup.</p>
+adds <code>RawFeature={-calt}</code> to disable contextual substitutions. Lilex and ordinary
+family overrides use their native italic faces. Only the exact legacy
+D2CodingLigature Nerd Font Propo family retains automatic slant in family-name
+mode, since it has no italic files. Manifest mode always requires explicit faces
+or an explicit per-face slant request.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;publication LaTeX encoding&gt;&gt;=+ </div>
 <div class="code">
@@ -326,17 +331,105 @@ code. LuaLaTeX is the intended compiler, with installed fonts and packages.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;publication LaTeX template&gt;&gt;= </div>
 <div class="code">
+<pre><code><span class="literate-tag-name">&lt;&lt;publication LaTeX font command&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication LaTeX companion path&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication LaTeX portable font command&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication LaTeX slant features&gt;&gt;</span>
+</code></pre>
+
+</div>
+</div><p>Family-name mode lets fontspec resolve native styles for Lilex and other ordinary
+families; only the known legacy D2 family keeps its prior synthetic declaration.
+Portable mode has no installed-family fallback and no automatic synthesis: only
+a manifest's explicit italic-face object can request FakeSlant.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX font command&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">fontCommand</span>(<span class="hljs-params">command: <span class="hljs-built_in">string</span>, family: <span class="hljs-built_in">string</span>, options: CheckedOptions, code = <span class="hljs-literal">false</span></span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">const</span> features = code ? <span class="hljs-string">`Ligatures=Common,Contextuals=Alternate,<span class="hljs-subst">${options.codeLigatures ? <span class="hljs-string">&#x27;&#x27;</span> : <span class="hljs-string">&#x27;RawFeature={-calt},&#x27;</span>}</span>`</span> : <span class="hljs-string">&#x27;&#x27;</span>;
+    <span class="hljs-keyword">if</span> (options.<span class="hljs-property">portableFonts</span> !== <span class="hljs-literal">undefined</span>) {
+        <span class="hljs-keyword">const</span> font = <span class="hljs-title class_">Object</span>.<span class="hljs-property"><span class="hljs-keyword">prototype</span></span>.<span class="hljs-property">hasOwnProperty</span>.<span class="hljs-title function_">call</span>(options.<span class="hljs-property">portableFonts</span>, family)
+            ? options.<span class="hljs-property">portableFonts</span>[family] : <span class="hljs-literal">undefined</span>;
+        <span class="hljs-keyword">if</span> (!font) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Invalid or missing portable font companions for <span class="hljs-subst">${family}</span>`</span>); }
+        <span class="hljs-keyword">return</span> <span class="hljs-title function_">portableFontCommand</span>(command, family, font, features);
+    }
+    <span class="hljs-keyword">if</span> (!code) { <span class="hljs-keyword">return</span> <span class="hljs-string">`<span class="hljs-subst">${command}</span>{<span class="hljs-subst">${family}</span>}`</span>; }
+    <span class="hljs-keyword">if</span> (family !== <span class="hljs-string">&#x27;D2CodingLigature Nerd Font Propo&#x27;</span>) {
+        <span class="hljs-keyword">return</span> <span class="hljs-string">`<span class="hljs-subst">${command}</span>[<span class="hljs-subst">${features.slice(<span class="hljs-number">0</span>, -<span class="hljs-number">1</span>)}</span>]{<span class="hljs-subst">${family}</span>}`</span>;
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-string">`<span class="hljs-subst">${command}</span>[<span class="hljs-subst">${features}</span>\nItalicFont={<span class="hljs-subst">${family}</span>},ItalicFeatures={FakeSlant=0.2},\nBoldItalicFont={<span class="hljs-subst">${family}</span>},BoldItalicFeatures={FakeSlant=0.2,FakeBold=1.5}]{<span class="hljs-subst">${family}</span>}`</span>;
+}
+</code></pre>
+
+</div>
+</div><p>The renderer validates companion names even for programmatic callers. Source
+paths and arbitrary TeX options cannot cross this boundary.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX companion path&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">companionPath</span>(<span class="hljs-params">value: <span class="hljs-built_in">unknown</span>, where: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> value !== <span class="hljs-string">&#x27;string&#x27;</span> ||
+        !<span class="hljs-regexp">/^lit-fonts-[a-f0-9]{64}\/[a-f0-9]{64}\.(ttf|otf)$/</span>.<span class="hljs-title function_">test</span>(value)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Invalid or missing portable font companions for <span class="hljs-subst">${where}</span>`</span>);
+    }
+    <span class="hljs-keyword">return</span> value;
+}
+</code></pre>
+
+</div>
+</div><p>Fontspec receives a separate Path and basename-only face names: slashes in its
+main font argument would otherwise leak into LaTeX's internal family identifier.
+Shared validation checks synthesis fields before any face is interpolated.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX portable font command&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">portableFontCommand</span>(<span class="hljs-params">command: <span class="hljs-built_in">string</span>, family: <span class="hljs-built_in">string</span>, font: PortableFont, features: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">const</span> checked = {} <span class="hljs-keyword">as</span> <span class="hljs-title class_">PortableFont</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> face <span class="hljs-keyword">of</span> fontFaces) {
+        checked[face] = <span class="hljs-title function_">checkFontFace</span>(font[face], face, <span class="hljs-string">`<span class="hljs-subst">${family}</span>.<span class="hljs-subst">${face}</span>`</span>, companionPath);
+    }
+    <span class="hljs-keyword">const</span> regular = <span class="hljs-title function_">fontFile</span>(checked.<span class="hljs-property">regular</span>);
+    <span class="hljs-keyword">const</span> directory = regular.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, regular.<span class="hljs-title function_">lastIndexOf</span>(<span class="hljs-string">&#x27;/&#x27;</span>) + <span class="hljs-number">1</span>);
+    <span class="hljs-keyword">if</span> (fontFaces.<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">face</span> =&gt;</span> !<span class="hljs-title function_">fontFile</span>(checked[face]).<span class="hljs-title function_">startsWith</span>(directory))) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Portable font faces must share one companion directory for <span class="hljs-subst">${family}</span>`</span>);
+    }
+    <span class="hljs-keyword">const</span> name = (<span class="hljs-attr">face</span>: keyof <span class="hljs-title class_">PortableFont</span>): <span class="hljs-function"><span class="hljs-params">string</span> =&gt;</span> <span class="hljs-title function_">fontFile</span>(checked[face]).<span class="hljs-title function_">slice</span>(directory.<span class="hljs-property">length</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-string">`<span class="hljs-subst">${command}</span>[<span class="hljs-subst">${features}</span>Path={<span class="hljs-subst">${directory}</span>},BoldFont={<span class="hljs-subst">${name(<span class="hljs-string">&#x27;bold&#x27;</span>)}</span>},`</span> +
+        <span class="hljs-string">`ItalicFont={<span class="hljs-subst">${name(<span class="hljs-string">&#x27;italic&#x27;</span>)}</span>},BoldItalicFont={<span class="hljs-subst">${name(<span class="hljs-string">&#x27;boldItalic&#x27;</span>)}</span>}`</span> +
+        <span class="hljs-string">`<span class="hljs-subst">${slantFeatures(checked)}</span>]{<span class="hljs-subst">${name(<span class="hljs-string">&#x27;regular&#x27;</span>)}</span>}`</span>;
+}
+</code></pre>
+
+</div>
+</div><p>Only explicitly synthesized faces receive a feature. Plain string mappings remain
+strict file mappings, and a boldItalic synthesis uses its supplied bold file rather
+than silently applying FakeBold. The bounded numbers stringify as TeX decimals.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX slant features&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">slantFeatures</span>(<span class="hljs-params">font: PortableFont</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">let</span> features = <span class="hljs-string">&#x27;&#x27;</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [face, option] <span class="hljs-keyword">of</span> [[<span class="hljs-string">&#x27;italic&#x27;</span>, <span class="hljs-string">&#x27;ItalicFeatures&#x27;</span>], [<span class="hljs-string">&#x27;boldItalic&#x27;</span>, <span class="hljs-string">&#x27;BoldItalicFeatures&#x27;</span>]] <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span>) {
+        <span class="hljs-keyword">const</span> choice = font[face];
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> choice !== <span class="hljs-string">&#x27;string&#x27;</span>) { features += <span class="hljs-string">`,<span class="hljs-subst">${option}</span>={FakeSlant=<span class="hljs-subst">${choice.slant}</span>}`</span>; }
+    }
+    <span class="hljs-keyword">return</span> features;
+}
+</code></pre>
+
+</div>
+</div><div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX template&gt;&gt;=+ </div>
+<div class="code">
 <pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">template</span>(<span class="hljs-params">body: <span class="hljs-built_in">string</span>, options: CheckedOptions, definitions: <span class="hljs-built_in">string</span>[]</span>): <span class="hljs-built_in">string</span> {
     <span class="hljs-keyword">const</span> c = options.<span class="hljs-property">theme</span>.<span class="hljs-property">colors</span>;
     <span class="hljs-keyword">return</span> <span class="hljs-title function_">themeNotice</span>() + <span class="hljs-title class_">String</span>.<span class="hljs-property">raw</span><span class="hljs-string">`\documentclass[11pt,oneside,openany]{scrbook}
 <span class="hljs-subst">${<span class="hljs-string">&#x27;\\usepackage&#x27;</span>}</span>{fontspec}
-\setmainfont{<span class="hljs-subst">${options.bodyFont}</span>}
-\newfontfamily\headingfont{<span class="hljs-subst">${options.headingFont}</span>}
-\newfontfamily\fragmentfont{<span class="hljs-subst">${options.fragmentFont}</span>}
-\newfontfamily\notefont{<span class="hljs-subst">${options.noteFont}</span>}
-\setmonofont[Ligatures=Common,Contextuals=Alternate,<span class="hljs-subst">${options.codeLigatures ? <span class="hljs-string">&#x27;&#x27;</span> : <span class="hljs-string">&#x27;RawFeature={-calt},&#x27;</span>}</span>
-ItalicFont={<span class="hljs-subst">${options.codeFont}</span>},ItalicFeatures={FakeSlant=0.2},
-BoldItalicFont={<span class="hljs-subst">${options.codeFont}</span>},BoldItalicFeatures={FakeSlant=0.2,FakeBold=1.5}]{<span class="hljs-subst">${options.codeFont}</span>}
+<span class="hljs-subst">${fontCommand(<span class="hljs-string">&#x27;\\setmainfont&#x27;</span>, options.bodyFont, options)}</span>
+<span class="hljs-subst">${fontCommand(<span class="hljs-string">&#x27;\\newfontfamily\\headingfont&#x27;</span>, options.headingFont, options)}</span>
+<span class="hljs-subst">${fontCommand(<span class="hljs-string">&#x27;\\newfontfamily\\fragmentfont&#x27;</span>, options.fragmentFont, options)}</span>
+<span class="hljs-subst">${fontCommand(<span class="hljs-string">&#x27;\\newfontfamily\\notefont&#x27;</span>, options.noteFont, options)}</span>
+<span class="hljs-subst">${fontCommand(<span class="hljs-string">&#x27;\\setmonofont&#x27;</span>, options.codeFont, options, <span class="hljs-literal">true</span>)}</span>
 <span class="hljs-subst">${<span class="hljs-string">&#x27;\\usepackage&#x27;</span>}</span>[<span class="hljs-subst">${options.paper}</span>,<span class="hljs-subst">${options.geometry}</span>]{geometry}
 <span class="hljs-subst">${<span class="hljs-string">&#x27;\\usepackage&#x27;</span>}</span>{fvextra,needspace,xcolor,microtype,amssymb,amsmath}
 <span class="hljs-subst">${<span class="hljs-string">&#x27;\\usepackage&#x27;</span>}</span>[normalem]{ulem}
@@ -660,8 +753,8 @@ access. This bounded duplication can move to a shared themes export later.</p>
 <p>Images, raw author markup, tables, Mermaid, and unsupported links still fail in
 <code>preparePandoc</code>; this is not yet a whole-project book exporter. No assets are
 copied, fonts downloaded, or TeX files compiled. The caller must install Latin
-Modern, Monofur Nerd Font and D2CodingLigature Nerd Font Propo (or supply safe
-family overrides), and the listed TeX packages. Missing glyphs remain compiler
+Modern, Monofur Nerd Font and Lilex Nerd Font (or supply safe family overrides or
+portable companions), and the listed TeX packages. Missing glyphs remain compiler
 errors/warnings to check, not a claim of universal Unicode coverage.</p>
 <p>Prose and inline-code escaping remain the trusted Pandoc writer's responsibility;
 ordinary block code is escaped by this renderer before conversion. Converters must

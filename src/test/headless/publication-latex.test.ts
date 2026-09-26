@@ -39,15 +39,15 @@ for (const theme of themes) {
     });
 }
 
-test('LaTeX defaults are portable, borderless, ligature-enabled and explicitly slanted', async () => {
+test('LaTeX defaults are borderless, ligature-enabled and use native Lilex styles', async () => {
     const result = await renderLatex(parse(''), {}, convert);
     assert.deepEqual(result.diagnostics, []);
     for (const expected of ['a4paper,margin=20mm', 'Latin Modern Roman', 'Monofur Nerd Font',
-        'D2CodingLigature Nerd Font Propo', 'Ligatures=Common,Contextuals=Alternate', 'FakeSlant=0.2',
+        'Lilex Nerd Font', 'Ligatures=Common,Contextuals=Alternate',
         'frame=none', '\\FancyVerbBreakStart#4\\FancyVerbBreakStop', 'breakanywheresymbolpre={}']) {
         assert.ok(result.latex?.includes(expected), expected);
     }
-    assert.doesNotMatch(result.latex!, /Path=|\/home\/|RawFeature=\{-calt/);
+    assert.doesNotMatch(result.latex!, /Path=|\/home\/|RawFeature=\{-calt|FakeSlant|FakeBold|ItalicFont=/);
 });
 
 test('LaTeX links full hanging names, distinct contribution labels and navigation', async () => {
@@ -195,7 +195,7 @@ test('LaTeX ligature options override settings in either direction', async () =>
             assert.deepEqual(result.diagnostics, []);
             assert.equal(result.latex?.includes('RawFeature={-calt}'), !(codeLigatures ?? configured === 'on'));
             assert.ok(result.latex?.includes('Ligatures=Common,Contextuals=Alternate'));
-            assert.ok(result.latex?.includes('FakeSlant=0.2'));
+            assert.doesNotMatch(result.latex!, /FakeSlant|FakeBold|ItalicFont=/);
         }
     }
 });

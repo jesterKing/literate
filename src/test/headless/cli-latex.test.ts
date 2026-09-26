@@ -62,6 +62,10 @@ function failureText(response: Response): string {
 }
 
 const invalidArguments: string[][] = [
+    ['--output', 'book.tex', '--font-manifest'],
+    ['--output', 'book.tex', '--font-manifest', '../fonts.json'],
+    ['--output', 'book.tex', '--font-manifest', '/fonts.json'],
+    ['--output', 'book.tex', '--font-manifest', 'a.json', '--font-manifest', 'b.json'],
     [], ['--output'], ['--output', ''], ['--output', '../escape.tex'],
     ['--output', '/absolute.tex'], ['--output', 'C:\\absolute.tex'],
     ['--output', 'book.pdf'], ['--output', 'book.html'], ['--output', 'book.TEX'],
@@ -91,7 +95,7 @@ for (const args of invalidArguments) {
 for (const name of ['generate', 'check', 'inspect', 'self-check']) {
     test(`${name} rejects all latex-only options, including help`, async t => {
         const root = fixture(t);
-        for (const option of [['--output', 'book.tex'], ['--paper', 'a4'], ['--margin', '20mm'],
+        for (const option of [['--output', 'book.tex'], ['--paper', 'a4'], ['--margin', '20mm'], ['--font-manifest', 'fonts.json'],
                     ...['top', 'right', 'bottom', 'left'].map(side => ['--margin-' + side, '20mm'])]) {
             for (const help of [[], ['--help']]) {
                 let calls = 0;
