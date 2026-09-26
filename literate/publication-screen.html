@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Publication and screen integration boundary</h1>
+<p>M1 establishes a tested correspondence, not a screen migration. <code>generateProject</code>
+produces HTML from its collected Markdown tokens; the VS Code contribution
+<code>markdown.markdownItPlugins</code> loads the <code>extendMarkdownIt</code> hook returned by
+<code>activate</code>. That hook wraps the <strong>host's</strong> fence renderer. The extension's private
+parser is not a substitute for testing this path.</p>
+<p>Neither screen path currently emits fragment IDs or reference links. A publication
+contribution maps to a screen block by canonical document path and its accepted
+fence token index (then its ordinal among fragment blocks in that document).
+Its family target identifies the base plus all additions; it is not a screen URL.
+LaTeX encodes that target again as <code>lit-</code> plus fixed-width UTF-16 hex. Heading IDs
+are a separate boundary: HTML has none; preview delegates them to VS Code.</p>
+<p>These tests drive the real engine and activated plugin, with only the VS Code API
+mocked by our existing fixture. They inspect actual labels, code, delegation and
+source maps, not equality of two model snapshots. The optional Pandoc test drives
+the production LaTeX renderer and process adapter on the same inputs. No renderer
+is replaced with a test implementation. This is not a VS Code host/browser click
+or source-synchronization end-to-end test.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication screen tests.*&gt;&gt;= src/test/headless/publication-screen.test.ts $</div>
+<div class="code">
+<pre><code><span class="literate-tag-name">&lt;&lt;publication screen imports&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication screen fixture&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication screen expectations&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication screen observations&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication screen preview&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication screen mapping checks&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication screen integration tests&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication screen literal boundary&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication screen highlighted fixture&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication screen highlighted test&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication screen latex mapping&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;publication screen latex test&gt;&gt;</span>
+</code></pre>
+
+</div>
+</div><h2>A fixture with independent expectations</h2>
+<p>Use punctuation-distinct families, repeated forward references, an escaped tag,
+an ordinary fence, nested declarations and additions in two chapters. Supplying
+documents out of order exercises chapter ordering rather than input-array order.
+The expected source is written independently, so a renderer that expands fragment
+uses, drops additions or mixes up the two names cannot pass by agreeing with itself.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication screen imports&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> assert = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;node:assert/strict&#x27;</span>);
+<span class="hljs-keyword">import</span> { test } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;node:test&#x27;</span>;
+<span class="hljs-keyword">import</span> <span class="hljs-title class_">MarkdownIt</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it&#x27;</span>);
+<span class="hljs-keyword">import</span> <span class="hljs-title class_">Token</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;markdown-it/lib/token&#x27;</span>);
+<span class="hljs-keyword">import</span> hljs <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;highlight.js&#x27;</span>;
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> * <span class="hljs-keyword">as</span> vscode <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;vscode&#x27;</span>;
+<span class="hljs-keyword">import</span> { generateProject, parseProject, <span class="hljs-title class_">PublicationModel</span>, <span class="hljs-title class_">PublicationSegment</span>, <span class="hljs-title class_">ParsedDocumentBlock</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;../../engine&#x27;</span>;
+<span class="hljs-keyword">import</span> { renderLatex } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;../../publication-latex&#x27;</span>;
+<span class="hljs-keyword">import</span> { runPandoc } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;../../cli&#x27;</span>;
+<span class="hljs-keyword">import</span> { fixture, fence } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./vscode-fixture&#x27;</span>;
+
+<span class="hljs-keyword">const</span> caller = <span class="hljs-string">&#x27;before <span class="literate-tag-name">&lt;&lt;a/b&gt;&gt;</span> / <span class="literate-tag-name">&lt;&lt;a-b&gt;&gt;</span> / <span class="literate-tag-name">&lt;&lt;a/b&gt;&gt;</span> after\n\\<span class="literate-tag-name">&lt;&lt;literal&gt;&gt;</span>&#x27;</span>;
+<span class="hljs-keyword">const</span> <span class="hljs-title function_">quoted</span> = (<span class="hljs-params">text: <span class="hljs-built_in">string</span></span>) =&gt; text.<span class="hljs-title function_">trimEnd</span>().<span class="hljs-title function_">split</span>(<span class="hljs-string">&#x27;\n&#x27;</span>).<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">line</span> =&gt;</span> <span class="hljs-string">&#x27;&gt; &#x27;</span> + line).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;\n&#x27;</span>) + <span class="hljs-string">&#x27;\n&#x27;</span>;
+</code></pre>
+
+</div>
+</div><p>The prose-shift variant changes token indexes and source lines without changing
+logical identities. Nested fences are rendered in their original containers.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication screen fixture&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">documents</span>(<span class="hljs-params">prefix = <span class="hljs-string">&#x27;&#x27;</span></span>) {
+    <span class="hljs-keyword">return</span> [
+        { <span class="hljs-attr">path</span>: <span class="hljs-string">&#x27;more.literate&#x27;</span>, <span class="hljs-attr">text</span>: <span class="hljs-string">&#x27;# More\n\n&#x27;</span> + <span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;text: <span class="literate-tag-name">&lt;&lt;a/b&gt;&gt;</span>=+&#x27;</span>, <span class="hljs-string">&#x27;third&#x27;</span>) },
+        { <span class="hljs-attr">path</span>: <span class="hljs-string">&#x27;defs.literate&#x27;</span>, <span class="hljs-attr">text</span>: <span class="hljs-string">&#x27;# Definitions\n\n[More](more.html)\n\n&#x27;</span>
+            + <span class="hljs-title function_">quoted</span>(<span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;text: <span class="literate-tag-name">&lt;&lt;a/b&gt;&gt;</span>=&#x27;</span>, <span class="hljs-string">&#x27;first&#x27;</span>))
+            + <span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;text: <span class="literate-tag-name">&lt;&lt;a-b&gt;&gt;</span>=&#x27;</span>, <span class="hljs-string">&#x27;other&#x27;</span>) + <span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;text: <span class="literate-tag-name">&lt;&lt;a/b&gt;&gt;</span>=+&#x27;</span>, <span class="hljs-string">&#x27;second&#x27;</span>) },
+        { <span class="hljs-attr">path</span>: <span class="hljs-string">&#x27;index.literate&#x27;</span>, <span class="hljs-attr">text</span>: prefix + <span class="hljs-string">&#x27;# Book\n\n[Definitions](defs.html)\n\n&#x27;</span>
+            + <span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;text&#x27;</span>, <span class="hljs-string">&#x27;<span class="literate-tag-name">&lt;&lt;ordinary&gt;&gt;</span>&#x27;</span>)
+            + <span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;text: <span class="literate-tag-name">&lt;&lt;main.*&gt;&gt;</span>= result.txt $&#x27;</span>, caller) }
+    ];
+}
+</code></pre>
+
+</div>
+</div><p>Expected declarations are not recovered from the HTML labels or publication model.
+The explicit count and sequence also catch extra/missing fragment wrappers.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication screen expectations&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> expected = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, { <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">kind</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">body</span>: <span class="hljs-built_in">string</span> }[]&gt;([
+    [<span class="hljs-string">&#x27;index.literate&#x27;</span>, [{ <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;main.*&#x27;</span>, <span class="hljs-attr">kind</span>: <span class="hljs-string">&#x27;definition&#x27;</span>, <span class="hljs-attr">body</span>: caller.<span class="hljs-title function_">replace</span>(<span class="hljs-string">&#x27;\\&lt;&lt;&#x27;</span>, <span class="hljs-string">&#x27;&lt;&lt;&#x27;</span>) + <span class="hljs-string">&#x27;\n&#x27;</span> }]],
+    [<span class="hljs-string">&#x27;defs.literate&#x27;</span>, [
+        { <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;a/b&#x27;</span>, <span class="hljs-attr">kind</span>: <span class="hljs-string">&#x27;definition&#x27;</span>, <span class="hljs-attr">body</span>: <span class="hljs-string">&#x27;first\n&#x27;</span> },
+        { <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;a-b&#x27;</span>, <span class="hljs-attr">kind</span>: <span class="hljs-string">&#x27;definition&#x27;</span>, <span class="hljs-attr">body</span>: <span class="hljs-string">&#x27;other\n&#x27;</span> },
+        { <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;a/b&#x27;</span>, <span class="hljs-attr">kind</span>: <span class="hljs-string">&#x27;append&#x27;</span>, <span class="hljs-attr">body</span>: <span class="hljs-string">&#x27;second\n&#x27;</span> }
+    ]],
+    [<span class="hljs-string">&#x27;more.literate&#x27;</span>, [{ <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;a/b&#x27;</span>, <span class="hljs-attr">kind</span>: <span class="hljs-string">&#x27;append&#x27;</span>, <span class="hljs-attr">body</span>: <span class="hljs-string">&#x27;third\n&#x27;</span> }]]
+]);
+<span class="hljs-keyword">const</span> <span class="hljs-built_in">escape</span> = <span class="hljs-keyword">new</span> <span class="hljs-title class_">MarkdownIt</span>().<span class="hljs-property">utils</span>.<span class="hljs-property">escapeHtml</span>;
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">textContent</span>(<span class="hljs-params">html: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">return</span> html.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/&lt;[^&gt;]*&gt;/g</span>, <span class="hljs-string">&#x27;&#x27;</span>).<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/&amp;(lt|gt|amp|quot|#39);/g</span>,
+        <span class="hljs-function">(<span class="hljs-params">_, entity: <span class="hljs-built_in">string</span></span>) =&gt;</span> ({ <span class="hljs-attr">lt</span>: <span class="hljs-string">&#x27;&lt;&#x27;</span>, <span class="hljs-attr">gt</span>: <span class="hljs-string">&#x27;&gt;&#x27;</span>, <span class="hljs-attr">amp</span>: <span class="hljs-string">&#x27;&amp;&#x27;</span>, <span class="hljs-attr">quot</span>: <span class="hljs-string">&#x27;&quot;&#x27;</span>, <span class="hljs-string">&#x27;#39&#x27;</span>: <span class="hljs-string">&quot;&#x27;&quot;</span> })[entity]!);
+}
+</code></pre>
+
+</div>
+</div><p>Our extractor deliberately understands only these controlled fragment wrappers,
+not arbitrary HTML. We assert wrapper counts as well, so extraction cannot quietly
+skip a malformed block. Ordinals are a test observation, not new persistent IDs.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication screen observations&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">blocks</span>(<span class="hljs-params">html: <span class="hljs-built_in">string</span></span>) {
+    <span class="hljs-keyword">const</span> found = [...html.<span class="hljs-title function_">matchAll</span>(<span class="hljs-regexp">/&lt;div class=&quot;codefragment&quot;&gt;\s*&lt;div class=&quot;fragmentname&quot;&gt;([^]*?)&lt;\/div&gt;\s*&lt;div class=&quot;code&quot;&gt;([^]*?)&lt;\/div&gt;\s*&lt;\/div&gt;/g</span>)];
+    assert.<span class="hljs-title function_">equal</span>(found.<span class="hljs-property">length</span>, (html.<span class="hljs-title function_">match</span>(<span class="hljs-regexp">/class=&quot;codefragment&quot;/g</span>) || []).<span class="hljs-property">length</span>);
+    <span class="hljs-keyword">return</span> found.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">match</span> =&gt;</span> ({ <span class="hljs-attr">label</span>: <span class="hljs-title function_">textContent</span>(match[<span class="hljs-number">1</span>]).<span class="hljs-title function_">trim</span>(), <span class="hljs-attr">code</span>: match[<span class="hljs-number">2</span>] }));
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">references</span>(<span class="hljs-params">model: PublicationModel</span>) {
+    <span class="hljs-keyword">return</span> model.<span class="hljs-property">contributions</span>.<span class="hljs-title function_">flatMap</span>(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> part.<span class="hljs-property">segments</span>.<span class="hljs-title function_">filter</span>(
+            (segment): segment is <span class="hljs-title class_">Extract</span>&lt;<span class="hljs-title class_">PublicationSegment</span>, { <span class="hljs-attr">kind</span>: <span class="hljs-string">&#x27;reference&#x27;</span> }&gt; =&gt; segment.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;reference&#x27;</span>));
+}
+</code></pre>
+
+</div>
+</div><h2>Activate the actual preview hook</h2>
+<p>Install a real Markdown-it renderer with highlight.js as its host highlighter.
+Observe delegation before the plugin wraps it: source maps and token positions
+must survive, while escaped literal openers are unescaped only in the display
+copy. The grabber environment retains the original tokens for comparison.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication screen preview&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">preview</span>(<span class="hljs-params"></span>) {
+    <span class="hljs-keyword">const</span> f = <span class="hljs-title function_">fixture</span>();
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">subscriptions</span>: vscode.<span class="hljs-property">Disposable</span>[] = [];
+    <span class="hljs-keyword">const</span> api = <span class="hljs-keyword">await</span> f.<span class="hljs-property">extension</span>.<span class="hljs-title function_">activate</span>({ subscriptions } <span class="hljs-keyword">as</span> <span class="hljs-built_in">unknown</span> <span class="hljs-keyword">as</span> vscode.<span class="hljs-property">ExtensionContext</span>);
+    <span class="hljs-keyword">const</span> md = <span class="hljs-keyword">new</span> <span class="hljs-title class_">MarkdownIt</span>({ <span class="hljs-attr">highlight</span>: <span class="hljs-function">(<span class="hljs-params">code, language</span>) =&gt;</span>
+        hljs.<span class="hljs-title function_">getLanguage</span>(language) ? hljs.<span class="hljs-title function_">highlight</span>(code, { language }).<span class="hljs-property">value</span> : <span class="hljs-string">&#x27;&#x27;</span> });
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">delegated</span>: { <span class="hljs-attr">index</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">token</span>: <span class="hljs-title class_">Token</span> }[] = [];
+    <span class="hljs-keyword">const</span> original = md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">fence</span>!;
+    md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">fence</span> = <span class="hljs-function">(<span class="hljs-params">tokens, index, options, env, renderer</span>) =&gt;</span> {
+        delegated.<span class="hljs-title function_">push</span>({ index, <span class="hljs-attr">token</span>: tokens[index] });
+        <span class="hljs-keyword">return</span> <span class="hljs-title function_">original</span>(tokens, index, options, env, renderer);
+    };
+    api.<span class="hljs-title function_">extendMarkdownIt</span>(md);
+    <span class="hljs-keyword">return</span> { md, delegated, <span class="hljs-attr">dispose</span>: <span class="hljs-function">() =&gt;</span> subscriptions.<span class="hljs-title function_">forEach</span>(<span class="hljs-function"><span class="hljs-params">value</span> =&gt;</span> value.<span class="hljs-title function_">dispose</span>()) };
+}
+</code></pre>
+
+</div>
+</div><h2>Map emitted blocks to shared targets</h2>
+<p>Check a screen block against its independently expected family, operator and
+unexpanded body, then join its source token to the publication target. We do not
+invent an anchor on either screen. Both absence of IDs and absence of links are
+intentional M1 boundary assertions; M2 must replace them with destination tests.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication screen mapping checks&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">checkBlocks</span>(<span class="hljs-params">html: <span class="hljs-built_in">string</span>, path: <span class="hljs-built_in">string</span>, model: PublicationModel, format: <span class="hljs-string">&#x27;html&#x27;</span> | <span class="hljs-string">&#x27;preview&#x27;</span></span>) {
+    <span class="hljs-keyword">const</span> rendered = <span class="hljs-title function_">blocks</span>(html);
+    <span class="hljs-keyword">const</span> wanted = expected.<span class="hljs-title function_">get</span>(path)!;
+    <span class="hljs-keyword">const</span> parts = model.<span class="hljs-property">contributions</span>.<span class="hljs-title function_">filter</span>(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> part.<span class="hljs-property">definition</span>.<span class="hljs-property">path</span> === path);
+    assert.<span class="hljs-title function_">equal</span>(rendered.<span class="hljs-property">length</span>, wanted.<span class="hljs-property">length</span>);
+    assert.<span class="hljs-title function_">equal</span>(parts.<span class="hljs-property">length</span>, wanted.<span class="hljs-property">length</span>);
+    <span class="hljs-keyword">return</span> rendered.<span class="hljs-title function_">map</span>(<span class="hljs-function">(<span class="hljs-params">block, index</span>) =&gt;</span> {
+        <span class="hljs-keyword">const</span> want = wanted[index], part = parts[index];
+        <span class="hljs-keyword">const</span> family = model.<span class="hljs-property">fragments</span>.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">value</span> =&gt;</span> value.<span class="hljs-property">name</span> === want.<span class="hljs-property">name</span>)!;
+        assert.<span class="hljs-title function_">ok</span>(family);
+        assert.<span class="hljs-title function_">equal</span>(part.<span class="hljs-property">kind</span>, want.<span class="hljs-property">kind</span>);
+        assert.<span class="hljs-title function_">equal</span>(part.<span class="hljs-property">fragmentTarget</span>, family.<span class="hljs-property">target</span>);
+        assert.<span class="hljs-title function_">ok</span>(family.<span class="hljs-property">contributions</span>.<span class="hljs-title function_">includes</span>(part.<span class="hljs-property">target</span>));
+        <span class="hljs-keyword">const</span> label = <span class="hljs-string">`<span class="literate-tag-name">&lt;&lt;${want.name}&gt;&gt;</span>=<span class="hljs-subst">${want.kind === <span class="hljs-string">&#x27;append&#x27;</span> ? <span class="hljs-string">&#x27;+&#x27;</span> : <span class="hljs-string">&#x27;&#x27;</span>}</span>`</span>;
+        <span class="hljs-keyword">const</span> suffix = want.<span class="hljs-property">name</span> === <span class="hljs-string">&#x27;main.*&#x27;</span> ? (format === <span class="hljs-string">&#x27;html&#x27;</span> ? <span class="hljs-string">&#x27; result.txt $&#x27;</span> : <span class="hljs-string">&#x27; result.txt&#x27;</span>) : <span class="hljs-string">&#x27;&#x27;</span>;
+        assert.<span class="hljs-title function_">equal</span>(block.<span class="hljs-property">label</span>, label + suffix);
+        <span class="hljs-keyword">const</span> code = block.<span class="hljs-property">code</span>.<span class="hljs-title function_">match</span>(<span class="hljs-regexp">/&lt;code\b[^&gt;]*&gt;([^]*?)&lt;\/code&gt;/</span>);
+        assert.<span class="hljs-title function_">ok</span>(code);
+        assert.<span class="hljs-title function_">equal</span>(<span class="hljs-title function_">textContent</span>(code[<span class="hljs-number">1</span>]), want.<span class="hljs-property">body</span>);
+        assert.<span class="hljs-title function_">doesNotMatch</span>(block.<span class="hljs-property">code</span>, <span class="hljs-regexp">/&lt;(?:a)\b|\bid=/</span>);
+        <span class="hljs-keyword">return</span> part.<span class="hljs-property">target</span>;
+    });
+}
+</code></pre>
+
+</div>
+</div><p>The main assertion uses generated HTML files, not direct calls to the fence rule.
+The preview renders the supplied current text, with no repository processing or
+filesystem generation to supply its contents. The source-output oracle also guards
+against accidentally changing tangling while preparing a publication test. Existing
+expansion trims each replacement's terminal newline and uses the whitespace just
+before a reference to indent its continuation lines; the oracle retains that policy.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication screen integration tests&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> prefix <span class="hljs-keyword">of</span> [<span class="hljs-string">&#x27;&#x27;</span>, <span class="hljs-string">&#x27;Inserted prose.\n\n&#x27;</span>]) {
+    <span class="hljs-title function_">test</span>(<span class="hljs-string">`screen blocks map to publication contributions through real renderers (<span class="hljs-subst">${prefix ? <span class="hljs-string">&#x27;shifted&#x27;</span> : <span class="hljs-string">&#x27;original&#x27;</span>}</span>)`</span>, <span class="hljs-keyword">async</span> () =&gt; {
+        <span class="hljs-keyword">const</span> inputs = <span class="hljs-title function_">documents</span>(prefix), parsed = <span class="hljs-title function_">parseProject</span>(inputs), generated = <span class="hljs-title function_">generateProject</span>(inputs);
+        assert.<span class="hljs-title function_">deepEqual</span>(parsed.<span class="hljs-property">diagnostics</span>, []);
+        assert.<span class="hljs-title function_">deepEqual</span>(generated.<span class="hljs-property">diagnostics</span>, []);
+        assert.<span class="hljs-title function_">deepEqual</span>(parsed.<span class="hljs-property">documents</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">doc</span> =&gt;</span> doc.<span class="hljs-property">path</span>), [<span class="hljs-string">&#x27;index.literate&#x27;</span>, <span class="hljs-string">&#x27;defs.literate&#x27;</span>, <span class="hljs-string">&#x27;more.literate&#x27;</span>]);
+        assert.<span class="hljs-title function_">equal</span>(generated.<span class="hljs-property">files</span>.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">file</span> =&gt;</span> file.<span class="hljs-property">path</span> === <span class="hljs-string">&#x27;result.txt&#x27;</span>)?.<span class="hljs-property">content</span>,
+            <span class="hljs-string">&#x27;before first\n second\n third / other / first\n second\n third after\n<span class="literate-tag-name">&lt;&lt;literal&gt;&gt;</span>\n&#x27;</span>);
+        <span class="hljs-keyword">const</span> p = <span class="hljs-keyword">await</span> <span class="hljs-title function_">preview</span>();
+        <span class="hljs-keyword">try</span> {
+            <span class="literate-tag-name">&lt;&lt;publication screen document assertions&gt;&gt;</span>
+            <span class="literate-tag-name">&lt;&lt;publication screen reference assertions&gt;&gt;</span>
+        } <span class="hljs-keyword">finally</span> { p.<span class="hljs-title function_">dispose</span>(); }
+    });
+}
+</code></pre>
+
+</div>
+</div><p>The token join checks the parsed contribution block as well as the actual preview
+host call. The fixture includes an ordinary fence before the caller, so an
+implementation that confuses fence ordinals with token indexes fails here.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication screen document assertions&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> doc <span class="hljs-keyword">of</span> parsed.<span class="hljs-property">documents</span>) {
+    p.<span class="hljs-property">delegated</span>.<span class="hljs-property">length</span> = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">const</span> env = {} <span class="hljs-keyword">as</span> { <span class="hljs-attr">gstate</span>: { <span class="hljs-attr">tokens</span>: <span class="hljs-title class_">Token</span>[] } };
+    <span class="hljs-keyword">const</span> screen = p.<span class="hljs-property">md</span>.<span class="hljs-title function_">render</span>(doc.<span class="hljs-property">source</span>, env);
+    <span class="hljs-keyword">const</span> html = generated.<span class="hljs-property">files</span>.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">file</span> =&gt;</span> file.<span class="hljs-property">path</span> === doc.<span class="hljs-property">path</span>.<span class="hljs-title function_">replace</span>(<span class="hljs-string">&#x27;.literate&#x27;</span>, <span class="hljs-string">&#x27;.html&#x27;</span>))!.<span class="hljs-property">content</span>;
+    <span class="hljs-keyword">const</span> targets = <span class="hljs-title function_">checkBlocks</span>(html, doc.<span class="hljs-property">path</span>, generated.<span class="hljs-property">publication</span>, <span class="hljs-string">&#x27;html&#x27;</span>);
+    assert.<span class="hljs-title function_">deepEqual</span>(<span class="hljs-title function_">checkBlocks</span>(screen, doc.<span class="hljs-property">path</span>, parsed.<span class="hljs-property">publication</span>, <span class="hljs-string">&#x27;preview&#x27;</span>), targets);
+    <span class="hljs-keyword">const</span> contributions = doc.<span class="hljs-property">blocks</span>.<span class="hljs-title function_">filter</span>(
+            (block): block is <span class="hljs-title class_">Extract</span>&lt;<span class="hljs-title class_">ParsedDocumentBlock</span>, { <span class="hljs-attr">kind</span>: <span class="hljs-string">&#x27;contribution&#x27;</span> }&gt; =&gt; block.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;contribution&#x27;</span>);
+    assert.<span class="hljs-title function_">deepEqual</span>(contributions.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">block</span> =&gt;</span> block.<span class="hljs-property">target</span>), targets);
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> block <span class="hljs-keyword">of</span> contributions) {
+        <span class="hljs-keyword">const</span> part = parsed.<span class="hljs-property">publication</span>.<span class="hljs-property">contributions</span>.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">value</span> =&gt;</span> value.<span class="hljs-property">target</span> === block.<span class="hljs-property">target</span>)!;
+        <span class="hljs-keyword">const</span> call = p.<span class="hljs-property">delegated</span>.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">value</span> =&gt;</span> value.<span class="hljs-property">index</span> === block.<span class="hljs-property">tokenIndex</span>)!;
+        assert.<span class="hljs-title function_">ok</span>(call, <span class="hljs-string">&#x27;fragment delegated to the host renderer&#x27;</span>);
+        assert.<span class="hljs-title function_">equal</span>(part.<span class="hljs-property">tokenIndex</span>, block.<span class="hljs-property">tokenIndex</span>);
+        assert.<span class="hljs-title function_">equal</span>(env.<span class="hljs-property">gstate</span>.<span class="hljs-property">tokens</span>[block.<span class="hljs-property">tokenIndex</span>].<span class="hljs-property">content</span>, part.<span class="hljs-property">content</span>);
+        assert.<span class="hljs-title function_">equal</span>(call.<span class="hljs-property">token</span>.<span class="hljs-property">content</span>, part.<span class="hljs-property">content</span>.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\\&lt;&lt;/g</span>, <span class="hljs-string">&#x27;&lt;&lt;&#x27;</span>));
+        assert.<span class="hljs-title function_">deepEqual</span>(call.<span class="hljs-property">token</span>.<span class="hljs-property">map</span>, doc.<span class="hljs-property">tokens</span>[block.<span class="hljs-property">tokenIndex</span>].<span class="hljs-property">map</span>);
+        assert.<span class="hljs-title function_">equal</span>(call.<span class="hljs-property">token</span>.<span class="hljs-property">map</span>![<span class="hljs-number">0</span>], part.<span class="hljs-property">definition</span>.<span class="hljs-property">line</span>);
+    }
+    assert.<span class="hljs-title function_">doesNotMatch</span>(html + screen, <span class="hljs-regexp">/\bid=&quot;[fc]-/</span>);
+}
+</code></pre>
+
+</div>
+</div><p>A reference resolves to a family, whose first contribution is its definition and
+whose following contributions are additions. Repetition is preserved. A literal
+lookalike and an ordinary fence must never enter this semantic list. Stability is
+checked against the unshifted fixture, separately from screen correspondence.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication screen reference assertions&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> model = parsed.<span class="hljs-property">publication</span>, refs = <span class="hljs-title function_">references</span>(model);
+assert.<span class="hljs-title function_">deepEqual</span>(refs.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">ref</span> =&gt;</span> ref.<span class="hljs-property">name</span>), [<span class="hljs-string">&#x27;a/b&#x27;</span>, <span class="hljs-string">&#x27;a-b&#x27;</span>, <span class="hljs-string">&#x27;a/b&#x27;</span>]);
+<span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> ref <span class="hljs-keyword">of</span> refs) {
+    <span class="hljs-keyword">const</span> family = model.<span class="hljs-property">fragments</span>.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">value</span> =&gt;</span> value.<span class="hljs-property">name</span> === ref.<span class="hljs-property">name</span>)!;
+    assert.<span class="hljs-title function_">deepEqual</span>(ref.<span class="hljs-property">resolution</span>, { <span class="hljs-attr">kind</span>: <span class="hljs-string">&#x27;resolved&#x27;</span>, <span class="hljs-attr">target</span>: family.<span class="hljs-property">target</span> });
+    <span class="hljs-keyword">const</span> definition = model.<span class="hljs-property">contributions</span>.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> part.<span class="hljs-property">target</span> === family.<span class="hljs-property">contributions</span>[<span class="hljs-number">0</span>])!;
+    assert.<span class="hljs-title function_">equal</span>(definition.<span class="hljs-property">kind</span>, <span class="hljs-string">&#x27;definition&#x27;</span>);
+    assert.<span class="hljs-title function_">equal</span>(definition.<span class="hljs-property">definition</span>.<span class="hljs-property">path</span>, <span class="hljs-string">&#x27;defs.literate&#x27;</span>);
+}
+assert.<span class="hljs-title function_">notEqual</span>(model.<span class="hljs-property">fragments</span>[<span class="hljs-number">1</span>].<span class="hljs-property">target</span>, model.<span class="hljs-property">fragments</span>[<span class="hljs-number">2</span>].<span class="hljs-property">target</span>);
+assert.<span class="hljs-title function_">deepEqual</span>(model.<span class="hljs-property">fragments</span>.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">value</span> =&gt;</span> value.<span class="hljs-property">name</span> === <span class="hljs-string">&#x27;a/b&#x27;</span>)!.<span class="hljs-property">contributions</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">target</span> =&gt;</span>
+    model.<span class="hljs-property">contributions</span>.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> part.<span class="hljs-property">target</span> === target)!.<span class="hljs-property">kind</span>), [<span class="hljs-string">&#x27;definition&#x27;</span>, <span class="hljs-string">&#x27;append&#x27;</span>, <span class="hljs-string">&#x27;append&#x27;</span>]);
+assert.<span class="hljs-title function_">deepEqual</span>(model.<span class="hljs-property">contributions</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> part.<span class="hljs-property">target</span>),
+    <span class="hljs-title function_">parseProject</span>(<span class="hljs-title function_">documents</span>()).<span class="hljs-property">publication</span>.<span class="hljs-property">contributions</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> part.<span class="hljs-property">target</span>));
+</code></pre>
+
+</div>
+</div><h2>Decoration is not reference semantics</h2>
+<p>Post-highlight screen decoration still mistakes an escaped tag for a visual tag.
+That is a known M2 gap, not a publication reference. An ordinary fence is not
+decorated at all. Assert the distinction explicitly rather than deleting the
+literal from the fixture or treating every span as a resolved link.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication screen literal boundary&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-title function_">test</span>(<span class="hljs-string">&#x27;screen tag decoration is explicitly not a semantic reference or link&#x27;</span>, <span class="hljs-keyword">async</span> () =&gt; {
+    <span class="hljs-keyword">const</span> inputs = <span class="hljs-title function_">documents</span>(), generated = <span class="hljs-title function_">generateProject</span>(inputs), p = <span class="hljs-keyword">await</span> <span class="hljs-title function_">preview</span>();
+    <span class="hljs-keyword">try</span> {
+        <span class="hljs-keyword">const</span> source = inputs.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">doc</span> =&gt;</span> doc.<span class="hljs-property">path</span> === <span class="hljs-string">&#x27;index.literate&#x27;</span>)!;
+        <span class="hljs-keyword">const</span> outputs = [generated.<span class="hljs-property">files</span>.<span class="hljs-title function_">find</span>(<span class="hljs-function"><span class="hljs-params">file</span> =&gt;</span> file.<span class="hljs-property">path</span> === <span class="hljs-string">&#x27;index.html&#x27;</span>)!.<span class="hljs-property">content</span>,
+            p.<span class="hljs-property">md</span>.<span class="hljs-title function_">render</span>(source.<span class="hljs-property">text</span>, {})];
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> html <span class="hljs-keyword">of</span> outputs) {
+            <span class="hljs-keyword">const</span> tags = [...<span class="hljs-title function_">blocks</span>(html)[<span class="hljs-number">0</span>].<span class="hljs-property">code</span>.<span class="hljs-title function_">matchAll</span>(<span class="hljs-regexp">/&lt;span class=&quot;literate-tag-name&quot;&gt;([^]*?)&lt;\/span&gt;/g</span>)];
+            assert.<span class="hljs-title function_">deepEqual</span>(tags.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">match</span> =&gt;</span> <span class="hljs-title function_">textContent</span>(match[<span class="hljs-number">1</span>])),
+                [<span class="hljs-string">&#x27;<span class="literate-tag-name">&lt;&lt;a/b&gt;&gt;</span>&#x27;</span>, <span class="hljs-string">&#x27;<span class="literate-tag-name">&lt;&lt;a-b&gt;&gt;</span>&#x27;</span>, <span class="hljs-string">&#x27;<span class="literate-tag-name">&lt;&lt;a/b&gt;&gt;</span>&#x27;</span>, <span class="hljs-string">&#x27;<span class="literate-tag-name">&lt;&lt;literal&gt;&gt;</span>&#x27;</span>]);
+            assert.<span class="hljs-title function_">ok</span>(html.<span class="hljs-title function_">includes</span>(<span class="hljs-built_in">escape</span>(<span class="hljs-string">&#x27;<span class="literate-tag-name">&lt;&lt;ordinary&gt;&gt;</span>&#x27;</span>)));
+            assert.<span class="hljs-title function_">ok</span>(!tags.<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">match</span> =&gt;</span> match[<span class="hljs-number">1</span>].<span class="hljs-title function_">includes</span>(<span class="hljs-string">&#x27;ordinary&#x27;</span>)));
+            assert.<span class="hljs-title function_">doesNotMatch</span>(<span class="hljs-title function_">blocks</span>(html)[<span class="hljs-number">0</span>].<span class="hljs-property">code</span>, <span class="hljs-regexp">/&lt;a\b/</span>);
+        }
+        assert.<span class="hljs-title function_">equal</span>(<span class="hljs-title function_">references</span>(generated.<span class="hljs-property">publication</span>).<span class="hljs-property">length</span>, <span class="hljs-number">3</span>);
+    } <span class="hljs-keyword">finally</span> { p.<span class="hljs-title function_">dispose</span>(); }
+});
+</code></pre>
+
+</div>
+</div><h2>Whole-block highlighting is an independent renderer input</h2>
+<p>The host highlighter must actually run: keyword and string spans are required,
+not just escaped plain text. HTML-looking literal text stays escaped, comments
+follow the existing screen removal policy, and only the unescaped use enters the
+publication model. M2 must not infer semantic uses from these decorated spans.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication screen highlighted fixture&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">highlightedDocuments</span>(<span class="hljs-params">spaced = <span class="hljs-literal">true</span></span>) {
+    <span class="hljs-keyword">const</span> body = <span class="hljs-string">&#x27;const s = &quot;<span class="literate-tag-name">&lt;&lt;a/b&gt;&gt;</span>&quot;;\nconst literal = &quot;\\<span class="literate-tag-name">&lt;&lt;literal&gt;&gt;</span> &lt;a href=x&gt;&quot;;\n// quiet comment&#x27;</span>;
+    <span class="hljs-keyword">return</span> [{ <span class="hljs-attr">path</span>: <span class="hljs-string">&#x27;index.literate&#x27;</span>, <span class="hljs-attr">text</span>: <span class="hljs-title function_">fence</span>((spaced ? <span class="hljs-string">&#x27;js : &#x27;</span> : <span class="hljs-string">&#x27;js: &#x27;</span>) + <span class="hljs-string">&#x27;<span class="literate-tag-name">&lt;&lt;highlighted&gt;&gt;</span>=&#x27;</span>, body)
+        + <span class="hljs-title function_">fence</span>(<span class="hljs-string">&#x27;text: <span class="literate-tag-name">&lt;&lt;a/b&gt;&gt;</span>=&#x27;</span>, <span class="hljs-string">&#x27;value&#x27;</span>) }];
+}
+</code></pre>
+
+</div>
+</div><p>Check output from both real paths, including the host's delegated language and
+original token content. This is deliberately not a malicious replacement renderer:
+we test the installed highlight.js renderer, and separate semantic tests guard its
+emitter adapter and invalid markup handling. Compact <code>js:</code> is a known discrepancy:
+the host receives that whole language word and does not highlight it; generated
+HTML extracts <code>js</code> correctly. The spaced <code>js :</code> form highlights in both. Keep both
+positive and negative assertions until M2 normalizes the delegated language.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication screen highlighted test&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> spaced <span class="hljs-keyword">of</span> [<span class="hljs-literal">true</span>, <span class="hljs-literal">false</span>]) {
+<span class="hljs-title function_">test</span>(<span class="hljs-string">`highlighted screen semantic/literal boundary (<span class="hljs-subst">${spaced ? <span class="hljs-string">&#x27;spaced&#x27;</span> : <span class="hljs-string">&#x27;compact&#x27;</span>}</span> header)`</span>, <span class="hljs-keyword">async</span> () =&gt; {
+    <span class="hljs-keyword">const</span> inputs = <span class="hljs-title function_">highlightedDocuments</span>(spaced), generated = <span class="hljs-title function_">generateProject</span>(inputs), p = <span class="hljs-keyword">await</span> <span class="hljs-title function_">preview</span>();
+    <span class="hljs-keyword">try</span> {
+        assert.<span class="hljs-title function_">deepEqual</span>(generated.<span class="hljs-property">diagnostics</span>, []);
+        <span class="hljs-keyword">const</span> env = {} <span class="hljs-keyword">as</span> { <span class="hljs-attr">gstate</span>: { <span class="hljs-attr">tokens</span>: <span class="hljs-title class_">Token</span>[] } };
+        <span class="hljs-keyword">const</span> screen = p.<span class="hljs-property">md</span>.<span class="hljs-title function_">render</span>(inputs[<span class="hljs-number">0</span>].<span class="hljs-property">text</span>, env);
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [format, html] <span class="hljs-keyword">of</span> [[<span class="hljs-string">&#x27;html&#x27;</span>, generated.<span class="hljs-property">files</span>[<span class="hljs-number">0</span>].<span class="hljs-property">content</span>], [<span class="hljs-string">&#x27;preview&#x27;</span>, screen]]) {
+            <span class="hljs-keyword">const</span> code = <span class="hljs-title function_">blocks</span>(html)[<span class="hljs-number">0</span>].<span class="hljs-property">code</span>;
+            <span class="literate-tag-name">&lt;&lt;publication screen highlighting assertions&gt;&gt;</span>
+        }
+        assert.<span class="hljs-title function_">deepEqual</span>(<span class="hljs-title function_">references</span>(generated.<span class="hljs-property">publication</span>).<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">ref</span> =&gt;</span> ref.<span class="hljs-property">name</span>), [<span class="hljs-string">&#x27;a/b&#x27;</span>]);
+        assert.<span class="hljs-title function_">equal</span>(p.<span class="hljs-property">delegated</span>[<span class="hljs-number">0</span>].<span class="hljs-property">token</span>.<span class="hljs-property">info</span>, (spaced ? <span class="hljs-string">&#x27;js : &#x27;</span> : <span class="hljs-string">&#x27;js: &#x27;</span>) + <span class="hljs-string">&#x27;<span class="literate-tag-name">&lt;&lt;highlighted&gt;&gt;</span>=&#x27;</span>);
+        assert.<span class="hljs-title function_">equal</span>(env.<span class="hljs-property">gstate</span>.<span class="hljs-property">tokens</span>[<span class="hljs-number">0</span>].<span class="hljs-property">content</span>, generated.<span class="hljs-property">publication</span>.<span class="hljs-property">contributions</span>[<span class="hljs-number">0</span>].<span class="hljs-property">content</span>);
+    } <span class="hljs-keyword">finally</span> { p.<span class="hljs-title function_">dispose</span>(); }
+});
+}
+</code></pre>
+
+</div>
+</div><p>The compact-header branch is an explicit known-bug assertion, not an optional
+highlighting check. Removing highlighting from either supported path, or silently
+changing the compact-header behavior, requires revisiting this boundary.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication screen highlighting assertions&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">if</span> (format === <span class="hljs-string">&#x27;html&#x27;</span> || spaced) {
+    assert.<span class="hljs-title function_">match</span>(code, <span class="hljs-regexp">/class=&quot;hljs-keyword&quot;/</span>);
+    assert.<span class="hljs-title function_">match</span>(code, <span class="hljs-regexp">/class=&quot;hljs-string&quot;/</span>);
+    assert.<span class="hljs-title function_">doesNotMatch</span>(code, <span class="hljs-regexp">/quiet comment/</span>);
+} <span class="hljs-keyword">else</span> {
+    assert.<span class="hljs-title function_">doesNotMatch</span>(code, <span class="hljs-regexp">/class=&quot;hljs-/</span>);
+    assert.<span class="hljs-title function_">match</span>(code, <span class="hljs-regexp">/quiet comment/</span>);
+    assert.<span class="hljs-title function_">match</span>(code, <span class="hljs-regexp">/class=&quot;language-js:&quot;/</span>);
+}
+assert.<span class="hljs-title function_">ok</span>(code.<span class="hljs-title function_">includes</span>(<span class="hljs-built_in">escape</span>(<span class="hljs-string">&#x27;&lt;a href=x&gt;&#x27;</span>)));
+assert.<span class="hljs-title function_">doesNotMatch</span>(code, <span class="hljs-regexp">/&lt;a\b/</span>);
+<span class="hljs-keyword">const</span> tags = [...code.<span class="hljs-title function_">matchAll</span>(<span class="hljs-regexp">/&lt;span class=&quot;literate-tag-name&quot;&gt;([^]*?)&lt;\/span&gt;/g</span>)];
+assert.<span class="hljs-title function_">deepEqual</span>(tags.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">match</span> =&gt;</span> <span class="hljs-title function_">textContent</span>(match[<span class="hljs-number">1</span>])), [<span class="hljs-string">&#x27;<span class="literate-tag-name">&lt;&lt;a/b&gt;&gt;</span>&#x27;</span>, <span class="hljs-string">&#x27;<span class="literate-tag-name">&lt;&lt;literal&gt;&gt;</span>&#x27;</span>]);
+</code></pre>
+
+</div>
+</div><h2>Follow the same targets through real Pandoc</h2>
+<p>Decode emitted LaTeX destinations rather than recomputing IDs with the production
+encoder. Every family/contribution must have exactly one label; reference macros
+must target precisely the three semantic occurrences, never the escaped lookalike.
+The renderer creates reference commands before highlighting; screen decoration is
+not an input to that process. Pandoc and the CLI adapter are real in this opt-in test.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication screen latex mapping&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">logicalTarget</span>(<span class="hljs-params">encoded: <span class="hljs-built_in">string</span></span>): <span class="hljs-built_in">string</span> {
+    assert.<span class="hljs-title function_">match</span>(encoded, <span class="hljs-regexp">/^lit-(?:[0-9a-f]{4})+$/</span>);
+    <span class="hljs-keyword">return</span> encoded.<span class="hljs-title function_">slice</span>(<span class="hljs-number">4</span>).<span class="hljs-title function_">match</span>(<span class="hljs-regexp">/.{4}/g</span>)!.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">unit</span> =&gt;</span> <span class="hljs-title class_">String</span>.<span class="hljs-title function_">fromCharCode</span>(<span class="hljs-built_in">parseInt</span>(unit, <span class="hljs-number">16</span>))).<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;&#x27;</span>);
+}
+</code></pre>
+
+</div>
+</div><p>The normal headless suite still needs no external tools. The full real-Pandoc
+validation enables this check alongside existing process lifecycle tests.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication screen latex test&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [name, inputs, count] <span class="hljs-keyword">of</span> [[<span class="hljs-string">&#x27;plain&#x27;</span>, <span class="hljs-title function_">documents</span>(), <span class="hljs-number">3</span>], [<span class="hljs-string">&#x27;highlighted&#x27;</span>, <span class="hljs-title function_">highlightedDocuments</span>(), <span class="hljs-number">1</span>]] <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span>) {
+<span class="hljs-title function_">test</span>(<span class="hljs-string">`real Pandoc LaTeX labels and reference macros map <span class="hljs-subst">${name}</span> screens to shared targets`</span>,
+    { <span class="hljs-attr">skip</span>: process.<span class="hljs-property">env</span>.<span class="hljs-property">LITERATE_TEST_PANDOC</span> !== <span class="hljs-string">&#x27;1&#x27;</span> }, <span class="hljs-keyword">async</span> () =&gt; {
+        <span class="hljs-keyword">const</span> parsed = <span class="hljs-title function_">parseProject</span>([...inputs]);
+        <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">await</span> <span class="hljs-title function_">renderLatex</span>(parsed, {}, runPandoc);
+        assert.<span class="hljs-title function_">deepEqual</span>(result.<span class="hljs-property">diagnostics</span>, []);
+        assert.<span class="hljs-title function_">ok</span>(result.<span class="hljs-property">latex</span>);
+        <span class="hljs-keyword">const</span> labels = [...result.<span class="hljs-property">latex</span>.<span class="hljs-title function_">matchAll</span>(<span class="hljs-regexp">/\\label\{(lit-[0-9a-f]+)\}/g</span>)].<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">match</span> =&gt;</span> <span class="hljs-title function_">logicalTarget</span>(match[<span class="hljs-number">1</span>]));
+        <span class="hljs-keyword">const</span> targets = [...parsed.<span class="hljs-property">publication</span>.<span class="hljs-property">fragments</span>, ...parsed.<span class="hljs-property">publication</span>.<span class="hljs-property">contributions</span>].<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">value</span> =&gt;</span> value.<span class="hljs-property">target</span>);
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> target <span class="hljs-keyword">of</span> targets) { assert.<span class="hljs-title function_">equal</span>(labels.<span class="hljs-title function_">filter</span>(<span class="hljs-function"><span class="hljs-params">label</span> =&gt;</span> label === target).<span class="hljs-property">length</span>, <span class="hljs-number">1</span>, target); }
+        <span class="hljs-keyword">const</span> commands = [...result.<span class="hljs-property">latex</span>.<span class="hljs-title function_">matchAll</span>(<span class="hljs-regexp">/\\newcommand\{\\LitReference[A-Z]+\}[^\n]+/g</span>)];
+        assert.<span class="hljs-title function_">equal</span>(commands.<span class="hljs-property">length</span>, count);
+        <span class="hljs-keyword">const</span> destinations = commands.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">command</span> =&gt;</span> {
+            <span class="hljs-keyword">const</span> link = command[<span class="hljs-number">0</span>].<span class="hljs-title function_">match</span>(<span class="hljs-regexp">/\\hyperref\[(lit-[0-9a-f]+)\]/</span>)!;
+            assert.<span class="hljs-title function_">ok</span>(link);
+            assert.<span class="hljs-title function_">ok</span>(command[<span class="hljs-number">0</span>].<span class="hljs-title function_">includes</span>(<span class="hljs-string">`\\pageref*{<span class="hljs-subst">${link[<span class="hljs-number">1</span>]}</span>}`</span>));
+            <span class="hljs-keyword">return</span> <span class="hljs-title function_">logicalTarget</span>(link[<span class="hljs-number">1</span>]);
+        });
+        assert.<span class="hljs-title function_">deepEqual</span>(destinations, <span class="hljs-title function_">references</span>(parsed.<span class="hljs-property">publication</span>).<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">ref</span> =&gt;</span> {
+            assert.<span class="hljs-title function_">equal</span>(ref.<span class="hljs-property">resolution</span>.<span class="hljs-property">kind</span>, <span class="hljs-string">&#x27;resolved&#x27;</span>);
+            <span class="hljs-keyword">return</span> ref.<span class="hljs-property">resolution</span>.<span class="hljs-property">kind</span> === <span class="hljs-string">&#x27;resolved&#x27;</span> ? ref.<span class="hljs-property">resolution</span>.<span class="hljs-property">target</span> : assert.<span class="hljs-title function_">fail</span>(<span class="hljs-string">&#x27;unresolved&#x27;</span>);
+        }));
+    });
+}
+</code></pre>
+
+</div>
+</div></div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

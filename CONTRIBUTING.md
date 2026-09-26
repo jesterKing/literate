@@ -18,7 +18,10 @@ The authoritative implementations are in `literate/*.literate`.
 `src/self-hosting.ts`, `src/symbols.ts`, `src/themes.ts`, `src/output-transactions.ts`,
 and `src/mermaid-preview.js` are generated;
 commit them together with their literate sources and rendered HTML.
-Tests and configuration remain ordinary files. Interleave prose with focused
+Many publication tests are also generated from their owning `.literate` chapters;
+`literate/publication-screen.literate` owns the HTML/preview/publication integration
+tests. Edit those chapters rather than their generated test files. Other tests and
+configuration remain ordinary files. Interleave prose with focused
 fragments: at most one function per fragment where practical, splitting larger
 functions into named steps. Aim for roughly 10–25 lines per code block; review
 blocks approaching 30 lines for a useful conceptual split. This applies to data
@@ -104,8 +107,112 @@ accented Latin in prose. Long unbreakable **inline prose code** can still overru
 PDF copying is not source-lossless. The harness does not test every palette,
 font, supported geometry, maximum-length heading at every page position, or a
 reference taller than a page. The repository's Mermaid-containing full book is
-still explicitly unsupported by LaTeX export; HTML/preview publication-target
-integration and final milestone sign-off are separate work.
+still explicitly unsupported by LaTeX export. The screen integration boundary and
+M1 acceptance assessment below do not broaden this PDF fixture's guarantees.
+
+## M1 acceptance review
+
+M1 is complete **for the documented supported-subset CLI LaTeX export**, not a
+universal book/layout or screen-parity guarantee. Work items 1–7 supply the shared
+parsed model/identity policy, controlled Pandoc bridge, styled book renderer,
+page references, geometry and transactional portable font companions. Work item 8
+is covered by the integration chapter described below; dependencies, commands,
+errors and limits are documented here and in README (work item 9). No whole-screen
+migration, automatic PDF compilation, extension export action or Mermaid support
+is included in this sign-off.
+
+Acceptance criteria, with their evidence and bounds:
+
+1. **Definitions, multiple additions, repeated/cross-chapter references:** the
+   publication/model and LaTeX tests cover logical destinations and navigation.
+   The portable A4/A5 fixture checks 95 semantic labels and 13 visible linked page
+   numbers in each PDF, including the base and two additions.
+2. **Escaped tags and highlighter safety:** semantic ranges are bound before
+   highlighting; emitter shape/version/reconstruction checks prevent highlight
+   output from inventing references. Literal/TeX-safety tests and real-Pandoc
+   integration check that only genuine uses produce reference commands. This
+   criterion holds for publication, **not visual screen decoration**: the latter
+   still decorates escaped tags and is explicitly recorded as an M2 gap.
+3. **Unicode, metacharacters, long names, inline positions, indentation and blank
+   lines:** automated source/rendering tests plus PDF fixture checks cover these
+   cases. Unicode remains font-dependent (Greek is tested in Lilex code, not
+   unsupported Latin Modern prose); ligature-enabled copying is not lossless.
+   Names beyond 512 code points are rejected, not claimed to fit.
+4. **Paper/margin changes update pagination:** A4/20mm and A5/asymmetric margins
+   produce 11 and 15 pages; the shared definition moves from page 2 to 3 and the
+   final addition from page 11 to 15, with automatically updated page links.
+5. **Successful compilation has no unresolved references, clipped fixture code
+   or orphaned fragment headings:** final fixture logs are clean; destination,
+   bounding-box and 36 heading-boundary checks pass. The 140-line contribution
+   spans four pages in each layout. This is bounded fixture acceptance with
+   sampled visual review, not proof for every heading/page arrangement, reference
+   taller than a page, or unbreakable prose inline-code token.
+6. **Tangling and self-hosting:** no tangling/runtime implementation changes are
+   needed for this final integration slice. A byte-exact source-output oracle,
+   existing engine regressions, full tests and `check:self` protect generation.
+   New tests and chapter HTML are regenerated from the authoritative book.
+7. **No TeX dependency during export:** the production converter invokes Pandoc
+   only; LaTeX generation and headless tests run without invoking a TeX engine.
+   PDF compilation belongs solely to the explicit developer harness/commands.
+8. **Failure preservation and portable output:** CLI/font/transaction regressions
+   cover diagnostics, process failures, protected paths, staging and rollback.
+   The PDF harness relocates unmodified TeX and font/license bytes and verifies
+   unchanged re-export. Packages still need installation; this host's disclosed
+   local `ulem` workaround is not a shipped companion. Images, tables, raw author
+   tokens and Mermaid fail explicitly rather than being silently omitted.
+
+No further M1 task is identified within those bounds. Universal Unicode/layout
+acceptance and clean-machine compilation without prerequisites remain unproven,
+not implicitly accepted. Supported assets currently mean explicit font/license
+companions; general publication images/diagrams remain later work. A complete
+term/index or note-column layout is not implemented; a separate note-font role
+reserves styling without claiming those features.
+
+### Screen integration regression
+
+`literate/publication-screen.literate` tangles
+`src/test/headless/publication-screen.test.ts`. It calls `generateProject` for
+HTML and `activate(...).extendMarkdownIt(...)` for preview, using the existing VS
+Code API fixture and actual Markdown-it/highlight.js rendering. It checks
+independent expected labels, bodies, source-token maps, chapter order, additions,
+repeated/collision-distinct references, unchanged tangling and identity stability
+across prose shifts. Opt-in cases use `renderLatex` with the real `runPandoc`
+adapter and decode emitted LaTeX labels/reference destinations back to logical IDs.
+Neither a fake renderer nor equality of two publication snapshots substitutes for
+rendered-output assertions.
+
+The mapping is canonical document + contribution token index → emitted fragment
+block → contribution target → family target. Screens currently have **no fragment
+IDs or links**, so this is a source/model correspondence, not clickable target
+parity. Tests also expose literal-tag decoration and the compact `js:` delegated
+language discrepancy. M2 must replace these explicit boundary assertions when
+adding semantic links and normalizing host language info. The plugin test does
+not run a VS Code host, test browser clicks, or prove full editor synchronization.
+
+Reproduce the focused and full gates (the latter includes real Pandoc lifecycle
+deadlines and generated-file checks):
+
+```sh
+yarn generate
+yarn compile
+LITERATE_TEST_PANDOC=1 node --test out/test/headless/publication-screen.test.js
+LITERATE_TEST_PANDOC=1 LITERATE_TEST_PANDOC_LIFECYCLE=1 yarn test
+yarn check:self
+yarn esbuild
+yarn check:generated
+git diff --check
+```
+
+Portable PDF acceptance is a separate, opt-in `yarn test:publication` run as
+specified above; do not describe a headless-suite pass as a fresh PDF build.
+
+The 2026-09-26 integration sign-off ran all seven new integration cases and the
+full real-Pandoc/lifecycle suite: **771 passed, zero failures or skips**. Self-host
+layout/typecheck/bundle/fixedpoint, extension/preview bundles, generated checks and
+whitespace checks passed. A fresh portable acceptance run also passed both A4/A5
+fixtures with the counts above and clean final logs, using the explicitly supplied
+local font manifest and disclosed `ulem` workaround. No new visual inspection or
+clean-machine/font-independent compilation is claimed by this run.
 
 ## Line endings across platforms
 

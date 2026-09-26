@@ -349,6 +349,43 @@ export. The repository's own book currently contains Mermaid diagrams, so it is
 not yet a supported whole-book export. Missing tools, conversion failures, and
 publication diagnostics leave existing output untouched.
 
+### M1 scope and screen compatibility
+
+The first publication milestone provides explicit CLI export of the supported
+prose/fragment subset to a portable LaTeX book, with optional licensed font
+companions. It does **not** promise export of this entire Mermaid-containing
+repository or compilation on a machine without the documented fonts/packages.
+See the [criterion-by-criterion acceptance review](CONTRIBUTING.md#m1-acceptance-review)
+for evidence and remaining limitations.
+
+Fragment families have collision-safe `f-` targets; individual accepted definitions
+and additions have distinct `c-` targets. IDs encode exact names as fixed-width
+UTF-16 hex, with canonical document path and a one-based per-family/document
+ordinal for contributions. Prose shifts and unrelated insertions preserve them;
+renames, moves and insertions into the same family can change contribution IDs.
+These are logical identities, not user-editable slugs. LaTeX destination names
+encode the logical target again with a `lit-` prefix.
+
+**HTML and VS Code preview have no fragment destination IDs or fragment-use links
+yet.** The integration test maps each emitted fragment block through its document
+and source token to the shared contribution/family; it does not claim matching
+screen anchor strings. It exercises generated HTML and the actual activated
+`extendMarkdownIt` hook with a real Markdown-it/highlight.js host renderer.
+Full accessible links, common destinations and contribution navigation remain M2.
+
+Two legacy screen differences are explicitly tested, not hidden by that mapping:
+
+- Escaped literal tags are still visually decorated like uses, but create no
+  publication references. Screen decoration is not semantic resolution.
+- Preview delegates the original fence info to the host. With highlight.js,
+  `js : <<name>>=` highlights as JavaScript, while compact `js: <<name>>=` supplies
+  the unrecognized language `js:` and leaves comments visible. Generated HTML
+  and LaTeX recognize both forms. Actual preview highlighting also depends on the
+  host renderer; the headless integration test is not a VS Code browser test.
+
+These findings reinforce M2's planned semantic screen rendering and normalized
+host-language boundary; M1 does not silently migrate screen output.
+
 Development validation: `LITERATE_TEST_PANDOC=1 yarn test` enables real Pandoc
 integration tests. Add `LITERATE_TEST_PANDOC_LIFECYCLE=1` to exercise both
 30-second converter deadlines on POSIX; ordinary tests skip these slow cases.
