@@ -70,6 +70,23 @@ test('LaTeX links full hanging names, distinct contribution labels and navigatio
     assert.doesNotMatch(latex, /\\parbox/);
 });
 
+test('LaTeX moves document anchors after opening headings without mutating parsed input', async () => {
+    const project = parse('# Chapter\n\nText');
+    const before = JSON.stringify(project);
+    const result = await renderLatex(project, {}, async document => {
+        const block = document.blocks[0];
+        assert.equal(block.t, 'Div');
+        if (block.t !== 'Div') { throw new Error('Expected document Div'); }
+        assert.equal(block.c[0][0], '');
+        assert.equal(block.c[1][0].t, 'Header');
+        assert.deepEqual(block.c[1][1], { t: 'RawBlock', c: ['latex',
+            '\\phantomsection\\label{d-0062006f006f006b002e006c0069007400650072006100740065}'] });
+        return raw(document.blocks);
+    });
+    assert.deepEqual(result.diagnostics, []);
+    assert.equal(JSON.stringify(project), before);
+});
+
 test('LaTeX keeps TeX-looking code as data and escaped openers literal', async () => {
     const project = parse(fence('safe', '\\end{Verbatim} % # $ & _ ^ ~ { }\n\\<<not a reference>>'));
     const result = await renderLatex(project, {}, convert);
@@ -322,6 +339,9 @@ test('LaTeX supports real Pandoc prose, ordinary code and nested contribution co
             const converted = spawnSync('pandoc', ['-f', 'json', '-t', 'latex', '--no-highlight',
                 '--top-level-division=chapter'], { input: JSON.stringify(document), encoding: 'utf8', timeout: 10000 });
             assert.equal(converted.status, 0, converted.stderr);
+            const heading = converted.stdout.indexOf(String.raw`\chapter{Heading}`);
+            const destination = converted.stdout.indexOf(String.raw`\label{d-`);
+            assert.ok(heading >= 0 && destination > heading);
             return converted.stdout;
         });
         assert.deepEqual(result.diagnostics, []);

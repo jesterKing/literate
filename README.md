@@ -352,6 +352,11 @@ publication diagnostics leave existing output untouched.
 Development validation: `LITERATE_TEST_PANDOC=1 yarn test` enables real Pandoc
 integration tests. Add `LITERATE_TEST_PANDOC_LIFECYCLE=1` to exercise both
 30-second converter deadlines on POSIX; ordinary tests skip these slow cases.
+For opt-in real A4/A5 portable PDF acceptance, use `yarn test:publication
+--font-manifest /path/to/font-project/fonts.json`; see
+[the acceptance workflow and its limits](CONTRIBUTING.md#opt-in-portable-publication-acceptance).
+It checks relocated, unmodified CLI exports and requires caller-supplied licensed
+fonts, LuaLaTeX/latexmk and Poppler. It is not part of the normal test suite.
 
 ## Output transactions and recovery
 

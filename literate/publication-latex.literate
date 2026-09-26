@@ -488,8 +488,25 @@ function referencePrefixEnd(text: string, cursor: number, start: number): number
 Ordinary fenced and indented code is literal data, never fragment syntax. Render
 it ourselves before conversion: even with highlighting disabled, Pandoc switches
 to unsupported highlighting macros when code contains a verbatim terminator.
-The walker replaces only CodeBlock leaves, retaining prose, inline code and their
-containers. No opener unescaping or semantic reference/highlight adapter runs here.
+The walker retains prose, inline code and their containers. No opener unescaping
+or semantic reference/highlight adapter runs here. Document destinations need one
+LaTeX-specific adjustment: Pandoc places a Div anchor before its opening chapter,
+so the chapter's page break can strand a whole-document link on the preceding
+page. Move that anchor just after an opening heading, retaining both stable IDs.
+Empty documents and documents starting with prose keep their original Div anchor.
+
+```ts : <<publication LaTeX code>>=+
+function documentAnchor(block: Extract<PandocBlock, { t: 'Div' }>, theme: LiterateTheme): PandocBlock {
+    const [attributes, contents] = block.c;
+    const children = ordinaryCode(contents, theme);
+    if (/^d-(?:[0-9a-f]{4})+$/.test(attributes[0]) && children[0]?.t === 'Header') {
+        children.splice(1, 0, { t: 'RawBlock',
+            c: ['latex', `\\phantomsection\\label{${attributes[0]}}`] });
+        return { t: 'Div', c: [['', attributes[1], attributes[2]], children] };
+    }
+    return { t: 'Div', c: [attributes, children] };
+}
+```
 
 ```ts : <<publication LaTeX code>>=+
 function ordinaryCode(blocks: PandocBlock[], theme: LiterateTheme): PandocBlock[] {
@@ -501,7 +518,7 @@ function ordinaryCode(blocks: PandocBlock[], theme: LiterateTheme): PandocBlock[
                     spans: text ? [{ start: 0, end: text.length, scope: '' }] : [] };
                 return { t: 'RawBlock', c: ['latex', literal(data, 0, text.length, theme)] };
             }
-            case 'Div': return { ...block, c: [block.c[0], ordinaryCode(block.c[1], theme)] };
+            case 'Div': return documentAnchor(block, theme);
             case 'BlockQuote': return { ...block, c: ordinaryCode(block.c, theme) };
             case 'BulletList': return { ...block, c: block.c.map(item => ordinaryCode(item, theme)) };
             case 'OrderedList': return { ...block,

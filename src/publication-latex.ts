@@ -276,6 +276,16 @@ function mergeStyles(data: Highlighted, theme: LiterateTheme): void {
     }
     data.spans = merged;
 }
+function documentAnchor(block: Extract<PandocBlock, { t: 'Div' }>, theme: LiterateTheme): PandocBlock {
+    const [attributes, contents] = block.c;
+    const children = ordinaryCode(contents, theme);
+    if (/^d-(?:[0-9a-f]{4})+$/.test(attributes[0]) && children[0]?.t === 'Header') {
+        children.splice(1, 0, { t: 'RawBlock',
+            c: ['latex', `\\phantomsection\\label{${attributes[0]}}`] });
+        return { t: 'Div', c: [['', attributes[1], attributes[2]], children] };
+    }
+    return { t: 'Div', c: [attributes, children] };
+}
 function ordinaryCode(blocks: PandocBlock[], theme: LiterateTheme): PandocBlock[] {
     return blocks.map(block => {
         switch (block.t) {
@@ -285,7 +295,7 @@ function ordinaryCode(blocks: PandocBlock[], theme: LiterateTheme): PandocBlock[
                     spans: text ? [{ start: 0, end: text.length, scope: '' }] : [] };
                 return { t: 'RawBlock', c: ['latex', literal(data, 0, text.length, theme)] };
             }
-            case 'Div': return { ...block, c: [block.c[0], ordinaryCode(block.c[1], theme)] };
+            case 'Div': return documentAnchor(block, theme);
             case 'BlockQuote': return { ...block, c: ordinaryCode(block.c, theme) };
             case 'BulletList': return { ...block, c: block.c.map(item => ordinaryCode(item, theme)) };
             case 'OrderedList': return { ...block,

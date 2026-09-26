@@ -654,9 +654,29 @@ the reference still uses the common 1.5em hanging display indent.</p>
 </div><p>Ordinary fenced and indented code is literal data, never fragment syntax. Render
 it ourselves before conversion: even with highlighting disabled, Pandoc switches
 to unsupported highlighting macros when code contains a verbatim terminator.
-The walker replaces only CodeBlock leaves, retaining prose, inline code and their
-containers. No opener unescaping or semantic reference/highlight adapter runs here.</p>
+The walker retains prose, inline code and their containers. No opener unescaping
+or semantic reference/highlight adapter runs here. Document destinations need one
+LaTeX-specific adjustment: Pandoc places a Div anchor before its opening chapter,
+so the chapter's page break can strand a whole-document link on the preceding
+page. Move that anchor just after an opening heading, retaining both stable IDs.
+Empty documents and documents starting with prose keep their original Div anchor.</p>
 <div class="codefragment">
+<div class="fragmentname">&lt;&lt;publication LaTeX code&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">documentAnchor</span>(<span class="hljs-params">block: Extract&lt;PandocBlock, { t: <span class="hljs-string">&#x27;Div&#x27;</span> }&gt;, theme: LiterateTheme</span>): <span class="hljs-title class_">PandocBlock</span> {
+    <span class="hljs-keyword">const</span> [attributes, contents] = block.<span class="hljs-property">c</span>;
+    <span class="hljs-keyword">const</span> children = <span class="hljs-title function_">ordinaryCode</span>(contents, theme);
+    <span class="hljs-keyword">if</span> (<span class="hljs-regexp">/^d-(?:[0-9a-f]{4})+$/</span>.<span class="hljs-title function_">test</span>(attributes[<span class="hljs-number">0</span>]) &amp;&amp; children[<span class="hljs-number">0</span>]?.<span class="hljs-property">t</span> === <span class="hljs-string">&#x27;Header&#x27;</span>) {
+        children.<span class="hljs-title function_">splice</span>(<span class="hljs-number">1</span>, <span class="hljs-number">0</span>, { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;RawBlock&#x27;</span>,
+            <span class="hljs-attr">c</span>: [<span class="hljs-string">&#x27;latex&#x27;</span>, <span class="hljs-string">`\\phantomsection\\label{<span class="hljs-subst">${attributes[<span class="hljs-number">0</span>]}</span>}`</span>] });
+        <span class="hljs-keyword">return</span> { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Div&#x27;</span>, <span class="hljs-attr">c</span>: [[<span class="hljs-string">&#x27;&#x27;</span>, attributes[<span class="hljs-number">1</span>], attributes[<span class="hljs-number">2</span>]], children] };
+    }
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;Div&#x27;</span>, <span class="hljs-attr">c</span>: [attributes, children] };
+}
+</code></pre>
+
+</div>
+</div><div class="codefragment">
 <div class="fragmentname">&lt;&lt;publication LaTeX code&gt;&gt;=+ </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">ordinaryCode</span>(<span class="hljs-params">blocks: PandocBlock[], theme: LiterateTheme</span>): <span class="hljs-title class_">PandocBlock</span>[] {
@@ -668,7 +688,7 @@ containers. No opener unescaping or semantic reference/highlight adapter runs he
                     <span class="hljs-attr">spans</span>: text ? [{ <span class="hljs-attr">start</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">end</span>: text.<span class="hljs-property">length</span>, <span class="hljs-attr">scope</span>: <span class="hljs-string">&#x27;&#x27;</span> }] : [] };
                 <span class="hljs-keyword">return</span> { <span class="hljs-attr">t</span>: <span class="hljs-string">&#x27;RawBlock&#x27;</span>, <span class="hljs-attr">c</span>: [<span class="hljs-string">&#x27;latex&#x27;</span>, <span class="hljs-title function_">literal</span>(data, <span class="hljs-number">0</span>, text.<span class="hljs-property">length</span>, theme)] };
             }
-            <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;Div&#x27;</span>: <span class="hljs-keyword">return</span> { ...block, <span class="hljs-attr">c</span>: [block.<span class="hljs-property">c</span>[<span class="hljs-number">0</span>], <span class="hljs-title function_">ordinaryCode</span>(block.<span class="hljs-property">c</span>[<span class="hljs-number">1</span>], theme)] };
+            <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;Div&#x27;</span>: <span class="hljs-keyword">return</span> <span class="hljs-title function_">documentAnchor</span>(block, theme);
             <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;BlockQuote&#x27;</span>: <span class="hljs-keyword">return</span> { ...block, <span class="hljs-attr">c</span>: <span class="hljs-title function_">ordinaryCode</span>(block.<span class="hljs-property">c</span>, theme) };
             <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;BulletList&#x27;</span>: <span class="hljs-keyword">return</span> { ...block, <span class="hljs-attr">c</span>: block.<span class="hljs-property">c</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">item</span> =&gt;</span> <span class="hljs-title function_">ordinaryCode</span>(item, theme)) };
             <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;OrderedList&#x27;</span>: <span class="hljs-keyword">return</span> { ...block,
