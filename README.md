@@ -149,6 +149,57 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and the
 [development chapter](literate/development.literate) for the self-hosting workflow.
 Edit the literate chapters rather than their generated TypeScript.
 
+## Explicit LaTeX book export
+
+The CLI can export a supported literate project as a typeset book source:
+
+```sh
+yarn literate latex path/to/project --output books/book.tex --paper a4 --margin 20mm
+```
+
+Omit `path/to/project` to use the current directory. The `.tex` destination is
+relative to the selected project root; absolute paths and paths outside it are
+rejected. Paper choices are `a4`, `a5`, `letter`, and `legal`; defaults are A4 and
+20 mm uniform margins. Margins currently accept decimal millimetres only. Run
+`yarn literate latex --help` for bounds, or add `--json` for machine-readable
+results. Arguments use separate values rather than `--option=value`.
+
+Export requires **Pandoc on PATH** (tested with 3.7.0.2), but does not require or
+run a TeX engine. It writes only the requested LaTeX file, not tangled source,
+HTML, or PDF. Export is always explicit; extension activation and saves do not
+publish books. Existing source/template paths are protected, and writes use the
+same transaction/recovery mechanism as generation. Re-exporting identical content
+leaves the output unchanged. Do not run concurrent writers.
+
+The existing root `SETTINGS` `theme` selects from all 70 palettes; the default is
+`rosepine-dawn`. Fonts default to Latin Modern Roman for prose, Monofur Nerd Font
+for headings/references, and D2CodingLigature Nerd Font Propo for code. Ligatures
+remain enabled; copying code from PDF may change operators, so use original or
+tangled source for executable code. Font SETTINGS and font-file bundling are not
+yet implemented, and export does not check whether these fonts are installed.
+
+To compile later, install the named fonts and LuaLaTeX packages `fontspec`,
+`geometry`, `fvextra`, `needspace`, `xcolor`, `microtype`, `amsmath`, `amssymb`,
+`ulem`, `hyperref`, and KOMA-Script (`scrbook`), then explicitly run, for example:
+
+```sh
+latexmk -lualatex -interaction=nonstopmode -halt-on-error -no-shell-escape books/book.tex
+```
+
+Compile trusted projects only: disabling shell escape is not a complete TeX
+sandbox. No fonts or packages are downloaded by the export command.
+
+**Current limits:** Mermaid, images, tables, raw author tokens, and heading-fragment
+links produce diagnostics rather than disappearing. Whole-document links to
+included `.literate`/`.html` chapters work. Missing fragments and cycles also block
+export. The repository's own book currently contains Mermaid diagrams, so it is
+not yet a supported whole-book export. Missing tools, conversion failures, and
+publication diagnostics leave existing output untouched.
+
+Development validation: `LITERATE_TEST_PANDOC=1 yarn test` enables real Pandoc
+integration tests. Add `LITERATE_TEST_PANDOC_LIFECYCLE=1` to exercise both
+30-second converter deadlines on POSIX; ordinary tests skip these slow cases.
+
 ## Output transactions and recovery
 
 CLI and editor generation stage the entire changed batch before replacing output

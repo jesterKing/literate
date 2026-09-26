@@ -138,6 +138,8 @@ validation, and an explicit read-only or writing operation.</p>
 <span class="literate-tag-name">&lt;&lt;cli filesystem inspection&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;cli transaction IO&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;cli document discovery&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;cli Pandoc runner&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;cli LaTeX plan&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;cli command lifecycle&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;cli executable entry point&gt;&gt;</span>
 </code></pre>
@@ -152,6 +154,8 @@ execute it. To reuse a known-working build while editing generated code, invoke
 It uses the engine's parser metadata, including partial metadata on invalid input.</li>
 <li><code>generate</code> validates the whole project before writing changed source and HTML.</li>
 <li><code>check</code> compares the generation plan with disk without writing.</li>
+<li><code>latex</code> explicitly exports one LaTeX book through Pandoc, without source/HTML
+generation, TeX execution, or PDF compilation.</li>
 <li><code>self-check</code> additionally type-checks fresh generated sources and rebuilds the
 engine to verify a fixed point. It executes this repository's trusted code;
 it is not a sandbox or a command for arbitrary untrusted projects.</li>
@@ -163,10 +167,14 @@ project fails rather than passing vacuously.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;cli usage&gt;&gt;= </div>
 <div class="code">
-<pre><code><span class="hljs-keyword">const</span> commands = [<span class="hljs-string">&#x27;generate&#x27;</span>, <span class="hljs-string">&#x27;check&#x27;</span>, <span class="hljs-string">&#x27;inspect&#x27;</span>, <span class="hljs-string">&#x27;self-check&#x27;</span>];
-<span class="hljs-keyword">const</span> usage = <span class="hljs-string">&#x27;Usage: node out/cli.js generate|check|inspect|self-check [root] [--json]\n       node out/cli.js &lt;command&gt; --help [--json]\n       node out/cli.js --help [--json]\n&#x27;</span>;
+<pre><code><span class="hljs-keyword">const</span> commands = [<span class="hljs-string">&#x27;generate&#x27;</span>, <span class="hljs-string">&#x27;check&#x27;</span>, <span class="hljs-string">&#x27;inspect&#x27;</span>, <span class="hljs-string">&#x27;self-check&#x27;</span>, <span class="hljs-string">&#x27;latex&#x27;</span>];
+<span class="hljs-keyword">const</span> latexUsage = <span class="hljs-string">&#x27;latex [root] --output path.tex [--paper a4|a5|letter|legal] [--margin 20mm] [--json]&#x27;</span>;
+<span class="hljs-keyword">const</span> usage = <span class="hljs-string">&#x27;Usage: node out/cli.js generate|check|inspect|self-check [root] [--json]\n&#x27;</span>
+    + <span class="hljs-string">`       node out/cli.js <span class="hljs-subst">${latexUsage}</span>\n`</span>
+    + <span class="hljs-string">&#x27;       node out/cli.js &lt;command&gt; --help [--json]\n       node out/cli.js --help [--json]\n&#x27;</span>;
 <span class="hljs-keyword">const</span> <span class="hljs-attr">descriptions</span>: <span class="hljs-title class_">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; = <span class="hljs-title class_">Object</span>.<span class="hljs-title function_">fromEntries</span>([
     [<span class="hljs-string">&#x27;generate&#x27;</span>, <span class="hljs-string">&#x27;Write missing or changed generated files.&#x27;</span>],
+    [<span class="hljs-string">&#x27;latex&#x27;</span>, <span class="hljs-string">&#x27;Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving an 80 × 100 mm body. No TeX/PDF execution or bundled fonts.&#x27;</span>],
     [<span class="hljs-string">&#x27;check&#x27;</span>, <span class="hljs-string">&#x27;Report missing or stale generated files without writing.&#x27;</span>],
     [<span class="hljs-string">&#x27;inspect&#x27;</span>, <span class="hljs-string">&#x27;Report documents, templates, and fragment definitions and dependencies without reading outputs or writing.&#x27;</span>],
     [<span class="hljs-string">&#x27;self-check&#x27;</span>, <span class="hljs-string">&#x27;Verify this repository’s trusted self-hosting code without generating files; all outputs must already be current.&#x27;</span>]
@@ -217,8 +225,10 @@ load compiler tooling until verification is requested.</p>
 <pre><code><span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> fs <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;fs/promises&#x27;</span>;
 <span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> path <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;path&#x27;</span>;
 <span class="hljs-keyword">import</span> { randomUUID } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;crypto&#x27;</span>;
+<span class="hljs-keyword">import</span> { spawn } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;child_process&#x27;</span>;
+<span class="hljs-keyword">import</span> { renderLatex, <span class="hljs-title class_">LatexConverter</span>, <span class="hljs-title class_">LatexOptions</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./publication-latex&#x27;</span>;
 <span class="hljs-keyword">import</span> { commitOutputs, <span class="hljs-title class_">OutputTransactionError</span>, <span class="hljs-title class_">TransactionIO</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./output-transactions&#x27;</span>;
-<span class="hljs-keyword">import</span> { discoveryExcludedDirectories, generateProject, safeRelativePath, templateReferences, <span class="hljs-title class_">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./engine&#x27;</span>;
+<span class="hljs-keyword">import</span> { discoveryExcludedDirectories, generateProject, parseProject, resolveProjectTheme, safeRelativePath, templateReferences, <span class="hljs-title class_">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;./engine&#x27;</span>;
 
 </code></pre>
 
@@ -477,6 +487,156 @@ against the same project.</p>
 </code></pre>
 
 </div>
+</div><h2>Explicit LaTeX export</h2>
+<p><code>latex [root] --output books/book.tex</code> resolves the destination relative to the
+selected project root (the current directory if omitted), never relative to a
+source chapter. Absolute paths, parent traversal, and non-<code>.tex</code> destinations
+are usage errors. Options take separate values, not <code>--name=value</code>. Paper defaults
+to <code>a4</code>, margin to <code>20mm</code>. The existing root <code>index.literate</code> SETTINGS <code>theme</code> key
+selects the publication palette through <code>resolveProjectTheme</code>; invalid themes
+report its diagnostics before conversion. No new settings or theme flag are
+introduced. Decimal millimetres are the only accepted margin unit, subject to the
+renderer's page/body constraints.</p>
+<p>The renderer names installed font families: Latin Modern Roman, Monofur Nerd Font,
+and D2CodingLigature Nerd Font Propo. Export does not resolve, install, or bundle
+fonts. Those families and the template's TeX packages are dependencies for later
+compilation by the user, not prerequisites checked or installed by this command.</p>
+<h3>A bounded production converter</h3>
+<p><code>runPandoc</code> implements the injected <code>LatexConverter</code> contract. Only the fixed
+executable <code>pandoc</code> on PATH is spawned, with an argument array and no shell. JSON
+is sent on stdin; neither source nor output paths become process arguments.
+The converter produces a body, never a standalone preamble or PDF. A 30-second
+wall-clock deadline includes stdin delivery and pipe closure. Stdout is limited
+to 16 MiB and stderr to 64 KiB; exceeding either fails rather than truncating a
+successful book. Process failures occur before the transaction boundary.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli Pandoc runner&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">const</span> <span class="hljs-attr">runPandoc</span>: <span class="hljs-title class_">LatexConverter</span> = <span class="hljs-keyword">async</span> <span class="hljs-variable language_">document</span> =&gt; {
+    <span class="hljs-keyword">const</span> input = <span class="hljs-title class_">JSON</span>.<span class="hljs-title function_">stringify</span>(<span class="hljs-variable language_">document</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">string</span>&gt;(<span class="hljs-function">(<span class="hljs-params">resolve, reject</span>) =&gt;</span> {
+        <span class="hljs-keyword">const</span> child = <span class="hljs-title function_">spawn</span>(<span class="hljs-string">&#x27;pandoc&#x27;</span>, [
+            <span class="hljs-string">&#x27;--from=json&#x27;</span>, <span class="hljs-string">&#x27;--to=latex&#x27;</span>, <span class="hljs-string">&#x27;--top-level-division=chapter&#x27;</span>, <span class="hljs-string">&#x27;--no-highlight&#x27;</span>
+        ], { <span class="hljs-attr">shell</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">stdio</span>: [<span class="hljs-string">&#x27;pipe&#x27;</span>, <span class="hljs-string">&#x27;pipe&#x27;</span>, <span class="hljs-string">&#x27;pipe&#x27;</span>] });
+        <span class="hljs-keyword">const</span> <span class="hljs-attr">stdout</span>: <span class="hljs-title class_">Buffer</span>[] = [], <span class="hljs-attr">stderr</span>: <span class="hljs-title class_">Buffer</span>[] = [];
+        <span class="hljs-keyword">let</span> outputBytes = <span class="hljs-number">0</span>, errorBytes = <span class="hljs-number">0</span>;
+        <span class="hljs-keyword">let</span> settled = <span class="hljs-literal">false</span>;
+        <span class="hljs-keyword">let</span> <span class="hljs-attr">inputError</span>: <span class="hljs-title class_">Error</span> | <span class="hljs-literal">undefined</span>;
+        <span class="literate-tag-name">&lt;&lt;cli Pandoc completion&gt;&gt;</span>
+        <span class="hljs-keyword">const</span> timer = <span class="hljs-built_in">setTimeout</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title function_">complete</span>(<span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Pandoc timed out after 30000 ms&#x27;</span>)), <span class="hljs-number">30000</span>);
+        <span class="literate-tag-name">&lt;&lt;cli Pandoc streams&gt;&gt;</span>
+        <span class="literate-tag-name">&lt;&lt;cli Pandoc exit&gt;&gt;</span>
+        child.<span class="hljs-property">stdin</span>.<span class="hljs-title function_">end</span>(input);
+    });
+};
+</code></pre>
+
+</div>
+</div><p>Diagnostics retain at most 2 KiB of stderr, remove terminal escape sequences and
+control characters, and collapse whitespace for both human and JSON consumers.
+On failure, kill the direct child and close its pipes without waiting indefinitely
+for inherited descriptors. This is resource bounding, not a process sandbox.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli Pandoc completion&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> detail = (): <span class="hljs-function"><span class="hljs-params">string</span> =&gt;</span> <span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">concat</span>(stderr).<span class="hljs-title function_">toString</span>(<span class="hljs-string">&#x27;utf8&#x27;</span>).<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">2048</span>)
+    .<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\x1b\[[0-?]*[ -/]*[@-~]/g</span>, <span class="hljs-string">&#x27;&#x27;</span>)
+    .<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/[\u0000-\u001f\u007f-\u009f]/g</span>, <span class="hljs-string">&#x27; &#x27;</span>).<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\s+/g</span>, <span class="hljs-string">&#x27; &#x27;</span>).<span class="hljs-title function_">trim</span>();
+<span class="hljs-keyword">const</span> complete = (error?: <span class="hljs-title class_">Error</span>): <span class="hljs-function"><span class="hljs-params">void</span> =&gt;</span> {
+    <span class="hljs-keyword">if</span> (settled) { <span class="hljs-keyword">return</span>; }
+    settled = <span class="hljs-literal">true</span>;
+    <span class="hljs-built_in">clearTimeout</span>(timer);
+    <span class="hljs-keyword">if</span> (error) {
+        child.<span class="hljs-title function_">kill</span>(<span class="hljs-string">&#x27;SIGKILL&#x27;</span>);
+        child.<span class="hljs-property">stdin</span>.<span class="hljs-title function_">destroy</span>(); child.<span class="hljs-property">stdout</span>.<span class="hljs-title function_">destroy</span>(); child.<span class="hljs-property">stderr</span>.<span class="hljs-title function_">destroy</span>();
+        <span class="hljs-keyword">const</span> diagnostic = <span class="hljs-title function_">detail</span>();
+        <span class="hljs-title function_">reject</span>(<span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(error.<span class="hljs-property">message</span> + (diagnostic ? <span class="hljs-string">`: <span class="hljs-subst">${diagnostic}</span>`</span> : <span class="hljs-string">&#x27;&#x27;</span>)));
+    } <span class="hljs-keyword">else</span> { <span class="hljs-title function_">resolve</span>(<span class="hljs-title class_">Buffer</span>.<span class="hljs-title function_">concat</span>(stdout).<span class="hljs-title function_">toString</span>(<span class="hljs-string">&#x27;utf8&#x27;</span>)); }
+};
+</code></pre>
+
+</div>
+</div><p>Count bytes before retaining chunks. Pipe errors are handled explicitly; a stdin
+error is reported after process closure so an early Pandoc rejection can retain
+its more useful exit status and stderr. The deadline still covers a stalled child.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli Pandoc streams&gt;&gt;= </div>
+<div class="code">
+<pre><code>child.<span class="hljs-property">stdout</span>.<span class="hljs-title function_">on</span>(<span class="hljs-string">&#x27;data&#x27;</span>, <span class="hljs-function">(<span class="hljs-params">chunk: Buffer</span>) =&gt;</span> {
+    <span class="hljs-keyword">if</span> (settled) { <span class="hljs-keyword">return</span>; }
+    outputBytes += chunk.<span class="hljs-property">length</span>;
+    <span class="hljs-keyword">if</span> (outputBytes &gt; <span class="hljs-number">16</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>) { <span class="hljs-title function_">complete</span>(<span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Pandoc stdout exceeded 16 MiB&#x27;</span>)); }
+    <span class="hljs-keyword">else</span> { stdout.<span class="hljs-title function_">push</span>(chunk); }
+});
+child.<span class="hljs-property">stderr</span>.<span class="hljs-title function_">on</span>(<span class="hljs-string">&#x27;data&#x27;</span>, <span class="hljs-function">(<span class="hljs-params">chunk: Buffer</span>) =&gt;</span> {
+    <span class="hljs-keyword">if</span> (settled) { <span class="hljs-keyword">return</span>; }
+    errorBytes += chunk.<span class="hljs-property">length</span>;
+    <span class="hljs-keyword">const</span> remaining = <span class="hljs-number">64</span> * <span class="hljs-number">1024</span> - (errorBytes - chunk.<span class="hljs-property">length</span>);
+    <span class="hljs-keyword">if</span> (remaining &gt; <span class="hljs-number">0</span>) { stderr.<span class="hljs-title function_">push</span>(chunk.<span class="hljs-title function_">subarray</span>(<span class="hljs-number">0</span>, remaining)); }
+    <span class="hljs-keyword">if</span> (errorBytes &gt; <span class="hljs-number">64</span> * <span class="hljs-number">1024</span>) { <span class="hljs-title function_">complete</span>(<span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Pandoc stderr exceeded 64 KiB&#x27;</span>)); }
+});
+child.<span class="hljs-property">stdin</span>.<span class="hljs-title function_">on</span>(<span class="hljs-string">&#x27;error&#x27;</span>, <span class="hljs-function"><span class="hljs-params">error</span> =&gt;</span> { inputError = error; });
+child.<span class="hljs-property">stdout</span>.<span class="hljs-title function_">on</span>(<span class="hljs-string">&#x27;error&#x27;</span>, <span class="hljs-function"><span class="hljs-params">error</span> =&gt;</span> <span class="hljs-title function_">complete</span>(error));
+child.<span class="hljs-property">stderr</span>.<span class="hljs-title function_">on</span>(<span class="hljs-string">&#x27;error&#x27;</span>, <span class="hljs-function"><span class="hljs-params">error</span> =&gt;</span> <span class="hljs-title function_">complete</span>(error));
+</code></pre>
+
+</div>
+</div><p>Missing executables get an actionable dependency message. Nonzero exits and
+signals reject the conversion; empty successful stdout is also not a book body.
+The renderer converts these rejections into positioned publication diagnostics.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli Pandoc exit&gt;&gt;= </div>
+<div class="code">
+<pre><code>child.<span class="hljs-title function_">on</span>(<span class="hljs-string">&#x27;error&#x27;</span>, <span class="hljs-function"><span class="hljs-params">error</span> =&gt;</span> <span class="hljs-title function_">complete</span>(<span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-title function_">missing</span>(error)
+    ? <span class="hljs-string">&#x27;Pandoc was not found; install Pandoc and ensure pandoc is on PATH, then retry latex&#x27;</span>
+    : <span class="hljs-string">`Unable to run Pandoc: <span class="hljs-subst">${error.message}</span>`</span>)));
+child.<span class="hljs-title function_">on</span>(<span class="hljs-string">&#x27;close&#x27;</span>, <span class="hljs-function">(<span class="hljs-params">code, signal</span>) =&gt;</span> {
+    <span class="hljs-keyword">if</span> (code !== <span class="hljs-number">0</span>) { <span class="hljs-title function_">complete</span>(<span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Pandoc failed (<span class="hljs-subst">${signal ? <span class="hljs-string">&#x27;signal &#x27;</span> + signal : <span class="hljs-string">&#x27;exit &#x27;</span> + code}</span>)`</span>)); }
+    <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (inputError) { <span class="hljs-title function_">complete</span>(<span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`Pandoc stdin failed: <span class="hljs-subst">${inputError.message}</span>`</span>)); }
+    <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (!outputBytes) { <span class="hljs-title function_">complete</span>(<span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;Pandoc returned an empty LaTeX body&#x27;</span>)); }
+    <span class="hljs-keyword">else</span> { <span class="hljs-title function_">complete</span>(); }
+});
+</code></pre>
+
+</div>
+</div><h3>Protect inputs before conversion</h3>
+<p>Use the discovered snapshots and <code>parseProject</code>, not source expansion or HTML
+rendering. Protect every discovered document and every declared template path,
+including missing templates, not only chapters selected for publication. Compare
+case-insensitively and reject equality and ancestor collisions in both directions.
+Filesystem inspection additionally rejects links and non-file destinations. The
+single complete book then joins the existing byte comparison and transaction flow;
+preparation/conversion failures never create output directories or staged files.
+Transaction failures retain the recovery/committed-cleanup semantics above.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli LaTeX plan&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">planLatex</span>(<span class="hljs-params">root: <span class="hljs-built_in">string</span>, documents: SourceDocument[], output: <span class="hljs-built_in">string</span>,
+    options: LatexOptions, convert: LatexConverter</span>): <span class="hljs-title class_">Promise</span>&lt;{
+        <span class="hljs-attr">files</span>: <span class="hljs-title class_">Generation</span>[<span class="hljs-string">&#x27;files&#x27;</span>]; <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">Generation</span>[<span class="hljs-string">&#x27;diagnostics&#x27;</span>];
+        inspection?: <span class="hljs-title class_">Generation</span>[<span class="hljs-string">&#x27;inspection&#x27;</span>];
+    }&gt; {
+    <span class="hljs-keyword">const</span> theme = <span class="hljs-title function_">resolveProjectTheme</span>(documents);
+    <span class="hljs-keyword">if</span> (theme.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">files</span>: [], <span class="hljs-attr">diagnostics</span>: theme.<span class="hljs-property">diagnostics</span> }; }
+    <span class="hljs-keyword">const</span> target = output.<span class="hljs-title function_">toLowerCase</span>();
+    <span class="hljs-keyword">const</span> inputs = [...documents.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">document</span> =&gt;</span> <span class="hljs-variable language_">document</span>.<span class="hljs-property">path</span>), ...<span class="hljs-title function_">templateReferences</span>(documents)];
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> input <span class="hljs-keyword">of</span> inputs) {
+        <span class="hljs-keyword">const</span> source = <span class="hljs-title function_">relative</span>(input).<span class="hljs-title function_">toLowerCase</span>();
+        <span class="hljs-keyword">if</span> (target === source || target.<span class="hljs-title function_">startsWith</span>(source + <span class="hljs-string">&#x27;/&#x27;</span>) || source.<span class="hljs-title function_">startsWith</span>(target + <span class="hljs-string">&#x27;/&#x27;</span>)) {
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">`LaTeX output conflicts with input: <span class="hljs-subst">${input}</span>`</span>);
+        }
+    }
+    <span class="hljs-keyword">await</span> <span class="hljs-title function_">inspect</span>(root, output);
+    <span class="hljs-keyword">const</span> rendered = <span class="hljs-keyword">await</span> <span class="hljs-title function_">renderLatex</span>(<span class="hljs-title function_">parseProject</span>(documents), { ...options, <span class="hljs-attr">theme</span>: theme.<span class="hljs-property">name</span> }, convert);
+    <span class="hljs-keyword">if</span> (!rendered.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span> &amp;&amp; rendered.<span class="hljs-property">latex</span> === <span class="hljs-literal">undefined</span>) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Error</span>(<span class="hljs-string">&#x27;LaTeX renderer returned no document&#x27;</span>);
+    }
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">diagnostics</span>: rendered.<span class="hljs-property">diagnostics</span>, <span class="hljs-attr">files</span>: rendered.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span> ? []
+        : [{ <span class="hljs-attr">path</span>: output, <span class="hljs-attr">content</span>: rendered.<span class="hljs-property">latex</span>! }] };
+}
+</code></pre>
+
+</div>
 </div><h2>The command lifecycle</h2>
 <p>The orchestration keeps the write boundary visible. Argument errors and help
 return before reading the project; inspection returns before touching output
@@ -486,7 +646,8 @@ sets the exit status and emits a JSON response exactly once.</p>
 <div class="fragmentname">&lt;&lt;cli command lifecycle&gt;&gt;= </div>
 <div class="code">
 <pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">run</span>(<span class="hljs-params">args: <span class="hljs-built_in">string</span>[], io: CliIO = defaultIO,
-    transactionIO: (root: <span class="hljs-built_in">string</span>) =&gt; TransactionIO = createTransactionIO</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">number</span>&gt; {
+    transactionIO: (root: <span class="hljs-built_in">string</span>) =&gt; TransactionIO = createTransactionIO,
+    convert: LatexConverter = runPandoc</span>): <span class="hljs-title class_">Promise</span>&lt;<span class="hljs-built_in">number</span>&gt; {
     <span class="literate-tag-name">&lt;&lt;cli response setup&gt;&gt;</span>
     <span class="literate-tag-name">&lt;&lt;cli argument parsing&gt;&gt;</span>
     <span class="literate-tag-name">&lt;&lt;cli argument validation and help&gt;&gt;</span>
@@ -518,6 +679,9 @@ is added only after that stage runs.</p>
 <pre><code><span class="hljs-keyword">const</span> json = args.<span class="hljs-title function_">includes</span>(<span class="hljs-string">&#x27;--json&#x27;</span>);
 <span class="hljs-keyword">const</span> <span class="hljs-attr">positional</span>: <span class="hljs-built_in">string</span>[] = [];
 <span class="hljs-keyword">const</span> flags = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
+<span class="hljs-keyword">const</span> values = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;();
+<span class="hljs-keyword">const</span> <span class="hljs-attr">latexOptions</span>: <span class="hljs-title class_">LatexOptions</span> = {};
+<span class="hljs-keyword">let</span> latexOutput = <span class="hljs-string">&#x27;&#x27;</span>;
 <span class="hljs-keyword">const</span> <span class="hljs-attr">response</span>: <span class="hljs-title class_">CliResponse</span> = {
     <span class="hljs-attr">schemaVersion</span>: <span class="hljs-number">1</span>, <span class="hljs-attr">command</span>: <span class="hljs-string">&#x27;help&#x27;</span>, <span class="hljs-attr">ok</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">diagnostics</span>: [], <span class="hljs-attr">errors</span>: [], <span class="hljs-attr">outputs</span>: []
 };
@@ -536,8 +700,15 @@ rather than silently changing which project is processed.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;cli argument parsing&gt;&gt;= </div>
 <div class="code">
-<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> arg <span class="hljs-keyword">of</span> args) {
-    <span class="hljs-keyword">if</span> (arg.<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&#x27;-&#x27;</span>)) {
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = <span class="hljs-number">0</span>; index &lt; args.<span class="hljs-property">length</span>; index++) {
+    <span class="hljs-keyword">const</span> arg = args[index];
+    <span class="hljs-keyword">if</span> ([<span class="hljs-string">&#x27;--output&#x27;</span>, <span class="hljs-string">&#x27;--paper&#x27;</span>, <span class="hljs-string">&#x27;--margin&#x27;</span>].<span class="hljs-title function_">includes</span>(arg)) {
+        <span class="hljs-keyword">if</span> (flags.<span class="hljs-title function_">has</span>(arg)) { response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">`Duplicate flag: <span class="hljs-subst">${arg}</span>`</span>); }
+        flags.<span class="hljs-title function_">add</span>(arg);
+        <span class="hljs-keyword">const</span> value = args[index + <span class="hljs-number">1</span>];
+        <span class="hljs-keyword">if</span> (!value || value.<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&#x27;-&#x27;</span>)) { response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">`Missing value for <span class="hljs-subst">${arg}</span>`</span>); }
+        <span class="hljs-keyword">else</span> { values.<span class="hljs-title function_">set</span>(arg, value); index++; }
+    } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (arg.<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&#x27;-&#x27;</span>)) {
         <span class="hljs-keyword">const</span> flag = arg === <span class="hljs-string">&#x27;-h&#x27;</span> ? <span class="hljs-string">&#x27;--help&#x27;</span> : arg;
         <span class="hljs-keyword">if</span> (![<span class="hljs-string">&#x27;--help&#x27;</span>, <span class="hljs-string">&#x27;--json&#x27;</span>].<span class="hljs-title function_">includes</span>(flag)) { response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">`Unknown flag: <span class="hljs-subst">${arg}</span>`</span>); }
         <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (flags.<span class="hljs-title function_">has</span>(flag)) { response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">`Duplicate flag: <span class="hljs-subst">${arg}</span>`</span>); }
@@ -565,6 +736,7 @@ them distinct from valid commands whose project fails validation.</p>
     (helpCommand &amp;&amp; flags.<span class="hljs-title function_">has</span>(<span class="hljs-string">&#x27;--help&#x27;</span>)) || (helpCommand &amp;&amp; topic &amp;&amp; !commands.<span class="hljs-title function_">includes</span>(topic))) {
     response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">&#x27;Invalid arguments&#x27;</span>);
 }
+<span class="literate-tag-name">&lt;&lt;cli LaTeX argument validation&gt;&gt;</span>
 <span class="hljs-keyword">if</span> (response.<span class="hljs-property">errors</span>.<span class="hljs-property">length</span>) {
     <span class="hljs-keyword">if</span> (!json) { io.<span class="hljs-title function_">stderr</span>(response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">join</span>(<span class="hljs-string">&#x27;\n&#x27;</span>) + <span class="hljs-string">&#x27;\n&#x27;</span> + usage); }
     <span class="hljs-keyword">return</span> <span class="hljs-title function_">finish</span>(<span class="hljs-number">2</span>);
@@ -572,10 +744,43 @@ them distinct from valid commands whose project fails validation.</p>
 <span class="hljs-keyword">if</span> (help) {
     response.<span class="hljs-property">command</span> = <span class="hljs-string">&#x27;help&#x27;</span>;
     response.<span class="hljs-property">usage</span> = topic
-        ? <span class="hljs-string">`Usage: node out/cli.js <span class="hljs-subst">${topic}</span> [root] [--json]\n<span class="hljs-subst">${descriptions[topic]}</span>\n`</span>
+        ? <span class="hljs-string">`Usage: node out/cli.js <span class="hljs-subst">${topic === <span class="hljs-string">&#x27;latex&#x27;</span> ? latexUsage : topic + <span class="hljs-string">&#x27; [root] [--json]&#x27;</span>}</span>\n<span class="hljs-subst">${descriptions[topic]}</span>\n`</span>
         : usage;
     <span class="hljs-keyword">if</span> (!json) { io.<span class="hljs-title function_">stdout</span>(response.<span class="hljs-property">usage</span>); }
     <span class="hljs-keyword">return</span> <span class="hljs-title function_">finish</span>(<span class="hljs-number">0</span>);
+}
+</code></pre>
+
+</div>
+</div><h3>Validate LaTeX-only options</h3>
+<p>Reject these options on other commands, even help for another command. Help for
+LaTeX does not require an output, but supplied values must still be valid. Usage
+validation happens before discovery or spawning Pandoc. A5 permits at most 34 mm
+uniform margins so the text body remains at least 80 mm wide.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;cli LaTeX argument validation&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">if</span> (topic !== <span class="hljs-string">&#x27;latex&#x27;</span> &amp;&amp; [<span class="hljs-string">&#x27;--output&#x27;</span>, <span class="hljs-string">&#x27;--paper&#x27;</span>, <span class="hljs-string">&#x27;--margin&#x27;</span>].<span class="hljs-title function_">some</span>(<span class="hljs-function"><span class="hljs-params">flag</span> =&gt;</span> flags.<span class="hljs-title function_">has</span>(flag))) {
+    response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">&#x27;--output, --paper and --margin are only valid for latex&#x27;</span>);
+}
+<span class="hljs-keyword">if</span> (topic === <span class="hljs-string">&#x27;latex&#x27;</span>) {
+    <span class="hljs-keyword">const</span> output = values.<span class="hljs-title function_">get</span>(<span class="hljs-string">&#x27;--output&#x27;</span>);
+    latexOutput = output ? <span class="hljs-title function_">safeRelativePath</span>(output) || <span class="hljs-string">&#x27;&#x27;</span> : <span class="hljs-string">&#x27;&#x27;</span>;
+    <span class="hljs-keyword">if</span> ((!help || output !== <span class="hljs-literal">undefined</span>) &amp;&amp; (!latexOutput || !latexOutput.<span class="hljs-title function_">endsWith</span>(<span class="hljs-string">&#x27;.tex&#x27;</span>))) {
+        response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">&#x27;latex requires --output with a safe root-relative .tex path&#x27;</span>);
+    }
+    <span class="hljs-keyword">const</span> paper = values.<span class="hljs-title function_">get</span>(<span class="hljs-string">&#x27;--paper&#x27;</span>) ?? <span class="hljs-string">&#x27;a4&#x27;</span>;
+    <span class="hljs-keyword">if</span> (![<span class="hljs-string">&#x27;a4&#x27;</span>, <span class="hljs-string">&#x27;a5&#x27;</span>, <span class="hljs-string">&#x27;letter&#x27;</span>, <span class="hljs-string">&#x27;legal&#x27;</span>].<span class="hljs-title function_">includes</span>(paper)) {
+        response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">&#x27;--paper must be a4, a5, letter or legal&#x27;</span>);
+    }
+    latexOptions.<span class="hljs-property">paper</span> = (paper === <span class="hljs-string">&#x27;a4&#x27;</span> ? <span class="hljs-string">&#x27;A4&#x27;</span> : paper === <span class="hljs-string">&#x27;a5&#x27;</span> ? <span class="hljs-string">&#x27;A5&#x27;</span> : paper) <span class="hljs-keyword">as</span> <span class="hljs-title class_">LatexOptions</span>[<span class="hljs-string">&#x27;paper&#x27;</span>];
+    <span class="hljs-keyword">const</span> margin = values.<span class="hljs-title function_">get</span>(<span class="hljs-string">&#x27;--margin&#x27;</span>) ?? <span class="hljs-string">&#x27;20mm&#x27;</span>;
+    <span class="hljs-keyword">const</span> mm = <span class="hljs-title class_">Number</span>(margin.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, -<span class="hljs-number">2</span>));
+    <span class="hljs-keyword">if</span> (!<span class="hljs-regexp">/^\d+(?:\.\d+)?mm$/</span>.<span class="hljs-title function_">test</span>(margin) || !<span class="hljs-title class_">Number</span>.<span class="hljs-built_in">isFinite</span>(mm) || mm &lt; <span class="hljs-number">5</span> || mm &gt; <span class="hljs-number">50</span> ||
+        (paper === <span class="hljs-string">&#x27;a5&#x27;</span> &amp;&amp; mm &gt; <span class="hljs-number">34</span>)) {
+        response.<span class="hljs-property">errors</span>.<span class="hljs-title function_">push</span>(<span class="hljs-string">&#x27;--margin requires numeric mm, 5–50 (at most 34 for a5)&#x27;</span>);
+    }
+    latexOptions.<span class="hljs-property">marginMm</span> = mm;
 }
 </code></pre>
 
@@ -608,7 +813,9 @@ Other commands stop on any diagnostic before examining or writing output files.<
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;cli validate and inspect project&gt;&gt;= </div>
 <div class="code">
-<pre><code><span class="hljs-keyword">const</span> result = <span class="hljs-title function_">generateProject</span>(documents, templates);
+<pre><code><span class="hljs-keyword">const</span> result = command === <span class="hljs-string">&#x27;latex&#x27;</span>
+    ? <span class="hljs-keyword">await</span> <span class="hljs-title function_">planLatex</span>(root, documents, latexOutput, latexOptions, convert)
+    : <span class="hljs-title function_">generateProject</span>(documents, templates);
 response.<span class="hljs-property">diagnostics</span> = result.<span class="hljs-property">diagnostics</span>;
 <span class="hljs-keyword">if</span> (command === <span class="hljs-string">&#x27;inspect&#x27;</span>) {
     response.<span class="hljs-property">inspection</span> = result.<span class="hljs-property">inspection</span>;

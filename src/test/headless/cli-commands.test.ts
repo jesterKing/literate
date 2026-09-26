@@ -172,7 +172,8 @@ test('self-check rejects stale outputs before executing project code and rejects
 test('CLI-only bootstrap succeeds without compiling broken extension source', t => {
     const root = fixture(t);
     const sourceRoot = path.resolve(__dirname, '../../../src');
-    for (const name of ['cli.ts', 'engine.ts', 'themes.ts', 'self-hosting.ts', 'output-transactions.ts']) {
+    for (const name of ['cli.ts', 'engine.ts', 'themes.ts', 'self-hosting.ts', 'output-transactions.ts',
+            'publication-latex.ts', 'publication-pandoc.ts', 'publication-highlight.ts']) {
         fs.copyFileSync(path.join(sourceRoot, name), path.join(root, name));
     }
     fs.writeFileSync(path.join(root, 'extension.ts'), 'this is not TypeScript');

@@ -1,8 +1,10 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
+import { spawn } from 'child_process';
+import { renderLatex, LatexConverter, LatexOptions } from './publication-latex';
 import { commitOutputs, OutputTransactionError, TransactionIO } from './output-transactions';
-import { discoveryExcludedDirectories, generateProject, safeRelativePath, templateReferences, SourceDocument } from './engine';
+import { discoveryExcludedDirectories, generateProject, parseProject, resolveProjectTheme, safeRelativePath, templateReferences, SourceDocument } from './engine';
 
 export interface CliIO {
     stdout(message: string): void;
@@ -24,10 +26,14 @@ interface CliResponse {
     usage?: string;
 }
 
-const commands = ['generate', 'check', 'inspect', 'self-check'];
-const usage = 'Usage: node out/cli.js generate|check|inspect|self-check [root] [--json]\n       node out/cli.js <command> --help [--json]\n       node out/cli.js --help [--json]\n';
+const commands = ['generate', 'check', 'inspect', 'self-check', 'latex'];
+const latexUsage = 'latex [root] --output path.tex [--paper a4|a5|letter|legal] [--margin 20mm] [--json]';
+const usage = 'Usage: node out/cli.js generate|check|inspect|self-check [root] [--json]\n'
+    + `       node out/cli.js ${latexUsage}\n`
+    + '       node out/cli.js <command> --help [--json]\n       node out/cli.js --help [--json]\n';
 const descriptions: Record<string, string> = Object.fromEntries([
     ['generate', 'Write missing or changed generated files.'],
+    ['latex', 'Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving an 80 × 100 mm body. No TeX/PDF execution or bundled fonts.'],
     ['check', 'Report missing or stale generated files without writing.'],
     ['inspect', 'Report documents, templates, and fragment definitions and dependencies without reading outputs or writing.'],
     ['self-check', 'Verify this repository’s trusted self-hosting code without generating files; all outputs must already be current.']
@@ -157,11 +163,91 @@ async function discover(root: string): Promise<SourceDocument[]> {
     return documents;
 }
 
+export const runPandoc: LatexConverter = async document => {
+    const input = JSON.stringify(document);
+    return new Promise<string>((resolve, reject) => {
+        const child = spawn('pandoc', [
+            '--from=json', '--to=latex', '--top-level-division=chapter', '--no-highlight'
+        ], { shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
+        const stdout: Buffer[] = [], stderr: Buffer[] = [];
+        let outputBytes = 0, errorBytes = 0;
+        let settled = false;
+        let inputError: Error | undefined;
+        const detail = (): string => Buffer.concat(stderr).toString('utf8').slice(0, 2048)
+            .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '')
+            .replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ').replace(/\s+/g, ' ').trim();
+        const complete = (error?: Error): void => {
+            if (settled) { return; }
+            settled = true;
+            clearTimeout(timer);
+            if (error) {
+                child.kill('SIGKILL');
+                child.stdin.destroy(); child.stdout.destroy(); child.stderr.destroy();
+                const diagnostic = detail();
+                reject(new Error(error.message + (diagnostic ? `: ${diagnostic}` : '')));
+            } else { resolve(Buffer.concat(stdout).toString('utf8')); }
+        };
+        const timer = setTimeout(() => complete(new Error('Pandoc timed out after 30000 ms')), 30000);
+        child.stdout.on('data', (chunk: Buffer) => {
+            if (settled) { return; }
+            outputBytes += chunk.length;
+            if (outputBytes > 16 * 1024 * 1024) { complete(new Error('Pandoc stdout exceeded 16 MiB')); }
+            else { stdout.push(chunk); }
+        });
+        child.stderr.on('data', (chunk: Buffer) => {
+            if (settled) { return; }
+            errorBytes += chunk.length;
+            const remaining = 64 * 1024 - (errorBytes - chunk.length);
+            if (remaining > 0) { stderr.push(chunk.subarray(0, remaining)); }
+            if (errorBytes > 64 * 1024) { complete(new Error('Pandoc stderr exceeded 64 KiB')); }
+        });
+        child.stdin.on('error', error => { inputError = error; });
+        child.stdout.on('error', error => complete(error));
+        child.stderr.on('error', error => complete(error));
+        child.on('error', error => complete(new Error(missing(error)
+            ? 'Pandoc was not found; install Pandoc and ensure pandoc is on PATH, then retry latex'
+            : `Unable to run Pandoc: ${error.message}`)));
+        child.on('close', (code, signal) => {
+            if (code !== 0) { complete(new Error(`Pandoc failed (${signal ? 'signal ' + signal : 'exit ' + code})`)); }
+            else if (inputError) { complete(new Error(`Pandoc stdin failed: ${inputError.message}`)); }
+            else if (!outputBytes) { complete(new Error('Pandoc returned an empty LaTeX body')); }
+            else { complete(); }
+        });
+        child.stdin.end(input);
+    });
+};
+async function planLatex(root: string, documents: SourceDocument[], output: string,
+    options: LatexOptions, convert: LatexConverter): Promise<{
+        files: Generation['files']; diagnostics: Generation['diagnostics'];
+        inspection?: Generation['inspection'];
+    }> {
+    const theme = resolveProjectTheme(documents);
+    if (theme.diagnostics.length) { return { files: [], diagnostics: theme.diagnostics }; }
+    const target = output.toLowerCase();
+    const inputs = [...documents.map(document => document.path), ...templateReferences(documents)];
+    for (const input of inputs) {
+        const source = relative(input).toLowerCase();
+        if (target === source || target.startsWith(source + '/') || source.startsWith(target + '/')) {
+            throw new Error(`LaTeX output conflicts with input: ${input}`);
+        }
+    }
+    await inspect(root, output);
+    const rendered = await renderLatex(parseProject(documents), { ...options, theme: theme.name }, convert);
+    if (!rendered.diagnostics.length && rendered.latex === undefined) {
+        throw new Error('LaTeX renderer returned no document');
+    }
+    return { diagnostics: rendered.diagnostics, files: rendered.diagnostics.length ? []
+        : [{ path: output, content: rendered.latex! }] };
+}
 export async function run(args: string[], io: CliIO = defaultIO,
-    transactionIO: (root: string) => TransactionIO = createTransactionIO): Promise<number> {
+    transactionIO: (root: string) => TransactionIO = createTransactionIO,
+    convert: LatexConverter = runPandoc): Promise<number> {
     const json = args.includes('--json');
     const positional: string[] = [];
     const flags = new Set<string>();
+    const values = new Map<string, string>();
+    const latexOptions: LatexOptions = {};
+    let latexOutput = '';
     const response: CliResponse = {
         schemaVersion: 1, command: 'help', ok: false, diagnostics: [], errors: [], outputs: []
     };
@@ -170,8 +256,15 @@ export async function run(args: string[], io: CliIO = defaultIO,
         if (json) { io.stdout(JSON.stringify(response) + '\n'); }
         return code;
     };
-    for (const arg of args) {
-        if (arg.startsWith('-')) {
+    for (let index = 0; index < args.length; index++) {
+        const arg = args[index];
+        if (['--output', '--paper', '--margin'].includes(arg)) {
+            if (flags.has(arg)) { response.errors.push(`Duplicate flag: ${arg}`); }
+            flags.add(arg);
+            const value = args[index + 1];
+            if (!value || value.startsWith('-')) { response.errors.push(`Missing value for ${arg}`); }
+            else { values.set(arg, value); index++; }
+        } else if (arg.startsWith('-')) {
             const flag = arg === '-h' ? '--help' : arg;
             if (!['--help', '--json'].includes(flag)) { response.errors.push(`Unknown flag: ${arg}`); }
             else if (flags.has(flag)) { response.errors.push(`Duplicate flag: ${arg}`); }
@@ -190,6 +283,28 @@ export async function run(args: string[], io: CliIO = defaultIO,
         (helpCommand && flags.has('--help')) || (helpCommand && topic && !commands.includes(topic))) {
         response.errors.push('Invalid arguments');
     }
+    if (topic !== 'latex' && ['--output', '--paper', '--margin'].some(flag => flags.has(flag))) {
+        response.errors.push('--output, --paper and --margin are only valid for latex');
+    }
+    if (topic === 'latex') {
+        const output = values.get('--output');
+        latexOutput = output ? safeRelativePath(output) || '' : '';
+        if ((!help || output !== undefined) && (!latexOutput || !latexOutput.endsWith('.tex'))) {
+            response.errors.push('latex requires --output with a safe root-relative .tex path');
+        }
+        const paper = values.get('--paper') ?? 'a4';
+        if (!['a4', 'a5', 'letter', 'legal'].includes(paper)) {
+            response.errors.push('--paper must be a4, a5, letter or legal');
+        }
+        latexOptions.paper = (paper === 'a4' ? 'A4' : paper === 'a5' ? 'A5' : paper) as LatexOptions['paper'];
+        const margin = values.get('--margin') ?? '20mm';
+        const mm = Number(margin.slice(0, -2));
+        if (!/^\d+(?:\.\d+)?mm$/.test(margin) || !Number.isFinite(mm) || mm < 5 || mm > 50 ||
+            (paper === 'a5' && mm > 34)) {
+            response.errors.push('--margin requires numeric mm, 5–50 (at most 34 for a5)');
+        }
+        latexOptions.marginMm = mm;
+    }
     if (response.errors.length) {
         if (!json) { io.stderr(response.errors.join('\n') + '\n' + usage); }
         return finish(2);
@@ -197,7 +312,7 @@ export async function run(args: string[], io: CliIO = defaultIO,
     if (help) {
         response.command = 'help';
         response.usage = topic
-            ? `Usage: node out/cli.js ${topic} [root] [--json]\n${descriptions[topic]}\n`
+            ? `Usage: node out/cli.js ${topic === 'latex' ? latexUsage : topic + ' [root] [--json]'}\n${descriptions[topic]}\n`
             : usage;
         if (!json) { io.stdout(response.usage); }
         return finish(0);
@@ -214,7 +329,9 @@ export async function run(args: string[], io: CliIO = defaultIO,
                 templates[reference] = await fs.readFile(path.join(root, reference), 'utf8');
             }
         }
-        const result = generateProject(documents, templates);
+        const result = command === 'latex'
+            ? await planLatex(root, documents, latexOutput, latexOptions, convert)
+            : generateProject(documents, templates);
         response.diagnostics = result.diagnostics;
         if (command === 'inspect') {
             response.inspection = result.inspection;
