@@ -128,6 +128,15 @@ test('self-contained stylesheet scopes every selector to the document wrapper', 
     }
 });
 
+test('fragment panels keep only the outer border while standalone code stays bordered', () => {
+    for (const theme of api.themes) {
+        const css = api.themeCss(theme);
+        assert.match(css, /\.literate-document pre \{[^}]*border: 1px solid var\(--literate-border\);/);
+        assert.match(css, /\.literate-document \.codefragment \{[^}]*border: 1px solid var\(--literate-border\);/);
+        assert.ok(css.includes('.literate-document .codefragment pre { border: 0; }'));
+    }
+});
+
 function upstreamNotice(): string {
     const notice = fs.readFileSync(path.join(root, 'THIRD_PARTY_NOTICES.md'), 'utf8');
     const fullText = /```text\n([\s\S]*?)\n```/.exec(notice);

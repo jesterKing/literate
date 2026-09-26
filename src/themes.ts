@@ -228,6 +228,7 @@ ${themeVariables(theme)}
 .literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
 .literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
 .literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
 .literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
 .literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
 .literate-document .code, .literate-document code div { color: var(--literate-text); }
