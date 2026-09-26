@@ -137,7 +137,10 @@ references exclude escaped tags and use original part offsets, not expanded text
 All inspection coordinates are zero-based JavaScript string positions.
 <code>GenerationResult.publication</code> retains ordered accepted contributions, stable
 logical targets, and unexpanded code segments for future publication renderers.
-It survives diagnostics without changing existing source or HTML emission.</p>
+It survives diagnostics without changing existing source or HTML emission.
+<code>parseProject(documents)</code> exposes the shared accepted snapshot without generation
+policy: original sources, Markdown-it tokens, ordered Markdown/contribution blocks,
+inspection, publication links, and source/declaration diagnostics only.</p>
 <p>The root fragment assembles the implementation in dependency order. The final
 fragment describes the generation phases; the preceding fragments provide
 shared contracts and helpers for both generation and its adapters.</p>
@@ -268,6 +271,69 @@ Adapters also share the directory exclusions used during source discovery.</p>
 <span class="hljs-keyword">interface</span> <span class="hljs-title class_">Part</span> { <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">location</span>: <span class="hljs-title class_">Location</span>; <span class="hljs-attr">definition</span>: <span class="hljs-title class_">Location</span>; <span class="hljs-attr">columns</span>: <span class="hljs-built_in">number</span>[]; }
 <span class="hljs-keyword">interface</span> <span class="hljs-title class_">Fragment</span> { <span class="hljs-attr">header</span>: <span class="hljs-title class_">Header</span>; <span class="hljs-attr">parts</span>: <span class="hljs-title class_">Part</span>[]; <span class="hljs-attr">location</span>: <span class="hljs-title class_">Location</span>; }
 
+</code></pre>
+
+</div>
+</div><h2>Shared parsing without generation policy</h2>
+<p><code>parseProject(documents)</code> accepts and orders sources, collects declarations, and
+resolves publication links without templates, tangling, highlighting, or HTML.
+Its diagnostics cover source admission and declaration syntax, including portable
+path syntax and declaration output/template restrictions. They do not check theme
+names, template availability, destination collisions, or dependency validity.
+Missing references are marked in publication segments; cycles still resolve to
+family targets. Reference operators, missing references, and cycles are diagnosed
+only by generation's existing expansion traversal.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine interfaces and dependencies&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">ParsedProject</span> {
+    <span class="hljs-attr">documents</span>: <span class="hljs-keyword">readonly</span> <span class="hljs-title class_">ParsedDocument</span>[];
+    <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">GenerationDiagnostic</span>[];
+    <span class="hljs-attr">inspection</span>: <span class="hljs-title class_">ProjectInspection</span>;
+    <span class="hljs-attr">publication</span>: <span class="hljs-title class_">PublicationModel</span>;
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title class_">ParsedDocument</span> {
+    <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">source</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">tokens</span>: <span class="hljs-keyword">readonly</span> <span class="hljs-title class_">Token</span>[];
+    <span class="hljs-attr">blocks</span>: <span class="hljs-keyword">readonly</span> <span class="hljs-title class_">ParsedDocumentBlock</span>[];
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title class_">ParsedDocumentBlock</span> =
+    | { <span class="hljs-attr">kind</span>: <span class="hljs-string">&#x27;markdown&#x27;</span>; <span class="hljs-attr">tokenStart</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">tokenEnd</span>: <span class="hljs-built_in">number</span> }
+    | { <span class="hljs-attr">kind</span>: <span class="hljs-string">&#x27;contribution&#x27;</span>; <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">tokenIndex</span>: <span class="hljs-built_in">number</span> };
+</code></pre>
+
+</div>
+</div><p>Each document retains original source text and the actual Markdown-it tokens used
+by the collector. Markdown ranges are half-open indexes into that array; an
+accepted contribution occupies its single fence token. Together the blocks cover
+all tokens exactly once, including container opens/closes, SETTINGS, ordinary code,
+and rejected declarations in Markdown ranges. Unclosed fences retain their ordinary
+Markdown-it boundaries. These ranges are token slices, not
+necessarily independently renderable Markdown subtrees. Diagnosed-but-retained
+contributions still receive links. Empty token arrays have no blocks.</p>
+<p>Readonly arrays are a TypeScript outer-array contract, not a deep freeze. Token
+objects (including children and attributes), block objects, and metadata remain
+mutable. Each call owns its tokens and state; adapters should avoid mutation when
+sharing a result. Parsing and generation use the same private collector, but no
+private graph types are exported and generation does not accept caller-mutated
+parsed snapshots.</p>
+<p>The concrete policy hooks preserve legacy diagnostic checkpoints without exposing
+a general event system. Parsing supplies no policy. Path normalization and
+syntactic declaration restrictions remain in the collector; only generation
+reserves destinations and checks template contents or presentation settings.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine interfaces and dependencies&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-keyword">interface</span> <span class="hljs-title class_">CollectionPolicy</span> {
+    <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">GenerationDiagnostic</span>[];
+    <span class="hljs-title function_">acceptInputs</span>(<span class="hljs-attr">sourceKeys</span>: <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;): <span class="hljs-built_in">void</span>;
+    <span class="hljs-title function_">settings</span>(<span class="hljs-attr">documents</span>: <span class="hljs-title class_">SourceDocument</span>[]): <span class="hljs-built_in">void</span>;
+    <span class="hljs-title function_">loadTemplate</span>(<span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>, <span class="hljs-attr">location</span>: <span class="hljs-title class_">Location</span>): <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>;
+    <span class="hljs-title function_">setAuthors</span>(<span class="hljs-attr">value</span>: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span>;
+    <span class="hljs-title function_">setHtmlTemplate</span>(<span class="hljs-attr">value</span>: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span>;
+    <span class="hljs-title function_">reserve</span>(<span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>, <span class="hljs-attr">location</span>: <span class="hljs-title class_">Location</span>): <span class="hljs-built_in">void</span>;
+}
 </code></pre>
 
 </div>
@@ -646,12 +712,12 @@ silently use this default.</p>
 
 </div>
 </div><h2>Generation is a validation pipeline</h2>
-<p>The orchestration is deliberately split at phase boundaries rather than into
-independent runtime functions. These fragments share the local scope of
-<code>generateProject</code>: first establish inputs and settings, then collect fragment
-definitions and reserve destinations, then validate and expand dependencies,
-and only then construct output files. The validation barrier is before both
-source emission and HTML rendering.</p>
+<p>The shared collector establishes accepted inputs and ordered declarations before
+snapshotting inspection, publication, and document blocks. Generation supplies
+concrete policy hooks at the original collection checkpoints, then consumes the
+private collected graph to validate and expand dependencies and construct files.
+Standalone parsing supplies no generation policy. The validation barrier remains
+before both source emission and HTML rendering.</p>
 <p>Diagnostics accumulate through the planning phases; inspection survives either
 outcome. Only the successful branch builds files, leaving all writes to adapters.</p>
 <pre class="mermaid">
@@ -672,6 +738,9 @@ flowchart TD
 <div class="code">
 <pre><code><span class="literate-tag-name">&lt;&lt;engine generation inputs and settings&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;engine fragment collection and output reservation&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;engine collected project snapshot&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;engine finish shared collection&gt;&gt;</span>
+<span class="literate-tag-name">&lt;&lt;engine generation policy and entry&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;engine dependency expansion and validation barrier&gt;&gt;</span>
 <span class="literate-tag-name">&lt;&lt;engine source and HTML emission&gt;&gt;</span>
 </code></pre>
@@ -686,21 +755,16 @@ template references must resolve in the supplied template map.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;engine generation inputs and settings&gt;&gt;= </div>
 <div class="code">
-<pre><code>
-<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">generateProject</span>(<span class="hljs-params">documents: SourceDocument[], templates: Record&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; = {}</span>): <span class="hljs-title class_">GenerationResult</span> {
-    <span class="hljs-keyword">const</span> <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">GenerationDiagnostic</span>[] = [];
-    <span class="hljs-keyword">const</span> <span class="hljs-attr">files</span>: <span class="hljs-title class_">GeneratedFile</span>[] = [];
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">collectProject</span>(<span class="hljs-params">documents: SourceDocument[], policy?: CollectionPolicy</span>) {
+    <span class="hljs-keyword">const</span> diagnostics = policy?.<span class="hljs-property">diagnostics</span> ?? [];
     <span class="hljs-keyword">const</span> report = (<span class="hljs-attr">location</span>: <span class="hljs-title class_">Location</span>, <span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>, code?: <span class="hljs-built_in">string</span>): <span class="hljs-function"><span class="hljs-params">void</span> =&gt;</span> {
         diagnostics.<span class="hljs-title function_">push</span>({ ...location, message, ...(code === <span class="hljs-literal">undefined</span> ? {} : { code }) });
     };
     <span class="hljs-keyword">const</span> md = <span class="hljs-keyword">new</span> <span class="hljs-title class_">MarkdownIt</span>();
-    <span class="hljs-keyword">const</span> <span class="hljs-built_in">escape</span> = (<span class="hljs-attr">value</span>: <span class="hljs-built_in">string</span>): <span class="hljs-function"><span class="hljs-params">string</span> =&gt;</span> md.<span class="hljs-property">utils</span>.escapeHtml(value);
     <span class="hljs-keyword">const</span> sources = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title class_">SourceDocument</span>&gt;();
-    <span class="hljs-keyword">const</span> templateMap = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;();
     <span class="hljs-keyword">const</span> sourceKeys = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
-    <span class="hljs-keyword">const</span> templateKeys = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
     <span class="literate-tag-name">&lt;&lt;engine accept source inputs&gt;&gt;</span>
-    <span class="literate-tag-name">&lt;&lt;engine accept template inputs&gt;&gt;</span>
+    policy?.<span class="hljs-title function_">acceptInputs</span>(sourceKeys);
 </code></pre>
 
 </div>
@@ -756,20 +820,18 @@ project-level HTML settings.</p>
         <span class="hljs-keyword">const</span> path = <span class="hljs-title function_">safeRelativePath</span>(value);
         <span class="hljs-keyword">if</span> (!path) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Invalid template path: <span class="hljs-subst">${value}</span>`</span>); <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
         referencedTemplates.<span class="hljs-title function_">add</span>(path);
-        <span class="hljs-keyword">if</span> (!templateMap.<span class="hljs-title function_">has</span>(path)) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Missing template: <span class="hljs-subst">${path}</span>`</span>); <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
-        <span class="hljs-keyword">return</span> templateMap.<span class="hljs-title function_">get</span>(path);
+        <span class="hljs-keyword">return</span> policy?.<span class="hljs-title function_">loadTemplate</span>(path, location);
     };
-    <span class="hljs-keyword">const</span> projectTheme = <span class="hljs-title function_">resolveProjectTheme</span>(<span class="hljs-title class_">Array</span>.<span class="hljs-title function_">from</span>(sources.<span class="hljs-title function_">values</span>()));
-    diagnostics.<span class="hljs-title function_">push</span>(...projectTheme.<span class="hljs-property">diagnostics</span>);
-    <span class="hljs-keyword">let</span> authors = <span class="hljs-string">&#x27;&#x27;</span>;
-    <span class="hljs-keyword">let</span> htmlTemplate = <span class="hljs-title function_">defaultTemplate</span>(projectTheme.<span class="hljs-property">name</span>);
+    policy?.<span class="hljs-title function_">settings</span>(<span class="hljs-title class_">Array</span>.<span class="hljs-title function_">from</span>(sources.<span class="hljs-title function_">values</span>()));
     <span class="literate-tag-name">&lt;&lt;engine apply root HTML settings&gt;&gt;</span>
 </code></pre>
 
 </div>
-</div><p>Root settings update authors and the HTML template in encounter order. A failed
-template load records a diagnostic without replacing the previous template;
-that fallback is only planning state, since any diagnostic later blocks emission.</p>
+</div><p>Root settings visit authors and template references in encounter order. Parsing
+records and validates template paths without loading contents. Generation's hooks
+update authors and the HTML template; a failed load diagnoses without replacing
+the previous template. That fallback is only planning state, since any diagnostic
+later blocks emission.</p>
 <div class="codefragment">
 <div class="fragmentname">&lt;&lt;engine apply root HTML settings&gt;&gt;= </div>
 <div class="code">
@@ -779,10 +841,10 @@ that fallback is only planning state, since any diagnostic later blocks emission
         <span class="hljs-keyword">const</span> match = <span class="hljs-regexp">/^\s*(authors|template)\s*=(.*)$/</span>.<span class="hljs-title function_">exec</span>(line);
         <span class="hljs-keyword">if</span> (!match) { <span class="hljs-keyword">return</span>; }
         <span class="hljs-keyword">const</span> value = match[<span class="hljs-number">2</span>].<span class="hljs-title function_">trim</span>();
-        <span class="hljs-keyword">if</span> (match[<span class="hljs-number">1</span>] === <span class="hljs-string">&#x27;authors&#x27;</span>) { authors = value; }
+        <span class="hljs-keyword">if</span> (match[<span class="hljs-number">1</span>] === <span class="hljs-string">&#x27;authors&#x27;</span>) { policy?.<span class="hljs-title function_">setAuthors</span>(value); }
         <span class="hljs-keyword">else</span> {
             <span class="hljs-keyword">const</span> loaded = <span class="hljs-title function_">loadTemplate</span>(value, { <span class="hljs-attr">path</span>: <span class="hljs-string">&#x27;index.literate&#x27;</span>, <span class="hljs-attr">line</span>: (token.<span class="hljs-property">map</span>?.[<span class="hljs-number">0</span>] || <span class="hljs-number">0</span>) + index + <span class="hljs-number">1</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span> });
-            <span class="hljs-keyword">if</span> (loaded !== <span class="hljs-literal">undefined</span>) { htmlTemplate = loaded; }
+            <span class="hljs-keyword">if</span> (loaded !== <span class="hljs-literal">undefined</span>) { policy?.<span class="hljs-title function_">setHtmlTemplate</span>(loaded); }
         }
     });
 }
@@ -807,21 +869,10 @@ collisions are found before any output is returned.</p>
     <span class="hljs-keyword">const</span> headers = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-title class_">Token</span>, <span class="hljs-title class_">Header</span>&gt;();
     <span class="hljs-keyword">const</span> <span class="hljs-attr">accepted</span>: { <span class="hljs-attr">header</span>: <span class="hljs-title class_">Header</span>; <span class="hljs-attr">part</span>: <span class="hljs-title class_">Part</span>; <span class="hljs-attr">tokenIndex</span>: <span class="hljs-built_in">number</span> }[] = [];
     <span class="hljs-keyword">const</span> sourceTemplates = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;();
-    <span class="hljs-keyword">const</span> outputs = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
-    <span class="hljs-keyword">const</span> inputKeys = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>([...sourceKeys, ...templateKeys]);
     <span class="hljs-keyword">const</span> reserve = (<span class="hljs-attr">value</span>: <span class="hljs-built_in">string</span>, <span class="hljs-attr">location</span>: <span class="hljs-title class_">Location</span>): <span class="hljs-built_in">string</span> | <span class="hljs-function"><span class="hljs-params">undefined</span> =&gt;</span> {
         <span class="hljs-keyword">const</span> path = <span class="hljs-title function_">safeRelativePath</span>(value);
         <span class="hljs-keyword">if</span> (!path) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Invalid output path: <span class="hljs-subst">${value}</span>`</span>); <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
-        <span class="hljs-keyword">const</span> key = <span class="hljs-title function_">pathKey</span>(path);
-        <span class="hljs-keyword">if</span> (inputKeys.<span class="hljs-title function_">has</span>(key)) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Output collides with input: <span class="hljs-subst">${path}</span>`</span>); }
-        <span class="hljs-keyword">if</span> (outputs.<span class="hljs-title function_">has</span>(key)) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Duplicate output path: <span class="hljs-subst">${path}</span>`</span>); }
-        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> input <span class="hljs-keyword">of</span> inputKeys) {
-            <span class="hljs-keyword">if</span> (<span class="hljs-title function_">ancestorConflict</span>(key, input)) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Output/input ancestor conflict: <span class="hljs-subst">${path}</span> and <span class="hljs-subst">${input}</span>`</span>); }
-        }
-        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> output <span class="hljs-keyword">of</span> outputs) {
-            <span class="hljs-keyword">if</span> (<span class="hljs-title function_">ancestorConflict</span>(key, output)) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Output ancestor conflict: <span class="hljs-subst">${path}</span> and <span class="hljs-subst">${output}</span>`</span>); }
-        }
-        outputs.<span class="hljs-title function_">add</span>(key);
+        policy?.<span class="hljs-title function_">reserve</span>(path, location);
         <span class="hljs-keyword">return</span> path;
     };
 </code></pre>
@@ -835,7 +886,7 @@ this lets inspection and diagnostics refer to the same declaration.</p>
 <div class="code">
 <pre><code>    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> path <span class="hljs-keyword">of</span> order) {
         <span class="hljs-keyword">const</span> sourceLines = sources.<span class="hljs-title function_">get</span>(path)!.<span class="hljs-property">text</span>.<span class="hljs-title function_">split</span>(<span class="hljs-regexp">/\r\n|\r|\n/</span>);
-        <span class="hljs-title function_">reserve</span>(path.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\.literate$/</span>, <span class="hljs-string">&#x27;.html&#x27;</span>), { path, <span class="hljs-attr">line</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span> });
+        <span class="hljs-keyword">if</span> (policy) { <span class="hljs-title function_">reserve</span>(path.<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/\.literate$/</span>, <span class="hljs-string">&#x27;.html&#x27;</span>), { path, <span class="hljs-attr">line</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span> }); }
         <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [tokenIndex, token] <span class="hljs-keyword">of</span> (tokens.<span class="hljs-title function_">get</span>(path) || []).<span class="hljs-title function_">entries</span>()) {
             <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> !== <span class="hljs-string">&#x27;fence&#x27;</span> || token.<span class="hljs-property">info</span>.<span class="hljs-title function_">trim</span>() === <span class="hljs-string">&#x27;SETTINGS&#x27;</span> || !token.<span class="hljs-property">info</span>.<span class="hljs-title function_">includes</span>(<span class="hljs-string">&#x27;&lt;&lt;&#x27;</span>)) { <span class="hljs-keyword">continue</span>; }
             <span class="hljs-keyword">const</span> line = token.<span class="hljs-property">map</span>?.[<span class="hljs-number">0</span>] || <span class="hljs-number">0</span>;
@@ -963,7 +1014,7 @@ computes positions from the original part, never from replacement text. The
 normalized prefix remains separate from the source column: only that prefix
 controls indentation when inserting multiline dependencies.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;engine dependency expansion and validation barrier&gt;&gt;= </div>
+<div class="fragmentname">&lt;&lt;engine collected project snapshot&gt;&gt;= </div>
 <div class="code">
 <pre><code>    <span class="hljs-keyword">function</span>* <span class="hljs-title function_">references</span>(<span class="hljs-params">part: Part</span>) {
         <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> tag <span class="hljs-keyword">of</span> <span class="hljs-title function_">scanFragmentTags</span>(part.<span class="hljs-property">content</span>)) {
@@ -982,7 +1033,7 @@ contents do not erase their normalized paths, and repeated references remain
 separate occurrences. Only accepted fragment parts contribute definitions and
 references; rejected duplicate definitions and orphan appends do not.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;engine dependency expansion and validation barrier&gt;&gt;=+ </div>
+<div class="fragmentname">&lt;&lt;engine collected project snapshot&gt;&gt;=+ </div>
 <div class="code">
 <pre><code>    inspection.<span class="hljs-property">templates</span> = <span class="hljs-title class_">Array</span>.<span class="hljs-title function_">from</span>(referencedTemplates).<span class="hljs-title function_">sort</span>();
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> { header, parts } <span class="hljs-keyword">of</span> fragments.<span class="hljs-title function_">values</span>()) {
@@ -1014,7 +1065,7 @@ resolve just like earlier definitions. A cycle still has resolved destinations;
 only an absent family is missing. This snapshot neither reports diagnostics nor
 changes the graph used for expansion or the tokens used for HTML rendering.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;engine dependency expansion and validation barrier&gt;&gt;=+ </div>
+<div class="fragmentname">&lt;&lt;engine collected project snapshot&gt;&gt;=+ </div>
 <div class="code">
 <pre><code>    <span class="hljs-keyword">const</span> <span class="hljs-attr">publication</span>: <span class="hljs-title class_">PublicationModel</span> = {
         <span class="hljs-attr">documents</span>: order.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">path</span> =&gt;</span> ({ path, <span class="hljs-attr">contributions</span>: [] })),
@@ -1027,6 +1078,7 @@ changes the graph used for expansion or the tokens used for HTML rendering.</p>
     <span class="hljs-keyword">const</span> publicationFamilies = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>(publication.<span class="hljs-property">fragments</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">fragment</span> =&gt;</span> [fragment.<span class="hljs-property">name</span>, fragment]));
     <span class="hljs-keyword">const</span> contributionOrdinals = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">number</span>&gt;();
     <span class="literate-tag-name">&lt;&lt;engine snapshot accepted contributions&gt;&gt;</span>
+    <span class="hljs-keyword">const</span> contributionsByTarget = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>(publication.<span class="hljs-property">contributions</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">value</span> =&gt;</span> [value.<span class="hljs-property">target</span>, value]));
 </code></pre>
 
 </div>
@@ -1078,6 +1130,137 @@ prevents duplicating it in the next literal segment. Empty bodies need no segmen
 </code></pre>
 
 </div>
+</div><h3>Finish the shared snapshot before expansion</h3>
+<p>Contribution token indexes select exactly the accepted fences. Keeping the token
+stream intact also preserves nested container boundaries and every rejected fence
+without inferring a second acceptance policy from headers.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine finish shared collection&gt;&gt;= </div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">const</span> <span class="hljs-attr">parsedDocuments</span>: <span class="hljs-title class_">ParsedDocument</span>[] = order.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">path</span> =&gt;</span> {
+        <span class="hljs-keyword">const</span> documentTokens = tokens.<span class="hljs-title function_">get</span>(path)!;
+        <span class="hljs-keyword">const</span> targets = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>(publicationDocuments.<span class="hljs-title function_">get</span>(path)!.<span class="hljs-property">contributions</span>.<span class="hljs-title function_">map</span>(<span class="hljs-function"><span class="hljs-params">target</span> =&gt;</span> {
+            <span class="hljs-keyword">const</span> contribution = contributionsByTarget.<span class="hljs-title function_">get</span>(target)!;
+            <span class="hljs-keyword">return</span> [contribution.<span class="hljs-property">tokenIndex</span>, target] <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span>;
+        }));
+        <span class="hljs-keyword">const</span> <span class="hljs-attr">blocks</span>: <span class="hljs-title class_">ParsedDocumentBlock</span>[] = [];
+        <span class="hljs-keyword">let</span> cursor = <span class="hljs-number">0</span>;
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [tokenIndex, target] <span class="hljs-keyword">of</span> targets) {
+            <span class="hljs-keyword">if</span> (cursor &lt; tokenIndex) { blocks.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">kind</span>: <span class="hljs-string">&#x27;markdown&#x27;</span>, <span class="hljs-attr">tokenStart</span>: cursor, <span class="hljs-attr">tokenEnd</span>: tokenIndex }); }
+            blocks.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">kind</span>: <span class="hljs-string">&#x27;contribution&#x27;</span>, target, tokenIndex });
+            cursor = tokenIndex + <span class="hljs-number">1</span>;
+        }
+        <span class="hljs-keyword">if</span> (cursor &lt; documentTokens.<span class="hljs-property">length</span>) {
+            blocks.<span class="hljs-title function_">push</span>({ <span class="hljs-attr">kind</span>: <span class="hljs-string">&#x27;markdown&#x27;</span>, <span class="hljs-attr">tokenStart</span>: cursor, <span class="hljs-attr">tokenEnd</span>: documentTokens.<span class="hljs-property">length</span> });
+        }
+        <span class="hljs-keyword">return</span> { path, <span class="hljs-attr">source</span>: sources.<span class="hljs-title function_">get</span>(path)!.<span class="hljs-property">text</span>, <span class="hljs-attr">tokens</span>: documentTokens, blocks };
+    });
+</code></pre>
+
+</div>
+</div><p>Public callers receive only the snapshot. Generation additionally consumes the
+private graph, source templates, header map, and the very same tokens and reference
+scanner. No expansion or rendering occurs while building the snapshot.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine finish shared collection&gt;&gt;=+ </div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">const</span> <span class="hljs-attr">parsed</span>: <span class="hljs-title class_">ParsedProject</span> = { <span class="hljs-attr">documents</span>: parsedDocuments, diagnostics, inspection, publication };
+    <span class="hljs-keyword">return</span> { parsed, md, tokens, order, fragments, headers, sourceTemplates, references };
+}
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">parseProject</span>(<span class="hljs-params">documents: SourceDocument[]</span>): <span class="hljs-title class_">ParsedProject</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_">collectProject</span>(documents).<span class="hljs-property">parsed</span>;
+}
+</code></pre>
+
+</div>
+</div><h3>Generation installs policy at the original checkpoints</h3>
+<p>The policy owns supplied template contents, portable destination reservations,
+and presentation settings. Its diagnostics array is shared with collection so
+source admission, template admission, settings, declaration checks, and expansion
+retain their original ordering. The source-key set includes NUL-rejected inputs.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine generation policy and entry&gt;&gt;= </div>
+<div class="code">
+<pre><code>
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">generateProject</span>(<span class="hljs-params">documents: SourceDocument[], templates: Record&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; = {}</span>): <span class="hljs-title class_">GenerationResult</span> {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">diagnostics</span>: <span class="hljs-title class_">GenerationDiagnostic</span>[] = [];
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">files</span>: <span class="hljs-title class_">GeneratedFile</span>[] = [];
+    <span class="hljs-keyword">const</span> report = (<span class="hljs-attr">location</span>: <span class="hljs-title class_">Location</span>, <span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>, code?: <span class="hljs-built_in">string</span>): <span class="hljs-function"><span class="hljs-params">void</span> =&gt;</span> {
+        diagnostics.<span class="hljs-title function_">push</span>({ ...location, message, ...(code === <span class="hljs-literal">undefined</span> ? {} : { code }) });
+    };
+    <span class="hljs-keyword">const</span> templateMap = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;();
+    <span class="hljs-keyword">const</span> templateKeys = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
+    <span class="hljs-keyword">const</span> outputs = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
+    <span class="hljs-keyword">let</span> inputKeys = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
+    <span class="hljs-keyword">let</span> projectTheme = { <span class="hljs-attr">name</span>: defaultThemeName, <span class="hljs-attr">diagnostics</span>: [] <span class="hljs-keyword">as</span> <span class="hljs-title class_">GenerationDiagnostic</span>[] };
+    <span class="hljs-keyword">let</span> authors = <span class="hljs-string">&#x27;&#x27;</span>;
+    <span class="hljs-keyword">let</span> htmlTemplate = <span class="hljs-string">&#x27;&#x27;</span>;
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">policy</span>: <span class="hljs-title class_">CollectionPolicy</span> = {
+        <span class="literate-tag-name">&lt;&lt;engine generation collection policy&gt;&gt;</span>
+    };
+</code></pre>
+
+</div>
+</div><p>Template input validation runs after source admission and before settings. Theme
+validation and default HTML construction remain generation-only. Explicit root
+templates are loaded by collection after this settings hook, in encounter order.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine generation collection policy&gt;&gt;= </div>
+<div class="code">
+<pre><code><span class="hljs-title function_">acceptInputs</span>(<span class="hljs-params">sourceKeys</span>) {
+    <span class="literate-tag-name">&lt;&lt;engine accept template inputs&gt;&gt;</span>
+    inputKeys = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Set</span>([...sourceKeys, ...templateKeys]);
+},
+<span class="hljs-title function_">settings</span>(<span class="hljs-params">sources</span>) {
+    projectTheme = <span class="hljs-title function_">resolveProjectTheme</span>(sources);
+    diagnostics.<span class="hljs-title function_">push</span>(...projectTheme.<span class="hljs-property">diagnostics</span>);
+    htmlTemplate = <span class="hljs-title function_">defaultTemplate</span>(projectTheme.<span class="hljs-property">name</span>);
+},
+<span class="hljs-title function_">loadTemplate</span>(<span class="hljs-params">path, location</span>) {
+    <span class="hljs-keyword">if</span> (!templateMap.<span class="hljs-title function_">has</span>(path)) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Missing template: <span class="hljs-subst">${path}</span>`</span>); <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">return</span> templateMap.<span class="hljs-title function_">get</span>(path);
+},
+<span class="hljs-title function_">setAuthors</span>(<span class="hljs-params">value</span>) { authors = value; },
+<span class="hljs-title function_">setHtmlTemplate</span>(<span class="hljs-params">value</span>) { htmlTemplate = value; },
+diagnostics,
+</code></pre>
+
+</div>
+</div><p>Collection normalizes each destination before this hook. Reservation diagnoses
+collisions but retains valid paths and reserves them even after a diagnostic,
+exactly as before. Invalid path syntax never reaches the hook.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine generation collection policy&gt;&gt;=+ </div>
+<div class="code">
+<pre><code><span class="hljs-title function_">reserve</span>(<span class="hljs-params">path, location</span>) {
+    <span class="hljs-keyword">const</span> key = <span class="hljs-title function_">pathKey</span>(path);
+    <span class="hljs-keyword">if</span> (inputKeys.<span class="hljs-title function_">has</span>(key)) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Output collides with input: <span class="hljs-subst">${path}</span>`</span>); }
+    <span class="hljs-keyword">if</span> (outputs.<span class="hljs-title function_">has</span>(key)) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Duplicate output path: <span class="hljs-subst">${path}</span>`</span>); }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> input <span class="hljs-keyword">of</span> inputKeys) {
+        <span class="hljs-keyword">if</span> (<span class="hljs-title function_">ancestorConflict</span>(key, input)) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Output/input ancestor conflict: <span class="hljs-subst">${path}</span> and <span class="hljs-subst">${input}</span>`</span>); }
+    }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> output <span class="hljs-keyword">of</span> outputs) {
+        <span class="hljs-keyword">if</span> (<span class="hljs-title function_">ancestorConflict</span>(key, output)) { <span class="hljs-title function_">report</span>(location, <span class="hljs-string">`Output ancestor conflict: <span class="hljs-subst">${path}</span> and <span class="hljs-subst">${output}</span>`</span>); }
+    }
+    outputs.<span class="hljs-title function_">add</span>(key);
+}
+</code></pre>
+
+</div>
+</div><p>Generation consumes the shared result, then runs the unchanged expansion and
+emission phases. Its renderer uses the collector's Markdown-it instance and
+original token identities, preserving header lookup and rendered bytes.</p>
+<div class="codefragment">
+<div class="fragmentname">&lt;&lt;engine generation policy and entry&gt;&gt;=+ </div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">const</span> collected = <span class="hljs-title function_">collectProject</span>(documents, policy);
+    <span class="hljs-keyword">const</span> { md, tokens, order, fragments, headers, sourceTemplates, references } = collected;
+    <span class="hljs-keyword">const</span> { inspection, publication } = collected.<span class="hljs-property">parsed</span>;
+    <span class="hljs-keyword">const</span> <span class="hljs-built_in">escape</span> = (<span class="hljs-attr">value</span>: <span class="hljs-built_in">string</span>): <span class="hljs-function"><span class="hljs-params">string</span> =&gt;</span> md.<span class="hljs-property">utils</span>.escapeHtml(value);
+</code></pre>
+
+</div>
 </div><p>Expansion consumes the same occurrences, but suspends each fragment's generator
 at a dependency instead of calling expansion recursively. The explicit frame
 stack preserves depth-first encounter order without consuming the JavaScript
@@ -1091,7 +1274,7 @@ a child's expansion applies indentation and removes one trailing newline, withou
 rescanning inserted text. Appended parts are visited only after earlier parts
 finish, preserving diagnostic ordering as well as output ordering.</p>
 <div class="codefragment">
-<div class="fragmentname">&lt;&lt;engine dependency expansion and validation barrier&gt;&gt;=+ </div>
+<div class="fragmentname">&lt;&lt;engine dependency expansion and validation barrier&gt;&gt;= </div>
 <div class="code">
 <pre><code>    <span class="hljs-keyword">type</span> <span class="hljs-title class_">Reference</span> = <span class="hljs-title class_">ReturnType</span>&lt;<span class="hljs-keyword">typeof</span> references&gt; <span class="hljs-keyword">extends</span> <span class="hljs-title class_">Generator</span>&lt;infer T&gt; ? T : <span class="hljs-built_in">never</span>;
     <span class="hljs-keyword">function</span>* <span class="hljs-title function_">expandParts</span>(<span class="hljs-attr">parts</span>: <span class="hljs-title class_">Part</span>[]): <span class="hljs-title class_">Generator</span>&lt;<span class="hljs-title class_">Reference</span>, <span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; {

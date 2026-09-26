@@ -17,6 +17,9 @@ All inspection coordinates are zero-based JavaScript string positions.
 `GenerationResult.publication` retains ordered accepted contributions, stable
 logical targets, and unexpanded code segments for future publication renderers.
 It survives diagnostics without changing existing source or HTML emission.
+`parseProject(documents)` exposes the shared accepted snapshot without generation
+policy: original sources, Markdown-it tokens, ordered Markdown/contribution blocks,
+inspection, publication links, and source/declaration diagnostics only.
 
 The root fragment assembles the implementation in dependency order. The final
 fragment describes the generation phases; the preceding fragments provide
@@ -139,6 +142,68 @@ interface Header { name: string; language: string; append: boolean; output?: str
 interface Part { content: string; location: Location; definition: Location; columns: number[]; }
 interface Fragment { header: Header; parts: Part[]; location: Location; }
 
+```
+
+## Shared parsing without generation policy
+
+`parseProject(documents)` accepts and orders sources, collects declarations, and
+resolves publication links without templates, tangling, highlighting, or HTML.
+Its diagnostics cover source admission and declaration syntax, including portable
+path syntax and declaration output/template restrictions. They do not check theme
+names, template availability, destination collisions, or dependency validity.
+Missing references are marked in publication segments; cycles still resolve to
+family targets. Reference operators, missing references, and cycles are diagnosed
+only by generation's existing expansion traversal.
+
+```ts : <<engine interfaces and dependencies>>=+
+export interface ParsedProject {
+    documents: readonly ParsedDocument[];
+    diagnostics: GenerationDiagnostic[];
+    inspection: ProjectInspection;
+    publication: PublicationModel;
+}
+export interface ParsedDocument {
+    path: string;
+    source: string;
+    tokens: readonly Token[];
+    blocks: readonly ParsedDocumentBlock[];
+}
+export type ParsedDocumentBlock =
+    | { kind: 'markdown'; tokenStart: number; tokenEnd: number }
+    | { kind: 'contribution'; target: string; tokenIndex: number };
+```
+
+Each document retains original source text and the actual Markdown-it tokens used
+by the collector. Markdown ranges are half-open indexes into that array; an
+accepted contribution occupies its single fence token. Together the blocks cover
+all tokens exactly once, including container opens/closes, SETTINGS, ordinary code,
+and rejected declarations in Markdown ranges. Unclosed fences retain their ordinary
+Markdown-it boundaries. These ranges are token slices, not
+necessarily independently renderable Markdown subtrees. Diagnosed-but-retained
+contributions still receive links. Empty token arrays have no blocks.
+
+Readonly arrays are a TypeScript outer-array contract, not a deep freeze. Token
+objects (including children and attributes), block objects, and metadata remain
+mutable. Each call owns its tokens and state; adapters should avoid mutation when
+sharing a result. Parsing and generation use the same private collector, but no
+private graph types are exported and generation does not accept caller-mutated
+parsed snapshots.
+
+The concrete policy hooks preserve legacy diagnostic checkpoints without exposing
+a general event system. Parsing supplies no policy. Path normalization and
+syntactic declaration restrictions remain in the collector; only generation
+reserves destinations and checks template contents or presentation settings.
+
+```ts : <<engine interfaces and dependencies>>=+
+interface CollectionPolicy {
+    diagnostics: GenerationDiagnostic[];
+    acceptInputs(sourceKeys: Set<string>): void;
+    settings(documents: SourceDocument[]): void;
+    loadTemplate(path: string, location: Location): string | undefined;
+    setAuthors(value: string): void;
+    setHtmlTemplate(value: string): void;
+    reserve(path: string, location: Location): void;
+}
 ```
 
 ## Publication identities do not depend on presentation
@@ -502,12 +567,12 @@ function defaultTemplate(themeName: string): string {
 
 ## Generation is a validation pipeline
 
-The orchestration is deliberately split at phase boundaries rather than into
-independent runtime functions. These fragments share the local scope of
-`generateProject`: first establish inputs and settings, then collect fragment
-definitions and reserve destinations, then validate and expand dependencies,
-and only then construct output files. The validation barrier is before both
-source emission and HTML rendering.
+The shared collector establishes accepted inputs and ordered declarations before
+snapshotting inspection, publication, and document blocks. Generation supplies
+concrete policy hooks at the original collection checkpoints, then consumes the
+private collected graph to validate and expand dependencies and construct files.
+Standalone parsing supplies no generation policy. The validation barrier remains
+before both source emission and HTML rendering.
 
 Diagnostics accumulate through the planning phases; inspection survives either
 outcome. Only the successful branch builds files, leaving all writes to adapters.
@@ -529,6 +594,9 @@ flowchart TD
 ```ts : <<engine generation orchestration>>=
 <<engine generation inputs and settings>>
 <<engine fragment collection and output reservation>>
+<<engine collected project snapshot>>
+<<engine finish shared collection>>
+<<engine generation policy and entry>>
 <<engine dependency expansion and validation barrier>>
 <<engine source and HTML emission>>
 ```
@@ -542,21 +610,16 @@ semicolon-separated `authors` and optional HTML `template` path; explicit
 template references must resolve in the supplied template map.
 
 ```ts : <<engine generation inputs and settings>>=
-/** Pure, atomic generation. Diagnostic positions are zero-based. */
-export function generateProject(documents: SourceDocument[], templates: Record<string, string> = {}): GenerationResult {
-    const diagnostics: GenerationDiagnostic[] = [];
-    const files: GeneratedFile[] = [];
+function collectProject(documents: SourceDocument[], policy?: CollectionPolicy) {
+    const diagnostics = policy?.diagnostics ?? [];
     const report = (location: Location, message: string, code?: string): void => {
         diagnostics.push({ ...location, message, ...(code === undefined ? {} : { code }) });
     };
     const md = new MarkdownIt();
-    const escape = (value: string): string => md.utils.escapeHtml(value);
     const sources = new Map<string, SourceDocument>();
-    const templateMap = new Map<string, string>();
     const sourceKeys = new Set<string>();
-    const templateKeys = new Set<string>();
     <<engine accept source inputs>>
-    <<engine accept template inputs>>
+    policy?.acceptInputs(sourceKeys);
 ```
 
 Accept sources under canonical paths, reserving a collision key before the NUL
@@ -606,19 +669,17 @@ project-level HTML settings.
         const path = safeRelativePath(value);
         if (!path) { report(location, `Invalid template path: ${value}`); return undefined; }
         referencedTemplates.add(path);
-        if (!templateMap.has(path)) { report(location, `Missing template: ${path}`); return undefined; }
-        return templateMap.get(path);
+        return policy?.loadTemplate(path, location);
     };
-    const projectTheme = resolveProjectTheme(Array.from(sources.values()));
-    diagnostics.push(...projectTheme.diagnostics);
-    let authors = '';
-    let htmlTemplate = defaultTemplate(projectTheme.name);
+    policy?.settings(Array.from(sources.values()));
     <<engine apply root HTML settings>>
 ```
 
-Root settings update authors and the HTML template in encounter order. A failed
-template load records a diagnostic without replacing the previous template;
-that fallback is only planning state, since any diagnostic later blocks emission.
+Root settings visit authors and template references in encounter order. Parsing
+records and validates template paths without loading contents. Generation's hooks
+update authors and the HTML template; a failed load diagnoses without replacing
+the previous template. That fallback is only planning state, since any diagnostic
+later blocks emission.
 
 ```ts : <<engine apply root HTML settings>>=
 for (const token of tokens.get('index.literate') || []) {
@@ -627,10 +688,10 @@ for (const token of tokens.get('index.literate') || []) {
         const match = /^\s*(authors|template)\s*=(.*)$/.exec(line);
         if (!match) { return; }
         const value = match[2].trim();
-        if (match[1] === 'authors') { authors = value; }
+        if (match[1] === 'authors') { policy?.setAuthors(value); }
         else {
             const loaded = loadTemplate(value, { path: 'index.literate', line: (token.map?.[0] || 0) + index + 1, column: 0 });
-            if (loaded !== undefined) { htmlTemplate = loaded; }
+            if (loaded !== undefined) { policy?.setHtmlTemplate(loaded); }
         }
     });
 }
@@ -655,21 +716,10 @@ collisions are found before any output is returned.
     const headers = new Map<Token, Header>();
     const accepted: { header: Header; part: Part; tokenIndex: number }[] = [];
     const sourceTemplates = new Map<string, string>();
-    const outputs = new Set<string>();
-    const inputKeys = new Set([...sourceKeys, ...templateKeys]);
     const reserve = (value: string, location: Location): string | undefined => {
         const path = safeRelativePath(value);
         if (!path) { report(location, `Invalid output path: ${value}`); return undefined; }
-        const key = pathKey(path);
-        if (inputKeys.has(key)) { report(location, `Output collides with input: ${path}`); }
-        if (outputs.has(key)) { report(location, `Duplicate output path: ${path}`); }
-        for (const input of inputKeys) {
-            if (ancestorConflict(key, input)) { report(location, `Output/input ancestor conflict: ${path} and ${input}`); }
-        }
-        for (const output of outputs) {
-            if (ancestorConflict(key, output)) { report(location, `Output ancestor conflict: ${path} and ${output}`); }
-        }
-        outputs.add(key);
+        policy?.reserve(path, location);
         return path;
     };
 ```
@@ -681,7 +731,7 @@ this lets inspection and diagnostics refer to the same declaration.
 ```ts : <<engine fragment collection and output reservation>>=+
     for (const path of order) {
         const sourceLines = sources.get(path)!.text.split(/\r\n|\r|\n/);
-        reserve(path.replace(/\.literate$/, '.html'), { path, line: 0, column: 0 });
+        if (policy) { reserve(path.replace(/\.literate$/, '.html'), { path, line: 0, column: 0 }); }
         for (const [tokenIndex, token] of (tokens.get(path) || []).entries()) {
             if (token.type !== 'fence' || token.info.trim() === 'SETTINGS' || !token.info.includes('\<<')) { continue; }
             const line = token.map?.[0] || 0;
@@ -805,7 +855,7 @@ computes positions from the original part, never from replacement text. The
 normalized prefix remains separate from the source column: only that prefix
 controls indentation when inserting multiline dependencies.
 
-```ts : <<engine dependency expansion and validation barrier>>=
+```ts : <<engine collected project snapshot>>=
     function* references(part: Part) {
         for (const tag of scanFragmentTags(part.content)) {
             const before = part.content.slice(0, tag.start);
@@ -822,7 +872,7 @@ contents do not erase their normalized paths, and repeated references remain
 separate occurrences. Only accepted fragment parts contribute definitions and
 references; rejected duplicate definitions and orphan appends do not.
 
-```ts : <<engine dependency expansion and validation barrier>>=+
+```ts : <<engine collected project snapshot>>=+
     inspection.templates = Array.from(referencedTemplates).sort();
     for (const { header, parts } of fragments.values()) {
         const entry: FragmentInspection = {
@@ -853,7 +903,7 @@ resolve just like earlier definitions. A cycle still has resolved destinations;
 only an absent family is missing. This snapshot neither reports diagnostics nor
 changes the graph used for expansion or the tokens used for HTML rendering.
 
-```ts : <<engine dependency expansion and validation barrier>>=+
+```ts : <<engine collected project snapshot>>=+
     const publication: PublicationModel = {
         documents: order.map(path => ({ path, contributions: [] })),
         fragments: Array.from(fragments.keys(), name => ({
@@ -865,6 +915,7 @@ changes the graph used for expansion or the tokens used for HTML rendering.
     const publicationFamilies = new Map(publication.fragments.map(fragment => [fragment.name, fragment]));
     const contributionOrdinals = new Map<string, number>();
     <<engine snapshot accepted contributions>>
+    const contributionsByTarget = new Map(publication.contributions.map(value => [value.target, value]));
 ```
 
 Walk the insertion log rather than grouping graph parts by family: interleaved
@@ -911,6 +962,127 @@ for (const { name, start, end, modifier, at } of references(part)) {
 if (cursor < part.content.length) { segments.push({ kind: 'text', text: part.content.slice(cursor) }); }
 ```
 
+### Finish the shared snapshot before expansion
+
+Contribution token indexes select exactly the accepted fences. Keeping the token
+stream intact also preserves nested container boundaries and every rejected fence
+without inferring a second acceptance policy from headers.
+
+```ts : <<engine finish shared collection>>=
+    const parsedDocuments: ParsedDocument[] = order.map(path => {
+        const documentTokens = tokens.get(path)!;
+        const targets = new Map(publicationDocuments.get(path)!.contributions.map(target => {
+            const contribution = contributionsByTarget.get(target)!;
+            return [contribution.tokenIndex, target] as const;
+        }));
+        const blocks: ParsedDocumentBlock[] = [];
+        let cursor = 0;
+        for (const [tokenIndex, target] of targets) {
+            if (cursor < tokenIndex) { blocks.push({ kind: 'markdown', tokenStart: cursor, tokenEnd: tokenIndex }); }
+            blocks.push({ kind: 'contribution', target, tokenIndex });
+            cursor = tokenIndex + 1;
+        }
+        if (cursor < documentTokens.length) {
+            blocks.push({ kind: 'markdown', tokenStart: cursor, tokenEnd: documentTokens.length });
+        }
+        return { path, source: sources.get(path)!.text, tokens: documentTokens, blocks };
+    });
+```
+
+Public callers receive only the snapshot. Generation additionally consumes the
+private graph, source templates, header map, and the very same tokens and reference
+scanner. No expansion or rendering occurs while building the snapshot.
+
+```ts : <<engine finish shared collection>>=+
+    const parsed: ParsedProject = { documents: parsedDocuments, diagnostics, inspection, publication };
+    return { parsed, md, tokens, order, fragments, headers, sourceTemplates, references };
+}
+
+export function parseProject(documents: SourceDocument[]): ParsedProject {
+    return collectProject(documents).parsed;
+}
+```
+
+### Generation installs policy at the original checkpoints
+
+The policy owns supplied template contents, portable destination reservations,
+and presentation settings. Its diagnostics array is shared with collection so
+source admission, template admission, settings, declaration checks, and expansion
+retain their original ordering. The source-key set includes NUL-rejected inputs.
+
+```ts : <<engine generation policy and entry>>=
+/** Pure, atomic generation. Diagnostic positions are zero-based. */
+export function generateProject(documents: SourceDocument[], templates: Record<string, string> = {}): GenerationResult {
+    const diagnostics: GenerationDiagnostic[] = [];
+    const files: GeneratedFile[] = [];
+    const report = (location: Location, message: string, code?: string): void => {
+        diagnostics.push({ ...location, message, ...(code === undefined ? {} : { code }) });
+    };
+    const templateMap = new Map<string, string>();
+    const templateKeys = new Set<string>();
+    const outputs = new Set<string>();
+    let inputKeys = new Set<string>();
+    let projectTheme = { name: defaultThemeName, diagnostics: [] as GenerationDiagnostic[] };
+    let authors = '';
+    let htmlTemplate = '';
+    const policy: CollectionPolicy = {
+        <<engine generation collection policy>>
+    };
+```
+
+Template input validation runs after source admission and before settings. Theme
+validation and default HTML construction remain generation-only. Explicit root
+templates are loaded by collection after this settings hook, in encounter order.
+
+```ts : <<engine generation collection policy>>=
+acceptInputs(sourceKeys) {
+    <<engine accept template inputs>>
+    inputKeys = new Set([...sourceKeys, ...templateKeys]);
+},
+settings(sources) {
+    projectTheme = resolveProjectTheme(sources);
+    diagnostics.push(...projectTheme.diagnostics);
+    htmlTemplate = defaultTemplate(projectTheme.name);
+},
+loadTemplate(path, location) {
+    if (!templateMap.has(path)) { report(location, `Missing template: ${path}`); return undefined; }
+    return templateMap.get(path);
+},
+setAuthors(value) { authors = value; },
+setHtmlTemplate(value) { htmlTemplate = value; },
+diagnostics,
+```
+
+Collection normalizes each destination before this hook. Reservation diagnoses
+collisions but retains valid paths and reserves them even after a diagnostic,
+exactly as before. Invalid path syntax never reaches the hook.
+
+```ts : <<engine generation collection policy>>=+
+reserve(path, location) {
+    const key = pathKey(path);
+    if (inputKeys.has(key)) { report(location, `Output collides with input: ${path}`); }
+    if (outputs.has(key)) { report(location, `Duplicate output path: ${path}`); }
+    for (const input of inputKeys) {
+        if (ancestorConflict(key, input)) { report(location, `Output/input ancestor conflict: ${path} and ${input}`); }
+    }
+    for (const output of outputs) {
+        if (ancestorConflict(key, output)) { report(location, `Output ancestor conflict: ${path} and ${output}`); }
+    }
+    outputs.add(key);
+}
+```
+
+Generation consumes the shared result, then runs the unchanged expansion and
+emission phases. Its renderer uses the collector's Markdown-it instance and
+original token identities, preserving header lookup and rendered bytes.
+
+```ts : <<engine generation policy and entry>>=+
+    const collected = collectProject(documents, policy);
+    const { md, tokens, order, fragments, headers, sourceTemplates, references } = collected;
+    const { inspection, publication } = collected.parsed;
+    const escape = (value: string): string => md.utils.escapeHtml(value);
+```
+
 Expansion consumes the same occurrences, but suspends each fragment's generator
 at a dependency instead of calling expansion recursively. The explicit frame
 stack preserves depth-first encounter order without consuming the JavaScript
@@ -925,7 +1097,7 @@ a child's expansion applies indentation and removes one trailing newline, withou
 rescanning inserted text. Appended parts are visited only after earlier parts
 finish, preserving diagnostic ordering as well as output ordering.
 
-```ts : <<engine dependency expansion and validation barrier>>=+
+```ts : <<engine dependency expansion and validation barrier>>=
     type Reference = ReturnType<typeof references> extends Generator<infer T> ? T : never;
     function* expandParts(parts: Part[]): Generator<Reference, string, string> {
         let content = '';

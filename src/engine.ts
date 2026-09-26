@@ -52,6 +52,30 @@ interface Header { name: string; language: string; append: boolean; output?: str
 interface Part { content: string; location: Location; definition: Location; columns: number[]; }
 interface Fragment { header: Header; parts: Part[]; location: Location; }
 
+export interface ParsedProject {
+    documents: readonly ParsedDocument[];
+    diagnostics: GenerationDiagnostic[];
+    inspection: ProjectInspection;
+    publication: PublicationModel;
+}
+export interface ParsedDocument {
+    path: string;
+    source: string;
+    tokens: readonly Token[];
+    blocks: readonly ParsedDocumentBlock[];
+}
+export type ParsedDocumentBlock =
+    | { kind: 'markdown'; tokenStart: number; tokenEnd: number }
+    | { kind: 'contribution'; target: string; tokenIndex: number };
+interface CollectionPolicy {
+    diagnostics: GenerationDiagnostic[];
+    acceptInputs(sourceKeys: Set<string>): void;
+    settings(documents: SourceDocument[]): void;
+    loadTemplate(path: string, location: Location): string | undefined;
+    setAuthors(value: string): void;
+    setHtmlTemplate(value: string): void;
+    reserve(path: string, location: Location): void;
+}
 function publicationEncode(value: string): string {
     let encoded = '';
     for (let index = 0; index < value.length; index++) {
@@ -242,19 +266,14 @@ function defaultTemplate(themeName: string): string {
 </html>`;
 }
 
-/** Pure, atomic generation. Diagnostic positions are zero-based. */
-export function generateProject(documents: SourceDocument[], templates: Record<string, string> = {}): GenerationResult {
-    const diagnostics: GenerationDiagnostic[] = [];
-    const files: GeneratedFile[] = [];
+function collectProject(documents: SourceDocument[], policy?: CollectionPolicy) {
+    const diagnostics = policy?.diagnostics ?? [];
     const report = (location: Location, message: string, code?: string): void => {
         diagnostics.push({ ...location, message, ...(code === undefined ? {} : { code }) });
     };
     const md = new MarkdownIt();
-    const escape = (value: string): string => md.utils.escapeHtml(value);
     const sources = new Map<string, SourceDocument>();
-    const templateMap = new Map<string, string>();
     const sourceKeys = new Set<string>();
-    const templateKeys = new Set<string>();
     for (const document of documents) {
         const path = safeRelativePath(document.path);
         const location = { path: document.path, line: 0, column: 0 };
@@ -265,14 +284,7 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
         if (nul) { diagnostics.push(nul); continue; }
         sources.set(path, { path, text: document.text });
     }
-    for (const key of Object.keys(templates).sort()) {
-        const path = safeRelativePath(key);
-        const location = { path: key, line: 0, column: 0 };
-        if (!path) { report(location, 'Invalid template path'); continue; }
-        if (templateKeys.has(pathKey(path))) { report(location, `Duplicate template path: ${path}`); continue; }
-        templateKeys.add(pathKey(path));
-        templateMap.set(path, templates[key]);
-    }
+    policy?.acceptInputs(sourceKeys);
     const tokens = new Map<string, Token[]>();
     for (const document of sources.values()) { tokens.set(document.path, md.parse(document.text, {})); }
     const order = orderSourceDocuments(Array.from(sources.values())).map(document => document.path);
@@ -282,23 +294,19 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
         const path = safeRelativePath(value);
         if (!path) { report(location, `Invalid template path: ${value}`); return undefined; }
         referencedTemplates.add(path);
-        if (!templateMap.has(path)) { report(location, `Missing template: ${path}`); return undefined; }
-        return templateMap.get(path);
+        return policy?.loadTemplate(path, location);
     };
-    const projectTheme = resolveProjectTheme(Array.from(sources.values()));
-    diagnostics.push(...projectTheme.diagnostics);
-    let authors = '';
-    let htmlTemplate = defaultTemplate(projectTheme.name);
+    policy?.settings(Array.from(sources.values()));
     for (const token of tokens.get('index.literate') || []) {
         if (token.type !== 'fence' || token.info.trim() !== 'SETTINGS') { continue; }
         token.content.split('\n').forEach((line: string, index: number) => {
             const match = /^\s*(authors|template)\s*=(.*)$/.exec(line);
             if (!match) { return; }
             const value = match[2].trim();
-            if (match[1] === 'authors') { authors = value; }
+            if (match[1] === 'authors') { policy?.setAuthors(value); }
             else {
                 const loaded = loadTemplate(value, { path: 'index.literate', line: (token.map?.[0] || 0) + index + 1, column: 0 });
-                if (loaded !== undefined) { htmlTemplate = loaded; }
+                if (loaded !== undefined) { policy?.setHtmlTemplate(loaded); }
             }
         });
     }
@@ -306,26 +314,15 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
     const headers = new Map<Token, Header>();
     const accepted: { header: Header; part: Part; tokenIndex: number }[] = [];
     const sourceTemplates = new Map<string, string>();
-    const outputs = new Set<string>();
-    const inputKeys = new Set([...sourceKeys, ...templateKeys]);
     const reserve = (value: string, location: Location): string | undefined => {
         const path = safeRelativePath(value);
         if (!path) { report(location, `Invalid output path: ${value}`); return undefined; }
-        const key = pathKey(path);
-        if (inputKeys.has(key)) { report(location, `Output collides with input: ${path}`); }
-        if (outputs.has(key)) { report(location, `Duplicate output path: ${path}`); }
-        for (const input of inputKeys) {
-            if (ancestorConflict(key, input)) { report(location, `Output/input ancestor conflict: ${path} and ${input}`); }
-        }
-        for (const output of outputs) {
-            if (ancestorConflict(key, output)) { report(location, `Output ancestor conflict: ${path} and ${output}`); }
-        }
-        outputs.add(key);
+        policy?.reserve(path, location);
         return path;
     };
     for (const path of order) {
         const sourceLines = sources.get(path)!.text.split(/\r\n|\r|\n/);
-        reserve(path.replace(/\.literate$/, '.html'), { path, line: 0, column: 0 });
+        if (policy) { reserve(path.replace(/\.literate$/, '.html'), { path, line: 0, column: 0 }); }
         for (const [tokenIndex, token] of (tokens.get(path) || []).entries()) {
             if (token.type !== 'fence' || token.info.trim() === 'SETTINGS' || !token.info.includes('<<')) { continue; }
             const line = token.map?.[0] || 0;
@@ -451,6 +448,87 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
         family.contributions.push(target);
         publicationDocuments.get(part.definition.path)!.contributions.push(target);
     }
+    const contributionsByTarget = new Map(publication.contributions.map(value => [value.target, value]));
+    const parsedDocuments: ParsedDocument[] = order.map(path => {
+        const documentTokens = tokens.get(path)!;
+        const targets = new Map(publicationDocuments.get(path)!.contributions.map(target => {
+            const contribution = contributionsByTarget.get(target)!;
+            return [contribution.tokenIndex, target] as const;
+        }));
+        const blocks: ParsedDocumentBlock[] = [];
+        let cursor = 0;
+        for (const [tokenIndex, target] of targets) {
+            if (cursor < tokenIndex) { blocks.push({ kind: 'markdown', tokenStart: cursor, tokenEnd: tokenIndex }); }
+            blocks.push({ kind: 'contribution', target, tokenIndex });
+            cursor = tokenIndex + 1;
+        }
+        if (cursor < documentTokens.length) {
+            blocks.push({ kind: 'markdown', tokenStart: cursor, tokenEnd: documentTokens.length });
+        }
+        return { path, source: sources.get(path)!.text, tokens: documentTokens, blocks };
+    });
+    const parsed: ParsedProject = { documents: parsedDocuments, diagnostics, inspection, publication };
+    return { parsed, md, tokens, order, fragments, headers, sourceTemplates, references };
+}
+
+export function parseProject(documents: SourceDocument[]): ParsedProject {
+    return collectProject(documents).parsed;
+}
+/** Pure, atomic generation. Diagnostic positions are zero-based. */
+export function generateProject(documents: SourceDocument[], templates: Record<string, string> = {}): GenerationResult {
+    const diagnostics: GenerationDiagnostic[] = [];
+    const files: GeneratedFile[] = [];
+    const report = (location: Location, message: string, code?: string): void => {
+        diagnostics.push({ ...location, message, ...(code === undefined ? {} : { code }) });
+    };
+    const templateMap = new Map<string, string>();
+    const templateKeys = new Set<string>();
+    const outputs = new Set<string>();
+    let inputKeys = new Set<string>();
+    let projectTheme = { name: defaultThemeName, diagnostics: [] as GenerationDiagnostic[] };
+    let authors = '';
+    let htmlTemplate = '';
+    const policy: CollectionPolicy = {
+        acceptInputs(sourceKeys) {
+            for (const key of Object.keys(templates).sort()) {
+                const path = safeRelativePath(key);
+                const location = { path: key, line: 0, column: 0 };
+                if (!path) { report(location, 'Invalid template path'); continue; }
+                if (templateKeys.has(pathKey(path))) { report(location, `Duplicate template path: ${path}`); continue; }
+                templateKeys.add(pathKey(path));
+                templateMap.set(path, templates[key]);
+            }
+            inputKeys = new Set([...sourceKeys, ...templateKeys]);
+        },
+        settings(sources) {
+            projectTheme = resolveProjectTheme(sources);
+            diagnostics.push(...projectTheme.diagnostics);
+            htmlTemplate = defaultTemplate(projectTheme.name);
+        },
+        loadTemplate(path, location) {
+            if (!templateMap.has(path)) { report(location, `Missing template: ${path}`); return undefined; }
+            return templateMap.get(path);
+        },
+        setAuthors(value) { authors = value; },
+        setHtmlTemplate(value) { htmlTemplate = value; },
+        diagnostics,
+        reserve(path, location) {
+            const key = pathKey(path);
+            if (inputKeys.has(key)) { report(location, `Output collides with input: ${path}`); }
+            if (outputs.has(key)) { report(location, `Duplicate output path: ${path}`); }
+            for (const input of inputKeys) {
+                if (ancestorConflict(key, input)) { report(location, `Output/input ancestor conflict: ${path} and ${input}`); }
+            }
+            for (const output of outputs) {
+                if (ancestorConflict(key, output)) { report(location, `Output ancestor conflict: ${path} and ${output}`); }
+            }
+            outputs.add(key);
+        }
+    };
+    const collected = collectProject(documents, policy);
+    const { md, tokens, order, fragments, headers, sourceTemplates, references } = collected;
+    const { inspection, publication } = collected.parsed;
+    const escape = (value: string): string => md.utils.escapeHtml(value);
     type Reference = ReturnType<typeof references> extends Generator<infer T> ? T : never;
     function* expandParts(parts: Part[]): Generator<Reference, string, string> {
         let content = '';
