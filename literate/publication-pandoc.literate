@@ -17,6 +17,7 @@ cannot cause an earlier contribution renderer to run.
 <<publication Pandoc pending types>>
 <<publication Pandoc diagnostics>>
 <<publication Pandoc graph validation>>
+<<publication Pandoc heading identities>>
 <<publication Pandoc document links>>
 <<publication Pandoc inline reader>>
 <<publication Pandoc block reader>>
@@ -189,8 +190,92 @@ function validateCycles(
 Each canonical document path gets a separate `d-` namespace with fixed-width
 UTF-16 hexadecimal encoding. This is injective and independent of titles, line
 numbers, and chapter order. Each document, including an empty one, has a `Div`
-destination. Heading identifiers are intentionally absent until a heading-slug
-and duplicate-heading policy is implemented.
+destination. Headings use a separate `h-` namespace encoding both document path
+and allocated slug, separated by a hyphen (which cannot occur in the encoding).
+Neither author text nor a URL is interpolated into raw TeX.
+
+Generated HTML currently uses plain Markdown-it headings without IDs. The
+extension installs fence/document renderers on the host preview parser, leaving
+heading IDs to VS Code; it supplies no slug implementation to reuse. Publication
+therefore defines its own explicit policy rather than claiming exact preview
+compatibility. Common lowercase, hyphenated links work where hosts use that
+convention; duplicate and punctuation behavior can differ.
+
+Slugs use parsed visible text and code spans, including emphasis and link labels,
+not Markdown delimiters or link URLs. Normalize to NFC, lowercase without locale,
+remove Unicode punctuation/symbols except hyphens and underscores, then collapse
+whitespace to hyphens. Normalize the final slug to NFC again before grouping or
+encoding: lowercasing and punctuation removal can create new composable sequences.
+Empty results become `section`. Accents and non-Latin letters remain; fragment
+matching is case-sensitive and NFC-normalized.
+
+```ts : <<publication Pandoc heading identities>>=
+interface DocumentDestination {
+    id: string;
+    headings: Map<string, string[]>;
+    tokens: Map<Token, string>;
+}
+type PublicationTargets = Map<string, DocumentDestination>;
+function headingSlug(inline?: Token): string {
+    const text = (inline?.children ?? []).map(token => {
+        if (token.type === 'text' || token.type === 'code_inline') { return token.content; }
+        return token.type === 'softbreak' || token.type === 'hardbreak' ? ' ' : '';
+    }).join('');
+    return text.normalize('NFC').toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s_-]/gu, '')
+        .trim().replace(/\s+/gu, '-').normalize('NFC') || 'section';
+}
+```
+
+Reserve every natural base slug before allocating duplicate suffixes. A unique
+base keeps its slug; every member of a duplicate group gets `base-1`, `base-2`,
+etc., skipping reserved or already allocated names. Thus literal `Foo-1` cannot
+steal a duplicate `Foo` destination. An unnumbered duplicate link is ambiguous
+and lists usable alternatives. Unlinked duplicates are valid.
+
+```ts : <<publication Pandoc heading identities>>=+
+function headingDestinations(document: ParsedDocument): DocumentDestination {
+    const groups = new Map<string, Token[]>();
+    document.tokens.forEach((token, index) => {
+        if (token.type !== 'heading_open') { return; }
+        const slug = headingSlug(document.tokens[index + 1]);
+        const group = groups.get(slug) ?? [];
+        group.push(token); groups.set(slug, group);
+    });
+    const destination: DocumentDestination = {
+        id: documentTarget(document.path), headings: new Map(), tokens: new Map()
+    };
+    const reserved = new Set(groups.keys());
+    for (const [base, tokens] of groups) {
+        allocateHeadings(document.path, base, tokens, reserved, destination);
+    }
+    return destination;
+}
+```
+
+The index scans the full stream before reading any links, so forward links,
+setext headings and nested headings work without flattening their containers.
+Identities do not depend on line offsets or chapter order. Unrelated headings do
+not change IDs; renaming a heading/path or inserting a colliding slug can change
+them. Duplicate ordinals follow source token order, not arbitrary edit-stable IDs.
+
+```ts : <<publication Pandoc heading identities>>=+
+function allocateHeadings(path: string, base: string, tokens: Token[], reserved: Set<string>,
+    destination: DocumentDestination): void {
+    const slugs: string[] = [];
+    let ordinal = 1;
+    for (const token of tokens) {
+        let slug = base;
+        if (tokens.length > 1) {
+            do { slug = base + '-' + ordinal++; } while (reserved.has(slug));
+        }
+        reserved.add(slug); slugs.push(slug);
+        const id = 'h-' + documentTarget(path).slice(2) + '-' + documentTarget(slug).slice(2);
+        destination.tokens.set(token, id);
+        destination.headings.set(slug, [id]);
+    }
+    if (tokens.length > 1) { destination.headings.set(base, slugs); }
+}
+```
 
 ```ts : <<publication Pandoc document links>>=
 function documentTarget(path: string): string {
@@ -219,9 +304,11 @@ function localDocumentPath(href: string, source: string): string | undefined {
 Only HTTP, HTTPS, and mailto schemes are admitted as external links. Relative
 links must resolve exactly to an included `.literate` document or its `.html`
 alias. Percent-encoded path names and parent-directory navigation are supported
-without permitting escape above the project root. Local queries and heading
-fragments produce diagnostics instead of guessed destinations. Link text and
-titles remain Pandoc data, never TeX commands.
+without permitting escape above the project root. Split the literal fragment
+separator before decoding either component exactly once. Queries, empty fragments,
+malformed escapes, control characters and unsafe paths remain unsupported.
+Missing included documents, missing headings and ambiguous headings have distinct
+diagnostics. Link text and titles remain Pandoc data, never TeX commands.
 
 ```ts : <<publication Pandoc document links>>=+
 function safeExternalLink(href: string): boolean {
@@ -233,18 +320,61 @@ function safeExternalLink(href: string): boolean {
     } catch { return false; }
 }
 function linkDestination(
-    href: string, document: ParsedDocument, targets: Map<string, string>,
+    href: string, document: ParsedDocument, targets: PublicationTargets,
     diagnostics: GenerationDiagnostic[], at: PublicationLocation
 ): string | undefined {
     if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {
         if (safeExternalLink(href)) { return href; }
     } else {
-        const path = localDocumentPath(href, document.path);
-        if (path !== undefined && targets.has(path)) { return '#' + targets.get(path)!; }
+        const resolved = localLinkDestination(href, document, targets, diagnostics, at);
+        if (resolved !== undefined) { return resolved || undefined; }
     }
     report(diagnostics, at, 'unsupported-publication-link',
-        `Unsupported link (expected safe HTTP/HTTPS/mailto or an included document without query/fragment): ${href}`);
+        `Unsupported link (expected safe HTTP/HTTPS/mailto or an included document/heading without query): ${href}`);
     return undefined;
+}
+```
+
+Local resolution returns an empty sentinel for an already diagnosed missing or
+ambiguous destination, avoiding a second misleading unsupported-link diagnostic.
+Whole-document links retain their original stable `Div` destinations.
+
+```ts : <<publication Pandoc document links>>=+
+function localLinkDestination(href: string, document: ParsedDocument, targets: PublicationTargets,
+    diagnostics: GenerationDiagnostic[], at: PublicationLocation): string | undefined {
+    const hash = href.indexOf('#');
+    const path = hash === 0 ? document.path : localDocumentPath(hash < 0 ? href : href.slice(0, hash), document.path);
+    let slug: string | undefined;
+    if (hash >= 0) {
+        try { slug = decodeURIComponent(href.slice(hash + 1)).normalize('NFC'); } catch { return undefined; }
+        if (!slug || /[?#\\\x00-\x20\x7f]/.test(slug)) { return undefined; }
+    }
+    if (path === undefined) { return undefined; }
+    const destination = targets.get(path);
+    if (!destination) {
+        report(diagnostics, at, 'missing-publication-document', `Document is not included: ${path}`);
+        return '';
+    }
+    if (slug === undefined) { return '#' + destination.id; }
+    return headingLinkDestination(destination, slug, path, diagnostics, at);
+}
+```
+
+An ambiguous base maps to allocated slug choices, whereas a unique slug maps to
+one opaque target. The map is private to this preparation and never mutates the
+engine's tokens or attributes.
+
+```ts : <<publication Pandoc document links>>=+
+function headingLinkDestination(destination: DocumentDestination, slug: string, path: string,
+    diagnostics: GenerationDiagnostic[], at: PublicationLocation): string {
+    const matches = destination.headings.get(slug);
+    if (!matches) {
+        report(diagnostics, at, 'missing-publication-heading', `Missing heading: ${path}#${slug}`);
+    } else if (matches.length > 1) {
+        report(diagnostics, at, 'ambiguous-publication-heading',
+            `Ambiguous heading: ${path}#${slug}; use ${matches.map(value => '#' + value).join(', ')}`);
+    } else { return '#' + matches[0]; }
+    return '';
 }
 ```
 
@@ -262,7 +392,7 @@ interface InlineReader {
     tokens: readonly Token[];
     index: number;
     at: PublicationLocation;
-    targets: Map<string, string>;
+    targets: PublicationTargets;
     diagnostics: GenerationDiagnostic[];
 }
 function textInlines(text: string): PandocInline[] {
@@ -333,7 +463,7 @@ interface BlockReader {
     document: ParsedDocument;
     index: number;
     contributions: Map<number, PublicationContribution>;
-    targets: Map<string, string>;
+    targets: PublicationTargets;
     diagnostics: GenerationDiagnostic[];
 }
 function contributionIndex(
@@ -426,7 +556,8 @@ function readHeading(reader: BlockReader, token: Token): PandocLeafBlock {
     if (!level) {
         report(reader.diagnostics, tokenLocation(reader.document, token), 'invalid-markdown-structure', 'Invalid heading level');
     }
-    return { t: 'Header', c: [level, emptyAttributes(), readTextBlock(reader, token)] };
+    const id = reader.targets.get(reader.document.path)!.tokens.get(token)!;
+    return { t: 'Header', c: [level, [id, [], []], readTextBlock(reader, token)] };
 }
 ```
 
@@ -546,12 +677,12 @@ export function preparePandoc(
     const diagnostics = project.diagnostics.map(diagnostic => ({ ...diagnostic }));
     if (diagnostics.length) { return { diagnostics }; }
     validateReferences(project, diagnostics);
-    const targets = new Map(project.documents.map(document => [document.path, documentTarget(document.path)]));
+    const targets = new Map(project.documents.map(document => [document.path, headingDestinations(document)]));
     const parts = new Map(project.publication.contributions.map(part => [part.target, part]));
     const pending: PendingBlock[] = project.documents.map(document => {
         const contributions = contributionIndex(document, parts, diagnostics);
         const body = readBlocks({ document, index: 0, contributions, targets, diagnostics });
-        return { t: 'Div', c: [[targets.get(document.path)!, [], []], body] };
+        return { t: 'Div', c: [[targets.get(document.path)!.id, [], []], body] };
     });
     if (diagnostics.length) { return { diagnostics }; }
     const blocks = materialize(pending, renderContribution, diagnostics);
@@ -564,7 +695,396 @@ export function preparePandoc(
 The intended cases are deliberately narrow: nested prose and contributions,
 ordinary code, stable document-to-document links, and exact semantic callback
 inputs. Missing references, invalid modifiers, cycles, unsupported tokens,
-Mermaid, and heading links block callbacks. HTML/TeX-looking ordinary text remains
-data. Empty projects produce an empty Pandoc document. Font selection, syntax
-highlighting, LaTeX assembly, heading-link policy, images, tables, Pandoc process
-execution, and export commands belong to later slices.
+Mermaid, and unresolved heading links block callbacks. HTML/TeX-looking ordinary
+text remains data. Empty projects produce an empty Pandoc document. Font selection,
+syntax highlighting, LaTeX assembly, process execution and export commands live
+in their own adapters; images and tables remain unsupported.
+
+## Heading contract tests
+
+These tests are self-hosted here alongside the policy they exercise. The older
+bridge regression suite remains in `src/test/headless/publication-pandoc.test.ts`.
+No test needs Pandoc unless explicitly enabled; the real-tool case checks both
+JSON round-trip and LaTeX escaping/destinations.
+
+```ts : <<publication heading tests.*>>= ./src/test/headless/publication-headings.test.ts $
+<<publication heading test dependencies>>
+<<publication heading test helpers>>
+<<publication heading slug tests>>
+<<publication heading identity tests>>
+<<publication heading container tests>>
+<<publication heading diagnostic tests>>
+<<publication heading adapter tests>>
+```
+
+The recursive test walker exposes blocks without changing their nesting in the
+actual document. Production still traverses the complete Markdown token stream.
+
+```ts : <<publication heading test dependencies>>=
+import assert = require('node:assert/strict');
+import { test } from 'node:test';
+import { spawnSync } from 'node:child_process';
+import { generateProject, parseProject, SourceDocument } from '../../engine';
+import { preparePandoc, PandocBlock, PandocDocument } from '../../publication-pandoc';
+import { renderLatex } from '../../publication-latex';
+const source = (text: string, path = 'index.literate'): SourceDocument => ({ path, text });
+const fence = (body: string) => '```ts : \<<piece>>=\n' + body + '\n```\n';
+function blocks(document: PandocDocument): PandocBlock[] {
+    const result: PandocBlock[] = [];
+    function visit(block: PandocBlock): void {
+        result.push(block);
+        if (block.t === 'Div') { block.c[1].forEach(visit); }
+        if (block.t === 'BlockQuote') { block.c.forEach(visit); }
+        if (block.t === 'BulletList') { block.c.forEach(item => item.forEach(visit)); }
+        if (block.t === 'OrderedList') { block.c[1].forEach(item => item.forEach(visit)); }
+    }
+    document.blocks.forEach(visit);
+    return result;
+}
+```
+
+Expected target encodings are derived from the public policy, not by importing a
+private slug function. Every preparation also verifies snapshot immutability.
+
+```ts : <<publication heading test helpers>>=
+function target(slug: string, path = 'index.literate'): string {
+    const hex = (value: string) => value.split('').map(c => c.charCodeAt(0).toString(16).padStart(4, '0')).join('');
+    return 'h-' + hex(path) + '-' + hex(slug);
+}
+function prepare(sources: SourceDocument[]): PandocDocument {
+    const project = parseProject(sources), before = JSON.stringify(project);
+    const result = preparePandoc(project, () => [{ t: 'Para', c: [{ t: 'Str', c: 'CONTRIBUTION' }] }]);
+    assert.deepEqual(result.diagnostics, []);
+    assert.equal(JSON.stringify(project), before);
+    assert.ok(result.document);
+    return result.document;
+}
+function headingIds(document: PandocDocument): string[] {
+    return blocks(document).flatMap(block => block.t === 'Header' ? [block.c[1][0]] : []);
+}
+function destinations(document: PandocDocument): string[] {
+    return blocks(document).flatMap(block => block.t === 'Para' || block.t === 'Plain'
+        ? block.c.flatMap(inline => inline.t === 'Link' ? [inline.c[2][0]] : []) : []);
+}
+```
+
+Titles slug from parsed inline content. This covers entities, escapes, code,
+link labels, nested formatting, Unicode normalization, symbols and empty titles.
+
+```ts : <<publication heading slug tests>>=
+for (const [title, slug] of [
+    ['A *bold **inside*** and `x_y` [Label](https://example.org/ignored)', 'a-bold-inside-and-x_y-label'],
+    ['Café 東京 Ελληνικά', 'café-東京-ελληνικά'], ['Cafe\u0301', 'café'],
+    ['A &amp; B \\*literal\\*', 'a-b-literal'], ['~~Gone~~: A.B/C+D!', 'gone-abcd'],
+    ['  A   B -- C_D  ', 'a-b----c_d'], ['😀 ♥ !!!', 'section'], ['', 'section'],
+    ['__proto__', 'proto'], ['constructor', 'constructor'], ['İ', 'i\u0307'],
+    ['`\\input{BAD}% & $ # ^ ~`', 'inputbad'], ['𝒜 𐐀', '𝒜-𐐨']
+]) {
+    test(`publication heading slug from ${JSON.stringify(title)}`, () => {
+        const document = prepare([source('# ' + title + '\n\n[go](#' + encodeURIComponent(slug) + ')')]);
+        assert.deepEqual(headingIds(document), [target(slug)]);
+        assert.deepEqual(destinations(document), ['#' + target(slug)]);
+        assert.match(headingIds(document)[0], /^h-[0-9a-f]+-[0-9a-f]+$/);
+    });
+}
+```
+
+Lowercasing can create a composable sequence (`J` plus caron), and removing
+punctuation can bring a letter and combining mark together (`A.` plus acute).
+Both composed and decomposed authored fragments must find the final NFC slug.
+
+```ts : <<publication heading slug tests>>=+
+for (const [title, slug] of [['J\u030c', '\u01f0'], ['A.\u0301', '\u00e1']]) {
+    test(`final slug normalization resolves both fragment forms for ${title}`, () => {
+        const links = [slug, slug.normalize('NFD')].map(value =>
+            '[go](#' + encodeURIComponent(value) + ')').join(' ');
+        const document = prepare([source('# ' + title + '\n\n' + links)]);
+        assert.deepEqual(headingIds(document), [target(slug)]);
+        assert.deepEqual(destinations(document), ['#' + target(slug), '#' + target(slug)]);
+        assert.deepEqual(headingIds(prepare([source('# ' + slug)])), headingIds(document));
+    });
+}
+```
+
+Final normalization must also precede duplicate grouping, not merely lookup or
+ID encoding. Canonically equivalent bases share numbered alternatives, and both
+fragment spellings report the same ambiguity when no ordinal is supplied.
+
+```ts : <<publication heading slug tests>>=+
+for (const [title, slug] of [['J\u030c', '\u01f0'], ['A.\u0301', '\u00e1']]) {
+    test(`final slug normalization groups canonical duplicates for ${title}`, () => {
+        const headings = '# ' + title + '\n\n# ' + slug;
+        const links = [slug, slug.normalize('NFD')].flatMap(value => [1, 2].map(ordinal =>
+            '[go](#' + encodeURIComponent(value) + '-' + ordinal + ')')).join(' ');
+        const document = prepare([source(headings + '\n\n' + links)]);
+        const ids = [target(slug + '-1'), target(slug + '-2')];
+        assert.deepEqual(headingIds(document), ids);
+        assert.deepEqual(destinations(document), [...ids, ...ids].map(id => '#' + id));
+        for (const value of [slug, slug.normalize('NFD')]) {
+            const project = parseProject([source(headings + '\n\n[bad](#' + encodeURIComponent(value) + ')')]);
+            const result = preparePandoc(project, () => { throw new Error('must not render'); });
+            assert.equal(result.document, undefined);
+            assert.deepEqual(result.diagnostics.map(d => [d.code, d.line]), [['ambiguous-publication-heading', 4]]);
+            assert.ok(result.diagnostics[0].message.endsWith('use #' + slug + '-1, #' + slug + '-2'));
+        }
+    });
+}
+```
+
+Markdown formatting remains in the Header AST, rather than being replaced with
+the plain slug text. Setext and ATX spellings describe the same heading identity.
+
+```ts : <<publication heading slug tests>>=+
+test('heading formatting survives and setext identities match ATX', () => {
+    const title = '*Strong* and `code` [label](https://example.org)';
+    const atx = prepare([source('# ' + title)]);
+    const setext = prepare([source(title + '\n====')]);
+    assert.deepEqual(headingIds(atx), headingIds(setext));
+    const header = blocks(atx).find(block => block.t === 'Header');
+    assert.ok(header?.t === 'Header');
+    assert.deepEqual(header.c[2].map(inline => inline.t), ['Emph', 'Space', 'Str', 'Space', 'Code', 'Space', 'Link']);
+});
+test('generated HTML has no heading IDs; publication does not change HTML behavior', () => {
+    const result = generateProject([source('# Same\n\n# Same\n\n[go](#same)')]);
+    assert.deepEqual(result.diagnostics, []);
+    const html = result.files.find(file => file.path === 'index.html')!.content;
+    assert.equal((html.match(/<h1>Same<\/h1>/g) ?? []).length, 2);
+    assert.ok(html.includes('href="#same"'));
+});
+```
+
+Natural suffixed names are reserved even when they occur after duplicates.
+Normalization collisions and empty-title fallbacks use the same rule.
+
+```ts : <<publication heading identity tests>>=
+test('duplicates reserve natural suffixes and allocate deterministic unique IDs', () => {
+    const text = '# Foo\n\n## Foo\n\n# Foo-1\n\n# Foo-2\n\n# !!!\n\n# 😀\n\n# section-1\n\n'
+        + '[a](#foo-3) [b](#foo-4) [c](#foo-1) [d](#section-2) [e](#section-3)';
+    const document = prepare([source(text)]);
+    assert.deepEqual(headingIds(document), ['foo-3', 'foo-4', 'foo-1', 'foo-2', 'section-2', 'section-3', 'section-1'].map(s => target(s)));
+    assert.equal(new Set(headingIds(document)).size, 7);
+    assert.deepEqual(destinations(document), ['foo-3', 'foo-4', 'foo-1', 'section-2', 'section-3'].map(s => '#' + target(s)));
+    const unicode = prepare([source('# Café\n\n# Cafe\u0301\n\n[a](#café-1) [b](#cafe%CC%81-2)')]);
+    assert.deepEqual(headingIds(unicode), ['café-1', 'café-2'].map(s => target(s)));
+    assert.deepEqual(destinations(unicode), headingIds(unicode).map(id => '#' + id));
+});
+```
+
+Repeated naturally suffixed titles form their own duplicate group. Reserving
+all bases also protects a literal second-level suffix from that group's ordinals.
+Both ambiguous bases must name exactly the numbered destinations actually emitted.
+
+```ts : <<publication heading identity tests>>=+
+test('repeated Foo and Foo-1 reserve literal Foo-1-1 without target collisions', () => {
+    const headings = '# Foo\n\n# Foo\n\n# Foo-1\n\n# Foo-1\n\n# Foo-1-1';
+    const slugs = ['foo-2', 'foo-3', 'foo-1-2', 'foo-1-3', 'foo-1-1'];
+    const links = slugs.map(slug => '[go](#' + slug + ')').join(' ');
+    const document = prepare([source(headings + '\n\n' + links)]);
+    assert.deepEqual(headingIds(document), slugs.map(slug => target(slug)));
+    assert.equal(new Set(headingIds(document)).size, slugs.length);
+    assert.deepEqual(destinations(document), headingIds(document).map(id => '#' + id));
+    const project = parseProject([source(headings + '\n\n[bad](#foo) [bad](#foo-1)')]);
+    const result = preparePandoc(project, () => { throw new Error('must not render'); });
+    assert.equal(result.document, undefined);
+    assert.deepEqual(result.diagnostics.map(d => [d.code, d.line, d.column]), [
+        ['ambiguous-publication-heading', 10, 0], ['ambiguous-publication-heading', 10, 0]
+    ]);
+    assert.ok(result.diagnostics[0].message.endsWith('use #foo-2, #foo-3'));
+    assert.ok(result.diagnostics[1].message.endsWith('use #foo-1-2, #foo-1-3'));
+});
+```
+
+Document paths, not titles or chapter positions, scope identities. Forward links
+and both existing local extension conventions resolve to the same destination.
+
+```ts : <<publication heading identity tests>>=+
+test('cross-document headings resolve before rendering with safe path aliases', () => {
+    const document = prepare([
+        source('[source](<chapters/a b.literate#same>) [html](chapters/a%20b.html#same)\n\n# Same'),
+        source('[back](../index.html#same) [self](#same)\n\n# Same', 'chapters/a b.literate')
+    ]);
+    const home = target('same'), other = target('same', 'chapters/a b.literate');
+    assert.deepEqual(headingIds(document), [home, other]);
+    assert.deepEqual(destinations(document), ['#' + other, '#' + other, '#' + home, '#' + other]);
+    const shifted = prepare([source('# Unrelated\n\n# Same', 'chapters/a b.literate'), source('\n\n# Same')]);
+    assert.ok(headingIds(shifted).includes(home));
+    assert.ok(headingIds(shifted).includes(other));
+    const reordered = prepare([source('# Same', 'z.literate'), source('# Same', 'a.literate')]);
+    assert.deepEqual(headingIds(reordered), [target('same', 'a.literate'), target('same', 'z.literate')]);
+});
+```
+
+Path and slug punctuation never leaks into target syntax. Percent escapes are
+URL syntax only and decoded once, not interpreted again as separators or code.
+
+```ts : <<publication heading identity tests>>=+
+test('hostile path characters and astral Unicode remain injective safe data', () => {
+    const paths = ['a-b.literate', 'a/b.literate', 'é.literate', '𝒜.literate', 'a%20b.literate', 'a b.literate', 'x{y}&_.literate'];
+    const links = paths.map(path => '[go](<' + encodeURI(path) + '#safe>)').join(' ');
+    const document = prepare([source(links), ...paths.map(path => source('# Safe', path))]);
+    assert.equal(new Set(headingIds(document)).size, paths.length);
+    assert.deepEqual(destinations(document), paths.map(path => '#' + target('safe', path)));
+    headingIds(document).forEach(id => assert.match(id, /^h-[0-9a-f]+-[0-9a-f]+$/));
+});
+```
+
+A heading before and after a contribution must stay inside its original quote
+and list item. Code containing fake headings contributes neither IDs nor aliases.
+
+```ts : <<publication heading container tests>>=
+test('nested headings and contribution slots retain the full container stream', () => {
+    const text = '[before](#nested) [after](#after)\n\n> - ## Nested\n>\n'
+        + '>   ```ts : \<<piece>>=\n>   # not a heading\n>   ```\n>\n>   ### After\n>\n>   tail\n';
+    const document = prepare([source(text)]);
+    assert.deepEqual(headingIds(document), [target('nested'), target('after')]);
+    assert.deepEqual(destinations(document), headingIds(document).map(id => '#' + id));
+    const quote = blocks(document).find(block => block.t === 'BlockQuote');
+    assert.ok(quote?.t === 'BlockQuote');
+    const list = quote.c[0];
+    assert.ok(list.t === 'BulletList');
+    assert.deepEqual(list.c[0].map(block => block.t), ['Header', 'Para', 'Header', 'Para']);
+    assert.deepEqual(list.c[0][1], { t: 'Para', c: [{ t: 'Str', c: 'CONTRIBUTION' }] });
+    assert.deepEqual(headingIds(prepare([source('```text\n# Fake\n```\n\n    # Also fake')])), []);
+});
+```
+
+Failure assertions require no partial document and no contribution callbacks,
+including when the invalid link occurs later than a valid contribution.
+
+```ts : <<publication heading test helpers>>=+
+function reject(text: string, code: string, line = 4): void {
+    const project = parseProject([source(fence('ok') + '\n' + text)]);
+    let calls = 0;
+    const result = preparePandoc(project, () => { calls++; return []; });
+    assert.equal(calls, 0);
+    assert.equal(result.document, undefined);
+    assert.ok(result.diagnostics.some(d => d.code === code && d.path === 'index.literate'
+        && d.line === line && d.column === 0), JSON.stringify(result.diagnostics));
+}
+for (const href of ['#absent', 'index.html#absent', 'index.literate#absent', '#Title', '#caf%25C3%25A9']) {
+    test(`missing heading diagnostic: ${href}`, () => {
+        reject('[bad](' + href + ')\n\n# title\n\n# café', 'missing-publication-heading');
+    });
+}
+```
+
+Distinct diagnostics distinguish absent chapters/headings from unsafe or
+unsupported URL syntax. Inject real tokens for values Markdown-it would otherwise
+escape or refuse to parse as links.
+
+```ts : <<publication heading diagnostic tests>>=
+for (const href of ['#', 'index.html#', '#bad%00', '#bad%0a', '#bad%7f', '#bad%5c', '#%zz',
+    '#a#b', '#a?b', '#a%20b', 'index.html?q=1#title', '../index.html#title',
+    '/index.html#title', '//host/index.html#title', 'index.html%23title', 'index.html%3fq=1#title']) {
+    test(`unsupported heading URL diagnostic: ${href}`, () => {
+        const project = parseProject([source(fence('ok') + '\n[bad](https://example.org)')]);
+        const inline = project.documents[0].tokens.find(token => token.type === 'inline')!;
+        inline.children!.find(token => token.type === 'link_open')!.attrSet('href', href);
+        let calls = 0;
+        const result = preparePandoc(project, () => { calls++; return []; });
+        assert.equal(calls, 0); assert.equal(result.document, undefined);
+        assert.deepEqual(result.diagnostics.map(d => [d.code, d.line, d.column]), [['unsupported-publication-link', 4, 0]]);
+    });
+}
+test('missing included document diagnostics cover whole and heading links', () => {
+    reject('[bad](missing.html)', 'missing-publication-document');
+    reject('[bad](missing.literate#title)', 'missing-publication-document');
+});
+```
+
+The authoring path must reject unsafe local URL syntax too, not only injected
+token attributes. These inputs survive Markdown-it as actual links and must
+reach the publication gate without running an earlier contribution callback.
+
+```ts : <<publication heading diagnostic tests>>=+
+test('authored unsafe heading URLs are rejected before callbacks', () => {
+    for (const href of ['#bad%00', '#bad%0a', '#bad%5c', 'index.html?q=1#title',
+        '../index.html#title', '//host/index.html#title']) {
+        reject('[bad](' + href + ')\n\n# Title', 'unsupported-publication-link');
+    }
+});
+```
+
+Ambiguous bases never silently select the first heading. Even a linked heading
+with an unsupported child still goes through the ordinary inline validator.
+
+```ts : <<publication heading diagnostic tests>>=+
+test('ambiguous bases list allocated alternatives at the source link', () => {
+    const project = parseProject([source('[bad](#foo)\n\n# Foo\n\n# Foo\n\n# Foo-1')]);
+    const result = preparePandoc(project, () => []);
+    assert.equal(result.document, undefined);
+    assert.deepEqual(result.diagnostics.map(d => [d.code, d.line]), [['ambiguous-publication-heading', 0]]);
+    assert.match(result.diagnostics[0].message, /use #foo-2, #foo-3/);
+    reject('[bad](index.html#foo)\n\n# Foo\n\n# Foo', 'ambiguous-publication-heading');
+});
+test('heading indexing does not bypass unsupported inline content or raw attributes', () => {
+    reject('# ![image](asset.png)', 'unsupported-pandoc-token');
+    reject('# [bad](#absent)', 'missing-publication-heading');
+    const project = parseProject([source('# Safe\n\n[go](#safe)')]);
+    project.documents[0].tokens[0].attrSet('id', '\\input{ATTACK}');
+    const result = preparePandoc(project, () => []);
+    assert.deepEqual(result.diagnostics, []);
+    assert.deepEqual(headingIds(result.document!), [target('safe')]);
+});
+```
+
+The LaTeX adapter's existing preparation gate must prevent converter invocation
+on every unresolved heading class. No special raw heading renderer is needed:
+Pandoc owns heading and hyperlink escaping.
+
+```ts : <<publication heading adapter tests>>=
+test('LaTeX adapter gates missing, ambiguous and unsupported heading links before converter', async () => {
+    for (const [text, code] of [
+        ['[go](#absent)', 'missing-publication-heading'],
+        ['[go](#same)\n\n# Same\n\n# Same', 'ambiguous-publication-heading'],
+        ['[go](index.html?q=1#same)', 'unsupported-publication-link']
+    ]) {
+        let calls = 0;
+        const result = await renderLatex(parseProject([source(fence('ok') + '\n' + text)]), {}, async () => {
+            calls++; return 'must not happen';
+        });
+        assert.equal(calls, 0); assert.equal(result.latex, undefined);
+        assert.ok(result.diagnostics.some(d => d.code === code));
+    }
+});
+```
+
+The real writer must preserve IDs, produce internal links to them, and escape
+hostile heading and link-title text. JSON round-trip also catches malformed Pandoc
+attributes that a mock converter could miss.
+
+```ts : <<publication heading adapter tests>>=+
+test('real Pandoc preserves heading destinations, links and escaped inline author data',
+    { skip: process.env.LITERATE_TEST_PANDOC !== '1' }, () => {
+        const document = prepare([
+            source('[next](two.html#café)\n\n# `\\input{HEADING_ATTACK}` & 50% _value_\n\n[me](#inputheading_attack-50-value "\\\\input{TITLE_ATTACK}")'),
+            source('# Café\n\n[back](index.literate#inputheading_attack-50-value)', 'two.literate')
+        ]);
+        for (const format of ['json', 'latex']) {
+            const result = spawnSync('pandoc', ['--from=json', '--to=' + format, '--top-level-division=chapter'], {
+                input: JSON.stringify(document), encoding: 'utf8', timeout: 15000, maxBuffer: 1024 * 1024
+            });
+            assert.ifError(result.error); assert.equal(result.status, 0, result.stderr);
+            if (format === 'json') {
+                assert.deepEqual(JSON.parse(result.stdout).blocks, document.blocks);
+            } else { checkHeadingLatex(result.stdout, document); }
+        }
+    });
+```
+
+These assertions verify destinations and link commands, not merely that IDs
+appear somewhere in output. A separate manual PDF proof can inspect annotations.
+
+```ts : <<publication heading test helpers>>=+
+function checkHeadingLatex(latex: string, document: PandocDocument): void {
+    for (const id of headingIds(document)) {
+        assert.ok(latex.includes('\\label{' + id + '}'), latex);
+        assert.ok(latex.includes('\\hyperref[' + id + ']'), latex);
+    }
+    assert.ok(!latex.includes('\\input{HEADING_ATTACK}'));
+    assert.ok(!latex.includes('\\input{TITLE_ATTACK}'));
+    for (const escaped of ['\\textbackslash', '\\{', '\\}', '\\&', '50\\%']) {
+        assert.ok(latex.includes(escaped), escaped + '\n' + latex);
+    }
+}
+```

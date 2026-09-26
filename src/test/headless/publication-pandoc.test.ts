@@ -54,8 +54,8 @@ test('Pandoc preserves supported blocks, inline nesting, breaks and list attribu
         + '*em **strong*** ~~gone~~ `x < y`\nsoft  \nhard\n\n---\n\n'
         + '- one\n- two\n\n3) three\n4) four\n\n7. seven\n');
     assert.deepEqual(chapter(prepared(project)).blocks, [
-        { t: 'Header', c: [1, ['', [], []], [word('Title')]] },
-        { t: 'Header', c: [2, ['', [], []], [word('Subtitle')]] },
+        { t: 'Header', c: [1, ['h-0069006e006400650078002e006c0069007400650072006100740065-007400690074006c0065', [], []], [word('Title')]] },
+        { t: 'Header', c: [2, ['h-0069006e006400650078002e006c0069007400650072006100740065-007300750062007400690074006c0065', [], []], [word('Subtitle')]] },
         { t: 'Para', c: [
             { t: 'Emph', c: [word('em'), { t: 'Space' }, { t: 'Strong', c: [word('strong')] }] },
             { t: 'Space' }, { t: 'Strikeout', c: [word('gone')] }, { t: 'Space' },
@@ -121,7 +121,7 @@ test('Pandoc accepts safe external links and resolves included documents with sp
     assert.deepEqual(shifted.blocks.map((_, index) => chapter(shifted, index).id), [home.id, other.id]);
 });
 
-for (const href of ['#heading', 'index.html#heading', 'index.literate?q=1', 'missing.html',
+for (const href of ['index.literate?q=1',
     '../index.html', '/index.html', '//example.org/index.html', 'file.txt']) {
     test(`Pandoc rejects unsupported authored link ${href} before callbacks`, () => {
         rejected(parse(fence(': <<early>>=', 'ok') + '\n[bad](' + href + ')\n'),

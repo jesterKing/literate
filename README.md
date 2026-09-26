@@ -298,9 +298,53 @@ latexmk -cd -lualatex -interaction=nonstopmode -halt-on-error -no-shell-escape b
 Compile trusted projects only: disabling shell escape is not a complete TeX
 sandbox. No fonts or packages are downloaded by the export command.
 
-**Current limits:** Mermaid, images, tables, raw author tokens, and heading-fragment
-links produce diagnostics rather than disappearing. Whole-document links to
-included `.literate`/`.html` chapters work. Missing fragments and cycles also block
+### Heading destinations and links
+
+Publication supports `[local](#heading)`, `[chapter](chapter.literate#heading)`
+and the existing `[HTML alias](chapter.html#heading)` convention. Whole-document
+links still work. Paths resolve relative to the source document, must stay inside
+the project, and must name an included document. Percent-encoded paths/fragments
+are decoded once; local queries, empty fragments, malformed escapes and unsafe
+URL forms are rejected. HTTP/HTTPS/mailto links retain their external semantics.
+
+Heading slugs use **visible parsed inline text** (including code spans and link
+labels), not formatting delimiters or link destinations:
+
+- Normalize Unicode to NFC and lowercase without locale-specific rules.
+- Keep Unicode letters, marks, numbers, whitespace, hyphens and underscores;
+  remove other punctuation/symbols. Trim and collapse whitespace to `-`.
+- Normalize the final slug to NFC again before duplicate grouping and ID encoding:
+  lowercasing or removing punctuation can create new composable sequences.
+- Use `section` if the result is empty. Thus `# *Café* and \`x_y\`` becomes
+  `café-and-x_y`; fragments are case-sensitive but NFC-normalized.
+- Reserve all natural slugs in a document. A unique heading keeps its slug.
+  Duplicate groups assign **every occurrence** numbered slugs (`foo-1`, `foo-2`,
+  …), skipping reserved/allocated names. With two `Foo` headings and a literal
+  `Foo-1`, use `#foo-2` and `#foo-3` for the duplicates, `#foo-1` for the literal.
+  An unnumbered `#foo` is ambiguous and reports the available alternatives.
+
+Opaque Pandoc heading IDs encode the canonical document path and allocated slug
+in a separate collision-safe namespace. Line offsets, chapter order and unrelated
+headings do not change them. Renaming paths/headings or adding colliding titles
+can change IDs; duplicate ordinals follow source order, not edit-stable author IDs.
+Forward links, setext headings and headings inside lists/quotes are supported
+without flattening containers. Titles and labels stay escaped Pandoc data.
+
+**Compatibility:** generated HTML currently emits plain Markdown-it headings
+without IDs. The extension leaves heading IDs to VS Code's preview parser and
+has no local slug implementation. Publication uses familiar lowercase/hyphen
+slugs where practical, but does not promise exact host-preview punctuation or
+duplicate behavior. In particular it rejects ambiguous duplicate links instead
+of silently selecting the first. This slice does not change HTML/preview output
+or add explicit `{#id}` syntax.
+
+Missing documents (`missing-publication-document`), missing headings
+(`missing-publication-heading`), ambiguous headings
+(`ambiguous-publication-heading`) and unsupported URL forms
+(`unsupported-publication-link`) report source locations **before conversion**.
+
+**Current limits:** Mermaid, images, tables and raw author tokens produce
+diagnostics rather than disappearing. Missing fragments and cycles also block
 export. The repository's own book currently contains Mermaid diagrams, so it is
 not yet a supported whole-book export. Missing tools, conversion failures, and
 publication diagnostics leave existing output untouched.

@@ -98,6 +98,53 @@ function validateCycles(
         }
     }
 }
+interface DocumentDestination {
+    id: string;
+    headings: Map<string, string[]>;
+    tokens: Map<Token, string>;
+}
+type PublicationTargets = Map<string, DocumentDestination>;
+function headingSlug(inline?: Token): string {
+    const text = (inline?.children ?? []).map(token => {
+        if (token.type === 'text' || token.type === 'code_inline') { return token.content; }
+        return token.type === 'softbreak' || token.type === 'hardbreak' ? ' ' : '';
+    }).join('');
+    return text.normalize('NFC').toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s_-]/gu, '')
+        .trim().replace(/\s+/gu, '-').normalize('NFC') || 'section';
+}
+function headingDestinations(document: ParsedDocument): DocumentDestination {
+    const groups = new Map<string, Token[]>();
+    document.tokens.forEach((token, index) => {
+        if (token.type !== 'heading_open') { return; }
+        const slug = headingSlug(document.tokens[index + 1]);
+        const group = groups.get(slug) ?? [];
+        group.push(token); groups.set(slug, group);
+    });
+    const destination: DocumentDestination = {
+        id: documentTarget(document.path), headings: new Map(), tokens: new Map()
+    };
+    const reserved = new Set(groups.keys());
+    for (const [base, tokens] of groups) {
+        allocateHeadings(document.path, base, tokens, reserved, destination);
+    }
+    return destination;
+}
+function allocateHeadings(path: string, base: string, tokens: Token[], reserved: Set<string>,
+    destination: DocumentDestination): void {
+    const slugs: string[] = [];
+    let ordinal = 1;
+    for (const token of tokens) {
+        let slug = base;
+        if (tokens.length > 1) {
+            do { slug = base + '-' + ordinal++; } while (reserved.has(slug));
+        }
+        reserved.add(slug); slugs.push(slug);
+        const id = 'h-' + documentTarget(path).slice(2) + '-' + documentTarget(slug).slice(2);
+        destination.tokens.set(token, id);
+        destination.headings.set(slug, [id]);
+    }
+    if (tokens.length > 1) { destination.headings.set(base, slugs); }
+}
 function documentTarget(path: string): string {
     let encoded = 'd-';
     for (let index = 0; index < path.length; index++) {
@@ -128,25 +175,54 @@ function safeExternalLink(href: string): boolean {
     } catch { return false; }
 }
 function linkDestination(
-    href: string, document: ParsedDocument, targets: Map<string, string>,
+    href: string, document: ParsedDocument, targets: PublicationTargets,
     diagnostics: GenerationDiagnostic[], at: PublicationLocation
 ): string | undefined {
     if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {
         if (safeExternalLink(href)) { return href; }
     } else {
-        const path = localDocumentPath(href, document.path);
-        if (path !== undefined && targets.has(path)) { return '#' + targets.get(path)!; }
+        const resolved = localLinkDestination(href, document, targets, diagnostics, at);
+        if (resolved !== undefined) { return resolved || undefined; }
     }
     report(diagnostics, at, 'unsupported-publication-link',
-        `Unsupported link (expected safe HTTP/HTTPS/mailto or an included document without query/fragment): ${href}`);
+        `Unsupported link (expected safe HTTP/HTTPS/mailto or an included document/heading without query): ${href}`);
     return undefined;
+}
+function localLinkDestination(href: string, document: ParsedDocument, targets: PublicationTargets,
+    diagnostics: GenerationDiagnostic[], at: PublicationLocation): string | undefined {
+    const hash = href.indexOf('#');
+    const path = hash === 0 ? document.path : localDocumentPath(hash < 0 ? href : href.slice(0, hash), document.path);
+    let slug: string | undefined;
+    if (hash >= 0) {
+        try { slug = decodeURIComponent(href.slice(hash + 1)).normalize('NFC'); } catch { return undefined; }
+        if (!slug || /[?#\\\x00-\x20\x7f]/.test(slug)) { return undefined; }
+    }
+    if (path === undefined) { return undefined; }
+    const destination = targets.get(path);
+    if (!destination) {
+        report(diagnostics, at, 'missing-publication-document', `Document is not included: ${path}`);
+        return '';
+    }
+    if (slug === undefined) { return '#' + destination.id; }
+    return headingLinkDestination(destination, slug, path, diagnostics, at);
+}
+function headingLinkDestination(destination: DocumentDestination, slug: string, path: string,
+    diagnostics: GenerationDiagnostic[], at: PublicationLocation): string {
+    const matches = destination.headings.get(slug);
+    if (!matches) {
+        report(diagnostics, at, 'missing-publication-heading', `Missing heading: ${path}#${slug}`);
+    } else if (matches.length > 1) {
+        report(diagnostics, at, 'ambiguous-publication-heading',
+            `Ambiguous heading: ${path}#${slug}; use ${matches.map(value => '#' + value).join(', ')}`);
+    } else { return '#' + matches[0]; }
+    return '';
 }
 interface InlineReader {
     document: ParsedDocument;
     tokens: readonly Token[];
     index: number;
     at: PublicationLocation;
-    targets: Map<string, string>;
+    targets: PublicationTargets;
     diagnostics: GenerationDiagnostic[];
 }
 function textInlines(text: string): PandocInline[] {
@@ -190,7 +266,7 @@ interface BlockReader {
     document: ParsedDocument;
     index: number;
     contributions: Map<number, PublicationContribution>;
-    targets: Map<string, string>;
+    targets: PublicationTargets;
     diagnostics: GenerationDiagnostic[];
 }
 function contributionIndex(
@@ -261,7 +337,8 @@ function readHeading(reader: BlockReader, token: Token): PandocLeafBlock {
     if (!level) {
         report(reader.diagnostics, tokenLocation(reader.document, token), 'invalid-markdown-structure', 'Invalid heading level');
     }
-    return { t: 'Header', c: [level, emptyAttributes(), readTextBlock(reader, token)] };
+    const id = reader.targets.get(reader.document.path)!.tokens.get(token)!;
+    return { t: 'Header', c: [level, [id, [], []], readTextBlock(reader, token)] };
 }
 function readList(reader: BlockReader, stop: string, depth: number): PendingBlock[][] {
     const result: PendingBlock[][] = [], tokens = reader.document.tokens;
@@ -334,12 +411,12 @@ export function preparePandoc(
     const diagnostics = project.diagnostics.map(diagnostic => ({ ...diagnostic }));
     if (diagnostics.length) { return { diagnostics }; }
     validateReferences(project, diagnostics);
-    const targets = new Map(project.documents.map(document => [document.path, documentTarget(document.path)]));
+    const targets = new Map(project.documents.map(document => [document.path, headingDestinations(document)]));
     const parts = new Map(project.publication.contributions.map(part => [part.target, part]));
     const pending: PendingBlock[] = project.documents.map(document => {
         const contributions = contributionIndex(document, parts, diagnostics);
         const body = readBlocks({ document, index: 0, contributions, targets, diagnostics });
-        return { t: 'Div', c: [[targets.get(document.path)!, [], []], body] };
+        return { t: 'Div', c: [[targets.get(document.path)!.id, [], []], body] };
     });
     if (diagnostics.length) { return { diagnostics }; }
     const blocks = materialize(pending, renderContribution, diagnostics);

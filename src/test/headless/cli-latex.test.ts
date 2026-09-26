@@ -253,11 +253,16 @@ test('latex JSON writes only the selected-root book and preserves identical byte
 
 for (const [name, text] of [
     ['syntax', '```text: <<broken>>\nmalformed header\n```\n'],
-    ['Mermaid', '```mermaid\ngraph TD; A-->B\n```\n']
+    ['Mermaid', '```mermaid\ngraph TD; A-->B\n```\n'],
+    ['missing heading', '[go](#absent)\n\n# Present'],
+    ['missing heading document', '[go](missing.html#absent)'],
+    ['ambiguous heading', '[go](#same)\n\n# Same\n\n# Same'],
+    ['unsupported heading URL', '[go](index.html?q=1#same)']
 ]) {
     test(`latex ${name} diagnostics prevent conversion and all writes`, async t => {
         const root = fixture(t);
         write(root, 'index.literate', text);
+        write(root, 'books/book.tex', 'previous book');
         const before = snapshot(root);
         let calls = 0;
         const result = await command(latex(root), async () => { calls++; return body; });
