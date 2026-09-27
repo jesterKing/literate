@@ -17,7 +17,7 @@ interface Response {
     outputs: { path: string; status: string }[];
     usage?: string;
 }
-const cli = path.resolve(__dirname, '../../cli.js');
+const cli = path.resolve(__dirname, '../../cli-entry.js');
 const body = '\\chapter{Converted book}\nBody from converter.\n';
 const convert: LatexConverter = async () => body;
 const source = '# A book\n\n```text: <<main.*>>= generated.txt $\nhello\n```\n';
@@ -381,7 +381,7 @@ function pandocChild(root: string, program?: string) {
         fs.chmodSync(path.join(bin, 'pandoc'), 0o755);
     }
     const document = { ['pandoc-api-version']: [1, 23, 1], meta: {}, blocks: [{ t: 'Para', c: [{ t: 'Str', c: 'stdin sentinel' }] }] };
-    const script = `const { runPandoc } = require(${JSON.stringify(cli)});
+    const script = `const { runPandoc } = require(${JSON.stringify(path.resolve(__dirname, '../../cli.js'))});
         runPandoc(${JSON.stringify(document)}, { standalone: false, syntaxHighlighting: 'none', topLevelDivision: 'chapter' })
         .then(body => console.log(JSON.stringify({ ok: true, body })),
             error => console.log(JSON.stringify({ ok: false, error: error.message })));`;

@@ -132,7 +132,7 @@ if necessary, then install the locked dependencies:</p>
 yarn build:cli
 </code></pre>
 <p>The checked-in generated TypeScript is the bootstrap: <code>build:cli</code> bundles only
-the CLI's local modules into <code>out/cli.js</code>, using installed packages at runtime.
+the CLI's local modules into <code>out/cli-entry.js</code>, using installed packages at runtime.
 It does not type-check or compile
 the extension, so an extension error does not prevent generation. No global
 TypeScript compiler or published Literate extension is required. <code>.gitattributes</code>
@@ -187,9 +187,9 @@ Use it only on trusted code; the child is not a security sandbox.</p>
 old output. Run <code>yarn literate generate</code> again, review the differences, then repeat
 the check. Keep generated TypeScript committed so the next checkout can bootstrap.</p>
 <p>If newly generated CLI code fails to build, keep using a known-working executable
-with <code>node out/cli.js generate</code> to regenerate after fixing the literate source.
+with <code>node out/cli-entry.js generate</code> to regenerate after fixing the literate source.
 Do not repair generated TypeScript by hand. Keep a separate known-good CLI bundle
-before risky generator syntax changes; <code>out/cli.js</code> can also be overwritten by
+before risky generator syntax changes; <code>out/cli-entry.js</code> can also be overwritten by
 compilation, so it is not a permanent backup.</p>
 <p>For syntax changes, retain compatibility long enough to generate the new parser
 before migrating the book. During this initial extraction the generated engine
@@ -203,8 +203,8 @@ yarn literate self-check --json
 output, definitions, and dependencies. Locations refer to the literate sources,
 not generated files. JSON responses use schema version 1 and zero-based positions;
 usage errors and I/O failures are also structured. Inspection and checks never
-write project output. The <code>yarn literate</code> wrapper does rebuild <code>out/cli.js</code>; invoke
-<code>node out/cli.js</code> directly when the whole invocation must avoid project writes.</p>
+write project output. The <code>yarn literate</code> wrapper does rebuild <code>out/cli-entry.js</code>; invoke
+<code>node out/cli-entry.js</code> directly when the whole invocation must avoid project writes.</p>
 <h2>Safe generation while editing</h2>
 <p>A missing fragment, a cycle, an invalid declaration, or an unsafe output path is
 an error. The engine returns diagnostics and no output files, preserving the last

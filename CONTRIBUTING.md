@@ -34,8 +34,12 @@ Do not merely split blocks to meet a line count or narrate every statement. The
 chapter should read as a knowledge book, not a source listing with captions.
 
 - `yarn build:cli`: bootstrap from generated CLI sources without compiling the extension.
+  Run the built executable with `node out/cli-entry.js check` (or `generate`,
+  `latex`, `pdf`, etc.). `out/cli.js` is a library, not the direct executable.
+- `yarn build:publication`: build the three self-contained publication runtime
+  bundles and their dependency-graph metadata; see M5 below.
 - `yarn build:preview`: bundle the pinned Mermaid dependency and browser preview client locally.
-- `yarn esbuild`: build both the extension and browser preview bundles.
+- `yarn esbuild`: build the extension, browser preview and publication bundles.
 - `yarn watch:preview`: rebuild the browser bundle while editing its generated entry (run generation after editing the chapter).
 - `yarn literate inspect [root] --json`: locate fragment definitions, references, and outputs.
 - `yarn literate generate [root]`: build the CLI, validate, and write changed outputs.
@@ -54,6 +58,135 @@ all generated diffs. Prose-only changes should not change generated TypeScript.
 
 The full workflow and limitations are documented in
 [Developing this literate program](literate/development.literate).
+
+## M5 integrated publication acceptance
+
+M5 integrates **Literate: Export LaTeX** and **Literate: Export PDF** into the
+Command Palette. See [README](README.md#m5-integrated-vs-code-publication) for
+User/machine settings, the folder/page/margin/destination flow, supported hosts,
+and the cancellation contract. M1–M4 evidence below is historical and remains
+bounded by its original fixtures; it is not a substitute for M5 host/package proof.
+
+### Runtime and regression boundaries
+
+- Require trusted local desktop `file:` workspaces on POSIX. Reject remote, web,
+  virtual and Windows environments. All tools run on the same host. External
+  Node >=22.12 is an explicit absolute User setting, never Electron; the optional
+  Chromium executable is also absolute and User/global-only. The optional font
+  manifest is root-relative. Do not trust workspace executable overrides.
+- Capture fresh file-backed `.literate` buffers only after prompting and entering
+  the serialized publication/generation queue, including dirty, new and empty
+  documents. Never call `saveAll`; binary assets/fonts remain disk-only. Initial
+  activation is read-only, with source/HTML generation deferred until save/process.
+  Generation-template failures must not disable the independent publication path.
+- Prompt cancellation starts no helper or writes. Progress cancellation and
+  revocation before commit preserve existing output through rollback. A late
+  cancellation after commit must still report success; folder removal/disposal
+  suppresses subsequent remember/open actions without pretending to undo a commit.
+- The helper's 10-minute deadline requests graceful `SIGTERM` cleanup. After
+  30 seconds without acknowledgment, report stuck cleanup and retain the queue
+  until exit. Do not add force kill or claim a hard termination guarantee.
+- Remember successful geometry/destination per workspace root and export kind.
+  Report compiler warnings in **Literate Publication**; **Open Output** opens the
+  exported file. Headless tests cover these boundaries with injected adapters,
+  including persistent cancellation and integrated read-only activation.
+
+The current recorded full suite in `out/m5-tests-final.log` reports **1,187 passed,
+2 skipped, 0 failed** (1,189 tests). This is the recorded M5 result, not a claim
+that every later repackage reran the suite. Real-tool evidence is separate below.
+
+### Build and package closure
+
+From the source checkout, run `yarn build:publication` (also part of
+`yarn esbuild` and the VSIX prepublish build). It validates declared and installed
+pins: Mermaid **12.0.0**, Puppeteer Core **25.12.0**, ZenUML and tidy-tree **1.0.1**,
+and esbuild **0.28.2**, using external Node >=22.12. It emits exactly these three
+publication runtime files:
+
+- `out/publication-helper.cjs`
+- `out/publication-mermaid-worker.mjs`
+- `out/publication-mermaid-browser.js`
+
+The build emits adjacent `.meta.json` dependency graphs and validates closure:
+no external non-builtin runtime imports, extra chunks, self-hosting/build toolchain,
+or Puppeteer browser downloader/launcher dependency. The VSIX ships the runtime
+files, not the metadata or `node_modules`; local external tools/fonts are still
+required. The acceptance closure check is not a complete transitive license audit.
+
+An actual archive, `out/literate-m5.vsix`, was built with **VSCE 4 `--no-dependencies`**.
+The evidence below identifies the tested archive by hash. The final archive has
+19 entries (4.72 MB), excluding Yarn state/configuration, plans and fonts. After
+any repackage, rerun acceptance and retain the new evidence path/hash rather than
+treating an older archive proof as proof of new bytes.
+
+### Real desktop host
+
+Build first with `yarn esbuild`, then explicitly run the bounded installed-host
+harness (it does not build, install or download):
+
+```sh
+timeout 240s node src/test/acceptance/publication-host-run.js
+```
+
+It needs an installed VS Code and display, checkout test dependencies, the real
+publication toolchain and fixture fonts. The launcher defaults to
+`/usr/share/code/code`, `/usr/bin/node`, `/usr/bin/chromium-browser`, the existing
+`out/portable-font-lilex/project/fonts.json`, and
+`out/publication-renderer/ulem.sty`. `M5_CODE`, `M5_FONT_MANIFEST`, `M5_ULEM` and
+`M5_CDP_PORT` override the corresponding harness inputs. It uses an isolated
+profile/workspace, not normal user settings. Its fixture launch disables the
+workspace-trust prompt and uses `--no-sandbox` for the **test VS Code host**; this
+is not a publication Chromium sandbox bypass or proof of runtime trust rejection.
+
+Retained evidence in `out/m5-host-hZ70jv/acceptance.json` records:
+
+- Read-only integrated activation: commands register without output writes or a
+  helper launch.
+- **Eight prompt cancellations**, folder/paper/margins/destination for both kinds,
+  with no helper launch or input/output changes. Folder, paper and margin prompts
+  use native workbench UI via CDP keyboard input; destination responses and
+  notifications are instrumented, not native Save-dialog/notification UI proof.
+- Real LaTeX and PDF exports from dirty index/chapter snapshots without saving,
+  using real Pandoc, Chromium and TeX. Integrated generation waits behind the
+  LaTeX helper on the shared queue before generating from dirty buffers.
+- The PDF fixture produces **3 A5 pages, 0 warnings**. This is bounded fixture
+  evidence, not universal layout/Unicode coverage or clean full-book typography.
+
+### Isolated packaged helper
+
+With the built metadata and an existing VSIX, run:
+
+```sh
+node src/test/acceptance/publication-package.mjs \
+  --node /absolute/path/to/node \
+  --browser /absolute/path/to/chromium \
+  --font-manifest /absolute/path/to/font-project/fonts.json \
+  --ulem /absolute/path/to/existing/ulem.sty \
+  --vsix /absolute/path/to/literate-m5.vsix
+```
+
+All supplied paths must be absolute existing files. Node, browser and manifest
+are required; `--ulem` is an optional disclosed local package workaround.
+`--vsix` is optional in the harness, but **required to claim actual VSIX proof**:
+without it, only existing `out/` bundles are tested. This harness requires Linux
+bubblewrap, `unzip`, the publication toolchain and Poppler; subprocesses are
+bounded. It neither builds nor downloads dependencies.
+
+`out/publication-package-MxMFVO/acceptance.json` records **all six checks passed**:
+actual VSIX extraction/hash and runtime equality, bundle closure/allowlist,
+snapshot LaTeX, unchanged repeat, snapshot PDF, and publication-only request
+boundaries. The isolated runtime hides `/home` and cannot resolve checkout
+packages; no `node_modules` is present. The PDF has **3 pages, 0 warnings**.
+This proves the packaged helper without checkout dependencies, not the extension
+host UI or cancellation phases. Keep the archive hash, inputs, metadata and
+limitations with the evidence; a later archive requires a fresh run.
+
+### Next milestone
+
+**M6 is not implemented and requires the user's choice of author-facing syntax
+before implementation.** Source-chapter design prose is design-only, not evidence
+that proposed syntax or behavior is available. Keep milestone/progress reports in
+these docs, preserving the historical acceptance sections below.
 
 ## Opt-in portable publication acceptance
 
@@ -147,8 +280,9 @@ are separate from this image harness; see M3 below.
 M3 adds transactional local PNG/JPEG/PDF and generated Mermaid SVG+PDF companions
 to explicit CLI LaTeX export. See [README](README.md#m3-explicit-mermaid-vector-export)
 for browser requirements, source restrictions and caps. Ordinary generation and
-extension use do not launch the publication browser; there is still no extension
-export action or automatic book PDF compilation.
+non-publication extension use do not launch the publication browser. M3 itself
+provided no extension export action or automatic book PDF compilation; M5 now
+provides explicit extension commands.
 
 Run the opt-in checks with **Node >=22.12 on POSIX**, checkout development
 dependencies (`puppeteer-core`, no browser download), and an explicitly installed,
@@ -190,7 +324,7 @@ Retained acceptance evidence:
   lines**. This proves compilation, **not clean full-book typography**.
 
 The historical M3 full test result was **918 passed, 2 skipped**; it is not the
-final M4 test count. Normal tests use injected adapters and do not launch Chromium; these opt-in browser/PDF checks
+final M4 or M5 test count. Normal tests use injected adapters and do not launch Chromium; these opt-in browser/PDF checks
 are separate evidence, not implied by a headless-suite pass. Each harness retains
 its own ignored `out/` evidence directory for diagnosis.
 
@@ -200,8 +334,8 @@ M4 is finished for explicit CLI PDF publication; see
 [README](README.md#m4-explicit-pdf-book-compilation) for the command, package list,
 limits, cancellation/transaction contract, and trusted-input restriction. The
 `latex` `.tex` export is unchanged. M3 added exportable diagrams, not an explicit
-book PDF command; M4 now supplies `pdf`. No extension publication commands exist
-yet (M5), and neither ordinary generation nor saves compile PDFs.
+book PDF command; M4 supplies `pdf`. M5 now adds explicit extension publication
+commands; neither ordinary generation nor saves compile PDFs.
 
 Run the production-CLI acceptance harness explicitly:
 
@@ -257,7 +391,7 @@ overfull boxes. This proves successful publication and warning reporting,
 fixture. Neither evidence set promises byte-identical PDFs or arbitrary-font,
 Unicode, layout, or theme coverage.
 
-The final `LITERATE_TEST_PANDOC=1 yarn test` run records **1,062 passed, 2 skipped,
+The historical final M4 `LITERATE_TEST_PANDOC=1 yarn test` run records **1,062 passed, 2 skipped,
 0 failed** in `out/m4-tests-final.log`, including compiler-lifetime and publication
 cancellation tests. `yarn check:self`, `yarn esbuild` and `git diff --check` also
 passed. The real PDF acceptance above is separate from the headless-suite result.

@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Publication commands</h1>
+<p>The editor adapter owns prompts and a fresh source snapshot, not generation.
+Only trusted, local, desktop file workspaces on POSIX are supported, including
+LaTeX-only exports: the helper and diagram process lifecycle use POSIX signals.
+A global guard rejects overlapping publication commands. A supplied repository
+queue serializes source capture and helper cleanup with ordinary generation.
+No save-all, cached repository state, or generated source/HTML is used here.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002e002a-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002e002a"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002e002a" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002e002a" aria-label="Definition of publication extension.*">&lt;&lt;publication extension.*&gt;&gt;= src/publication-extension.ts $</a></div>
+<div class="code">
+<pre><code><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200069006d0070006f007200740073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200069006d0070006f007200740073" aria-label="Definition of publication extension imports">&lt;&lt;publication extension imports&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200070006f006c006900630079" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200070006f006c006900630079" aria-label="Definition of publication extension policy">&lt;&lt;publication extension policy&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700061007400680073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700061007400680073" aria-label="Definition of publication extension paths">&lt;&lt;publication extension paths&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200073006e0061007000730068006f0074" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200073006e0061007000730068006f0074" aria-label="Definition of publication extension snapshot">&lt;&lt;publication extension snapshot&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065" aria-label="Definition of publication extension bridge">&lt;&lt;publication extension bridge&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073" aria-label="Definition of publication extension prompts">&lt;&lt;publication extension prompts&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" aria-label="Definition of publication extension commands">&lt;&lt;publication extension commands&gt;&gt;</a>
+</code></pre>
+
+</div>
+</div><h2>Registration and configuration</h2>
+<p><code>registerPublicationCommands(context, serialize, bridge)</code> registers
+<code>literate.exportLatex</code> and <code>literate.exportPdf</code> and attaches their disposables to
+the extension context. The optional <code>PublicationQueue</code> callback accepts one async
+operation and returns its result; without a callback, operations execute directly.
+The default bridge runs <code>out/publication-helper.cjs</code> as an external Node process.</p>
+<p>The restricted, machine-scope string settings have empty defaults:
+<code>literate.publication.nodePath</code> is a required absolute external Node &gt;=22.12
+executable, never Electron; <code>literate.publication.browserPath</code> is an optional
+absolute sandbox-capable Chromium executable; and
+<code>literate.publication.fontManifest</code> is optional root-relative JSON.
+Executable settings are read only from user/global values, never workspace or
+folder overrides. Dependencies such as Pandoc and latexmk/LuaLaTeX remain the
+helper's preflight responsibility.
+Fonts and licenses are optional disk inputs; editor overlays apply only to sources.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200069006d0070006f007200740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200069006d0070006f007200740073"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200069006d0070006f007200740073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200069006d0070006f007200740073" aria-label="Definition of publication extension imports">&lt;&lt;publication extension imports&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> vscode <span class="hljs-keyword">from</span> <span class="hljs-string">'vscode'</span>;
+<span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> fs <span class="hljs-keyword">from</span> <span class="hljs-string">'node:fs/promises'</span>;
+<span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> path <span class="hljs-keyword">from</span> <span class="hljs-string">'node:path'</span>;
+<span class="hljs-keyword">import</span> { spawn } <span class="hljs-keyword">from</span> <span class="hljs-string">'node:child_process'</span>;
+<span class="hljs-keyword">import</span> { discoveryExcludedDirectories, safeRelativePath } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
+
+<span class="hljs-keyword">type</span> <span class="hljs-title">Kind</span> = <span class="hljs-string">'latex'</span> | <span class="hljs-string">'pdf'</span>;
+<span class="hljs-keyword">interface</span> <span class="hljs-title">Choice</span> { <span class="hljs-attr">paper</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">margins</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">destination</span>: <span class="hljs-built_in">string</span>; }
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationRequest</span> { <span class="hljs-attr">args</span>: <span class="hljs-built_in">string</span>[]; <span class="hljs-attr">documents</span>: <span class="hljs-title">SourceDocument</span>[]; }
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">HelperResult</span> { <span class="hljs-attr">stdout</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">stderr</span>: <span class="hljs-built_in">string</span>; }
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title">PublicationQueue</span> = &lt;T&gt;<span class="hljs-function">(</span><span class="hljs-params">operation: </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">Promise</span><span class="hljs-params">&lt;T&gt;</span><span class="hljs-function">) =&gt;</span> <span class="hljs-title">Promise</span>&lt;T&gt;;
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title">PublicationBridge</span> = <span class="hljs-function">(</span><span class="hljs-params">node: </span><span class="hljs-built_in">string</span><span class="hljs-params">, helper: </span><span class="hljs-built_in">string</span><span class="hljs-params">, root: </span><span class="hljs-built_in">string</span><span class="hljs-params">,
+    request: PublicationRequest, token: vscode.CancellationToken,
+    report: </span><span class="hljs-params">(message: </span><span class="hljs-built_in">string</span><span class="hljs-params">)</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span><span class="hljs-function">) =&gt;</span> <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">HelperResult</span>&gt;;
+<span class="hljs-keyword">const</span> <span class="hljs-attr">papers</span>: <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, [<span class="hljs-built_in">number</span>, <span class="hljs-built_in">number</span>]&gt; = {
+    <span class="hljs-attr">a4</span>: [<span class="hljs-number">210</span>, <span class="hljs-number">297</span>], <span class="hljs-attr">a5</span>: [<span class="hljs-number">148</span>, <span class="hljs-number">210</span>], <span class="hljs-attr">letter</span>: [<span class="hljs-number">215.9</span>, <span class="hljs-number">279.4</span>], <span class="hljs-attr">legal</span>: [<span class="hljs-number">215.9</span>, <span class="hljs-number">355.6</span>]
+};
+<span class="hljs-keyword">const</span> excluded = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>(discoveryExcludedDirectories);
+<span class="hljs-keyword">const</span> inputLimit = <span class="hljs-number">32</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>;
+<span class="hljs-keyword">const</span> outputLimit = <span class="hljs-number">8</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>;
+<span class="hljs-keyword">let</span> publishing = <span class="hljs-literal">false</span>;
+<span class="hljs-keyword">const</span> message = (<span class="hljs-attr">error</span>: <span class="hljs-built_in">unknown</span>): <span class="hljs-params">string</span><span class="hljs-function"> =&gt;</span> error <span class="hljs-keyword">instanceof</span> <span class="hljs-title">Error</span> ? error.<span class="hljs-property">message</span> : <span class="hljs-title">String</span>(error);
+<span class="hljs-keyword">function</span> <span class="hljs-title">cancelled</span>(<span class="hljs-params">token: vscode.CancellationToken</span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">if</span> (token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Publication cancelled'</span>); }
+}
+</code></pre>
+
+</div>
+</div><h2>Workspace and geometry policy</h2>
+<p>Recheck trust and workspace membership at asynchronous boundaries. A save dialog's
+initial directory is guidance, not containment enforcement. Each path is checked
+lexically and against disk ancestors, including dangling symlinks. Normal OS
+filesystem races cannot be eliminated by this adapter; the shared CLI additionally
+preflights and protects publication inputs at transaction time.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200070006f006c006900630079-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200070006f006c006900630079"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200070006f006c006900630079" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200070006f006c006900630079" aria-label="Definition of publication extension policy">&lt;&lt;publication extension policy&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">allowed</span>(<span class="hljs-params">folder?: vscode.WorkspaceFolder</span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">if</span> (!vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">isTrusted</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Publication requires Workspace Trust.'</span>); }
+    <span class="hljs-keyword">if</span> (vscode.<span class="hljs-property">env</span>.<span class="hljs-property">remoteName</span> || vscode.<span class="hljs-property">env</span>.<span class="hljs-property">uiKind</span> === vscode.<span class="hljs-property">UIKind</span>.<span class="hljs-property">Web</span>) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Publication requires a local desktop workspace, not remote or web.'</span>);
+    }
+    <span class="hljs-keyword">if</span> (process.<span class="hljs-property">platform</span> === <span class="hljs-string">'win32'</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Publication currently requires POSIX.'</span>); }
+    <span class="hljs-keyword">if</span> (folder &amp;&amp; (folder.<span class="hljs-property">uri</span>.<span class="hljs-property">scheme</span> !== <span class="hljs-string">'file'</span> || folder.<span class="hljs-property">uri</span>.<span class="hljs-property">authority</span> ||
+        !vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span>?.<span class="hljs-title">some</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> item.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>() === folder.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>()))) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Publication requires a current local file workspace folder.'</span>);
+    }
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">validateMargins</span>(<span class="hljs-params">paper: </span><span class="hljs-built_in">string</span><span class="hljs-params">, value: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">const</span> parts = value.<span class="hljs-title">split</span>(<span class="hljs-string">','</span>).<span class="hljs-title">map</span>(<span class="hljs-params">part</span><span class="hljs-function"> =&gt;</span> part.<span class="hljs-title">trim</span>());
+    <span class="hljs-keyword">const</span> values = parts.<span class="hljs-title">map</span>(<span class="hljs-title">Number</span>);
+    <span class="hljs-keyword">if</span> (parts.<span class="hljs-property">length</span> !== <span class="hljs-number">4</span> || parts.<span class="hljs-title">some</span>(<span class="hljs-params">part</span><span class="hljs-function"> =&gt;</span> !<span class="hljs-regexp">/^</span><span class="hljs-regexp">\d</span><span class="hljs-regexp">+(?:</span><span class="hljs-regexp">\.</span><span class="hljs-regexp">\d</span><span class="hljs-regexp">+)?$/</span>.<span class="hljs-title">test</span>(part)) ||
+        values.<span class="hljs-title">some</span>(<span class="hljs-params">value</span><span class="hljs-function"> =&gt;</span> !<span class="hljs-title">Number</span>.<span class="hljs-built_in">isFinite</span>(value) || value &lt; <span class="hljs-number">5</span> || value &gt; <span class="hljs-number">50</span>)) {
+        <span class="hljs-keyword">return</span> <span class="hljs-string">'Enter four numbers in mm: top,right,bottom,left (each 5–50).'</span>;
+    }
+    <span class="hljs-keyword">const</span> size = papers[paper];
+    <span class="hljs-keyword">if</span> (!size || size[<span class="hljs-number">0</span>] - values[<span class="hljs-number">1</span>] - values[<span class="hljs-number">3</span>] &lt; <span class="hljs-number">80</span> || size[<span class="hljs-number">1</span>] - values[<span class="hljs-number">0</span>] - values[<span class="hljs-number">2</span>] &lt; <span class="hljs-number">100</span>) {
+        <span class="hljs-keyword">return</span> <span class="hljs-string">'Margins must leave at least an 80 × 100 mm body.'</span>;
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
+}
+</code></pre>
+
+</div>
+</div><p>Canonical paths are also used for state keys. Symlink roots are rejected rather
+than allowing multiple aliases for the same project. Missing leaf paths are
+permitted for new buffers and output destinations, but existing ancestors must
+remain real directories.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700061007400680073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700061007400680073"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700061007400680073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700061007400680073" aria-label="Definition of publication extension paths">&lt;&lt;publication extension paths&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">relativePath</span>(<span class="hljs-params">root: </span><span class="hljs-built_in">string</span><span class="hljs-params">, target: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">const</span> relative = path.<span class="hljs-title">relative</span>(root, target).<span class="hljs-title">split</span>(path.<span class="hljs-property">sep</span>).<span class="hljs-title">join</span>(<span class="hljs-string">'/'</span>);
+    <span class="hljs-keyword">const</span> safe = <span class="hljs-title">safeRelativePath</span>(relative);
+    <span class="hljs-keyword">if</span> (!safe || safe !== relative) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Path must be inside the selected root: </span><span class="hljs-subst">${target}</span><span class="hljs-string">`</span>); }
+    <span class="hljs-keyword">return</span> safe;
+}
+<span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">checkPath</span>(<span class="hljs-params">root: </span><span class="hljs-built_in">string</span><span class="hljs-params">, relative: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; {
+    <span class="hljs-keyword">let</span> current = root;
+    <span class="hljs-keyword">const</span> parts = relative.<span class="hljs-title">split</span>(<span class="hljs-string">'/'</span>);
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = <span class="hljs-number">0</span>; index &lt; parts.<span class="hljs-property">length</span>; index++) {
+        current = path.<span class="hljs-title">join</span>(current, parts[index]);
+        <span class="hljs-keyword">let</span> stat;
+        <span class="hljs-keyword">try</span> { stat = <span class="hljs-keyword">await</span> fs.<span class="hljs-title">lstat</span>(current); }
+        <span class="hljs-keyword">catch</span> (error) { <span class="hljs-keyword">if</span> ((error <span class="hljs-keyword">as</span> <span class="hljs-title">NodeJS</span>.<span class="hljs-property">ErrnoException</span>).<span class="hljs-property">code</span> === <span class="hljs-string">'ENOENT'</span>) { <span class="hljs-keyword">return</span>; } <span class="hljs-keyword">throw</span> error; }
+        <span class="hljs-keyword">if</span> (stat.<span class="hljs-title">isSymbolicLink</span>() || (index &lt; parts.<span class="hljs-property">length</span> - <span class="hljs-number">1</span> ? !stat.<span class="hljs-title">isDirectory</span>() : !stat.<span class="hljs-title">isFile</span>())) {
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Unsafe publication path (symlink or non-file): </span><span class="hljs-subst">${current}</span><span class="hljs-string">`</span>);
+        }
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> fs.<span class="hljs-title">realpath</span>(current) !== current) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Noncanonical path: </span><span class="hljs-subst">${current}</span><span class="hljs-string">`</span>); }
+    }
+}
+<span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">canonicalRoot</span>(<span class="hljs-params">folder: vscode.WorkspaceFolder</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">string</span>&gt; {
+    <span class="hljs-title">allowed</span>(folder);
+    <span class="hljs-keyword">const</span> root = path.<span class="hljs-title">resolve</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-property">fsPath</span>);
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> fs.<span class="hljs-title">realpath</span>(root) !== root || !(<span class="hljs-keyword">await</span> fs.<span class="hljs-title">lstat</span>(root)).<span class="hljs-title">isDirectory</span>()) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Publication root must be a real, canonical directory, not a symlink.'</span>);
+    }
+    <span class="hljs-keyword">return</span> root;
+}
+</code></pre>
+
+</div>
+</div><h2>Fresh source snapshot</h2>
+<p>All eligible open text is cloned synchronously before the first disk await.
+Empty buffers and new file-backed documents override disk just like nonempty
+buffers; untitled and foreign documents do not. Discovery is sorted and shares
+the engine's directory exclusions. No disk read of an overlaid source is needed.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200073006e0061007000730068006f0074-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200073006e0061007000730068006f0074"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200073006e0061007000730068006f0074" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200073006e0061007000730068006f0074" aria-label="Definition of publication extension snapshot">&lt;&lt;publication extension snapshot&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">capturePublicationSnapshot</span>(<span class="hljs-params">root: </span><span class="hljs-built_in">string</span><span class="hljs-params">, token: vscode.CancellationToken</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">SourceDocument</span>[]&gt; {
+    <span class="hljs-title">cancelled</span>(token);
+    <span class="hljs-keyword">const</span> overlays = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;();
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> <span class="hljs-variable">document</span> <span class="hljs-keyword">of</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">textDocuments</span>) {
+        <span class="hljs-keyword">if</span> (<span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">scheme</span> !== <span class="hljs-string">'file'</span> || <span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">authority</span>) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">const</span> relative = path.<span class="hljs-title">relative</span>(root, <span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">fsPath</span>).<span class="hljs-title">split</span>(path.<span class="hljs-property">sep</span>).<span class="hljs-title">join</span>(<span class="hljs-string">'/'</span>);
+        <span class="hljs-keyword">if</span> (!relative.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'.literate'</span>) || relative.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'../'</span>) || path.<span class="hljs-title">isAbsolute</span>(relative)) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">if</span> (relative.<span class="hljs-title">split</span>(<span class="hljs-string">'/'</span>).<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, -<span class="hljs-number">1</span>).<span class="hljs-title">some</span>(<span class="hljs-params">part</span><span class="hljs-function"> =&gt;</span> excluded.<span class="hljs-title">has</span>(part))) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">const</span> safe = <span class="hljs-title">relativePath</span>(root, <span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">fsPath</span>);
+        overlays.<span class="hljs-title">set</span>(safe, <span class="hljs-variable">document</span>.<span class="hljs-title">getText</span>());
+    }
+    <span class="hljs-keyword">const</span> documents = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;();
+    <span class="hljs-keyword">let</span> bytes = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">const</span> add = (<span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>, <span class="hljs-attr">text</span>: <span class="hljs-built_in">string</span>): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+        bytes += <span class="hljs-title">Buffer</span>.<span class="hljs-title">byteLength</span>(<span class="hljs-title">JSON</span>.<span class="hljs-title">stringify</span>({ <span class="hljs-attr">path</span>: name, text })) + <span class="hljs-number">1</span>;
+        <span class="hljs-keyword">if</span> (bytes &gt; inputLimit) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Publication snapshot exceeds 32 MiB.'</span>); }
+        documents.<span class="hljs-title">set</span>(name, text);
+    };
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [name, text] <span class="hljs-keyword">of</span> overlays) {
+        <span class="hljs-title">cancelled</span>(token);
+        <span class="hljs-keyword">await</span> <span class="hljs-title">checkPath</span>(root, name);
+        <span class="hljs-title">add</span>(name, text);
+    }
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of publication extension snapshot"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200073006e0061007000730068006f0074-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200073006e0061007000730068006f0074-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2" aria-label="Next contribution of publication extension snapshot">Next</a></nav>
+</div><p>The final serialized envelope is checked again, including arguments and JSON
+escaping. Source files are size-checked before reading; helper input is bounded
+independently. Binary assets, manifests, fonts and licenses stay on disk.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200073006e0061007000730068006f0074-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200073006e0061007000730068006f0074" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200073006e0061007000730068006f0074" aria-label="Definition of publication extension snapshot">&lt;&lt;publication extension snapshot&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">const</span> visit = <span class="hljs-keyword">async</span> (<span class="hljs-attr">directory</span>: <span class="hljs-built_in">string</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; =&gt; {
+        <span class="hljs-title">cancelled</span>(token);
+        <span class="hljs-keyword">const</span> absolute = path.<span class="hljs-title">join</span>(root, directory);
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">await</span> fs.<span class="hljs-title">realpath</span>(absolute) !== absolute) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Noncanonical source directory: </span><span class="hljs-subst">${absolute}</span><span class="hljs-string">`</span>); }
+        <span class="hljs-keyword">const</span> entries = <span class="hljs-keyword">await</span> fs.<span class="hljs-title">readdir</span>(absolute, { <span class="hljs-attr">withFileTypes</span>: <span class="hljs-literal">true</span> });
+        entries.<span class="hljs-title">sort</span>(<span class="hljs-function">(</span><span class="hljs-params">a, b</span><span class="hljs-function">) =&gt;</span> a.<span class="hljs-property">name</span> &lt; b.<span class="hljs-property">name</span> ? -<span class="hljs-number">1</span> : a.<span class="hljs-property">name</span> &gt; b.<span class="hljs-property">name</span> ? <span class="hljs-number">1</span> : <span class="hljs-number">0</span>);
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> entry <span class="hljs-keyword">of</span> entries) {
+            <span class="hljs-title">cancelled</span>(token);
+            <span class="hljs-keyword">if</span> (entry.<span class="hljs-title">isSymbolicLink</span>()) { <span class="hljs-keyword">continue</span>; }
+            <span class="hljs-keyword">const</span> name = directory ? <span class="hljs-string">`</span><span class="hljs-subst">${directory}</span><span class="hljs-string">/</span><span class="hljs-subst">${entry.name}</span><span class="hljs-string">`</span> : entry.<span class="hljs-property">name</span>;
+            <span class="hljs-keyword">if</span> (entry.<span class="hljs-title">isDirectory</span>() &amp;&amp; !excluded.<span class="hljs-title">has</span>(entry.<span class="hljs-property">name</span>)) { <span class="hljs-keyword">await</span> <span class="hljs-title">visit</span>(name); }
+            <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (entry.<span class="hljs-title">isFile</span>() &amp;&amp; name.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'.literate'</span>) &amp;&amp; !overlays.<span class="hljs-title">has</span>(name)) {
+                <span class="hljs-title">relativePath</span>(root, path.<span class="hljs-title">join</span>(root, name));
+                <span class="hljs-keyword">await</span> <span class="hljs-title">checkPath</span>(root, name);
+                <span class="hljs-keyword">if</span> ((<span class="hljs-keyword">await</span> fs.<span class="hljs-title">stat</span>(path.<span class="hljs-title">join</span>(root, name))).<span class="hljs-property">size</span> &gt; inputLimit) {
+                    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Publication source exceeds 32 MiB: </span><span class="hljs-subst">${name}</span><span class="hljs-string">`</span>);
+                }
+                <span class="hljs-title">add</span>(name, <span class="hljs-keyword">await</span> fs.<span class="hljs-title">readFile</span>(path.<span class="hljs-title">join</span>(root, name), <span class="hljs-string">'utf8'</span>));
+            }
+        }
+    };
+    <span class="hljs-keyword">await</span> <span class="hljs-title">visit</span>(<span class="hljs-string">''</span>);
+    <span class="hljs-title">cancelled</span>(token);
+    <span class="hljs-keyword">return</span> [...documents].<span class="hljs-title">sort</span>(<span class="hljs-function">(</span><span class="hljs-params">[a], [b]</span><span class="hljs-function">) =&gt;</span> a &lt; b ? -<span class="hljs-number">1</span> : a &gt; b ? <span class="hljs-number">1</span> : <span class="hljs-number">0</span>)
+        .<span class="hljs-title">map</span>(<span class="hljs-function">(</span><span class="hljs-params">[name, text]</span><span class="hljs-function">) =&gt;</span> ({ <span class="hljs-attr">path</span>: name, text }));
+}
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of publication extension snapshot"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200073006e0061007000730068006f0074-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200073006e0061007000730068006f0074-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" aria-label="Previous contribution of publication extension snapshot">Previous</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200073006e0061007000730068006f0074-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200073006e0061007000730068006f0074-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" aria-label="Base contribution of publication extension snapshot">Base</a></nav>
+</div><h2>External process lifecycle</h2>
+<p>Never use a shell or the extension host executable. The helper enforces external
+Node &gt;=22.12 and rejects Electron. The bridge bounds combined stdout/stderr and
+stdin. Its ten-minute execution deadline allows diagram (120s), TeX (180s) and
+preflight budgets, then requests graceful cancellation. Child close acknowledges
+termination; exit alone is insufficient because stdio may still be draining.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065" aria-label="Definition of publication extension bridge">&lt;&lt;publication extension bridge&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">const</span> <span class="hljs-attr">runPublicationHelper</span>: <span class="hljs-title">PublicationBridge</span> = <span class="hljs-function">(</span><span class="hljs-params">node, helper, root, request, token, report</span><span class="hljs-function">) =&gt;</span> {
+    <span class="hljs-title">cancelled</span>(token);
+    <span class="hljs-keyword">const</span> input = <span class="hljs-title">JSON</span>.<span class="hljs-title">stringify</span>(request);
+    <span class="hljs-keyword">if</span> (<span class="hljs-title">Buffer</span>.<span class="hljs-title">byteLength</span>(input) &gt; inputLimit) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Publication request exceeds 32 MiB.'</span>); }
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Promise</span>(<span class="hljs-function">(</span><span class="hljs-params">resolve, reject</span><span class="hljs-function">) =&gt;</span> {
+        <span class="hljs-keyword">const</span> child = <span class="hljs-title">spawn</span>(node, [helper], { <span class="hljs-attr">cwd</span>: root, <span class="hljs-attr">shell</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">stdio</span>: [<span class="hljs-string">'pipe'</span>, <span class="hljs-string">'pipe'</span>, <span class="hljs-string">'pipe'</span>] });
+        <span class="hljs-keyword">const</span> <span class="hljs-attr">stdout</span>: <span class="hljs-title">Buffer</span>[] = [], <span class="hljs-attr">stderr</span>: <span class="hljs-title">Buffer</span>[] = [];
+        <span class="hljs-keyword">let</span> bytes = <span class="hljs-number">0</span>, <span class="hljs-attr">failure</span>: <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>, stopped = <span class="hljs-literal">false</span>;
+        <span class="hljs-keyword">let</span> <span class="hljs-attr">grace</span>: <span class="hljs-title">ReturnType</span>&lt;<span class="hljs-keyword">typeof</span> <span class="hljs-built_in">setTimeout</span>&gt; | <span class="hljs-literal">undefined</span>;
+        <span class="hljs-keyword">const</span> stop = (reason?: <span class="hljs-built_in">string</span>): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+            failure ??= reason;
+            <span class="hljs-keyword">if</span> (stopped) { <span class="hljs-keyword">return</span>; }
+            stopped = <span class="hljs-literal">true</span>;
+            <span class="hljs-keyword">if</span> (!child.<span class="hljs-title">kill</span>(<span class="hljs-string">'SIGTERM'</span>)) { <span class="hljs-title">report</span>(<span class="hljs-string">'Unable to deliver SIGTERM; waiting for helper exit.'</span>); }
+            grace = <span class="hljs-built_in">setTimeout</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title">report</span>(<span class="hljs-string">'Helper has not acknowledged cancellation. Waiting for transaction cleanup; publication remains locked.'</span>), <span class="hljs-number">30000</span>);
+        };
+        <span class="hljs-keyword">const</span> timer = <span class="hljs-built_in">setTimeout</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title">stop</span>(<span class="hljs-string">'Publication exceeded the 10 minute execution deadline.'</span>), <span class="hljs-number">600000</span>);
+        <span class="hljs-keyword">const</span> subscription = token.<span class="hljs-title">onCancellationRequested</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title">stop</span>());
+        <span class="hljs-keyword">const</span> collect = (<span class="hljs-attr">chunks</span>: <span class="hljs-title">Buffer</span>[], <span class="hljs-attr">chunk</span>: <span class="hljs-title">Buffer</span>): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+            bytes += chunk.<span class="hljs-property">length</span>;
+            <span class="hljs-keyword">if</span> (bytes &gt; outputLimit) { <span class="hljs-title">stop</span>(<span class="hljs-string">'Publication helper output exceeds 8 MiB.'</span>); }
+            <span class="hljs-keyword">else</span> { chunks.<span class="hljs-title">push</span>(chunk); }
+        };
+        child.<span class="hljs-property">stdout</span>.<span class="hljs-title">on</span>(<span class="hljs-string">'data'</span>, <span class="hljs-function">(</span><span class="hljs-params">chunk: Buffer</span><span class="hljs-function">) =&gt;</span> <span class="hljs-title">collect</span>(stdout, chunk));
+        child.<span class="hljs-property">stderr</span>.<span class="hljs-title">on</span>(<span class="hljs-string">'data'</span>, <span class="hljs-function">(</span><span class="hljs-params">chunk: Buffer</span><span class="hljs-function">) =&gt;</span> <span class="hljs-title">collect</span>(stderr, chunk));
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of publication extension bridge"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2" aria-label="Next contribution of publication extension bridge">Next</a></nav>
+</div><p>There is deliberately no SIGKILL fallback: terminating a helper mid-rollback can
+abandon a transaction. If graceful cleanup stalls, report it and retain the lock
+until close rather than claiming cancellation completed or starting another writer.
+This is a bounded execution budget, not an unsafe hard cleanup deadline.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065" aria-label="Definition of publication extension bridge">&lt;&lt;publication extension bridge&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code>        child.<span class="hljs-title">on</span>(<span class="hljs-string">'error'</span>, <span class="hljs-params">error</span><span class="hljs-function"> =&gt;</span> { failure ??= <span class="hljs-string">`Cannot run publication Node: </span><span class="hljs-subst">${message(error)}</span><span class="hljs-string">`</span>; });
+        child.<span class="hljs-property">stdin</span>.<span class="hljs-title">on</span>(<span class="hljs-string">'error'</span>, <span class="hljs-params">error</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">stop</span>(<span class="hljs-string">`Cannot send publication snapshot: </span><span class="hljs-subst">${message(error)}</span><span class="hljs-string">`</span>));
+        child.<span class="hljs-title">once</span>(<span class="hljs-string">'close'</span>, <span class="hljs-function">(</span><span class="hljs-params">code, signal</span><span class="hljs-function">) =&gt;</span> {
+            <span class="hljs-built_in">clearTimeout</span>(timer);
+            <span class="hljs-keyword">if</span> (grace) { <span class="hljs-built_in">clearTimeout</span>(grace); }
+            subscription.<span class="hljs-title">dispose</span>();
+            <span class="hljs-keyword">const</span> result = { <span class="hljs-attr">stdout</span>: <span class="hljs-title">Buffer</span>.<span class="hljs-title">concat</span>(stdout).<span class="hljs-title">toString</span>(<span class="hljs-string">'utf8'</span>), <span class="hljs-attr">stderr</span>: <span class="hljs-title">Buffer</span>.<span class="hljs-title">concat</span>(stderr).<span class="hljs-title">toString</span>(<span class="hljs-string">'utf8'</span>) };
+            <span class="hljs-keyword">if</span> (failure || code !== <span class="hljs-number">0</span> || signal) {
+                <span class="hljs-title">reject</span>(<span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>([failure ?? <span class="hljs-string">`Publication helper exited </span><span class="hljs-subst">${code ?? signal}</span><span class="hljs-string">.`</span>, result.<span class="hljs-property">stdout</span>, result.<span class="hljs-property">stderr</span>]
+                    .<span class="hljs-title">filter</span>(<span class="hljs-title">Boolean</span>).<span class="hljs-title">join</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>)));
+            } <span class="hljs-keyword">else</span> {
+                <span class="hljs-keyword">try</span> {
+                    <span class="hljs-title">publicationWarnings</span>(result, request.<span class="hljs-property">args</span>[<span class="hljs-number">0</span>], request.<span class="hljs-property">args</span>[request.<span class="hljs-property">args</span>.<span class="hljs-title">indexOf</span>(<span class="hljs-string">'--output'</span>) + <span class="hljs-number">1</span>]);
+                    <span class="hljs-title">resolve</span>(result);
+                } <span class="hljs-keyword">catch</span> (error) { <span class="hljs-title">reject</span>(error); }
+            }
+        });
+        <span class="hljs-keyword">if</span> (token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-title">stop</span>(); }
+        <span class="hljs-keyword">if</span> (!stopped) { child.<span class="hljs-property">stdin</span>.<span class="hljs-title">end</span>(input); }
+        <span class="hljs-keyword">else</span> { child.<span class="hljs-property">stdin</span>.<span class="hljs-title">end</span>(); }
+    });
+};
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of publication extension bridge"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" aria-label="Previous contribution of publication extension bridge">Previous</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" aria-label="Base contribution of publication extension bridge">Base</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-3" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-3" aria-label="Next contribution of publication extension bridge">Next</a></nav>
+</div><p>Cancellation requests SIGTERM but does not overwrite a committed outcome. After
+close, exit zero plus a valid written/current response is authoritative, even if
+cancellation arrived after commit. Transport errors, deadlines and output overflow
+remain failures regardless of exit code or response. Invalid protocol never becomes
+success merely because cancellation was requested.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-3"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065" aria-label="Definition of publication extension bridge">&lt;&lt;publication extension bridge&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">publicationWarnings</span>(<span class="hljs-params">result: HelperResult, kind: </span><span class="hljs-built_in">string</span><span class="hljs-params">, destination: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span>[] {
+    <span class="hljs-keyword">let</span> response;
+    <span class="hljs-keyword">try</span> { response = <span class="hljs-title">JSON</span>.<span class="hljs-title">parse</span>(result.<span class="hljs-property">stdout</span>); }
+    <span class="hljs-keyword">catch</span> { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Invalid JSON from publication helper:</span><span class="hljs-string">\n</span><span class="hljs-subst">${result.stdout}</span><span class="hljs-string">`</span>); }
+    <span class="hljs-keyword">if</span> (response?.<span class="hljs-property">schemaVersion</span> !== <span class="hljs-number">1</span> || response.<span class="hljs-property">command</span> !== kind || response.<span class="hljs-property">ok</span> !== <span class="hljs-literal">true</span> ||
+        !<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(response.<span class="hljs-property">outputs</span>) || !response.<span class="hljs-property">outputs</span>.<span class="hljs-title">some</span>(<span class="hljs-function">(</span><span class="hljs-params">item: </span><span class="hljs-params">{ path?: </span><span class="hljs-built_in">string</span><span class="hljs-params">; status?: </span><span class="hljs-built_in">string</span><span class="hljs-params"> }</span><span class="hljs-function">) =&gt;</span>
+            item?.<span class="hljs-property">path</span> === destination &amp;&amp; [<span class="hljs-string">'written'</span>, <span class="hljs-string">'current'</span>].<span class="hljs-title">includes</span>(item.<span class="hljs-property">status</span> ?? <span class="hljs-string">''</span>))) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Publication did not report successful output:</span><span class="hljs-string">\n</span><span class="hljs-subst">${result.stdout}</span><span class="hljs-string">`</span>);
+    }
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">warnings</span>: <span class="hljs-built_in">unknown</span> = response.<span class="hljs-property">publication</span>?.<span class="hljs-property">warnings</span>;
+    <span class="hljs-keyword">return</span> <span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(warnings) ? warnings.<span class="hljs-title">map</span>(<span class="hljs-title">String</span>) : [];
+}
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of publication extension bridge"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2" aria-label="Previous contribution of publication extension bridge">Previous</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" aria-label="Base contribution of publication extension bridge">Base</a></nav>
+</div><h2>Prompts and explicit dependencies</h2>
+<p>Remember only successful paper, margins and relative destination, separately for
+each canonical root and kind. Every prompt can cancel without spawning or writing.
+The active editor's workspace wins; otherwise offer all folders explicitly.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073" aria-label="Definition of publication extension prompts">&lt;&lt;publication extension prompts&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">chooseFolder</span>(): <span class="hljs-title">Promise</span>&lt;vscode.<span class="hljs-property">WorkspaceFolder</span> | <span class="hljs-literal">undefined</span>&gt; {
+    <span class="hljs-title">allowed</span>();
+    <span class="hljs-keyword">const</span> active = vscode.<span class="hljs-property">window</span>.<span class="hljs-property">activeTextEditor</span>?.<span class="hljs-property">document</span>.<span class="hljs-property">uri</span>;
+    <span class="hljs-keyword">const</span> folder = active &amp;&amp; vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">getWorkspaceFolder</span>(active);
+    <span class="hljs-keyword">if</span> (folder) { <span class="hljs-title">allowed</span>(folder); <span class="hljs-keyword">return</span> folder; }
+    <span class="hljs-keyword">const</span> folders = vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span> ?? [];
+    <span class="hljs-keyword">if</span> (!folders.<span class="hljs-property">length</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Open a local project folder before exporting.'</span>); }
+    <span class="hljs-keyword">const</span> choice = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showQuickPick</span>(folders.<span class="hljs-title">map</span>(<span class="hljs-params">folder</span><span class="hljs-function"> =&gt;</span> ({
+        <span class="hljs-attr">label</span>: folder.<span class="hljs-property">name</span>, <span class="hljs-attr">description</span>: folder.<span class="hljs-property">uri</span>.<span class="hljs-property">fsPath</span>, folder
+    })), { <span class="hljs-attr">placeHolder</span>: <span class="hljs-string">'Select publication project folder'</span> });
+    <span class="hljs-keyword">if</span> (choice) { <span class="hljs-title">allowed</span>(choice.<span class="hljs-property">folder</span>); }
+    <span class="hljs-keyword">return</span> choice?.<span class="hljs-property">folder</span>;
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title">executable</span>(<span class="hljs-params">name: </span><span class="hljs-built_in">string</span><span class="hljs-params">, required: </span><span class="hljs-built_in">boolean</span>): <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">const</span> value = vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">getConfiguration</span>(<span class="hljs-string">'literate.publication'</span>).<span class="hljs-property">inspect</span>&lt;<span class="hljs-built_in">string</span>&gt;(name)?.<span class="hljs-property">globalValue</span>;
+    <span class="hljs-keyword">if</span> (value === <span class="hljs-literal">undefined</span> || value === <span class="hljs-string">''</span>) {
+        <span class="hljs-keyword">if</span> (required) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Set literate.publication.</span><span class="hljs-subst">${name}</span><span class="hljs-string"> in User settings to an absolute external Node &gt;=22.12 executable (not Electron).`</span>); }
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
+    }
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> value !== <span class="hljs-string">'string'</span> || !path.<span class="hljs-title">isAbsolute</span>(value) || <span class="hljs-regexp">/</span><span class="hljs-regexp">[</span><span class="hljs-regexp">\x</span><span class="hljs-regexp">00-</span><span class="hljs-regexp">\x</span><span class="hljs-regexp">1f]</span><span class="hljs-regexp">/</span>.<span class="hljs-title">test</span>(value)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`literate.publication.</span><span class="hljs-subst">${name}</span><span class="hljs-string"> must be an explicit absolute executable path in User settings.`</span>);
+    }
+    <span class="hljs-keyword">return</span> value;
+}
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of publication extension prompts"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2" aria-label="Next contribution of publication extension prompts">Next</a></nav>
+</div><p>Paper ordering makes the last successful value the initial selection without
+silently bypassing the prompt. Validate margins both in the input UI and after it
+returns, and enforce the save URI's scheme, extension and containment ourselves.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073" aria-label="Definition of publication extension prompts">&lt;&lt;publication extension prompts&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">chooseOutput</span>(<span class="hljs-params">root: </span><span class="hljs-built_in">string</span><span class="hljs-params">, kind: Kind, previous?: Choice</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">Choice</span> | <span class="hljs-literal">undefined</span>&gt; {
+    <span class="hljs-keyword">const</span> names = <span class="hljs-title">Object</span>.<span class="hljs-title">keys</span>(papers);
+    <span class="hljs-keyword">if</span> (previous &amp;&amp; names.<span class="hljs-title">includes</span>(previous.<span class="hljs-property">paper</span>)) { names.<span class="hljs-title">splice</span>(names.<span class="hljs-title">indexOf</span>(previous.<span class="hljs-property">paper</span>), <span class="hljs-number">1</span>); names.<span class="hljs-title">unshift</span>(previous.<span class="hljs-property">paper</span>); }
+    <span class="hljs-keyword">const</span> paper = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showQuickPick</span>(names, { <span class="hljs-attr">placeHolder</span>: <span class="hljs-string">'Publication page size'</span> });
+    <span class="hljs-keyword">if</span> (paper === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">const</span> margins = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showInputBox</span>({ <span class="hljs-attr">prompt</span>: <span class="hljs-string">'Margins in mm: top,right,bottom,left (5–50 each)'</span>,
+        <span class="hljs-attr">value</span>: previous?.<span class="hljs-property">margins</span> ?? <span class="hljs-string">'20,20,20,20'</span>, <span class="hljs-attr">validateInput</span>: <span class="hljs-params">value</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">validateMargins</span>(paper, value) });
+    <span class="hljs-keyword">if</span> (margins === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">const</span> error = <span class="hljs-title">validateMargins</span>(paper, margins);
+    <span class="hljs-keyword">if</span> (error) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(error); }
+    <span class="hljs-keyword">const</span> extension = kind === <span class="hljs-string">'latex'</span> ? <span class="hljs-string">'tex'</span> : <span class="hljs-string">'pdf'</span>;
+    <span class="hljs-keyword">const</span> remembered = previous?.<span class="hljs-property">destination</span>;
+    <span class="hljs-keyword">const</span> destination = remembered &amp;&amp; <span class="hljs-title">safeRelativePath</span>(remembered) === remembered &amp;&amp; remembered.<span class="hljs-title">endsWith</span>(<span class="hljs-string">`.</span><span class="hljs-subst">${extension}</span><span class="hljs-string">`</span>)
+        ? remembered : <span class="hljs-string">`publication.</span><span class="hljs-subst">${extension}</span><span class="hljs-string">`</span>;
+    <span class="hljs-keyword">const</span> uri = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showSaveDialog</span>({ <span class="hljs-attr">defaultUri</span>: vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title">file</span>(path.<span class="hljs-title">join</span>(root, destination)),
+        <span class="hljs-attr">filters</span>: { [extension.<span class="hljs-title">toUpperCase</span>()]: [extension] }, <span class="hljs-attr">title</span>: <span class="hljs-string">'Export publication inside the selected project'</span> });
+    <span class="hljs-keyword">if</span> (!uri) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">if</span> (uri.<span class="hljs-property">scheme</span> !== <span class="hljs-string">'file'</span> || uri.<span class="hljs-property">authority</span> || !uri.<span class="hljs-property">fsPath</span>.<span class="hljs-title">endsWith</span>(<span class="hljs-string">`.</span><span class="hljs-subst">${extension}</span><span class="hljs-string">`</span>)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Choose a local .</span><span class="hljs-subst">${extension}</span><span class="hljs-string"> file inside the selected project.`</span>);
+    }
+    <span class="hljs-keyword">const</span> relative = <span class="hljs-title">relativePath</span>(root, uri.<span class="hljs-property">fsPath</span>);
+    <span class="hljs-keyword">await</span> <span class="hljs-title">checkPath</span>(root, relative);
+    <span class="hljs-keyword">return</span> { paper, <span class="hljs-attr">margins</span>: margins.<span class="hljs-title">split</span>(<span class="hljs-string">','</span>).<span class="hljs-title">map</span>(<span class="hljs-params">value</span><span class="hljs-function"> =&gt;</span> value.<span class="hljs-title">trim</span>()).<span class="hljs-title">join</span>(<span class="hljs-string">','</span>), <span class="hljs-attr">destination</span>: relative };
+}
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of publication extension prompts"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" aria-label="Previous contribution of publication extension prompts">Previous</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" aria-label="Base contribution of publication extension prompts">Base</a></nav>
+</div><h2>Command lifetime</h2>
+<p>The global guard covers prompts, queue waiting, snapshot and helper cleanup.
+Each operation owns its cancellation source. Removing its selected workspace folder
+latches authority revocation and cancels the source, even if the folder is re-added.
+The optional bridge parameter isolates process behavior in headless tests.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" aria-label="Definition of publication extension commands">&lt;&lt;publication extension commands&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">registerPublicationCommands</span>(<span class="hljs-params">context: vscode.ExtensionContext,
+    serialize: PublicationQueue = operation =&gt; operation</span><span class="hljs-params">()</span><span class="hljs-params">, bridge: PublicationBridge = runPublicationHelper</span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">const</span> output = vscode.<span class="hljs-property">window</span>.<span class="hljs-title">createOutputChannel</span>(<span class="hljs-string">'Literate Publication'</span>);
+    <span class="hljs-keyword">let</span> disposed = <span class="hljs-literal">false</span>;
+    <span class="hljs-keyword">let</span> <span class="hljs-attr">active</span>: { <span class="hljs-attr">source</span>: vscode.<span class="hljs-property">CancellationTokenSource</span>; folder?: vscode.<span class="hljs-property">WorkspaceFolder</span>; revoked?: <span class="hljs-built_in">string</span> } | <span class="hljs-literal">undefined</span>;
+    <span class="hljs-keyword">const</span> foldersChanged = vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">onDidChangeWorkspaceFolders</span>(<span class="hljs-params">event</span><span class="hljs-function"> =&gt;</span> {
+        <span class="hljs-keyword">if</span> (active?.<span class="hljs-property">folder</span> &amp;&amp; event.<span class="hljs-property">removed</span>.<span class="hljs-title">some</span>(<span class="hljs-params">folder</span><span class="hljs-function"> =&gt;</span> folder.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>() === active!.<span class="hljs-property">folder</span>!.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>())) {
+            active.<span class="hljs-property">revoked</span> = <span class="hljs-string">'Selected workspace folder was removed.'</span>;
+            active.<span class="hljs-property">source</span>.<span class="hljs-title">cancel</span>();
+        }
+    });
+    <span class="hljs-keyword">const</span> execute = <span class="hljs-keyword">async</span> (<span class="hljs-attr">kind</span>: <span class="hljs-title">Kind</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; =&gt; {
+        <span class="hljs-keyword">if</span> (disposed) { <span class="hljs-keyword">return</span>; }
+        <span class="hljs-keyword">if</span> (publishing) {
+            <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showWarningMessage</span>(<span class="hljs-string">'A publication is already in progress. Wait for it to finish.'</span>);
+            <span class="hljs-keyword">return</span>;
+        }
+        publishing = <span class="hljs-literal">true</span>;
+        <span class="hljs-keyword">const</span> <span class="hljs-attr">operation</span>: <span class="hljs-title">NonNullable</span>&lt;<span class="hljs-keyword">typeof</span> active&gt; = { <span class="hljs-attr">source</span>: <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">CancellationTokenSource</span>() };
+        active = operation;
+        <span class="hljs-keyword">const</span> token = operation.<span class="hljs-property">source</span>.<span class="hljs-property">token</span>;
+        <span class="hljs-keyword">let</span> <span class="hljs-attr">completed</span>: <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>;
+        <span class="hljs-keyword">const</span> authority = (): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+            <span class="hljs-keyword">if</span> (disposed) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Publication registration was disposed.'</span>); }
+            <span class="hljs-keyword">if</span> (operation.<span class="hljs-property">revoked</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(operation.<span class="hljs-property">revoked</span>); }
+            <span class="hljs-title">allowed</span>(operation.<span class="hljs-property">folder</span>);
+        };
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of publication extension commands"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2" aria-label="Next contribution of publication extension commands">Next</a></nav>
+</div><p>Prompts do not hold the repository queue. Disposal during prompts still cancels
+the operation; no subsequent snapshot or helper may start. Executable settings
+are resolved only after a destination has been chosen.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" aria-label="Definition of publication extension commands">&lt;&lt;publication extension commands&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code>        <span class="hljs-keyword">try</span> {
+            <span class="hljs-keyword">const</span> folder = <span class="hljs-keyword">await</span> <span class="hljs-title">chooseFolder</span>();
+            <span class="hljs-keyword">if</span> (!folder) { <span class="hljs-keyword">return</span>; }
+            operation.<span class="hljs-property">folder</span> = folder;
+            <span class="hljs-title">cancelled</span>(token);
+            <span class="hljs-title">authority</span>();
+            <span class="hljs-keyword">const</span> root = <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalRoot</span>(folder);
+            <span class="hljs-keyword">const</span> key = <span class="hljs-string">`literate.publication:</span><span class="hljs-subst">${kind}</span><span class="hljs-string">:</span><span class="hljs-subst">${root}</span><span class="hljs-string">`</span>;
+            <span class="hljs-keyword">const</span> choice = <span class="hljs-keyword">await</span> <span class="hljs-title">chooseOutput</span>(root, kind, context.<span class="hljs-property">workspaceState</span>.<span class="hljs-property">get</span>&lt;<span class="hljs-title">Choice</span>&gt;(key));
+            <span class="hljs-keyword">if</span> (!choice) { <span class="hljs-keyword">return</span>; }
+            <span class="hljs-title">cancelled</span>(token);
+            <span class="hljs-title">authority</span>();
+            <span class="hljs-keyword">const</span> node = <span class="hljs-title">executable</span>(<span class="hljs-string">'nodePath'</span>, <span class="hljs-literal">true</span>)!;
+            <span class="hljs-keyword">const</span> browser = <span class="hljs-title">executable</span>(<span class="hljs-string">'browserPath'</span>, <span class="hljs-literal">false</span>);
+            <span class="hljs-keyword">const</span> manifest = vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">getConfiguration</span>(<span class="hljs-string">'literate.publication'</span>, folder.<span class="hljs-property">uri</span>).<span class="hljs-property">get</span>&lt;<span class="hljs-built_in">string</span>&gt;(<span class="hljs-string">'fontManifest'</span>);
+            <span class="hljs-keyword">if</span> (manifest &amp;&amp; (<span class="hljs-keyword">typeof</span> manifest !== <span class="hljs-string">'string'</span> || <span class="hljs-title">safeRelativePath</span>(manifest) !== manifest)) {
+                <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'literate.publication.fontManifest must be a safe root-relative JSON path.'</span>);
+            }
+            <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">withProgress</span>({ <span class="hljs-attr">location</span>: vscode.<span class="hljs-property">ProgressLocation</span>.<span class="hljs-property">Notification</span>,
+                <span class="hljs-attr">title</span>: <span class="hljs-string">`Export </span><span class="hljs-subst">${kind === </span><span class="hljs-string">'latex'</span><span class="hljs-subst"> ? </span><span class="hljs-string">'LaTeX'</span><span class="hljs-subst"> : </span><span class="hljs-string">'PDF'</span><span class="hljs-subst">}</span><span class="hljs-string">`</span>, <span class="hljs-attr">cancellable</span>: <span class="hljs-literal">true</span> }, <span class="hljs-keyword">async</span> (progress, progressToken) =&gt; {
+                <span class="hljs-keyword">const</span> forwarding = progressToken.<span class="hljs-title">onCancellationRequested</span>(<span class="hljs-function">() =&gt;</span> operation.<span class="hljs-property">source</span>.<span class="hljs-title">cancel</span>());
+                <span class="hljs-keyword">if</span> (progressToken.<span class="hljs-property">isCancellationRequested</span>) { operation.<span class="hljs-property">source</span>.<span class="hljs-title">cancel</span>(); }
+                <span class="hljs-keyword">try</span> {
+                    <span class="hljs-keyword">await</span> <span class="hljs-title">serialize</span>(<span class="hljs-keyword">async</span> () =&gt; {
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of publication extension commands"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" aria-label="Previous contribution of publication extension commands">Previous</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" aria-label="Base contribution of publication extension commands">Base</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-3" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-3" aria-label="Next contribution of publication extension commands">Next</a></nav>
+</div><p>Snapshot capture occurs after queue acquisition. Cancellation is checked before
+source capture or spawn. Revalidating the canonical root and folder prevents a
+stale selection granting authority to another workspace. The serializer holds the
+queue until the helper closes and its response is validated; its owner advances
+the queue on resolution or rejection, never merely on a cancellation request.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-3"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" aria-label="Definition of publication extension commands">&lt;&lt;publication extension commands&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code>                        <span class="hljs-title">cancelled</span>(token);
+                        <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalRoot</span>(folder);
+                        <span class="hljs-title">authority</span>();
+                        <span class="hljs-keyword">const</span> documents = <span class="hljs-keyword">await</span> <span class="hljs-title">capturePublicationSnapshot</span>(root, token);
+                        <span class="hljs-keyword">const</span> args = [kind, root, <span class="hljs-string">'--output'</span>, choice.<span class="hljs-property">destination</span>, <span class="hljs-string">'--paper'</span>, choice.<span class="hljs-property">paper</span>];
+                        [<span class="hljs-string">'top'</span>, <span class="hljs-string">'right'</span>, <span class="hljs-string">'bottom'</span>, <span class="hljs-string">'left'</span>].<span class="hljs-title">forEach</span>(<span class="hljs-function">(</span><span class="hljs-params">side, index</span><span class="hljs-function">) =&gt;</span> {
+                            args.<span class="hljs-title">push</span>(<span class="hljs-string">`--margin-</span><span class="hljs-subst">${side}</span><span class="hljs-string">`</span>, <span class="hljs-string">`</span><span class="hljs-subst">${choice.margins.split(</span><span class="hljs-string">','</span><span class="hljs-subst">)[index]}</span><span class="hljs-string">mm`</span>);
+                        });
+                        <span class="hljs-keyword">if</span> (browser) { args.<span class="hljs-title">push</span>(<span class="hljs-string">'--browser'</span>, browser); }
+                        <span class="hljs-keyword">if</span> (manifest) { <span class="hljs-keyword">await</span> <span class="hljs-title">checkPath</span>(root, manifest); args.<span class="hljs-title">push</span>(<span class="hljs-string">'--font-manifest'</span>, manifest); }
+                        args.<span class="hljs-title">push</span>(<span class="hljs-string">'--json'</span>);
+                        <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalRoot</span>(folder);
+                        <span class="hljs-keyword">await</span> <span class="hljs-title">checkPath</span>(root, choice.<span class="hljs-property">destination</span>);
+                        <span class="hljs-title">authority</span>();
+                        <span class="hljs-title">cancelled</span>(token);
+                        <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">await</span> <span class="hljs-title">bridge</span>(node, context.<span class="hljs-title">asAbsolutePath</span>(<span class="hljs-string">'out/publication-helper.cjs'</span>), root,
+                            { args, documents }, token, <span class="hljs-params">text</span><span class="hljs-function"> =&gt;</span> { output.<span class="hljs-title">appendLine</span>(text); progress.<span class="hljs-title">report</span>({ <span class="hljs-attr">message</span>: text }); });
+                        <span class="hljs-keyword">if</span> (result.<span class="hljs-property">stderr</span>) { output.<span class="hljs-title">appendLine</span>(result.<span class="hljs-property">stderr</span>); }
+                        <span class="hljs-keyword">const</span> warnings = <span class="hljs-title">publicationWarnings</span>(result, kind, choice.<span class="hljs-property">destination</span>);
+                        completed = path.<span class="hljs-title">join</span>(root, choice.<span class="hljs-property">destination</span>);
+                        output.<span class="hljs-title">appendLine</span>(<span class="hljs-string">`Publication completed: </span><span class="hljs-subst">${completed}</span><span class="hljs-string">`</span>);
+                        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> warning <span class="hljs-keyword">of</span> warnings) { output.<span class="hljs-title">appendLine</span>(<span class="hljs-string">`Warning: </span><span class="hljs-subst">${warning}</span><span class="hljs-string">`</span>); }
+                    });
+                } <span class="hljs-keyword">finally</span> { forwarding.<span class="hljs-title">dispose</span>(); }
+            });
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of publication extension commands"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2" aria-label="Previous contribution of publication extension commands">Previous</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" aria-label="Base contribution of publication extension commands">Base</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-4" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-4" aria-label="Next contribution of publication extension commands">Next</a></nav>
+</div><p>A validated outcome precedes cancellation state: a late cancellation cannot undo
+commit. Authority is separate and is checked before remembering, offering an open
+action and opening. If authority is revoked after commit, report the actual completed
+output without claiming failure or taking further success actions. PDFs open via
+<code>vscode.open</code>, never as text documents.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-4"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" aria-label="Definition of publication extension commands">&lt;&lt;publication extension commands&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code>            <span class="hljs-title">authority</span>();
+            <span class="hljs-keyword">await</span> context.<span class="hljs-property">workspaceState</span>.<span class="hljs-title">update</span>(key, choice);
+            <span class="hljs-title">authority</span>();
+            <span class="hljs-keyword">const</span> action = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showInformationMessage</span>(<span class="hljs-string">`Exported </span><span class="hljs-subst">${choice.destination}</span><span class="hljs-string">`</span>, <span class="hljs-string">'Open Output'</span>);
+            <span class="hljs-keyword">if</span> (action === <span class="hljs-string">'Open Output'</span>) {
+                <span class="hljs-title">authority</span>();
+                <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">commands</span>.<span class="hljs-title">executeCommand</span>(<span class="hljs-string">'vscode.open'</span>, vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title">file</span>(path.<span class="hljs-title">join</span>(root, choice.<span class="hljs-property">destination</span>)));
+            }
+        } <span class="hljs-keyword">catch</span> (error) {
+            <span class="hljs-keyword">const</span> detail = completed
+                ? <span class="hljs-string">`Publication completed: </span><span class="hljs-subst">${completed}</span><span class="hljs-string">. </span><span class="hljs-subst">${message(error)}</span><span class="hljs-string"> No further success actions will be taken.`</span>
+                : <span class="hljs-string">`Publication failed: </span><span class="hljs-subst">${message(error)}</span><span class="hljs-string">`</span>;
+            output.<span class="hljs-title">appendLine</span>(detail);
+            <span class="hljs-keyword">if</span> (!disposed) {
+                output.<span class="hljs-title">show</span>(<span class="hljs-literal">true</span>);
+                <span class="hljs-keyword">if</span> (completed) { <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showWarningMessage</span>(detail.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">1500</span>)); }
+                <span class="hljs-keyword">else</span> { <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showErrorMessage</span>(detail.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">1500</span>)); }
+            }
+        } <span class="hljs-keyword">finally</span> {
+            operation.<span class="hljs-property">source</span>.<span class="hljs-title">dispose</span>();
+            active = <span class="hljs-literal">undefined</span>;
+            publishing = <span class="hljs-literal">false</span>;
+            <span class="hljs-keyword">if</span> (disposed) { output.<span class="hljs-title">dispose</span>(); }
+        }
+    };
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of publication extension commands"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-3" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-3" aria-label="Previous contribution of publication extension commands">Previous</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" aria-label="Base contribution of publication extension commands">Base</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-5" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-5" aria-label="Next contribution of publication extension commands">Next</a></nav>
+</div><p>Registration disposal cancels the active operation and removes event and command
+subscriptions immediately. The channel remains alive until the operation settles,
+so helper results and cleanup diagnostics cannot write to a disposed channel.
+Disposal does not release either guard early or force-kill the helper.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-5"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" aria-label="Definition of publication extension commands">&lt;&lt;publication extension commands&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">const</span> commands = ([[<span class="hljs-string">'literate.exportLatex'</span>, <span class="hljs-string">'latex'</span>], [<span class="hljs-string">'literate.exportPdf'</span>, <span class="hljs-string">'pdf'</span>]] <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span>)
+        .<span class="hljs-title">map</span>(<span class="hljs-function">(</span><span class="hljs-params">[command, kind]</span><span class="hljs-function">) =&gt;</span> vscode.<span class="hljs-property">commands</span>.<span class="hljs-title">registerCommand</span>(command, <span class="hljs-function">() =&gt;</span> <span class="hljs-title">execute</span>(kind)));
+    context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title">push</span>({ <span class="hljs-title">dispose</span>(): <span class="hljs-built_in">void</span> {
+        <span class="hljs-keyword">if</span> (disposed) { <span class="hljs-keyword">return</span>; }
+        disposed = <span class="hljs-literal">true</span>;
+        foldersChanged.<span class="hljs-title">dispose</span>();
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> command <span class="hljs-keyword">of</span> commands) { command.<span class="hljs-title">dispose</span>(); }
+        active?.<span class="hljs-property">source</span>.<span class="hljs-title">cancel</span>();
+        <span class="hljs-keyword">if</span> (!active) { output.<span class="hljs-title">dispose</span>(); }
+    } });
+}
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of publication extension commands"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-4" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-4" aria-label="Previous contribution of publication extension commands">Previous</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" aria-label="Base contribution of publication extension commands">Base</a></nav>
+</div></div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

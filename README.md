@@ -6,10 +6,12 @@ This extension is inspired by the work done by [Physically Based Rendering: From
 Theory To Implementation](http://www.pbr-book.org) by Matt Pharr, Wenzel Jakob,
 and Greg Humphreys.
 
-The extension generates HTML and code on activation and as literate documents
-change. Markdown preview supplies an editor preview. A headless CLI uses the same
-generation engine, so VS Code is not required to regenerate or check a project.
-Invalid projects produce diagnostics without replacing generated files.
+Initial extension activation is read-only: it discovers the project without
+writing source or HTML. Saving inputs or running **Literate: Process** triggers
+generation. Markdown preview supplies an editor preview. A headless CLI uses the
+same generation engine, so VS Code is not required to regenerate or check a
+project. Invalid projects produce diagnostics without replacing generated files.
+Book publication is separate and always explicit.
 
 Markdown previews receive Literate's document-scoped theme. The extension no
 longer injects the legacy global `style.css`; the surrounding editor UI retains
@@ -129,7 +131,7 @@ currently rejected to keep rendering configuration controlled by Literate.
 Literate handles its own diagram containers; other Mermaid extensions are optional.
 
 This support is for the **VS Code preview**. Generated HTML still uses the existing
-browser/CDN rendering path; offline, embedded-SVG HTML export is the next milestone.
+browser/CDN rendering path; offline, embedded-SVG HTML export is not implemented.
 
 ## Command-line development
 
@@ -147,9 +149,99 @@ writing. An optional final argument selects another project root. The CLI reads
 saved files, whereas the extension uses open buffers; do not run both generators
 concurrently against the same project.
 
+After `yarn build:cli`, the direct executable is `node out/cli-entry.js`
+(for example, `node out/cli-entry.js check`). `out/cli.js` is a library module,
+not the executable entry point.
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) and the
 [development chapter](literate/development.literate) for the self-hosting workflow.
 Edit the literate chapters rather than their generated TypeScript.
+
+## M5: integrated VS Code publication
+
+Use the Command Palette's **Literate: Export LaTeX** (`literate.exportLatex`) or
+**Literate: Export PDF** (`literate.exportPdf`). M5 integrates the explicit M1–M4
+publication pipeline; saves and ordinary generation still never export a book.
+
+### Configure local tools
+
+Publication requires a **trusted, local desktop workspace with `file:` folders
+on POSIX**. Remote extension hosts/workspaces, web, virtual filesystems and Windows
+are rejected. Node, Pandoc, TeX, Chromium and the project must be on the same host.
+This is trusted-input processing, not a TeX/Lua sandbox.
+
+Configure these machine-scoped settings in **User settings**, not workspace
+settings:
+
+- `literate.publication.nodePath`: required explicit **absolute path to external
+  Node.js >=22.12**. Electron (including VS Code's runtime) is not supported;
+  there is no PATH-based Node discovery. Workspace executable overrides are ignored.
+- `literate.publication.browserPath`: optional explicit **absolute path** to an
+  installed sandbox-capable Chromium. Required for Mermaid publication; omit for
+  books without diagrams. No browser discovery or downloader is provided.
+- `literate.publication.fontManifest`: optional safe **root-relative** JSON path,
+  such as `fonts.json`, resolved inside the selected workspace folder. See
+  [portable fonts](#opt-in-portable-fonts) for its format and licensing obligations.
+
+Pandoc must be on PATH; PDF also requires the local TeX tools and packages listed
+under [M4](#m4-explicit-pdf-book-compilation). Installed packages need no checkout,
+`node_modules`, or build tools: publication ships three self-contained runtime
+files (`publication-helper.cjs`, `publication-mermaid-worker.mjs`, and
+`publication-mermaid-browser.js`). External tools and fonts are not bundled or
+installed automatically.
+
+### Export a captured book
+
+1. The active editor's workspace folder is selected when available; otherwise
+   choose a workspace folder in the picker.
+2. Pick the page size: `a4`, `a5`, `letter`, or `legal`.
+3. Enter margins in **top,right,bottom,left** order, in millimetres, for example
+   `18,16,22,20`. Each must be 5–50 mm and leave at least an 80 × 100 mm text area.
+4. Choose a `.tex` or `.pdf` save path **inside the selected root**. The Save dialog
+   selects the output, not a request to save your input documents. Unsafe paths,
+   symlinks and protected input aliases are rejected.
+
+Only successful choices are remembered, separately per workspace root and export
+kind. Defaults are A4, `20,20,20,20`, and `publication.tex` or `publication.pdf`.
+Prompt cancellation starts no helper and writes nothing.
+
+After the prompts and on entering the shared queue, publication captures a fresh
+snapshot of the selected project's `.literate` documents. Open file-backed buffers
+supply their current text, including unsaved edits, new files not yet on disk and
+empty documents. It never calls `saveAll`; untitled/virtual documents are not
+project inputs. Later edits do not change that captured export. Binary assets and
+font files are read from disk only, not from editor buffers.
+
+Publication and source/HTML generation use one serialized extension queue; a
+second publication is rejected while one is in progress. Initial activation is
+read-only—no source/HTML output until a save or explicit processing. Invalid
+source/HTML generation templates do not disable publication. This queue does not
+coordinate separate CLI processes or other VS Code instances: do not run those
+writers concurrently.
+
+### Progress, cancellation and results
+
+The notification provides cancellable progress. Cancellation or revocation before
+commit aborts publication and rolls back staged changes, preserving existing
+outputs. A cancellation arriving after commit does not undo the output: committed
+success is reported truthfully. Removing the selected folder or disposing the
+extension cancels active work and suppresses subsequent remember/open actions;
+any already committed output remains published.
+
+The helper has a **10-minute execution deadline**, after which the extension sends
+`SIGTERM` for graceful transaction cleanup. Cancellation uses the same cooperative
+path. If cleanup has not acknowledged cancellation after 30 seconds, progress and
+the output channel report that publication remains locked. The queue is retained
+until the helper exits—there is **no force kill or hard termination guarantee**.
+
+The **Literate Publication** output channel records results, errors and compiler
+warnings. Success offers **Open Output**, which opens the exported file. Success
+with warnings is not a clean-typography guarantee; inspect the channel and PDF.
+See [M5 acceptance](CONTRIBUTING.md#m5-integrated-publication-acceptance) for the
+headless, real-host and isolated-package evidence and its limits.
+
+**Next: M6 requires a user choice of author-facing syntax before implementation.**
+It is not implemented; design prose is not a shipped syntax or feature contract.
 
 ## M4: explicit PDF book compilation
 
@@ -215,7 +307,7 @@ build path to stderr. Successful compilation does **not** imply clean typography
 `SOURCE_DATE_EPOCH` is honored via the inherited build environment, but PDF byte
 determinism is not promised. The `latex ... --output books/book.tex` command is
 unchanged and never compiles the book. Ordinary generation, activation and saves
-do not compile PDFs; extension publication commands remain future M5 work.
+do not compile PDFs; M5 adds the explicit extension commands described above.
 See [M4 acceptance](CONTRIBUTING.md#m4-pdf-acceptance) for real CLI evidence and
 `yarn test:pdf`.
 
@@ -250,7 +342,8 @@ exports without diagrams need no browser. It writes the requested LaTeX file,
 local image/diagram companions and, only with `--font-manifest`, font/license
 companions—not tangled source, HTML, or a compiled book PDF. Export is always
 explicit: ordinary generation, extension activation and saves never launch the
-publication browser. There is no extension export action or automatic PDF compilation. Source, template, font and image inputs are protected
+publication browser. M5 supplies explicit extension export actions, not automatic
+PDF compilation. Source, template, font and image inputs are protected
 (including existing hard-link aliases), and all writes use the
 same transaction/recovery mechanism as generation. Re-exporting identical content
 leaves the output unchanged. Do not run concurrent writers.

@@ -612,6 +612,22 @@ processLiterateFiles(
 }
 ```
 
+Publication and generation share one serial queue. An export owns the queue from
+source capture through helper cleanup, preventing editor-driven generation from
+changing inputs or outputs while a book is being published. Failure advances the
+queue without replacing the error reported by the publication command.
+
+```ts : <<fragment generation method>>=+
+withPublicationOperation<T>(operation: () => Promise<T>): Promise<T> {
+  const pending = this.processingQueue.then(() => {
+    if (this.disposed) { throw new Error('Literate repository is disposed'); }
+    return operation();
+  });
+  this.processingQueue = pending.then(() => {}, () => {});
+  return pending;
+}
+```
+
 A semantic refresh is requested only after installing the new navigation/source
 snapshot, so a host that starts rendering immediately cannot see old destinations.
 It is not awaited and does not change whether output writes are requested.
@@ -2348,6 +2364,7 @@ import { parseProject, discoveryExcludedDirectories, generateProject, resolvePro
 import { collectFragmentOccurrences, planFragmentRename, FragmentOccurrence } from './symbols';
 import { defaultThemeName } from './themes';
 import { renderScreenCode, renderScreenContribution, screenIndex } from './publication-screen';
+import { registerPublicationCommands } from './publication-extension';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');
 import Token = require('markdown-it/lib/token');
@@ -2387,16 +2404,19 @@ We start the activation by setting up the `FragmentRepository`. This is the hard
 of the processing of literate projects. We give it the `context` so that it can
 also push disposables to the `context.subscriptions` for proper cleanup.
 
-With the repository set up we will process the entire workspace for literate
-projects. We want to `await` here to ensure everything is ready, that is our
-repository can provide fragments when requested.
+The initial workspace scan is read-only: activation prepares fragment navigation
+without generating source or HTML. Opening an export prompt must not write files.
+Explicit processing and the existing save workflow own ordinary generation.
+Publication commands are registered independently of this scan: an unreadable
+generation template is reported by the repository queue without disabling export.
 
 With that done we place our repository in the `context.subscriptions`.
 
 ``` ts : <<activate the extension>>=+
   theOneRepository = new FragmentRepository(context);
-  await theOneRepository.processLiterateFiles(undefined, true);
   context.subscriptions.push(theOneRepository);
+  registerPublicationCommands(context, operation => theOneRepository.withPublicationOperation(operation));
+  await theOneRepository.processLiterateFiles(undefined, false).catch(() => undefined);
     const navigation = new PreviewNavigation();
     context.subscriptions.push(navigation, vscode.window.registerUriHandler(navigation));
 ```

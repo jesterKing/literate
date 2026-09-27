@@ -106,7 +106,8 @@ test('PDF compiler receives the full virtual plan; only PDF is published, with m
     fs.linkSync(path.join(root, 'index.literate'), path.join(root, 'books/book.tex'));
     const original = tree(root);
     const compiler: PdfCompiler = async (files, entry, options) => {
-        assert.equal(entry, 'books/book.tex'); assert.deepEqual(options, { keepBuild: true });
+        assert.equal(entry, 'books/book.tex'); assert.equal(options?.keepBuild, true);
+                assert.equal(typeof options?.checkCancelled, 'function'); options?.checkCancelled?.();
         assert.deepEqual(tree(root), original, 'nothing is staged before compilation');
         const tex = files.find(file => file.path === entry)!.content;
         assert.equal(typeof tex, 'string');
@@ -168,7 +169,8 @@ test('latex never invokes the PDF compiler or adds publication metadata', async 
 test('human warnings and retained directories go to stderr; keep-build defaults false', async t => {
     const root = fixture(t);
     const result = await command(args(root), async (_files, _entry, options) => {
-        assert.deepEqual(options, { keepBuild: false });
+        assert.equal(options?.keepBuild, false);
+                assert.equal(typeof options?.checkCancelled, 'function'); options?.checkCancelled?.();
         return { pdf, warnings: ['Font warning'], buildDirectory: '/private/build' };
     }, convert, createTransactionIO, false);
     assert.equal(result.code, 0);

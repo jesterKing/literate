@@ -1,10 +1,10 @@
 # A browser that produces assets
 
 Chromium supplies SVG layout and PDF vector printing; it does not typeset the
-book. The worker loads the exact local Mermaid distribution through Puppeteer
-Core, whose package contains no browser downloader. Each diagram gets a new
-browser context, preventing one diagram's DOM and Mermaid counters from affecting
-another. The controller owns the deadline, process group and temporary directory.
+book. The worker loads the bundled Mermaid distribution through a connect-only
+Puppeteer adapter, excluding browser management and download code. Each diagram
+gets a new browser context, preventing one diagram's DOM and Mermaid counters
+from affecting another. The controller owns the deadline, process group and temporary directory.
 
 ```js : <<Mermaid browser worker.*>>= ./src/publication-mermaid-worker.mjs $
 <<Mermaid worker imports>>
@@ -72,12 +72,12 @@ the selected palette still controls colors.
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import { createRequire } from 'node:module';
+import mermaidPackage from 'mermaid/package.json' with { type: 'json' };
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { getTheme, mermaidTheme } from './themes';
 import { diagramLimits, validateDiagram } from './publication-mermaid';
-const require = createRequire(import.meta.url);
+
 const hash = value => createHash('sha256').update(value).digest('hex');
 export function configuration(theme, seed) {
     return { ...mermaidTheme(getTheme(theme)), startOnLoad: false,
@@ -294,8 +294,11 @@ return { pdf, svg: Buffer.from(geometry.svg) };
 
 ## Browser ownership
 
-Puppeteer is imported only in the child. The browser sandbox remains enabled;
-there is no fallback to `--no-sandbox`. The private profile, disabled background
+Puppeteer is imported only in the child. Mermaid's metadata is a static JSON
+import, embedded by the publication build; no installed package lookup occurs.
+The build validates the matching browser dependency pins before writing outputs.
+The browser sandbox remains enabled; there is no fallback to `--no-sandbox`.
+The private profile, disabled background
 services and failed DNS resolution complement page-level request blocking.
 JavaScript heaps are capped, but this is not a hard operating-system RSS quota.
 
@@ -306,8 +309,7 @@ export async function browserBatch(directory, executable, launch) {
         throw new Error('Invalid Mermaid worker request');
     }
     request.sources.forEach(validateDiagram);
-    const manifest = require.resolve('mermaid/package.json');
-    if (JSON.parse(await fs.readFile(manifest, 'utf8')).version !== '12.0.0') {
+    if (mermaidPackage.version !== '12.0.0') {
         throw new Error('Publication requires the pinned Mermaid 12.0.0 bundle');
     }
     const bundle = await fs.readFile(path.join(path.dirname(fileURLToPath(import.meta.url)),
@@ -394,17 +396,18 @@ function browserEndpoint(child) {
 }
 ```
 
-Missing optional dependencies and browser launch failures stay actionable. The
-worker never chooses a browser or retries with weakened security. A bounded
-message is sufficient because the parent retains the publication's source context.
+Browser launch failures stay actionable without asking installed-extension users
+to install development dependencies. The worker never chooses a browser or
+retries with weakened security. A bounded message is sufficient because the
+parent retains the publication's source context.
 
 ```js : <<Mermaid worker entry>>=
 async function main() {
     try {
-        const { default: puppeteer } = await import('puppeteer-core');
+        const { default: puppeteer } = await import('./publication-puppeteer.mjs');
         await browserBatch(process.argv[2], process.argv[3], options => connectOwnedBrowser(puppeteer, options));
     } catch (error) {
-        process.stderr.write(('Mermaid browser failed (install dev dependencies; supply a sandbox-capable system browser): '
+        process.stderr.write(('Mermaid browser failed (use external Node >=22.12 and a sandbox-capable system Chromium): '
             + String(error)).slice(0, 16000) + '\n', () => process.exit(1));
     }
 }

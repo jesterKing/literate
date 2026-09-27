@@ -16,6 +16,13 @@ const entry = files[0].path;
 const required = ['scrbook.cls', 'fontspec.sty', 'geometry.sty', 'fvextra.sty', 'needspace.sty',
     'xcolor.sty', 'microtype.sty', 'amssymb.sty', 'amsmath.sty', 'graphicx.sty', 'ulem.sty', 'hyperref.sty'];
 
+test('caller cancellation survives lazy compiler loading before any tool starts', async () => {
+    const compiler = createPdfCompiler(async () => assert.fail('no tool may start'));
+    await assert.rejects(compiler(files, entry, { checkCancelled() {
+        throw new Error('caller cancelled before import completed');
+    } }), /caller cancelled before import completed/);
+});
+
 type Build = (request: PdfProcessRequest) => Promise<{ code: number | null; output: string }>;
 function fixture(build?: Build) {
     const calls: PdfProcessRequest[] = [];

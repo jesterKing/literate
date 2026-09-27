@@ -3,7 +3,7 @@ import { constants } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { tmpdir } from 'node:os';
-export interface PdfCompileOptions { keepBuild?: boolean; }
+export interface PdfCompileOptions { keepBuild?: boolean; checkCancelled?: () => void; }
 export interface PdfCompilation {
     pdf: Uint8Array;
     warnings: string[];
@@ -308,10 +308,11 @@ async function compileInStage(files: Parameters<PdfCompiler>[0], entry: string, 
 export function createPdfCompiler(runner: PdfProcessRunner = runPdfProcess): PdfCompiler {
     return async (files, entry, options = {}) => {
         const lifetime = compilerLifetime();
+        const check = (): void => { lifetime.check(); options.checkCancelled?.(); };
         try {
+            check();
             const prepared = prepareFiles(files, entry);
-            lifetime.check();
-            return await compileInStage(prepared, entry, options, runner, lifetime.check);
+            return await compileInStage(prepared, entry, options, runner, check);
         } catch (error) {
             if (error instanceof PdfCompilationError) { throw error; }
             throw new PdfCompilationError(errorMessage(error));

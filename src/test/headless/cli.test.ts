@@ -5,7 +5,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const cli = path.resolve(__dirname, '../../cli.js');
+const cli = path.resolve(__dirname, '../../cli-entry.js');
 
 function fixture(t: { after(callback: () => void): void }) {
     const base = fs.mkdtempSync(path.join(os.tmpdir(), 'literate headless '));

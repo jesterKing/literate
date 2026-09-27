@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { runInNewContext } from 'node:vm';
+import { execFileSync } from 'node:child_process';
 import { test } from 'node:test';
 import { renderDiagrams, validateDiagram, executeDiagramWorker, DiagramRenderer } from '../../publication-mermaid';
 import { collectAssets, planAssets } from '../../publication-assets';
@@ -78,6 +79,61 @@ test('missing browser, nonexistent executable, invalid theme and request limits 
     await assert.rejects(renderDiagrams(Array.from({ length: 65 }, (_, i) => asset(source + i)), 'rosepine-dawn', process.execPath, worker), /64 unique/);
     await assert.rejects(renderDiagrams([asset('%%{init:{}}%%')], 'rosepine-dawn', process.execPath, worker), /chapter.literate:3/);
 });
+test('latched cancellation is checked at entry, even without diagrams', async () => {
+    const cancellation = new Error('publication interrupted');
+    const checkCancelled = (): void => { throw cancellation; };
+    for (const assets of [[], [asset()]]) {
+        await assert.rejects(renderDiagrams(assets, 'invalid', undefined,
+            async () => assert.fail('worker must not start'), checkCancelled), error => error === cancellation);
+    }
+});
+for (const stage of ['stat', 'access', 'mkdtemp', 'writeFile', 'worker', 'lstat', 'readFile']) {
+    test(`persistent cancellation after ${stage} stops rendering and cleans temporary files`, () => {
+        // Filesystem hooks live in a child process, never in another test's module cache.
+        execFileSync(process.execPath, ['-e', `
+            const assert = require('node:assert/strict');
+            const fs = require('node:fs');
+            const promises = require('node:fs/promises');
+            const path = require('node:path');
+            const { renderDiagrams } = require(process.argv[1]);
+            const stage = process.argv[2];
+            const cancellation = new Error('publication interrupted');
+            let cancelled = false, scratch = '', workers = 0;
+            const calls = [];
+            for (const name of ['stat', 'access', 'mkdtemp', 'writeFile', 'lstat', 'readFile']) {
+                const original = promises[name];
+                promises[name] = async (...args) => {
+                    calls.push(name);
+                    const result = await original(...args);
+                    if (name === 'mkdtemp') { scratch = result; }
+                    if (name === stage) { cancelled = true; }
+                    return result;
+                };
+            }
+            const asset = ${JSON.stringify(asset())};
+            (async () => {
+                try {
+                    await assert.rejects(renderDiagrams([asset], 'rosepine-dawn', process.execPath,
+                        async directory => {
+                            workers++;
+                            assert.equal(cancelled, false, 'cancelled preparation must not spawn a worker');
+                            calls.push('worker');
+                            fs.writeFileSync(path.join(directory, '0.pdf'), '%PDF-1.4');
+                            fs.writeFileSync(path.join(directory, '0.svg'), '<svg/>');
+                            if (stage === 'worker') { cancelled = true; }
+                        }, () => { if (cancelled) { throw cancellation; } }), error => error === cancellation);
+                    const steps = ['stat', 'access', 'mkdtemp', 'writeFile', 'worker', 'lstat', 'readFile'];
+                    assert.deepEqual(calls, steps.slice(0, steps.indexOf(stage) + 1));
+                    assert.equal(workers, steps.indexOf(stage) >= steps.indexOf('worker') ? 1 : 0);
+                    assert.equal(Boolean(scratch), steps.indexOf(stage) >= steps.indexOf('mkdtemp'));
+                    if (scratch) { assert.equal(fs.existsSync(scratch), false, 'temporary directory must be removed'); }
+                } finally {
+                    if (scratch) { fs.rmSync(scratch, { recursive: true, force: true }); }
+                }
+            })().catch(error => { console.error(error); process.exitCode = 1; });
+        `, require.resolve('../../publication-mermaid'), stage], { timeout: 10000, encoding: 'utf8' });
+    });
+}
 for (const mode of ['success', 'worker-failure', 'missing', 'symlink', 'oversized', 'signature']) {
     test(`controller cleans its private directory on ${mode}`, async () => {
         let scratch = '', calls = 0;

@@ -21,6 +21,7 @@ import { parseProject, discoveryExcludedDirectories, generateProject, resolvePro
 import { collectFragmentOccurrences, planFragmentRename, FragmentOccurrence } from './symbols';
 import { defaultThemeName } from './themes';
 import { renderScreenCode, renderScreenContribution, screenIndex } from './publication-screen';
+import { registerPublicationCommands } from './publication-extension';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');
 import Token = require('markdown-it/lib/token');
@@ -912,6 +913,14 @@ export class FragmentRepository {
     });
     return operation;
   }
+  withPublicationOperation<T>(operation: () => Promise<T>): Promise<T> {
+    const pending = this.processingQueue.then(() => {
+      if (this.disposed) { throw new Error('Literate repository is disposed'); }
+      return operation();
+    });
+    this.processingQueue = pending.then(() => {}, () => {});
+    return pending;
+  }
   private async preflightOutputs(
     root: vscode.Uri, files: readonly { path: string; content: string }[]
   ): Promise<{ files: TransactionFile[]; io: TransactionIO }> {
@@ -1349,8 +1358,9 @@ function determineWorkspaceFolder(document : vscode.TextDocument) : vscode.Works
 let theOneRepository : FragmentRepository;
 export async function activate(context: vscode.ExtensionContext) {
   theOneRepository = new FragmentRepository(context);
-  await theOneRepository.processLiterateFiles(undefined, true);
   context.subscriptions.push(theOneRepository);
+  registerPublicationCommands(context, operation => theOneRepository.withPublicationOperation(operation));
+  await theOneRepository.processLiterateFiles(undefined, false).catch(() => undefined);
     const navigation = new PreviewNavigation();
     context.subscriptions.push(navigation, vscode.window.registerUriHandler(navigation));
   let literateProcessDisposable = vscode.commands.registerCommand(

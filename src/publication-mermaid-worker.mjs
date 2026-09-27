@@ -1,12 +1,12 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import { createRequire } from 'node:module';
+import mermaidPackage from 'mermaid/package.json' with { type: 'json' };
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { getTheme, mermaidTheme } from './themes';
 import { diagramLimits, validateDiagram } from './publication-mermaid';
-const require = createRequire(import.meta.url);
+
 const hash = value => createHash('sha256').update(value).digest('hex');
 export function configuration(theme, seed) {
     return { ...mermaidTheme(getTheme(theme)), startOnLoad: false,
@@ -142,8 +142,7 @@ export async function browserBatch(directory, executable, launch) {
         throw new Error('Invalid Mermaid worker request');
     }
     request.sources.forEach(validateDiagram);
-    const manifest = require.resolve('mermaid/package.json');
-    if (JSON.parse(await fs.readFile(manifest, 'utf8')).version !== '12.0.0') {
+    if (mermaidPackage.version !== '12.0.0') {
         throw new Error('Publication requires the pinned Mermaid 12.0.0 bundle');
     }
     const bundle = await fs.readFile(path.join(path.dirname(fileURLToPath(import.meta.url)),
@@ -204,10 +203,10 @@ function browserEndpoint(child) {
 }
 async function main() {
     try {
-        const { default: puppeteer } = await import('puppeteer-core');
+        const { default: puppeteer } = await import('./publication-puppeteer.mjs');
         await browserBatch(process.argv[2], process.argv[3], options => connectOwnedBrowser(puppeteer, options));
     } catch (error) {
-        process.stderr.write(('Mermaid browser failed (install dev dependencies; supply a sandbox-capable system browser): '
+        process.stderr.write(('Mermaid browser failed (use external Node >=22.12 and a sandbox-capable system Chromium): '
             + String(error)).slice(0, 16000) + '\n', () => process.exit(1));
     }
 }

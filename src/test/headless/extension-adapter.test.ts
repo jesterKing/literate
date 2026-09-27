@@ -8,6 +8,20 @@ import { generateProject, SourceDocument } from '../../engine';
 
 import { fixture, fence, root, tick } from './vscode-fixture';
 
+test('publication commands remain registered after a read-only startup template failure', async () => {
+    const f = fixture();
+    f.open('index.literate', fence('SETTINGS', 'template=blocked.template') + root('hello'));
+    f.controls.readError = 'NoPermissions';
+    const subscriptions: vscode.Disposable[] = [];
+    await f.extension.activate({ subscriptions } as vscode.ExtensionContext);
+    assert.ok(f.commands.has('literate.exportLatex'));
+    assert.ok(f.commands.has('literate.exportPdf'));
+    assert.ok(f.errors.some(error => error.includes('processing failed')));
+    assert.equal(f.writes.length, 0);
+    for (const subscription of subscriptions) { subscription.dispose(); }
+    f.repository.dispose();
+});
+
 function expected(documents: SourceDocument[], templates: Record<string, string> = {}) {
     const result = generateProject(documents, templates);
     assert.deepEqual(result.diagnostics, []);

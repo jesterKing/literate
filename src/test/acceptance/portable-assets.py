@@ -96,7 +96,7 @@ def main():
     (root / 'cache').mkdir()
     reports = {}
     for paper, width, height in [('a4', 210, 297), ('a5', 148, 210)]:
-        command = ['node', REPO / 'out/cli.js', 'latex', project, '--output', f'{paper}/book.tex',
+        command = ['node', REPO / 'out/cli-entry.js', 'latex', project, '--output', f'{paper}/book.tex',
                    '--font-manifest', 'fonts.json', '--paper', paper, '--margin-top', '18mm',
                    '--margin-right', '16mm', '--margin-bottom', '22mm', '--margin-left', '20mm', '--json']
         exported = json.loads(run(command, REPO, root / f'export-{paper}.json'))
@@ -175,7 +175,7 @@ def main():
     (rejected / 'wide.pdf').write_bytes(vector_pdf(1200, 120))
     (rejected / 'index.literate').write_text('# Caption budget\n\n![' + 'M ' * 2047 + '](wide.pdf)\n')
     LAYOUT.copy_manifest(args.font_manifest.resolve(), rejected)
-    run(['node', REPO / 'out/cli.js', 'latex', rejected, '--output', 'book.tex',
+    run(['node', REPO / 'out/cli-entry.js', 'latex', rejected, '--output', 'book.tex',
          '--font-manifest', 'fonts.json', '--paper', 'a5', '--json'], REPO, root / 'caption-export.json')
     if args.ulem:
         shutil.copyfile(args.ulem, rejected / 'ulem.sty')

@@ -104,7 +104,7 @@ def main():
     reports = {'environment': {'browser': str(args.browser), 'fontManifest': str(args.font_manifest.resolve()),
                                'ulem': str(args.ulem.resolve()) if args.ulem else 'system lookup'}}
     for paper, width, height in [('a4', 210, 297), ('a5', 148, 210)]:
-        command = ['node', REPO / 'out/cli.js', 'latex', project, '--output', f'{paper}/book.tex',
+        command = ['node', REPO / 'out/cli-entry.js', 'latex', project, '--output', f'{paper}/book.tex',
                    '--font-manifest', 'fonts.json', '--browser', args.browser, '--paper', paper,
                    '--margin-top', '18mm', '--margin-right', '16mm', '--margin-bottom', '22mm', '--margin-left', '20mm', '--json']
         exported = json.loads(run(command, REPO, root / f'export-{paper}.json'))
@@ -148,7 +148,7 @@ def main():
         manifest_path = root / 'full-fonts.json'
         manifest_path.write_text(json.dumps(manifest))
         destination = root / 'full-export/book.tex'
-        command = ['node', REPO / 'out/cli.js', 'latex', REPO, '--output', destination.relative_to(REPO),
+        command = ['node', REPO / 'out/cli-entry.js', 'latex', REPO, '--output', destination.relative_to(REPO),
                    '--font-manifest', manifest_path.relative_to(REPO), '--browser', args.browser, '--json']
         result = json.loads(run(command, REPO, root / 'full-export.json'))
         assert result['ok']

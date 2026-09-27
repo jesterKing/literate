@@ -357,6 +357,7 @@ export function fixture(workspaceUri = 'file:///project') {
             return controls.externalUri ? controls.externalUri(uri) : Uri.parse(uri.toString() + '?windowId%3D1');
         } },
         window: {
+            createOutputChannel: () => ({ appendLine() {}, show() {}, dispose() {} }),
             registerUriHandler(handler: { handleUri(uri: Uri): Promise<void> }) {
                 assert.equal(uriHandler, undefined, 'one URI handler per activation');
                 uriHandler = handler;
@@ -379,9 +380,12 @@ export function fixture(workspaceUri = 'file:///project') {
     const originalLoad = loader._load;
     const extensionPath = require.resolve('../../extension'); // out/extension.js after compilation
     const previousModule = require.cache[extensionPath];
+    const publicationPath = require.resolve('../../publication-extension');
+    const previousPublication = require.cache[publicationPath];
     let extension: typeof import('../../extension');
     try {
         delete require.cache[extensionPath];
+        delete require.cache[publicationPath];
         loader._load = function (request, parent, isMain) {
             if ((request === 'fs/promises' || request === 'node:fs/promises') && parent?.filename === extensionPath) {
                 // Only the extension's mode operations are mocked; never touch real /project files.
@@ -411,6 +415,8 @@ export function fixture(workspaceUri = 'file:///project') {
         loader._load = originalLoad;
         if (previousModule) { require.cache[extensionPath] = previousModule; }
         else { delete require.cache[extensionPath]; }
+        if (previousPublication) { require.cache[publicationPath] = previousPublication; }
+        else { delete require.cache[publicationPath]; }
     }
     const repository = new extension.FragmentRepository({ subscriptions: [] } as unknown as vscode.ExtensionContext);
     const uri = (name: string, base = folder) => Uri.joinPath(base.uri, name).toString();

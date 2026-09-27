@@ -43,7 +43,7 @@ is caller-owned, including after failure; otherwise cleanup runs in `finally`.
 Validation failures occurring before staging have no build directory to retain.
 
 ```ts : <<publication PDF API>>=
-export interface PdfCompileOptions { keepBuild?: boolean; }
+export interface PdfCompileOptions { keepBuild?: boolean; checkCancelled?: () => void; }
 export interface PdfCompilation {
     pdf: Uint8Array;
     warnings: string[];
@@ -485,17 +485,19 @@ async function compileInStage(files: Parameters<PdfCompiler>[0], entry: string, 
 ```
 
 Lifetime hooks are acquired before any asynchronous work and disposed only after
-the stage has been handled. Synchronous validation errors retain the same public
+the stage has been handled. An optional caller checkpoint carries cancellation
+across lazy module loading, before these local signal listeners exist. Synchronous validation errors retain the same public
 error type without allocating a build directory.
 
 ```ts : <<publication PDF orchestration>>=+
 export function createPdfCompiler(runner: PdfProcessRunner = runPdfProcess): PdfCompiler {
     return async (files, entry, options = {}) => {
         const lifetime = compilerLifetime();
+        const check = (): void => { lifetime.check(); options.checkCancelled?.(); };
         try {
+            check();
             const prepared = prepareFiles(files, entry);
-            lifetime.check();
-            return await compileInStage(prepared, entry, options, runner, lifetime.check);
+            return await compileInStage(prepared, entry, options, runner, check);
         } catch (error) {
             if (error instanceof PdfCompilationError) { throw error; }
             throw new PdfCompilationError(errorMessage(error));

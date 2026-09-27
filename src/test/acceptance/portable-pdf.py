@@ -85,7 +85,7 @@ def main():
 
     def invoke(project, output, name, keep=True, success=True, browser=False):
         paper = Path(output).parts[0]
-        command = ['node', str(REPO / 'out/cli.js'), 'pdf', str(project), '--output', output,
+        command = ['node', str(REPO / 'out/cli-entry.js'), 'pdf', str(project), '--output', output,
                    '--font-manifest', 'fonts.json', '--paper', paper, '--margin-left', '20mm',
                    '--margin-top', '20mm' if paper == 'a4' else '18mm',
                    '--margin-right', '20mm' if paper == 'a4' else '16mm',

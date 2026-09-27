@@ -123,10 +123,10 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 <body>
 <div class="literate-document" data-literate-theme="rosepine-dawn"><h1>A browser that produces assets</h1>
 <p>Chromium supplies SVG layout and PDF vector printing; it does not typeset the
-book. The worker loads the exact local Mermaid distribution through Puppeteer
-Core, whose package contains no browser downloader. Each diagram gets a new
-browser context, preventing one diagram's DOM and Mermaid counters from affecting
-another. The controller owns the deadline, process group and temporary directory.</p>
+book. The worker loads the bundled Mermaid distribution through a connect-only
+Puppeteer adapter, excluding browser management and download code. Each diagram
+gets a new browser context, preventing one diagram's DOM and Mermaid counters
+from affecting another. The controller owns the deadline, process group and temporary directory.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-004d00650072006d006100690064002000620072006f007700730065007200200077006f0072006b00650072002e002a-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d006100690064002000620072006f007700730065007200200077006f0072006b00650072002e002a"></span><a class="literate-tag-name" href="#f-004d00650072006d006100690064002000620072006f007700730065007200200077006f0072006b00650072002e002a" data-literate-target="f-004d00650072006d006100690064002000620072006f007700730065007200200077006f0072006b00650072002e002a" aria-label="Definition of Mermaid browser worker.*">&lt;&lt;Mermaid browser worker.*&gt;&gt;= src/publication-mermaid-worker.mjs $</a></div>
 <div class="code">
@@ -195,12 +195,12 @@ the selected palette still controls colors.</p>
 <pre><code><span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> fs <span class="hljs-keyword">from</span> <span class="hljs-string">'node:fs/promises'</span>;
 <span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> path <span class="hljs-keyword">from</span> <span class="hljs-string">'node:path'</span>;
 <span class="hljs-keyword">import</span> { createHash } <span class="hljs-keyword">from</span> <span class="hljs-string">'node:crypto'</span>;
-<span class="hljs-keyword">import</span> { createRequire } <span class="hljs-keyword">from</span> <span class="hljs-string">'node:module'</span>;
+<span class="hljs-keyword">import</span> mermaidPackage <span class="hljs-keyword">from</span> <span class="hljs-string">'mermaid/package.json'</span> <span class="hljs-keyword">with</span> { <span class="hljs-attr">type</span>: <span class="hljs-string">'json'</span> };
 <span class="hljs-keyword">import</span> { fileURLToPath } <span class="hljs-keyword">from</span> <span class="hljs-string">'node:url'</span>;
 <span class="hljs-keyword">import</span> { spawn } <span class="hljs-keyword">from</span> <span class="hljs-string">'node:child_process'</span>;
 <span class="hljs-keyword">import</span> { getTheme, mermaidTheme } <span class="hljs-keyword">from</span> <span class="hljs-string">'./themes'</span>;
 <span class="hljs-keyword">import</span> { diagramLimits, validateDiagram } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-mermaid'</span>;
-<span class="hljs-keyword">const</span> <span class="hljs-built_in">require</span> = <span class="hljs-title">createRequire</span>(<span class="hljs-keyword">import</span>.<span class="hljs-property">meta</span>.<span class="hljs-property">url</span>);
+
 <span class="hljs-keyword">const</span> <span class="hljs-title">hash</span> = value =&gt; <span class="hljs-title">createHash</span>(<span class="hljs-string">'sha256'</span>).<span class="hljs-title">update</span>(value).<span class="hljs-title">digest</span>(<span class="hljs-string">'hex'</span>);
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">configuration</span>(<span class="hljs-params">theme, seed</span>) {
     <span class="hljs-keyword">return</span> { ...<span class="hljs-title">mermaidTheme</span>(<span class="hljs-title">getTheme</span>(theme)), <span class="hljs-attr">startOnLoad</span>: <span class="hljs-literal">false</span>,
@@ -433,8 +433,11 @@ to the complete SVG. A small rounding allowance prevents a trailing blank page.<
 
 </div>
 </div><h2>Browser ownership</h2>
-<p>Puppeteer is imported only in the child. The browser sandbox remains enabled;
-there is no fallback to <code>--no-sandbox</code>. The private profile, disabled background
+<p>Puppeteer is imported only in the child. Mermaid's metadata is a static JSON
+import, embedded by the publication build; no installed package lookup occurs.
+The build validates the matching browser dependency pins before writing outputs.
+The browser sandbox remains enabled; there is no fallback to <code>--no-sandbox</code>.
+The private profile, disabled background
 services and failed DNS resolution complement page-level request blocking.
 JavaScript heaps are capped, but this is not a hard operating-system RSS quota.</p>
 <div class="codefragment">
@@ -446,8 +449,7 @@ JavaScript heaps are capped, but this is not a hard operating-system RSS quota.<
         <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Invalid Mermaid worker request'</span>);
     }
     request.<span class="hljs-property">sources</span>.<span class="hljs-title">forEach</span>(validateDiagram);
-    <span class="hljs-keyword">const</span> manifest = <span class="hljs-built_in">require</span>.<span class="hljs-title">resolve</span>(<span class="hljs-string">'mermaid/package.json'</span>);
-    <span class="hljs-keyword">if</span> (<span class="hljs-title">JSON</span>.<span class="hljs-title">parse</span>(<span class="hljs-keyword">await</span> fs.<span class="hljs-title">readFile</span>(manifest, <span class="hljs-string">'utf8'</span>)).<span class="hljs-property">version</span> !== <span class="hljs-string">'12.0.0'</span>) {
+    <span class="hljs-keyword">if</span> (mermaidPackage.<span class="hljs-property">version</span> !== <span class="hljs-string">'12.0.0'</span>) {
         <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Publication requires the pinned Mermaid 12.0.0 bundle'</span>);
     }
     <span class="hljs-keyword">const</span> bundle = <span class="hljs-keyword">await</span> fs.<span class="hljs-title">readFile</span>(path.<span class="hljs-title">join</span>(path.<span class="hljs-title">dirname</span>(<span class="hljs-title">fileURLToPath</span>(<span class="hljs-keyword">import</span>.<span class="hljs-property">meta</span>.<span class="hljs-property">url</span>)),
@@ -543,18 +545,19 @@ connection to drain the pipe, but retains no additional browser log data.</p>
 
 </div>
 <nav class="fragment-navigation" aria-label="Contributions of Mermaid owned browser process"><a class="literate-tag-name" href="#c-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1" data-literate-target="c-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1" aria-label="Previous contribution of Mermaid owned browser process">Previous</a> · <a class="literate-tag-name" href="#c-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1" data-literate-target="c-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1" aria-label="Base contribution of Mermaid owned browser process">Base</a></nav>
-</div><p>Missing optional dependencies and browser launch failures stay actionable. The
-worker never chooses a browser or retries with weakened security. A bounded
-message is sufficient because the parent retains the publication's source context.</p>
+</div><p>Browser launch failures stay actionable without asking installed-extension users
+to install development dependencies. The worker never chooses a browser or
+retries with weakened security. A bounded message is sufficient because the
+parent retains the publication's source context.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-004d00650072006d00610069006400200077006f0072006b0065007200200065006e007400720079-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d00610069006400200077006f0072006b0065007200200065006e007400720079"></span><a class="literate-tag-name" href="#f-004d00650072006d00610069006400200077006f0072006b0065007200200065006e007400720079" data-literate-target="f-004d00650072006d00610069006400200077006f0072006b0065007200200065006e007400720079" aria-label="Definition of Mermaid worker entry">&lt;&lt;Mermaid worker entry&gt;&gt;=</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">main</span>() {
     <span class="hljs-keyword">try</span> {
-        <span class="hljs-keyword">const</span> { <span class="hljs-attr">default</span>: puppeteer } = <span class="hljs-keyword">await</span> <span class="hljs-keyword">import</span>(<span class="hljs-string">'puppeteer-core'</span>);
+        <span class="hljs-keyword">const</span> { <span class="hljs-attr">default</span>: puppeteer } = <span class="hljs-keyword">await</span> <span class="hljs-keyword">import</span>(<span class="hljs-string">'./publication-puppeteer.mjs'</span>);
         <span class="hljs-keyword">await</span> <span class="hljs-title">browserBatch</span>(process.<span class="hljs-property">argv</span>[<span class="hljs-number">2</span>], process.<span class="hljs-property">argv</span>[<span class="hljs-number">3</span>], <span class="hljs-params">options</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">connectOwnedBrowser</span>(puppeteer, options));
     } <span class="hljs-keyword">catch</span> (error) {
-        process.<span class="hljs-property">stderr</span>.<span class="hljs-title">write</span>((<span class="hljs-string">'Mermaid browser failed (install dev dependencies; supply a sandbox-capable system browser): '</span>
+        process.<span class="hljs-property">stderr</span>.<span class="hljs-title">write</span>((<span class="hljs-string">'Mermaid browser failed (use external Node &gt;=22.12 and a sandbox-capable system Chromium): '</span>
             + <span class="hljs-title">String</span>(error)).<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">16000</span>) + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>, <span class="hljs-function">() =&gt;</span> process.<span class="hljs-title">exit</span>(<span class="hljs-number">1</span>));
     }
 }

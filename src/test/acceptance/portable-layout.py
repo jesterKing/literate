@@ -276,7 +276,7 @@ def main():
     (root / 'cache').mkdir()
     reports = {}
     for paper in ['a4', 'a5']:
-        command = ['node', REPO / 'out/cli.js', 'latex', project, '--output', f'{paper}/book.tex',
+        command = ['node', REPO / 'out/cli-entry.js', 'latex', project, '--output', f'{paper}/book.tex',
                    '--font-manifest', 'fonts.json', '--paper', paper, '--margin', '20mm', '--json']
         if paper == 'a5':
             command += ['--margin-top', '18mm', '--margin-right', '16mm', '--margin-bottom', '22mm']

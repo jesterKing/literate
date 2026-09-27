@@ -15,7 +15,7 @@ yarn build:cli
 ```
 
 The checked-in generated TypeScript is the bootstrap: `build:cli` bundles only
-the CLI's local modules into `out/cli.js`, using installed packages at runtime.
+the CLI's local modules into `out/cli-entry.js`, using installed packages at runtime.
 It does not type-check or compile
 the extension, so an extension error does not prevent generation. No global
 TypeScript compiler or published Literate extension is required. `.gitattributes`
@@ -90,9 +90,9 @@ old output. Run `yarn literate generate` again, review the differences, then rep
 the check. Keep generated TypeScript committed so the next checkout can bootstrap.
 
 If newly generated CLI code fails to build, keep using a known-working executable
-with `node out/cli.js generate` to regenerate after fixing the literate source.
+with `node out/cli-entry.js generate` to regenerate after fixing the literate source.
 Do not repair generated TypeScript by hand. Keep a separate known-good CLI bundle
-before risky generator syntax changes; `out/cli.js` can also be overwritten by
+before risky generator syntax changes; `out/cli-entry.js` can also be overwritten by
 compilation, so it is not a permanent backup.
 
 For syntax changes, retain compatibility long enough to generate the new parser
@@ -111,8 +111,8 @@ Inspection lists ordered input documents, referenced templates, and each fragmen
 output, definitions, and dependencies. Locations refer to the literate sources,
 not generated files. JSON responses use schema version 1 and zero-based positions;
 usage errors and I/O failures are also structured. Inspection and checks never
-write project output. The `yarn literate` wrapper does rebuild `out/cli.js`; invoke
-`node out/cli.js` directly when the whole invocation must avoid project writes.
+write project output. The `yarn literate` wrapper does rebuild `out/cli-entry.js`; invoke
+`node out/cli-entry.js` directly when the whole invocation must avoid project writes.
 
 ## Safe generation while editing
 
