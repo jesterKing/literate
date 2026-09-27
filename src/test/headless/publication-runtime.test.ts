@@ -155,9 +155,9 @@ test('publication mode stubs self-hosting and does not replace outputs after a f
     files.forEach((file, index) => assert.deepEqual(fs.readFileSync(file), before[index]));
 });
 
-test('VSIX adds exactly the three publication runtime files, not build evidence', () => {
+test('VSIX adds publication runtime and exploration preview, not build evidence', () => {
     const ignore = fs.readFileSync(path.join(root, '.vscodeignore'), 'utf8');
     assert.deepEqual(ignore.split(/\r?\n/).filter(line => line.startsWith('!out/publication-')).sort(), [
-        '!out/publication-helper.cjs', '!out/publication-mermaid-browser.js', '!out/publication-mermaid-worker.mjs'
+        '!out/publication-exploration-preview.js', '!out/publication-helper.cjs', '!out/publication-mermaid-browser.js', '!out/publication-mermaid-worker.mjs'
     ]);
 });

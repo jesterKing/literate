@@ -38,8 +38,12 @@ import { highlightContribution, syntaxStyle } from './publication-highlight';
 
 The callback must not run after a preparation error. Results are atomic: diagnostics
 never accompany partial LaTeX. Installed-font lookup and PDF compilation are caller work.
+`publicationTemplateVersion` identifies the renderer-owned template contract in emitted
+TeX. It is not a custom-template API; only validated layout, palette and font options
+cross the template boundary.
 
 ```ts : <<publication LaTeX API>>=
+export const publicationTemplateVersion = 1;
 export interface LatexOptions {
     assetPath?: (asset: PublicationAsset) => string;
     theme?: string;
@@ -286,7 +290,7 @@ function slantFeatures(font: PortableFont): string {
 ```ts : <<publication LaTeX template>>=+
 function template(body: string, options: CheckedOptions, definitions: string[], rail: string): string {
     const c = options.theme.colors;
-    return themeNotice() + String.raw`\newcommand{\DoNotLoadEpstopdf}{}
+    return `% Literate publication template v${publicationTemplateVersion}\n` + themeNotice() + String.raw`\newcommand{\DoNotLoadEpstopdf}{}
     \documentclass[11pt,oneside,openany]{scrbook}
 ${'\\usepackage'}{fontspec}
 ${fontCommand('\\setmainfont', options.bodyFont, options)}
@@ -325,6 +329,9 @@ function templateCodeSettings(): string {
     return String.raw`\fvset{fontsize=\small,breaklines=true,breakanywhere=true,
 breakautoindent=false,breaksymbolleft={},breaksymbolright={},
 breakanywheresymbolpre={},breakanywheresymbolpost={},frame=none}
+\DeclareRobustCommand{\LitInlineCode}[1]{\texttt{#1}}
+
+\setlength{\emergencystretch}{3em}
 \providecommand{\st}[1]{\sout{#1}}
 \DefineVerbatimEnvironment{Highlighting}{Verbatim}{}
 \RecustomVerbatimEnvironment{verbatim}{Verbatim}{}
@@ -501,8 +508,16 @@ function referencePrefixEnd(text: string, cursor: number, start: number): number
 Ordinary fenced and indented code is literal data, never fragment syntax. Render
 it ourselves before conversion: even with highlighting disabled, Pandoc switches
 to unsupported highlighting macros when code contains a verbatim terminator.
-The walker retains prose, inline code and their containers. No opener unescaping
-or semantic reference/highlight adapter runs here. Document destinations need one
+The walker retains prose and containers. Inline code uses escaped renderer-owned
+text with discretionary breaks between adjacent printable ASCII characters. Each
+ASCII space uses explicit breakable glue measured from the active code font, so
+TeX cannot collapse repeated spaces. Markdown's inline-code whitespace normalization
+is unchanged, and Unicode sequences remain intact. Formatting
+and links still belong to Pandoc. Heading code stays with Pandoc so PDF bookmarks
+retain their text. Break boundaries can interrupt inline ligatures;
+font selection and fenced-code shaping are unchanged. A 3 em emergency stretch
+provides a last-resort paragraph pass, not blanket sloppy justification or scaling.
+No opener unescaping or semantic reference/highlight adapter runs here. Document destinations need one
 LaTeX-specific adjustment: Pandoc places a Div anchor before its opening chapter,
 so the chapter's page break can strand a whole-document link on the preceding
 page. Move that anchor just after an opening heading, retaining both stable IDs.
@@ -522,9 +537,31 @@ function documentAnchor(block: Extract<PandocBlock, { t: 'Div' }>, theme: Litera
 ```
 
 ```ts : <<publication LaTeX code>>=+
+function inlineCode(inlines: PandocInline[]): PandocInline[] {
+    return inlines.map(inline => {
+        if (inline.t === 'Code') {
+            const characters = Array.from(inline.c[1]);
+            const text = characters.map((character, index) => {
+                if (character === ' ') { return '\\hspace{\\fontdimen2\\font}\\allowbreak{}'; }
+                const boundary = index > 0 && /^[!-~]$/.test(characters[index - 1]) && /^[!-~]$/.test(character);
+                return (boundary ? '\\allowbreak{}' : '') + tex(character);
+            }).join('');
+            return rawInline(`\\LitInlineCode{${text}}`);
+        }
+        if (inline.t === 'Emph' || inline.t === 'Strong' || inline.t === 'Strikeout') {
+            return { ...inline, c: inlineCode(inline.c) };
+        }
+        if (inline.t === 'Link') {
+            return { ...inline, c: [inline.c[0], inlineCode(inline.c[1]), inline.c[2]] };
+        }
+        return inline;
+    });
+}
 function ordinaryCode(blocks: PandocBlock[], theme: LiterateTheme): PandocBlock[] {
     return blocks.map(block => {
         switch (block.t) {
+            case 'Para': case 'Plain': return { ...block, c: inlineCode(block.c) };
+
             case 'CodeBlock': {
                 const text = block.c[1];
                 const data: Highlighted = { text, references: [],
@@ -852,9 +889,9 @@ Modern, Monofur Nerd Font and Lilex Nerd Font (or supply safe family overrides o
 portable companions), and the listed TeX packages. Missing glyphs remain compiler
 errors/warnings to check, not a claim of universal Unicode coverage.
 
-Prose and inline-code escaping remain the trusted Pandoc writer's responsibility;
-ordinary block code is escaped by this renderer before conversion. Converters must
-preserve trusted RawBlocks, without filters, external includes, or highlighting. The ignored `out/publication-renderer` harness
+Prose escaping remains the trusted Pandoc writer's responsibility; inline and
+ordinary block code are escaped by this renderer before conversion. Converters must
+preserve trusted RawBlocks and RawInlines, without filters, external includes, or highlighting. The ignored `out/publication-renderer` harness
 compiles rosepine-dawn, hermonica and flexoki-light A5 fixtures, including nested
 containers, full references and long styled tokens. It retains logs, glyph traces,
 link/bounds checks and previews. Headless tests cover every catalogue theme, but

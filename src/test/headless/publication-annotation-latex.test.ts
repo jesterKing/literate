@@ -66,7 +66,7 @@ test('annotations preserve bodies, use labels once, share encoded targets and av
     assert.ok(latex.includes(`\\label{${destination}}`));
     assert.ok(latex.includes(`\\LitTermUse{lit-use-1}{${destination}}{\\hyperref[${destination}]{\\textbf{Unique label}`));
     assert.equal(latex.split('Unique label').length - 1, 1);
-    assert.match(latex, /Definition \\emph\{emphasis\} and \\texttt\{code\}/);
+    assert.ok(latex.includes('Definition \\emph{emphasis} and \\LitInlineCode{c\\allowbreak{}o\\allowbreak{}d\\allowbreak{}e}'));
     assert.match(latex, /NOTE-SENTINEL/);
     assert.match(latex, /\\textbf\{Alpha \\& beta\}/);
     assert.match(latex, /right=50mm/);
@@ -304,6 +304,6 @@ test('real Pandoc preserves controlled note lists, emphasis, inline code and lin
     assert.deepEqual(result.diagnostics, []);
     assert.match(result.latex!, /\\begin\{itemize\}/);
     assert.match(result.latex!, /\\emph\{emphasis\}/);
-    assert.match(result.latex!, /\\texttt\{code\}/);
+    assert.ok(result.latex!.includes('\\LitInlineCode{c\\allowbreak{}o\\allowbreak{}d\\allowbreak{}e}'));
     assert.match(result.latex!, /\\LitTermUse\{lit-use-1\}\{lit-[a-f0-9]+\}\{\\hyperref\[lit-[a-f0-9]+\]\{\\textbf\{Label\}/);
 });

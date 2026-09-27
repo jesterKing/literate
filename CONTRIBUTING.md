@@ -11,6 +11,33 @@ yarn test
 yarn esbuild
 ```
 
+## M7 publication closure
+
+The agreed book-publication scope is complete, including bounded screen fragment
+exploration, template version 1, and breakable inline code that preserves repeated
+spaces. Further copy controls, single-chapter export policy, broader accessibility
+and host UX acceptance, font fallback, and the whole-book prose rewrite are
+follow-up work, not prerequisites for using publication.
+
+Security regressions in `src/test/headless/publication-exploration.test.ts` cover
+unsafe payload schemes, malformed editor capabilities, valid native routing
+queries, conflicting baseline links, oversized text and escaped/UTF-8 costs,
+duplicate/excessive contributions and segments, and forged accounting attributes.
+Candidate panels are preflighted before any candidate DOM allocation. Private
+ownership, not mutable DOM attributes, controls budget charging and reclamation.
+
+The initializer is tangled both as executable browser JavaScript and as literal
+source for standalone HTML. Do not replace the latter with `Function.toString()`:
+bundle-dependent renaming breaks the self-hosted HTML fixed point. Isolated-realm
+parity tests exercise both forms and the packaged preview entry.
+
+Validation: `LITERATE_TEST_PANDOC=1 yarn test`, `yarn check:self`, `yarn esbuild`,
+and `git diff --check`. Local run evidence is kept under ignored `out/`.
+The optional `yarn test:polish --ulem /path/to/ulem.sty` probes A4/A5 themed PDFs,
+inline-code overflow and measured one/two/four-space advances. It uses installed
+fonts and TeX; it does not install dependencies. Missing glyphs still depend on
+the selected font's coverage; no universal Unicode fallback is promised.
+
 ## Edit the book, then generate
 
 The authoritative implementations are in `literate/*.literate`.

@@ -3,7 +3,7 @@ import Token = require('markdown-it/lib/token');
 import hljs from 'highlight.js';
 import { collectAnnotations, PublicationAnnotations } from './publication-annotations';
 import { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAnnotation,
-    installScreenTermLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle } from './publication-screen';
+    installScreenTermLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle, renderScreenExploration } from './publication-screen';
 import { defaultThemeName, getTheme, themeCss, mermaidTheme } from './themes';
 
 export interface SourceDocument { path: string; text: string; }
@@ -629,7 +629,8 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
         const literateScreen = { model: publication, annotations, path, format: 'html' as const };
         const literateUseTargets = screenTermUseAnchors(tokens.get(path)!, annotations, path);
             const rendered = md.renderer.render(tokens.get(path)!, md.options, { path, literateScreen, literateUseTargets })
-            + renderScreenIndexes(literateScreen, order);
+            + renderScreenIndexes(literateScreen, order)
+                    + renderScreenExploration(publication, path, 'html');
         const wrapper = `<div class="literate-document" data-literate-theme="${escape(projectTheme.name)}">${rendered}</div>`;
         const content = htmlTemplate.includes('[THEME]') ? wrapper : theme + wrapper;
         files.push({ path: safeRelativePath(path.replace(/\.literate$/, '.html'))!, content: substitute(htmlTemplate, { content, authors: metaAuthors, theme }) });

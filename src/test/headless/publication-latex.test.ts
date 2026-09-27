@@ -320,10 +320,11 @@ test('LaTeX ordinary-code walk retains nested containers and prose/inline code',
         '1. ```text\n   \\end{verbatim}\n   ```\n');
     const result = await renderLatex(project, {}, async document => {
         const json = JSON.stringify(document);
-        for (const type of ['Para', 'Code', 'Div', 'BlockQuote', 'BulletList', 'OrderedList']) {
+        for (const type of ['Para', 'RawInline', 'Div', 'BlockQuote', 'BulletList', 'OrderedList']) {
             assert.ok(json.includes(`"t":"${type}"`), type);
         }
         assert.doesNotMatch(json, /"t":"CodeBlock"/);
+        assert.ok(json.includes('LitInlineCode'));
         assert.equal((raw(document.blocks).match(/\\begin\{Verbatim\}/g) ?? []).length, 2);
         return raw(document.blocks);
     });

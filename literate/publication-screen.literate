@@ -12,6 +12,7 @@ rescanned for tags. This module has no filesystem or VS Code dependency.
 <<screen syntax rendering>>
 <<screen syntax merge>>
 
+<<screen exploration rendering>>
 <<screen contribution rendering>>
 <<screen contribution navigation>>
 <<screen annotation rendering>>
@@ -33,6 +34,7 @@ import type { PublicationModel, PublicationContribution } from './engine';
 import type { PublicationAnnotations, PublicationTerm, PublicationNote, PublicationTermUse } from './publication-annotations';
 import { parseAnnotationBody, resolveTermHref } from './publication-annotations';
 import { highlightContribution } from './publication-highlight';
+import { explorationPayload, explorationBrowserScript } from './publication-exploration';
 const escapeHtml = new MarkdownIt().utils.escapeHtml;
 export type ScreenFormat = 'html' | 'preview';
 export type PreviewDestination = (target: string) => string | undefined;
@@ -92,9 +94,31 @@ for (const ref of display.references) {
     const family = index.families.get(ref.target);
     const base = index.parts.get(family?.contributions[0] || '');
     const text = display.text.slice(ref.start, ref.end);
-    output += base ? screenLink(screenHref(part.definition.path, base.definition.path, ref.target, format, destination),
+    const link = base ? screenLink(screenHref(part.definition.path, base.definition.path, ref.target, format, destination),
         `Definition of ${ref.name}`, text, ref.target) : escapeHtml(text);
+    output += `<span data-literate-explore="${escapeHtml(ref.target)}">${link}</span>`;
     cursor = ref.end;
+}
+```
+
+Exploration markers wrap only semantic uses. The client adds buttons; without
+JavaScript there are no dead controls. Content-only templates include the same
+inert payload and standalone initializer as the default template. Documents with
+no usable reference uses emit neither, including declaration-only chapters and
+annotation-only projects. Pending preview capabilities wait for the normal refresh.
+
+```ts : <<screen exploration rendering>>=
+export function renderScreenExploration(model: PublicationModel, path: string, format: ScreenFormat,
+    destination?: PreviewDestination): string {
+    const index = screenIndex(model);
+    const targets = index.explorationTargets.get(path);
+    if (!targets || !Array.from(targets).some(target => {
+        const base = index.parts.get(index.families.get(target)?.contributions[0] || '');
+        return base && screenHref(path, base.definition.path, target, format, destination) !== undefined;
+    })) { return ''; }
+    const payload = explorationPayload(model, path, format, destination);
+    return `<script type="application/json" class="literate-exploration-data">${payload}</script>`
+        + (format === 'html' ? `<script>${explorationBrowserScript()}</script>` : '');
 }
 ```
 
@@ -187,7 +211,7 @@ function buildScreenIndex(model: PublicationModel, annotations?: PublicationAnno
     <<screen annotation index>>
     <<screen reverse references>>
     return { families, parts, ordinals, tokens, lines, targets, annotationLines, annotationTargets,
-        termReferences, fragmentReferences };
+        termReferences, fragmentReferences, explorationTargets };
 }
 ```
 
@@ -223,6 +247,7 @@ rescanning every contribution for each family or every use for each term.
         termReferences.get(use.target)!.push(use);
     }
     const fragmentReferences = new Map<string, PublicationContribution[]>();
+    const explorationTargets = new Map<string, Set<string>>();
     for (const part of model.contributions) {
         const seen = new Set<string>();
         for (const segment of part.segments) {
@@ -232,6 +257,10 @@ rescanning every contribution for each family or every use for each term.
             seen.add(target);
             if (!fragmentReferences.has(target)) { fragmentReferences.set(target, []); }
             fragmentReferences.get(target)!.push(part);
+            if (!parts.has(families.get(target)?.contributions[0] || '')) { continue; }
+            const path = part.definition.path;
+            if (!explorationTargets.has(path)) { explorationTargets.set(path, new Set()); }
+            explorationTargets.get(path)!.add(target);
         }
     }
 ```

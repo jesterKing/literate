@@ -4,6 +4,7 @@ import type { PublicationModel, PublicationContribution } from './engine';
 import type { PublicationAnnotations, PublicationTerm, PublicationNote, PublicationTermUse } from './publication-annotations';
 import { parseAnnotationBody, resolveTermHref } from './publication-annotations';
 import { highlightContribution } from './publication-highlight';
+import { explorationPayload, explorationBrowserScript } from './publication-exploration';
 const escapeHtml = new MarkdownIt().utils.escapeHtml;
 export type ScreenFormat = 'html' | 'preview';
 export type PreviewDestination = (target: string) => string | undefined;
@@ -70,6 +71,7 @@ function buildScreenIndex(model: PublicationModel, annotations?: PublicationAnno
             termReferences.get(use.target)!.push(use);
         }
         const fragmentReferences = new Map<string, PublicationContribution[]>();
+        const explorationTargets = new Map<string, Set<string>>();
         for (const part of model.contributions) {
             const seen = new Set<string>();
             for (const segment of part.segments) {
@@ -79,10 +81,14 @@ function buildScreenIndex(model: PublicationModel, annotations?: PublicationAnno
                 seen.add(target);
                 if (!fragmentReferences.has(target)) { fragmentReferences.set(target, []); }
                 fragmentReferences.get(target)!.push(part);
+                if (!parts.has(families.get(target)?.contributions[0] || '')) { continue; }
+                const path = part.definition.path;
+                if (!explorationTargets.has(path)) { explorationTargets.set(path, new Set()); }
+                explorationTargets.get(path)!.add(target);
             }
         }
     return { families, parts, ordinals, tokens, lines, targets, annotationLines, annotationTargets,
-        termReferences, fragmentReferences };
+        termReferences, fragmentReferences, explorationTargets };
 }
 export function previewLanguage(language: string): string {
     switch (language.toLowerCase()) {
@@ -106,8 +112,9 @@ export function renderScreenCode(part: PublicationContribution, model: Publicati
         const family = index.families.get(ref.target);
         const base = index.parts.get(family?.contributions[0] || '');
         const text = display.text.slice(ref.start, ref.end);
-        output += base ? screenLink(screenHref(part.definition.path, base.definition.path, ref.target, format, destination),
+        const link = base ? screenLink(screenHref(part.definition.path, base.definition.path, ref.target, format, destination),
             `Definition of ${ref.name}`, text, ref.target) : escapeHtml(text);
+        output += `<span data-literate-explore="${escapeHtml(ref.target)}">${link}</span>`;
         cursor = ref.end;
     }
     return output + syntax(cursor, display.text.length);
@@ -133,6 +140,18 @@ function screenSyntax(display: ReturnType<typeof highlightContribution>) {
     };
 }
 
+export function renderScreenExploration(model: PublicationModel, path: string, format: ScreenFormat,
+    destination?: PreviewDestination): string {
+    const index = screenIndex(model);
+    const targets = index.explorationTargets.get(path);
+    if (!targets || !Array.from(targets).some(target => {
+        const base = index.parts.get(index.families.get(target)?.contributions[0] || '');
+        return base && screenHref(path, base.definition.path, target, format, destination) !== undefined;
+    })) { return ''; }
+    const payload = explorationPayload(model, path, format, destination);
+    return `<script type="application/json" class="literate-exploration-data">${payload}</script>`
+        + (format === 'html' ? `<script>${explorationBrowserScript()}</script>` : '');
+}
 export function renderScreenContribution(part: PublicationContribution, model: PublicationModel,
     format: ScreenFormat, label: string, code: string, destination?: PreviewDestination): string {
     const index = screenIndex(model);

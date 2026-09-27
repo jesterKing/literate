@@ -51,7 +51,8 @@
     },
     "markdown.markdownItPlugins": true,
     "markdown.previewScripts": [
-      "./out/mermaid-preview.js"
+      "./out/mermaid-preview.js",
+      "./out/publication-exploration-preview.js"
     ],
     "configuration": {
       "title": "Literate publication",
@@ -93,7 +94,7 @@
     ]
   },
   "scripts": {
-    "compile": "tsc -p ./",
+    "compile": "yarn build:exploration && tsc -p ./",
     "watch": "tsc -watch -p ./",
     "build:publication": "node ./src/build-publication.mjs",
     "build:mermaid-browser": "node ./src/build-publication.mjs --browser",
@@ -108,14 +109,16 @@
     "test:extension": "yarn compile && yarn esbuild && node ./out/test/runTest.js",
     "test:publication": "yarn build:cli && python3 src/test/acceptance/portable-layout.py",
     "test:pdf": "yarn build:cli && python3 src/test/acceptance/portable-pdf.py",
+    "test:polish": "yarn build:cli && python3 src/test/acceptance/portable-polish.py",
     "test:annotations": "yarn build:cli && python3 src/test/acceptance/portable-annotations.py",
     "test:assets": "yarn build:cli && python3 src/test/acceptance/portable-assets.py",
     "test:mermaid": "yarn build:cli && python3 src/test/acceptance/portable-mermaid.py",
     "test:browser-security": "yarn compile && yarn build:mermaid-worker && node src/test/acceptance/mermaid-security.mjs",
     "vscode:prepublish": "npm run -S esbuild-base -- --minify",
+    "build:exploration": "esbuild ./src/publication-exploration-browser.js --bundle --outfile=out/publication-exploration-preview.js --format=iife --platform=browser --target=chrome128 --minify && esbuild ./src/publication-exploration-browser.js --bundle --outfile=out/publication-exploration-browser.js --format=cjs --platform=node --log-level=error",
     "build:preview": "esbuild ./src/mermaid-preview.js --bundle --outfile=out/mermaid-preview.js --format=iife --platform=browser --target=chrome128 --minify",
     "watch:preview": "yarn build:preview --watch",
-    "esbuild-base": "yarn build:preview && yarn build:publication && esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node",
+    "esbuild-base": "yarn build:exploration && yarn build:preview && yarn build:publication && esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node",
     "esbuild": "npm run -S esbuild-base -- --sourcemap",
     "esbuild-watch": "npm run -S esbuild-base -- --sourcemap --watch",
     "test-compile": "tsc -p ./"

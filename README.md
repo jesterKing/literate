@@ -77,6 +77,23 @@ folders. Edits to referenced source/HTML templates also regenerate automatically
 external input create/change/delete events are debounced per workspace. Associate
 `*.literate` files with Markdown to enable the editor providers.
 
+## Exploring fragment references
+
+Preview and generated HTML retain ordinary fragment-navigation links and add
+separate disclosure buttons for local fragment uses. Opening a disclosure shows
+the family's contributions without eagerly expanding the whole reference graph.
+Nested references can be explored in turn; cycles and depth limits stop locally.
+Without JavaScript, ordinary links remain usable.
+
+Exploration is bounded: a 1 MiB serialized payload, eight nested layers, 256 KiB
+of conservatively accounted panel content per document, 200 open panels, and at
+most 200 unique contributions and 4096 segments per requested panel. Oversized
+views are rejected before their DOM is allocated, rather than silently truncated.
+Links from payloads accept only matching anchors, validated relative HTML paths,
+or narrowly shaped Literate editor capabilities. HTTPS destinations are reused
+only from an existing same-target baseline link. The extension independently
+validates editor capabilities; payloads cannot supply arbitrary commands.
+
 ## Document themes
 
 All **70 HErmonica built-in palettes** are available locally, with their original

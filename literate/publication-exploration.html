@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Optional fragment exploration</h1>
+<p>The model stores each accepted contribution once, without traversing references.
+Payload and DOM limits reject whole views, never truncate code. Ordinary links
+remain independent of the optional browser client.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020006500780070006c006f0072006100740069006f006e002e002a-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020006500780070006c006f0072006100740069006f006e002e002a"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020006500780070006c006f0072006100740069006f006e002e002a" data-literate-target="f-007000750062006c00690063006100740069006f006e0020006500780070006c006f0072006100740069006f006e002e002a" aria-label="Definition of publication exploration.*">&lt;&lt;publication exploration.*&gt;&gt;= src/publication-exploration.ts $</a></div>
+<div class="code">
+<pre><code><span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000740079007000650073"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000740079007000650073" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000740079007000650073" aria-label="Definition of exploration types">&lt;&lt;exploration types&gt;&gt;</a></span>
+<span data-literate-explore="f-006500780070006c006f0072006100740069006f006e0020006e00650075007400720061006c002000630061006300680065"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e0020006e00650075007400720061006c002000630061006300680065" data-literate-target="f-006500780070006c006f0072006100740069006f006e0020006e00650075007400720061006c002000630061006300680065" aria-label="Definition of exploration neutral cache">&lt;&lt;exploration neutral cache&gt;&gt;</a></span>
+<span data-literate-explore="f-006500780070006c006f0072006100740069006f006e00200063006f006c006c006500630074002000700061007200740073"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e00200063006f006c006c006500630074002000700061007200740073" data-literate-target="f-006500780070006c006f0072006100740069006f006e00200063006f006c006c006500630074002000700061007200740073" aria-label="Definition of exploration collect parts">&lt;&lt;exploration collect parts&gt;&gt;</a></span>
+
+<span data-literate-explore="f-006500780070006c006f0072006100740069006f006e00200064006f00630075006d0065006e00740020007000610079006c006f00610064"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e00200064006f00630075006d0065006e00740020007000610079006c006f00610064" data-literate-target="f-006500780070006c006f0072006100740069006f006e00200064006f00630075006d0065006e00740020007000610079006c006f00610064" aria-label="Definition of exploration document payload">&lt;&lt;exploration document payload&gt;&gt;</a></span>
+<span data-literate-explore="f-006500780070006c006f0072006100740069006f006e0020007300630072006900700074002000730065007200690061006c0069007a006100740069006f006e"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e0020007300630072006900700074002000730065007200690061006c0069007a006100740069006f006e" data-literate-target="f-006500780070006c006f0072006100740069006f006e0020007300630072006900700074002000730065007200690061006c0069007a006100740069006f006e" aria-label="Definition of exploration script serialization">&lt;&lt;exploration script serialization&gt;&gt;</a></span>
+</code></pre>
+
+</div>
+</div><div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000740079007000650073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000740079007000650073"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000740079007000650073" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000740079007000650073" aria-label="Definition of exploration types">&lt;&lt;exploration types&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">PublicationModel</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
+<span class="hljs-keyword">import</span> { screenIndex, screenHref, <span class="hljs-title">ScreenFormat</span>, <span class="hljs-title">PreviewDestination</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-screen'</span>;
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">const</span> explorationLimits = <span class="hljs-title">Object</span>.<span class="hljs-title">freeze</span>({ <span class="hljs-attr">payload</span>: <span class="hljs-number">1048576</span>, <span class="hljs-attr">layers</span>: <span class="hljs-number">8</span>, <span class="hljs-attr">bytes</span>: <span class="hljs-number">262144</span>, <span class="hljs-attr">panels</span>: <span class="hljs-number">200</span>,
+    <span class="hljs-attr">parts</span>: <span class="hljs-number">200</span>, <span class="hljs-attr">segments</span>: <span class="hljs-number">4096</span> });
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">ExplorationSegment</span> { <span class="hljs-attr">text</span>: <span class="hljs-built_in">string</span>; reference?: <span class="hljs-literal">true</span>; target?: <span class="hljs-built_in">string</span>; }
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">ExplorationFamily</span> { <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">parts</span>: <span class="hljs-built_in">string</span>[]; href?: <span class="hljs-built_in">string</span>; }
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">ExplorationPayload</span> {
+    <span class="hljs-attr">version</span>: <span class="hljs-number">1</span>;
+    <span class="hljs-attr">parts</span>: <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">ExplorationSegment</span>[]&gt;;
+    <span class="hljs-attr">families</span>: <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">ExplorationFamily</span>&gt;;
+    unavailable?: <span class="hljs-built_in">string</span>;
+}
+<span class="hljs-keyword">const</span> unavailable = (): <span class="hljs-params">ExplorationPayload</span><span class="hljs-function"> =&gt;</span> ({ <span class="hljs-attr">version</span>: <span class="hljs-number">1</span>, <span class="hljs-attr">parts</span>: {}, <span class="hljs-attr">families</span>: {},
+    <span class="hljs-attr">unavailable</span>: <span class="hljs-string">'Exploration payload exceeds the one MiB limit.'</span> });
+<span class="hljs-keyword">const</span> neutralModels = <span class="hljs-keyword">new</span> <span class="hljs-title">WeakMap</span>&lt;<span class="hljs-title">PublicationModel</span>, <span class="hljs-title">ExplorationPayload</span>&gt;();
+</code></pre>
+
+</div>
+</div><p>Serialization accounts for escaped bytes, not JavaScript character counts. Stop
+at the first oversized entry; later documents reuse the same bounded snapshot.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e0020006e00650075007400720061006c002000630061006300680065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e0020006e00650075007400720061006c002000630061006300680065"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e0020006e00650075007400720061006c002000630061006300680065" data-literate-target="f-006500780070006c006f0072006100740069006f006e0020006e00650075007400720061006c002000630061006300680065" aria-label="Definition of exploration neutral cache">&lt;&lt;exploration neutral cache&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">neutralModel</span>(<span class="hljs-params">model: PublicationModel</span>): <span class="hljs-title">ExplorationPayload</span> {
+    <span class="hljs-keyword">const</span> cached = neutralModels.<span class="hljs-title">get</span>(model);
+    <span class="hljs-keyword">if</span> (cached) { <span class="hljs-keyword">return</span> cached; }
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">value</span>: <span class="hljs-title">ExplorationPayload</span> = { <span class="hljs-attr">version</span>: <span class="hljs-number">1</span>, <span class="hljs-attr">parts</span>: <span class="hljs-title">Object</span>.<span class="hljs-title">create</span>(<span class="hljs-literal">null</span>), <span class="hljs-attr">families</span>: <span class="hljs-title">Object</span>.<span class="hljs-title">create</span>(<span class="hljs-literal">null</span>) };
+    <span class="hljs-keyword">let</span> budget = <span class="hljs-number">128</span>;
+    <span class="hljs-keyword">const</span> fits = (<span class="hljs-attr">entry</span>: <span class="hljs-built_in">unknown</span>): <span class="hljs-params">boolean</span><span class="hljs-function"> =&gt;</span> {
+        budget += <span class="hljs-title">Buffer</span>.<span class="hljs-title">byteLength</span>(<span class="hljs-title">serializeExploration</span>(entry), <span class="hljs-string">'utf8'</span>) + <span class="hljs-number">8</span>;
+        <span class="hljs-keyword">return</span> budget &lt;= explorationLimits.<span class="hljs-property">payload</span>;
+    };
+    <span class="hljs-keyword">const</span> <span class="hljs-title">reject</span> = () =&gt; { <span class="hljs-keyword">const</span> result = <span class="hljs-title">unavailable</span>(); neutralModels.<span class="hljs-title">set</span>(model, result); <span class="hljs-keyword">return</span> result; };
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e00200062006f0075006e00640065006400200063006f006c006c0065006300740069006f006e"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e00200062006f0075006e00640065006400200063006f006c006c0065006300740069006f006e" data-literate-target="f-006500780070006c006f0072006100740069006f006e00200062006f0075006e00640065006400200063006f006c006c0065006300740069006f006e" aria-label="Definition of exploration bounded collection">&lt;&lt;exploration bounded collection&gt;&gt;</a></span>
+    neutralModels.<span class="hljs-title">set</span>(model, value);
+    <span class="hljs-keyword">return</span> value;
+}
+</code></pre>
+
+</div>
+</div><div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e00200063006f006c006c006500630074002000700061007200740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e00200063006f006c006c006500630074002000700061007200740073"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e00200063006f006c006c006500630074002000700061007200740073" data-literate-target="f-006500780070006c006f0072006100740069006f006e00200063006f006c006c006500630074002000700061007200740073" aria-label="Definition of exploration collect parts">&lt;&lt;exploration collect parts&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">explorationSegment</span>(<span class="hljs-params">segment: PublicationModel[</span><span class="hljs-string">'contributions'</span><span class="hljs-params">][</span><span class="hljs-built_in">number</span><span class="hljs-params">][</span><span class="hljs-string">'segments'</span><span class="hljs-params">][</span><span class="hljs-built_in">number</span><span class="hljs-params">]</span>): <span class="hljs-title">ExplorationSegment</span> {
+    <span class="hljs-keyword">const</span> text = segment.<span class="hljs-property">text</span>.<span class="hljs-title">replace</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\\</span><span class="hljs-regexp">&lt;&lt;/g</span>, <span class="hljs-string">'&lt;&lt;'</span>);
+    <span class="hljs-keyword">return</span> segment.<span class="hljs-property">kind</span> === <span class="hljs-string">'text'</span> ? { text } : { text, <span class="hljs-attr">reference</span>: <span class="hljs-literal">true</span>,
+        ...(segment.<span class="hljs-property">resolution</span>.<span class="hljs-property">kind</span> === <span class="hljs-string">'resolved'</span> ? { <span class="hljs-attr">target</span>: segment.<span class="hljs-property">resolution</span>.<span class="hljs-property">target</span> } : {}) };
+}
+</code></pre>
+
+</div>
+</div><div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e00200062006f0075006e00640065006400200063006f006c006c0065006300740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e00200062006f0075006e00640065006400200063006f006c006c0065006300740069006f006e"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e00200062006f0075006e00640065006400200063006f006c006c0065006300740069006f006e" data-literate-target="f-006500780070006c006f0072006100740069006f006e00200062006f0075006e00640065006400200063006f006c006c0065006300740069006f006e" aria-label="Definition of exploration bounded collection">&lt;&lt;exploration bounded collection&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> part <span class="hljs-keyword">of</span> <span class="hljs-title">screenIndex</span>(model).<span class="hljs-property">parts</span>.<span class="hljs-title">values</span>()) {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">segments</span>: <span class="hljs-title">ExplorationSegment</span>[] = [];
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">fits</span>(part.<span class="hljs-property">target</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-title">reject</span>(); }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> segment <span class="hljs-keyword">of</span> part.<span class="hljs-property">segments</span>) {
+        <span class="hljs-keyword">if</span> (segment.<span class="hljs-property">text</span>.<span class="hljs-property">length</span> &gt; explorationLimits.<span class="hljs-property">payload</span>) { <span class="hljs-keyword">return</span> <span class="hljs-title">reject</span>(); }
+        <span class="hljs-keyword">const</span> entry = <span class="hljs-title">explorationSegment</span>(segment);
+        <span class="hljs-keyword">if</span> (!<span class="hljs-title">fits</span>(entry)) { <span class="hljs-keyword">return</span> <span class="hljs-title">reject</span>(); }
+        segments.<span class="hljs-title">push</span>(entry);
+    }
+    value.<span class="hljs-property">parts</span>[part.<span class="hljs-property">target</span>] = segments;
+}
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of exploration bounded collection"><a class="literate-tag-name" href="#c-006500780070006c006f0072006100740069006f006e00200062006f0075006e00640065006400200063006f006c006c0065006300740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-2" data-literate-target="c-006500780070006c006f0072006100740069006f006e00200062006f0075006e00640065006400200063006f006c006c0065006300740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-2" aria-label="Next contribution of exploration bounded collection">Next</a></nav>
+</div><div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e00200062006f0075006e00640065006400200063006f006c006c0065006300740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e00200062006f0075006e00640065006400200063006f006c006c0065006300740069006f006e" data-literate-target="f-006500780070006c006f0072006100740069006f006e00200062006f0075006e00640065006400200063006f006c006c0065006300740069006f006e" aria-label="Definition of exploration bounded collection">&lt;&lt;exploration bounded collection&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> family <span class="hljs-keyword">of</span> <span class="hljs-title">screenIndex</span>(model).<span class="hljs-property">families</span>.<span class="hljs-title">values</span>()) {
+    <span class="hljs-keyword">if</span> (family.<span class="hljs-property">name</span>.<span class="hljs-property">length</span> &gt; explorationLimits.<span class="hljs-property">payload</span> || family.<span class="hljs-property">contributions</span>.<span class="hljs-property">length</span> &gt; explorationLimits.<span class="hljs-property">payload</span> / <span class="hljs-number">8</span>) {
+        <span class="hljs-keyword">return</span> <span class="hljs-title">reject</span>();
+    }
+    <span class="hljs-keyword">const</span> entry = { <span class="hljs-attr">name</span>: family.<span class="hljs-property">name</span>, <span class="hljs-attr">parts</span>: family.<span class="hljs-property">contributions</span> };
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">fits</span>([family.<span class="hljs-property">target</span>, entry])) { <span class="hljs-keyword">return</span> <span class="hljs-title">reject</span>(); }
+    value.<span class="hljs-property">families</span>[family.<span class="hljs-property">target</span>] = entry;
+}
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of exploration bounded collection"><a class="literate-tag-name" href="#c-006500780070006c006f0072006100740069006f006e00200062006f0075006e00640065006400200063006f006c006c0065006300740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-006500780070006c006f0072006100740069006f006e00200062006f0075006e00640065006400200063006f006c006c0065006300740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1" aria-label="Previous contribution of exploration bounded collection">Previous</a> · <a class="literate-tag-name" href="#c-006500780070006c006f0072006100740069006f006e00200062006f0075006e00640065006400200063006f006c006c0065006300740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-006500780070006c006f0072006100740069006f006e00200062006f0075006e00640065006400200063006f006c006c0065006300740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1" aria-label="Base contribution of exploration bounded collection">Base</a></nav>
+</div><p>Links are resolved from the viewing document, not the definition's file. Preview
+asks the existing capability adapter for every included family, including families
+that only appear inside unopened expansions. No raw editor URLs are constructed.
+The client does not trust those strings merely because they occur in JSON.</p>
+<p>Expanded links prefer an existing baseline anchor for the same target. New links
+accept only matching fragments, <code>./</code> HTML paths, or native Literate capabilities:
+<code>vscode</code>/<code>vscode-insiders</code>, authority <code>jesterking.literate</code>, and exactly
+<code>/navigate/&lt;48 lowercase hex&gt;/&lt;48 lowercase hex&gt;</code>, with an optional host query
+but no fragment. Query transport does not change the capability path.
+HTTPS is borrowed only from a same-target baseline anchor, never from payload
+metadata alone; otherwise the reference remains text with its disclosure intact.
+The host still checks native token membership and expiry. No new transport API is
+assumed: arbitrary HTTPS <code>asExternalUri</code> shapes cannot be authenticated here.</p>
+<p>A requested panel is preflighted before candidate DOM allocation. Duplicate part
+IDs are rejected rather than repeated or silently deduplicated. At most 200 parts
+and 4096 segments are visited, with conservative escaped-byte accounting including
+controls and later status text. Private panel ownership tracks costs; DOM data
+attributes are diagnostic only. Collapse, detach and payload removal release all
+owned descendants. Identity/link changes invalidate panels and focused teardown
+returns to a surviving root disclosure or baseline anchor.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e00200064006f00630075006d0065006e00740020007000610079006c006f00610064-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e00200064006f00630075006d0065006e00740020007000610079006c006f00610064"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e00200064006f00630075006d0065006e00740020007000610079006c006f00610064" data-literate-target="f-006500780070006c006f0072006100740069006f006e00200064006f00630075006d0065006e00740020007000610079006c006f00610064" aria-label="Definition of exploration document payload">&lt;&lt;exploration document payload&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">explorationPayload</span>(<span class="hljs-params">model: PublicationModel, path: </span><span class="hljs-built_in">string</span><span class="hljs-params">, format: ScreenFormat,
+    destination?: PreviewDestination</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">const</span> neutral = <span class="hljs-title">neutralModel</span>(model);
+    <span class="hljs-keyword">if</span> (neutral.<span class="hljs-property">unavailable</span>) { <span class="hljs-keyword">return</span> <span class="hljs-title">serializeExploration</span>(neutral); }
+    <span class="hljs-keyword">const</span> value = { ...neutral, <span class="hljs-attr">families</span>: <span class="hljs-title">Object</span>.<span class="hljs-title">create</span>(<span class="hljs-literal">null</span>) <span class="hljs-keyword">as</span> <span class="hljs-title">ExplorationPayload</span>[<span class="hljs-string">'families'</span>] };
+    <span class="hljs-keyword">const</span> index = <span class="hljs-title">screenIndex</span>(model);
+    <span class="hljs-keyword">let</span> budget = <span class="hljs-title">Buffer</span>.<span class="hljs-title">byteLength</span>(<span class="hljs-title">serializeExploration</span>(neutral), <span class="hljs-string">'utf8'</span>);
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [target, family] <span class="hljs-keyword">of</span> <span class="hljs-title">Object</span>.<span class="hljs-title">entries</span>(neutral.<span class="hljs-property">families</span>)) {
+        <span class="hljs-keyword">const</span> base = index.<span class="hljs-property">parts</span>.<span class="hljs-title">get</span>(family.<span class="hljs-property">parts</span>[<span class="hljs-number">0</span>]);
+        <span class="hljs-keyword">const</span> href = base &amp;&amp; <span class="hljs-title">screenHref</span>(path, base.<span class="hljs-property">definition</span>.<span class="hljs-property">path</span>, target, format, destination);
+        <span class="hljs-keyword">if</span> (href !== <span class="hljs-literal">undefined</span>) { budget += <span class="hljs-title">Buffer</span>.<span class="hljs-title">byteLength</span>(<span class="hljs-title">serializeExploration</span>({ href }), <span class="hljs-string">'utf8'</span>) + <span class="hljs-number">1</span>; }
+        <span class="hljs-keyword">if</span> (budget &gt; explorationLimits.<span class="hljs-property">payload</span>) { <span class="hljs-keyword">return</span> <span class="hljs-title">serializeExploration</span>(<span class="hljs-title">unavailable</span>()); }
+        value.<span class="hljs-property">families</span>[target] = { ...family, ...(href === <span class="hljs-literal">undefined</span> ? {} : { href }) };
+    }
+    <span class="hljs-keyword">const</span> json = <span class="hljs-title">serializeExploration</span>(value);
+    <span class="hljs-keyword">return</span> <span class="hljs-title">Buffer</span>.<span class="hljs-title">byteLength</span>(json, <span class="hljs-string">'utf8'</span>) &lt;= explorationLimits.<span class="hljs-property">payload</span> ? json : <span class="hljs-title">serializeExploration</span>(<span class="hljs-title">unavailable</span>());
+}
+</code></pre>
+
+</div>
+</div><p>Standalone HTML embeds the authoritative initializer as source data, not a
+compiled function's <code>toString()</code>: bundlers rename locals according to the enclosing
+module graph, so runtime function text cannot define reproducible publication
+bytes. Tangling expands the same initializer fragment into a raw string here and
+executable JavaScript in the browser module. Keep that fragment free of backticks
+and template interpolation openers; raw strings preserve its regex escapes.</p>
+<p>The initializer remains closure-free because standalone HTML runs it in a fresh
+realm. Preview compiles the browser module to <code>publication-exploration-preview.js</code>;
+its CommonJS counterpart remains available to Node consumers. Neither client loads
+remote code. JSON stays inert around closing script tags.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e0020007300630072006900700074002000730065007200690061006c0069007a006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e0020007300630072006900700074002000730065007200690061006c0069007a006100740069006f006e"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e0020007300630072006900700074002000730065007200690061006c0069007a006100740069006f006e" data-literate-target="f-006500780070006c006f0072006100740069006f006e0020007300630072006900700074002000730065007200690061006c0069007a006100740069006f006e" aria-label="Definition of exploration script serialization">&lt;&lt;exploration script serialization&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">serializeExploration</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">unknown</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-title">JSON</span>.<span class="hljs-title">stringify</span>(value).<span class="hljs-title">replace</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">[&lt;&gt;&amp;</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">2028</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">2029]</span><span class="hljs-regexp">/g</span>,
+        <span class="hljs-params">character</span><span class="hljs-function"> =&gt;</span> <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">u'</span> + character.<span class="hljs-title">charCodeAt</span>(<span class="hljs-number">0</span>).<span class="hljs-title">toString</span>(<span class="hljs-number">16</span>).<span class="hljs-title">padStart</span>(<span class="hljs-number">4</span>, <span class="hljs-string">'0'</span>));
+}
+<span class="hljs-keyword">const</span> explorationInitializer = <span class="hljs-title">String</span>.<span class="hljs-property">raw</span><span class="hljs-string">`
+</span><span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200069006e0069007400690061006c0069007a00650072"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200069006e0069007400690061006c0069007a00650072" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200069006e0069007400690061006c0069007a00650072" aria-label="Definition of exploration browser initializer">&lt;&lt;exploration browser initializer&gt;&gt;</a></span><span class="hljs-string">
+`</span>;
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">explorationBrowserScript</span>(): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-string">'('</span> + explorationInitializer.<span class="hljs-title">replace</span>(<span class="hljs-regexp">/&lt;</span><span class="hljs-regexp">\/</span><span class="hljs-regexp">script/gi</span>, <span class="hljs-string">'&lt;</span><span class="hljs-string">\\</span><span class="hljs-string">/script'</span>) + <span class="hljs-string">')(document);'</span>;
+}
+</code></pre>
+
+</div>
+</div><h2>Browser exploration assembly</h2>
+<p>One browser implementation serves both standalone HTML and editor previews.
+The module assembles strict mode, a self-contained initializer and the entry
+points that expose or invoke it in each environment.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006d006f00640075006c0065002e002a-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006d006f00640075006c0065002e002a"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006d006f00640075006c0065002e002a" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006d006f00640075006c0065002e002a" aria-label="Definition of exploration browser module.*">&lt;&lt;exploration browser module.*&gt;&gt;= src/publication-exploration-browser.js $</a></div>
+<div class="code">
+<pre><code><span class="hljs-meta">'use strict'</span>;
+
+<span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200069006e0069007400690061006c0069007a00650072"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200069006e0069007400690061006c0069007a00650072" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200069006e0069007400690061006c0069007a00650072" aria-label="Definition of exploration browser initializer">&lt;&lt;exploration browser initializer&gt;&gt;</a></span>
+
+<span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200065006e00740072007900200070006f0069006e00740073"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200065006e00740072007900200070006f0069006e00740073" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200065006e00740072007900200070006f0069006e00740073" aria-label="Definition of exploration browser entry points">&lt;&lt;exploration browser entry points&gt;&gt;</a></span>
+</code></pre>
+
+</div>
+</div><h3>A self-contained lifetime</h3>
+<p>Standalone HTML embeds only the initializer. Every helper, limit and private map
+therefore stays inside its body; fragment boundaries introduce no runtime scope
+and no dependency on the module wrapper.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200069006e0069007400690061006c0069007a00650072-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200069006e0069007400690061006c0069007a00650072"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200069006e0069007400690061006c0069007a00650072" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200069006e0069007400690061006c0069007a00650072" aria-label="Definition of exploration browser initializer">&lt;&lt;exploration browser initializer&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>
+<span class="hljs-keyword">function</span> <span class="hljs-title">initializePublicationExploration</span>(<span class="hljs-variable">document</span>) {
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000730074006100740065"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000730074006100740065" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000730074006100740065" aria-label="Definition of exploration browser state">&lt;&lt;exploration browser state&gt;&gt;</a></span>
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000700061006e0065006c0020006d0065006d0062006500720073006800690070"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000700061006e0065006c0020006d0065006d0062006500720073006800690070" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000700061006e0065006c0020006d0065006d0062006500720073006800690070" aria-label="Definition of exploration browser panel membership">&lt;&lt;exploration browser panel membership&gt;&gt;</a></span>
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300610066006500200068007200650066"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300610066006500200068007200650066" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300610066006500200068007200650066" aria-label="Definition of exploration browser safe href">&lt;&lt;exploration browser safe href&gt;&gt;</a></span>
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006c0069006e006b002000730065006c0065006300740069006f006e"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006c0069006e006b002000730065006c0065006300740069006f006e" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006c0069006e006b002000730065006c0065006300740069006f006e" aria-label="Definition of exploration browser link selection">&lt;&lt;exploration browser link selection&gt;&gt;</a></span>
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200066006f0063007500730020006f0077006e006500720073006800690070"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200066006f0063007500730020006f0077006e006500720073006800690070" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200066006f0063007500730020006f0077006e006500720073006800690070" aria-label="Definition of exploration browser focus ownership">&lt;&lt;exploration browser focus ownership&gt;&gt;</a></span>
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200063006c006f00730065"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200063006c006f00730065" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200063006c006f00730065" aria-label="Definition of exploration browser close">&lt;&lt;exploration browser close&gt;&gt;</a></span>
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000640065007300740072006f0079"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000640065007300740072006f0079" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000640065007300740072006f0079" aria-label="Definition of exploration browser destroy">&lt;&lt;exploration browser destroy&gt;&gt;</a></span>
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200072006500730074006f00720065"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200072006500730074006f00720065" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200072006500730074006f00720065" aria-label="Definition of exploration browser restore">&lt;&lt;exploration browser restore&gt;&gt;</a></span>
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006500730063006100700065006400200063006f00730074"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006500730063006100700065006400200063006f00730074" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006500730063006100700065006400200063006f00730074" aria-label="Definition of exploration browser escaped cost">&lt;&lt;exploration browser escaped cost&gt;&gt;</a></span>
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e" aria-label="Definition of exploration browser plan">&lt;&lt;exploration browser plan&gt;&gt;</a></span>
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006f00700065006e"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006f00700065006e" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006f00700065006e" aria-label="Definition of exploration browser open">&lt;&lt;exploration browser open&gt;&gt;</a></span>
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300690067006e00610074007500720065"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300690067006e00610074007500720065" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300690067006e00610074007500720065" aria-label="Definition of exploration browser signature">&lt;&lt;exploration browser signature&gt;&gt;</a></span>
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200065006e00680061006e00630065"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200065006e00680061006e00630065" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200065006e00680061006e00630065" aria-label="Definition of exploration browser enhance">&lt;&lt;exploration browser enhance&gt;&gt;</a></span>
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000720065006100640020006d006f00640065006c"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000720065006100640020006d006f00640065006c" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000720065006100640020006d006f00640065006c" aria-label="Definition of exploration browser read model">&lt;&lt;exploration browser read model&gt;&gt;</a></span>
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200062006100730065006c0069006e00650020006c0069006e006b0073"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200062006100730065006c0069006e00650020006c0069006e006b0073" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200062006100730065006c0069006e00650020006c0069006e006b0073" aria-label="Definition of exploration browser baseline links">&lt;&lt;exploration browser baseline links&gt;&gt;</a></span>
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e" aria-label="Definition of exploration browser scan">&lt;&lt;exploration browser scan&gt;&gt;</a></span>
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006f00620073006500720076006100740069006f006e"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006f00620073006500720076006100740069006f006e" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006f00620073006500720076006100740069006f006e" aria-label="Definition of exploration browser observation">&lt;&lt;exploration browser observation&gt;&gt;</a></span>
+}
+</code></pre>
+
+</div>
+</div><p>A document is initialized once and owns its complete exploration budget. Private
+maps separate root contexts, disclosure controls and charged panels; text nodes
+are created through textContent rather than interpreted markup.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000730074006100740065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000730074006100740065"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000730074006100740065" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000730074006100740065" aria-label="Definition of exploration browser state">&lt;&lt;exploration browser state&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> view = <span class="hljs-variable">document</span>.<span class="hljs-property">defaultView</span>;
+<span class="hljs-keyword">if</span> (!view || <span class="hljs-variable">document</span>.<span class="hljs-property">__literateExploration</span>) { <span class="hljs-keyword">return</span>; }
+<span class="hljs-variable">document</span>.<span class="hljs-property">__literateExploration</span> = <span class="hljs-literal">true</span>;
+<span class="hljs-keyword">const</span> limits = { <span class="hljs-attr">payload</span>: <span class="hljs-number">1048576</span>, <span class="hljs-attr">layers</span>: <span class="hljs-number">8</span>, <span class="hljs-attr">bytes</span>: <span class="hljs-number">262144</span>, <span class="hljs-attr">panels</span>: <span class="hljs-number">200</span>, <span class="hljs-attr">parts</span>: <span class="hljs-number">200</span>, <span class="hljs-attr">segments</span>: <span class="hljs-number">4096</span> };
+<span class="hljs-keyword">const</span> roots = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>();
+<span class="hljs-keyword">const</span> controls = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>();
+<span class="hljs-keyword">const</span> panels = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>();
+<span class="hljs-keyword">const</span> encoder = <span class="hljs-keyword">new</span> view.<span class="hljs-title">TextEncoder</span>();
+<span class="hljs-keyword">const</span> <span class="hljs-title">own</span> = (<span class="hljs-params">object, key</span>) =&gt; object &amp;&amp; <span class="hljs-title">Object</span>.<span class="hljs-keyword">prototype</span>.<span class="hljs-property">hasOwnProperty</span>.<span class="hljs-title">call</span>(object, key) ? object[key] : <span class="hljs-literal">undefined</span>;
+<span class="hljs-keyword">const</span> <span class="hljs-title">record</span> = value =&gt; value &amp;&amp; <span class="hljs-keyword">typeof</span> value === <span class="hljs-string">'object'</span> &amp;&amp; !<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(value);
+<span class="hljs-keyword">const</span> <span class="hljs-title">identifier</span> = value =&gt; <span class="hljs-keyword">typeof</span> value === <span class="hljs-string">'string'</span> &amp;&amp; value.<span class="hljs-property">length</span> &lt;= <span class="hljs-number">4096</span> &amp;&amp; <span class="hljs-regexp">/^</span><span class="hljs-regexp">[A-Za-z0-9_-]</span><span class="hljs-regexp">+$/</span>.<span class="hljs-title">test</span>(value);
+<span class="hljs-keyword">const</span> <span class="hljs-title">connected</span> = node =&gt; !!node &amp;&amp; <span class="hljs-variable">document</span>.<span class="hljs-property">documentElement</span>.<span class="hljs-title">contains</span>(node);
+<span class="hljs-keyword">let</span> usedBytes = <span class="hljs-number">0</span>, serial = <span class="hljs-number">0</span>, focused;
+<span class="hljs-keyword">const</span> <span class="hljs-title">element</span> = (<span class="hljs-params">tag, text</span>) =&gt; {
+    <span class="hljs-keyword">const</span> node = <span class="hljs-variable">document</span>.<span class="hljs-title">createElement</span>(tag);
+    <span class="hljs-keyword">if</span> (text !== <span class="hljs-literal">undefined</span>) { node.<span class="hljs-property">textContent</span> = text; }
+    <span class="hljs-keyword">return</span> node;
+};
+</code></pre>
+
+</div>
+</div><p>Panel membership follows private ownership, not editable DOM attributes. This
+keeps generated references out of the baseline-link and root-control scans.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000700061006e0065006c0020006d0065006d0062006500720073006800690070-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000700061006e0065006c0020006d0065006d0062006500720073006800690070"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000700061006e0065006c0020006d0065006d0062006500720073006800690070" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000700061006e0065006c0020006d0065006d0062006500720073006800690070" aria-label="Definition of exploration browser panel membership">&lt;&lt;exploration browser panel membership&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">inPanel</span>(<span class="hljs-params">node</span>) {
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> parent = node; parent; parent = parent.<span class="hljs-property">parentNode</span>) { <span class="hljs-keyword">if</span> (panels.<span class="hljs-title">has</span>(parent)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>; } }
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;
+}
+</code></pre>
+
+</div>
+</div><h3>Link authority precedes rendering</h3>
+<p>Payload links must match the target and an accepted local or native capability
+shape. Native capabilities retain host-added queries, but never fragments or a
+changed authority or path. HTTPS requires a baseline anchor supplied by the host,
+never JSON authority alone. Invalid destinations stay text.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300610066006500200068007200650066-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300610066006500200068007200650066"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300610066006500200068007200650066" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300610066006500200068007200650066" aria-label="Definition of exploration browser safe href">&lt;&lt;exploration browser safe href&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">safeHref</span>(<span class="hljs-params">href, target, baseline = </span><span class="hljs-literal">false</span>) {
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> href !== <span class="hljs-string">'string'</span> || href.<span class="hljs-property">length</span> &gt; <span class="hljs-number">4096</span> || <span class="hljs-regexp">/</span><span class="hljs-regexp">[</span><span class="hljs-regexp">\s</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">0000-</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">001f</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">007f</span><span class="hljs-regexp">\\</span><span class="hljs-regexp">]</span><span class="hljs-regexp">/</span>.<span class="hljs-title">test</span>(href)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">if</span> (<span class="hljs-title">identifier</span>(target) &amp;&amp; href === <span class="hljs-string">'#'</span> + target) { <span class="hljs-keyword">return</span> href; }
+    <span class="hljs-keyword">if</span> (<span class="hljs-title">identifier</span>(target) &amp;&amp; href.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'#'</span> + target)) {
+        <span class="hljs-keyword">const</span> path = href.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, -target.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>);
+        <span class="hljs-keyword">if</span> (path.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'./'</span>) &amp;&amp; path.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'.html'</span>) &amp;&amp; path.<span class="hljs-title">slice</span>(<span class="hljs-number">2</span>).<span class="hljs-title">split</span>(<span class="hljs-string">'/'</span>).<span class="hljs-title">every</span>(
+            <span class="hljs-params">part</span><span class="hljs-function"> =&gt;</span> <span class="hljs-regexp">/^(?:</span><span class="hljs-regexp">[A-Za-z0-9_~.!'()*-]</span><span class="hljs-regexp">|%</span><span class="hljs-regexp">[0-9a-fA-F]</span><span class="hljs-regexp">{2})+$/</span>.<span class="hljs-title">test</span>(part))) { <span class="hljs-keyword">return</span> href; }
+    }
+    <span class="hljs-keyword">if</span> (<span class="hljs-regexp">/^vscode(?:-insiders)?:</span><span class="hljs-regexp">\/</span><span class="hljs-regexp">\/</span><span class="hljs-regexp">jesterking</span><span class="hljs-regexp">\.</span><span class="hljs-regexp">literate</span><span class="hljs-regexp">\/</span><span class="hljs-regexp">navigate</span><span class="hljs-regexp">\/</span><span class="hljs-regexp">[a-f0-9]</span><span class="hljs-regexp">{48}</span><span class="hljs-regexp">\/</span><span class="hljs-regexp">[a-f0-9]</span><span class="hljs-regexp">{48}(?:</span><span class="hljs-regexp">\?</span><span class="hljs-regexp">[^#]</span><span class="hljs-regexp">*)?$/</span>.<span class="hljs-title">test</span>(href)) { <span class="hljs-keyword">return</span> href; }
+    
+    <span class="hljs-keyword">if</span> (baseline &amp;&amp; <span class="hljs-regexp">/^https:</span><span class="hljs-regexp">\/</span><span class="hljs-regexp">\/</span><span class="hljs-regexp">/</span>.<span class="hljs-title">test</span>(href)) {
+        <span class="hljs-keyword">try</span> {
+            <span class="hljs-keyword">const</span> url = <span class="hljs-keyword">new</span> view.<span class="hljs-title">URL</span>(href);
+            <span class="hljs-keyword">if</span> (url.<span class="hljs-property">protocol</span> === <span class="hljs-string">'https:'</span> &amp;&amp; url.<span class="hljs-property">hostname</span> &amp;&amp; !url.<span class="hljs-property">username</span> &amp;&amp; !url.<span class="hljs-property">password</span>) { <span class="hljs-keyword">return</span> href; }
+        } <span class="hljs-keyword">catch</span> (_) {  }
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
+}
+</code></pre>
+
+</div>
+</div><p>A baseline decision wins even when its value is undefined: rejected or
+conflicting host anchors cannot be bypassed by falling back to payload metadata.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006c0069006e006b002000730065006c0065006300740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006c0069006e006b002000730065006c0065006300740069006f006e"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006c0069006e006b002000730065006c0065006300740069006f006e" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006c0069006e006b002000730065006c0065006300740069006f006e" aria-label="Definition of exploration browser link selection">&lt;&lt;exploration browser link selection&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">linkFor</span>(<span class="hljs-params">context, model, target</span>) {
+    <span class="hljs-keyword">if</span> (context.<span class="hljs-property">links</span>.<span class="hljs-title">has</span>(target)) { <span class="hljs-keyword">return</span> context.<span class="hljs-property">links</span>.<span class="hljs-title">get</span>(target); }
+    <span class="hljs-keyword">return</span> <span class="hljs-title">safeHref</span>(<span class="hljs-title">own</span>(model.<span class="hljs-property">families</span>, target)?.<span class="hljs-property">href</span>, target);
+}
+</code></pre>
+
+</div>
+</div><h3>Teardown preserves navigation</h3>
+<p>Focus ownership includes the remembered top-level disclosure when DOM removal
+has already displaced the active element. That memory lets later reconciliation
+restore navigation without retaining detached panels.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200066006f0063007500730020006f0077006e006500720073006800690070-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200066006f0063007500730020006f0077006e006500720073006800690070"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200066006f0063007500730020006f0077006e006500720073006800690070" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200066006f0063007500730020006f0077006e006500720073006800690070" aria-label="Definition of exploration browser focus ownership">&lt;&lt;exploration browser focus ownership&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">focusWithin</span>(<span class="hljs-params">control</span>) {
+    <span class="hljs-keyword">const</span> active = <span class="hljs-variable">document</span>.<span class="hljs-property">activeElement</span>;
+    <span class="hljs-keyword">if</span> (control.<span class="hljs-property">button</span> === active || control.<span class="hljs-property">panel</span>?.<span class="hljs-title">contains</span>(active)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>; }
+    <span class="hljs-keyword">return</span> focused?.<span class="hljs-property">top</span> === control &amp;&amp; (!active || active === <span class="hljs-variable">document</span>.<span class="hljs-property">body</span> || !<span class="hljs-title">connected</span>(active));
+}
+</code></pre>
+
+</div>
+</div><p>Closing recursively destroys descendants before releasing the panel charge.
+Accounting reads only the private map; diagnostic attributes cannot refund or
+inflate the budget. The disclosure then returns to its collapsed state.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200063006c006f00730065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200063006c006f00730065"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200063006c006f00730065" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200063006c006f00730065" aria-label="Definition of exploration browser close">&lt;&lt;exploration browser close&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">close</span>(<span class="hljs-params">control</span>) {
+    <span class="hljs-keyword">if</span> (!control.<span class="hljs-property">panel</span>) { <span class="hljs-keyword">return</span>; }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> child <span class="hljs-keyword">of</span> [...control.<span class="hljs-property">children</span>]) { <span class="hljs-title">destroy</span>(child); }
+    <span class="hljs-keyword">const</span> cost = panels.<span class="hljs-title">get</span>(control.<span class="hljs-property">panel</span>)?.<span class="hljs-property">cost</span>;
+    <span class="hljs-keyword">if</span> (cost !== <span class="hljs-literal">undefined</span>) { usedBytes -= cost; panels.<span class="hljs-title">delete</span>(control.<span class="hljs-property">panel</span>); }
+    control.<span class="hljs-property">panel</span>.<span class="hljs-title">remove</span>(); control.<span class="hljs-property">panel</span> = <span class="hljs-literal">undefined</span>;
+    control.<span class="hljs-property">button</span>.<span class="hljs-title">setAttribute</span>(<span class="hljs-string">'aria-expanded'</span>, <span class="hljs-string">'false'</span>);
+    control.<span class="hljs-property">button</span>.<span class="hljs-title">removeAttribute</span>(<span class="hljs-string">'aria-controls'</span>);
+    control.<span class="hljs-property">note</span>.<span class="hljs-property">textContent</span> = <span class="hljs-string">''</span>;
+}
+</code></pre>
+
+</div>
+</div><p>Destroying a disclosure also removes its registrations and auxiliary nodes.
+Parent-child and root-context ownership are updated along with the global map.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000640065007300740072006f0079-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000640065007300740072006f0079"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000640065007300740072006f0079" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000640065007300740072006f0079" aria-label="Definition of exploration browser destroy">&lt;&lt;exploration browser destroy&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">destroy</span>(<span class="hljs-params">control</span>) {
+    <span class="hljs-title">close</span>(control);
+    controls.<span class="hljs-title">delete</span>(control.<span class="hljs-property">use</span>);
+    control.<span class="hljs-property">parent</span>?.<span class="hljs-property">children</span>.<span class="hljs-title">delete</span>(control);
+    control.<span class="hljs-property">context</span>.<span class="hljs-property">controls</span>.<span class="hljs-title">delete</span>(control.<span class="hljs-property">use</span>);
+    control.<span class="hljs-property">button</span>.<span class="hljs-title">remove</span>(); control.<span class="hljs-property">note</span>.<span class="hljs-title">remove</span>();
+}
+</code></pre>
+
+</div>
+</div><p>Focus restoration prefers a surviving disclosure for the original use or target,
+then a connected definition anchor. It does not recreate a removed panel merely
+to recover focus.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200072006500730074006f00720065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200072006500730074006f00720065"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200072006500730074006f00720065" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200072006500730074006f00720065" aria-label="Definition of exploration browser restore">&lt;&lt;exploration browser restore&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">restore</span>(<span class="hljs-params">request</span>) {
+    <span class="hljs-keyword">if</span> (!request) { <span class="hljs-keyword">return</span>; }
+    <span class="hljs-keyword">const</span> replacement = controls.<span class="hljs-title">get</span>(request.<span class="hljs-property">use</span>) || [...controls.<span class="hljs-title">values</span>()].<span class="hljs-title">find</span>(<span class="hljs-params">control</span><span class="hljs-function"> =&gt;</span>
+        !control.<span class="hljs-property">parent</span> &amp;&amp; control.<span class="hljs-property">target</span> === request.<span class="hljs-property">target</span>);
+    <span class="hljs-keyword">const</span> anchor = [request.<span class="hljs-property">use</span>.<span class="hljs-title">querySelector</span>(<span class="hljs-string">'a'</span>), request.<span class="hljs-property">context</span>.<span class="hljs-property">root</span>.<span class="hljs-title">querySelector</span>(<span class="hljs-string">'a'</span>),
+        ...<span class="hljs-variable">document</span>.<span class="hljs-title">querySelectorAll</span>(<span class="hljs-string">'a'</span>)].<span class="hljs-title">find</span>(<span class="hljs-params">node</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">connected</span>(node) &amp;&amp; node.<span class="hljs-title">getAttribute</span>(<span class="hljs-string">'href'</span>));
+    <span class="hljs-keyword">const</span> destination = replacement?.<span class="hljs-property">button</span> || anchor;
+    focused = <span class="hljs-literal">undefined</span>;
+    <span class="hljs-keyword">if</span> (destination) { destination.<span class="hljs-title">focus</span>(); }
+}
+</code></pre>
+
+</div>
+</div><h3>Preflight before candidate DOM</h3>
+<p>Serialized cost includes UTF-8 bytes and conservative escaping overhead. An
+oversized string fails before encoding, and the estimate needs neither candidate
+DOM nor an expanded serialization.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006500730063006100700065006400200063006f00730074-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006500730063006100700065006400200063006f00730074"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006500730063006100700065006400200063006f00730074" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006500730063006100700065006400200063006f00730074" aria-label="Definition of exploration browser escaped cost">&lt;&lt;exploration browser escaped cost&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>
+<span class="hljs-keyword">function</span> <span class="hljs-title">escapedCost</span>(<span class="hljs-params">text</span>) {
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> text !== <span class="hljs-string">'string'</span> || text.<span class="hljs-property">length</span> &gt; limits.<span class="hljs-property">bytes</span>) { <span class="hljs-keyword">return</span> <span class="hljs-title">Infinity</span>; }
+    <span class="hljs-keyword">let</span> cost = encoder.<span class="hljs-title">encode</span>(text).<span class="hljs-property">length</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> character <span class="hljs-keyword">of</span> text) {
+        <span class="hljs-keyword">if</span> (character === <span class="hljs-string">'&amp;'</span>) { cost += <span class="hljs-number">4</span>; }
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (character === <span class="hljs-string">'&lt;'</span> || character === <span class="hljs-string">'&gt;'</span>) { cost += <span class="hljs-number">3</span>; }
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (character === <span class="hljs-string">'&quot;'</span> || character === <span class="hljs-string">&quot;'&quot;</span>) { cost += <span class="hljs-number">5</span>; }
+    }
+    <span class="hljs-keyword">return</span> cost;
+}
+</code></pre>
+
+</div>
+</div><p>The plan rejects unavailable families, cycles, excessive depth and exhausted
+panel capacity before traversing contributions. It returns either a complete
+bounded plan or a refusal; no partial code view is accepted.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e" aria-label="Definition of exploration browser plan">&lt;&lt;exploration browser plan&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">plan</span>(<span class="hljs-params">control</span>) {
+    <span class="hljs-keyword">const</span> { model, target, path, context } = control;
+    <span class="hljs-keyword">const</span> family = <span class="hljs-title">own</span>(model.<span class="hljs-property">families</span>, target);
+    <span class="hljs-keyword">if</span> (model.<span class="hljs-property">unavailable</span>) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">reason</span>: <span class="hljs-string">'Exploration data is unavailable.'</span> }; }
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">identifier</span>(target) || !<span class="hljs-title">record</span>(family) || <span class="hljs-keyword">typeof</span> family.<span class="hljs-property">name</span> !== <span class="hljs-string">'string'</span> || family.<span class="hljs-property">name</span>.<span class="hljs-property">length</span> &gt; <span class="hljs-number">1024</span> || !<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(family.<span class="hljs-property">parts</span>)) {
+        <span class="hljs-keyword">return</span> { <span class="hljs-attr">reason</span>: <span class="hljs-string">'Fragment is unavailable in this snapshot.'</span> };
+    }
+    <span class="hljs-keyword">if</span> (path.<span class="hljs-title">includes</span>(target)) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">reason</span>: <span class="hljs-string">'Cycle: this fragment is already open on this path.'</span> }; }
+    <span class="hljs-keyword">if</span> (path.<span class="hljs-property">length</span> &gt;= limits.<span class="hljs-property">layers</span>) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">reason</span>: <span class="hljs-string">'Exploration is limited to eight layers.'</span> }; }
+    <span class="hljs-keyword">if</span> (panels.<span class="hljs-property">size</span> &gt;= limits.<span class="hljs-property">panels</span>) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">reason</span>: <span class="hljs-string">'Exploration panel limit reached; collapse a panel first.'</span> }; }
+    <span class="hljs-keyword">const</span> failure = { <span class="hljs-attr">reason</span>: <span class="hljs-string">'Exploration DOM budget or contribution limit reached. No code was truncated.'</span> };
+    <span class="hljs-keyword">if</span> (family.<span class="hljs-property">parts</span>.<span class="hljs-property">length</span> &gt; limits.<span class="hljs-property">parts</span>) { <span class="hljs-keyword">return</span> failure; }
+    <span class="hljs-keyword">const</span> parts = [], seen = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>();
+    <span class="hljs-keyword">let</span> cost = <span class="hljs-number">512</span> + escapedCost(family.<span class="hljs-property">name</span>), count = <span class="hljs-number">0</span>;
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e002000700061007200740073"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e002000700061007200740073" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e002000700061007200740073" aria-label="Definition of exploration browser plan parts">&lt;&lt;exploration browser plan parts&gt;&gt;</a></span>
+    <span class="hljs-keyword">return</span> cost + usedBytes &lt;= limits.<span class="hljs-property">bytes</span> ? { <span class="hljs-attr">name</span>: family.<span class="hljs-property">name</span>, parts, cost } : failure;
+}
+</code></pre>
+
+</div>
+</div><p>Contribution IDs must be valid and unique. The traversal bounds the total
+segment count and reserves per-part overhead, checking the shared byte budget
+before accepting each contribution.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e002000700061007200740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e002000700061007200740073"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e002000700061007200740073" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e002000700061007200740073" aria-label="Definition of exploration browser plan parts">&lt;&lt;exploration browser plan parts&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> id <span class="hljs-keyword">of</span> family.<span class="hljs-property">parts</span>) {
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">identifier</span>(id) || seen.<span class="hljs-title">has</span>(id)) { <span class="hljs-keyword">return</span> failure; }
+    seen.<span class="hljs-title">add</span>(id);
+    <span class="hljs-keyword">const</span> segments = <span class="hljs-title">own</span>(model.<span class="hljs-property">parts</span>, id);
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(segments) || (count += segments.<span class="hljs-property">length</span>) &gt; limits.<span class="hljs-property">segments</span>) { <span class="hljs-keyword">return</span> failure; }
+    cost += <span class="hljs-number">96</span>;
+    <span class="hljs-keyword">const</span> entries = [];
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e0020007300650067006d0065006e00740073"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e0020007300650067006d0065006e00740073" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e0020007300650067006d0065006e00740073" aria-label="Definition of exploration browser plan segments">&lt;&lt;exploration browser plan segments&gt;&gt;</a></span>
+    <span class="hljs-keyword">if</span> (cost + usedBytes &gt; limits.<span class="hljs-property">bytes</span>) { <span class="hljs-keyword">return</span> failure; }
+    parts.<span class="hljs-title">push</span>(entries);
+}
+</code></pre>
+
+</div>
+</div><p>Each segment is validated and its link decision fixed during preflight.
+Reference cost includes disclosure and status overhead as well as escaped target
+and link text, so rejection happens before the rendering pass allocates nodes.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e0020007300650067006d0065006e00740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e0020007300650067006d0065006e00740073"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e0020007300650067006d0065006e00740073" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200070006c0061006e0020007300650067006d0065006e00740073" aria-label="Definition of exploration browser plan segments">&lt;&lt;exploration browser plan segments&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> segment <span class="hljs-keyword">of</span> segments) {
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">record</span>(segment) || <span class="hljs-keyword">typeof</span> segment.<span class="hljs-property">text</span> !== <span class="hljs-string">'string'</span>) { <span class="hljs-keyword">return</span> failure; }
+    <span class="hljs-keyword">const</span> reference = segment.<span class="hljs-property">reference</span> === <span class="hljs-literal">true</span>;
+    <span class="hljs-keyword">const</span> destination = segment.<span class="hljs-property">target</span> === <span class="hljs-literal">undefined</span> ? <span class="hljs-string">''</span> : segment.<span class="hljs-property">target</span>;
+    <span class="hljs-keyword">if</span> (reference &amp;&amp; destination !== <span class="hljs-string">''</span> &amp;&amp; !<span class="hljs-title">identifier</span>(destination)) { <span class="hljs-keyword">return</span> failure; }
+    <span class="hljs-keyword">const</span> href = reference ? <span class="hljs-title">linkFor</span>(context, model, destination) : <span class="hljs-literal">undefined</span>;
+    cost += <span class="hljs-number">96</span> + escapedCost(segment.<span class="hljs-property">text</span>);
+    <span class="hljs-keyword">if</span> (reference) {
+        cost += <span class="hljs-number">1024</span> + escapedCost(segment.<span class="hljs-property">text</span>.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">512</span>)) + escapedCost(destination) * <span class="hljs-number">2</span>;
+        <span class="hljs-keyword">if</span> (href) { cost += escapedCost(href); }
+    }
+    <span class="hljs-keyword">if</span> (cost + usedBytes &gt; limits.<span class="hljs-property">bytes</span>) { <span class="hljs-keyword">return</span> failure; }
+    entries.<span class="hljs-title">push</span>({ <span class="hljs-attr">text</span>: segment.<span class="hljs-property">text</span>, reference, <span class="hljs-attr">target</span>: destination, href });
+}
+</code></pre>
+
+</div>
+</div><h3>Commit only an accepted panel</h3>
+<p>Opening first obtains the complete plan. Refusal leaves ordinary definition
+links available; success creates a labelled group, records its private charge
+and ownership, and only then exposes the expanded disclosure state.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006f00700065006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006f00700065006e"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006f00700065006e" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006f00700065006e" aria-label="Definition of exploration browser open">&lt;&lt;exploration browser open&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">open</span>(<span class="hljs-params">control</span>) {
+    <span class="hljs-keyword">const</span> accepted = <span class="hljs-title">plan</span>(control);
+    <span class="hljs-keyword">if</span> (accepted.<span class="hljs-property">reason</span>) { control.<span class="hljs-property">note</span>.<span class="hljs-property">textContent</span> = accepted.<span class="hljs-property">reason</span> + <span class="hljs-string">' Definition links remain available.'</span>; <span class="hljs-keyword">return</span>; }
+    <span class="hljs-keyword">const</span> candidate = <span class="hljs-title">element</span>(<span class="hljs-string">'span'</span>);
+    candidate.<span class="hljs-property">style</span>.<span class="hljs-property">display</span> = <span class="hljs-string">'block'</span>;
+    candidate.<span class="hljs-title">setAttribute</span>(<span class="hljs-string">'role'</span>, <span class="hljs-string">'group'</span>);
+    candidate.<span class="hljs-title">setAttribute</span>(<span class="hljs-string">'aria-label'</span>, <span class="hljs-string">'Unexpanded fragment '</span> + accepted.<span class="hljs-property">name</span>);
+    candidate.<span class="hljs-title">append</span>(<span class="hljs-title">element</span>(<span class="hljs-string">'span'</span>, <span class="hljs-string">'Unexpanded fragment — plain text; explore references separately.</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>));
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000720065006e00640065007200200065006e00740072006900650073"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000720065006e00640065007200200065006e00740072006900650073" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000720065006e00640065007200200065006e00740072006900650073" aria-label="Definition of exploration browser render entries">&lt;&lt;exploration browser render entries&gt;&gt;</a></span>
+    <span class="hljs-keyword">do</span> { candidate.<span class="hljs-property">id</span> = <span class="hljs-string">'literate-exploration-'</span> + (++serial); } <span class="hljs-keyword">while</span> (<span class="hljs-variable">document</span>.<span class="hljs-title">getElementById</span>(candidate.<span class="hljs-property">id</span>));
+    
+    candidate.<span class="hljs-title">setAttribute</span>(<span class="hljs-string">'data-literate-panel-bytes'</span>, <span class="hljs-title">String</span>(accepted.<span class="hljs-property">cost</span>));
+    usedBytes += accepted.<span class="hljs-property">cost</span>;
+    panels.<span class="hljs-title">set</span>(candidate, { <span class="hljs-attr">cost</span>: accepted.<span class="hljs-property">cost</span>, <span class="hljs-attr">owner</span>: control });
+    control.<span class="hljs-property">panel</span> = candidate;
+    control.<span class="hljs-property">note</span>.<span class="hljs-property">textContent</span> = <span class="hljs-string">''</span>; control.<span class="hljs-property">note</span>.<span class="hljs-title">after</span>(candidate);
+    control.<span class="hljs-property">button</span>.<span class="hljs-title">setAttribute</span>(<span class="hljs-string">'aria-controls'</span>, candidate.<span class="hljs-property">id</span>);
+    control.<span class="hljs-property">button</span>.<span class="hljs-title">setAttribute</span>(<span class="hljs-string">'aria-expanded'</span>, <span class="hljs-string">'true'</span>);
+}
+</code></pre>
+
+</div>
+</div><p>Rendering consumes accepted entries as plain text, with anchors only for
+approved destinations. Nested disclosures extend the current exploration path
+without recursively opening or expanding their targets.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000720065006e00640065007200200065006e00740072006900650073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000720065006e00640065007200200065006e00740072006900650073"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000720065006e00640065007200200065006e00740072006900650073" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000720065006e00640065007200200065006e00740072006900650073" aria-label="Definition of exploration browser render entries">&lt;&lt;exploration browser render entries&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> entries <span class="hljs-keyword">of</span> accepted.<span class="hljs-property">parts</span>) {
+    <span class="hljs-keyword">const</span> code = <span class="hljs-title">element</span>(<span class="hljs-string">'span'</span>); code.<span class="hljs-property">style</span>.<span class="hljs-property">whiteSpace</span> = <span class="hljs-string">'pre-wrap'</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> entry <span class="hljs-keyword">of</span> entries) {
+        <span class="hljs-keyword">const</span> text = <span class="hljs-title">element</span>(entry.<span class="hljs-property">href</span> ? <span class="hljs-string">'a'</span> : <span class="hljs-string">'span'</span>, entry.<span class="hljs-property">text</span>);
+        <span class="hljs-keyword">if</span> (entry.<span class="hljs-property">href</span>) { text.<span class="hljs-title">setAttribute</span>(<span class="hljs-string">'href'</span>, entry.<span class="hljs-property">href</span>); text.<span class="hljs-title">setAttribute</span>(<span class="hljs-string">'data-literate-target'</span>, entry.<span class="hljs-property">target</span>); }
+        code.<span class="hljs-title">append</span>(text);
+        <span class="hljs-keyword">if</span> (entry.<span class="hljs-property">reference</span>) {
+            text.<span class="hljs-title">setAttribute</span>(<span class="hljs-string">'data-literate-explore'</span>, entry.<span class="hljs-property">target</span>);
+            <span class="hljs-title">enhance</span>(text, control.<span class="hljs-property">context</span>, [...control.<span class="hljs-property">path</span>, control.<span class="hljs-property">target</span>], control);
+        }
+    }
+    candidate.<span class="hljs-title">append</span>(code);
+}
+</code></pre>
+
+</div>
+</div><h3>Disclosures follow source identity</h3>
+<p>A disclosure signature includes its target, bounded label and anchor identity
+and attributes. Reconciliation can therefore invalidate stale controls when a
+preview updates links or replaces source nodes.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300690067006e00610074007500720065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300690067006e00610074007500720065"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300690067006e00610074007500720065" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300690067006e00610074007500720065" aria-label="Definition of exploration browser signature">&lt;&lt;exploration browser signature&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">signature</span>(<span class="hljs-params">use</span>) {
+    <span class="hljs-keyword">const</span> anchor = use.<span class="hljs-title">matches</span>(<span class="hljs-string">'a'</span>) ? use : use.<span class="hljs-title">querySelector</span>(<span class="hljs-string">'a'</span>);
+    <span class="hljs-keyword">return</span> [use.<span class="hljs-title">getAttribute</span>(<span class="hljs-string">'data-literate-explore'</span>), use.<span class="hljs-property">textContent</span>.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">512</span>), anchor,
+        anchor?.<span class="hljs-title">getAttribute</span>(<span class="hljs-string">'href'</span>), anchor?.<span class="hljs-title">getAttribute</span>(<span class="hljs-string">'data-literate-target'</span>)];
+}
+</code></pre>
+
+</div>
+</div><p>Enhancement adds a button and live status beside the original use, leaving the
+definition link independent. A click reconciles the document before acting, so
+a retired control cannot open a panel against an obsolete snapshot.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200065006e00680061006e00630065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200065006e00680061006e00630065"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200065006e00680061006e00630065" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200065006e00680061006e00630065" aria-label="Definition of exploration browser enhance">&lt;&lt;exploration browser enhance&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">enhance</span>(<span class="hljs-params">use, context, path = [], parent</span>) {
+    <span class="hljs-keyword">const</span> identity = <span class="hljs-title">signature</span>(use);
+    <span class="hljs-keyword">const</span> button = <span class="hljs-title">element</span>(<span class="hljs-string">'button'</span>, <span class="hljs-string">'Explore fragment'</span>); button.<span class="hljs-property">type</span> = <span class="hljs-string">'button'</span>;
+    button.<span class="hljs-title">setAttribute</span>(<span class="hljs-string">'aria-label'</span>, <span class="hljs-string">'Explore '</span> + identity[<span class="hljs-number">1</span>]);
+    button.<span class="hljs-title">setAttribute</span>(<span class="hljs-string">'aria-expanded'</span>, <span class="hljs-string">'false'</span>);
+    <span class="hljs-keyword">const</span> note = <span class="hljs-title">element</span>(<span class="hljs-string">'span'</span>); note.<span class="hljs-title">setAttribute</span>(<span class="hljs-string">'role'</span>, <span class="hljs-string">'status'</span>);
+    use.<span class="hljs-title">after</span>(button, note);
+    <span class="hljs-keyword">const</span> control = { use, context, <span class="hljs-attr">model</span>: context.<span class="hljs-property">model</span>, identity, <span class="hljs-attr">target</span>: identity[<span class="hljs-number">0</span>], path,
+        button, note, parent, <span class="hljs-attr">children</span>: <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>(), <span class="hljs-attr">panel</span>: <span class="hljs-literal">undefined</span> };
+    controls.<span class="hljs-title">set</span>(use, control);
+    <span class="hljs-keyword">if</span> (parent) { parent.<span class="hljs-property">children</span>.<span class="hljs-title">add</span>(control); } <span class="hljs-keyword">else</span> { context.<span class="hljs-property">controls</span>.<span class="hljs-title">set</span>(use, control); }
+    button.<span class="hljs-title">addEventListener</span>(<span class="hljs-string">'click'</span>, <span class="hljs-function">() =&gt;</span> {
+        <span class="hljs-title">scan</span>();
+        <span class="hljs-keyword">if</span> (controls.<span class="hljs-title">get</span>(use) !== control) { <span class="hljs-keyword">return</span>; }
+        <span class="hljs-keyword">if</span> (control.<span class="hljs-property">panel</span>) {
+            <span class="hljs-keyword">if</span> (<span class="hljs-title">focusWithin</span>(control)) { button.<span class="hljs-title">focus</span>(); }
+            <span class="hljs-title">close</span>(control);
+        } <span class="hljs-keyword">else</span> { <span class="hljs-title">open</span>(control); }
+    });
+    <span class="hljs-keyword">return</span> control;
+}
+</code></pre>
+
+</div>
+</div><p>Payload size is checked in characters and UTF-8 bytes before JSON parsing.
+Malformed or unsupported models become an unavailable snapshot rather than
+preventing the surrounding document from remaining navigable.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000720065006100640020006d006f00640065006c-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000720065006100640020006d006f00640065006c"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000720065006100640020006d006f00640065006c" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f0077007300650072002000720065006100640020006d006f00640065006c" aria-label="Definition of exploration browser read model">&lt;&lt;exploration browser read model&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">readModel</span>(<span class="hljs-params">source</span>) {
+    <span class="hljs-keyword">try</span> {
+        <span class="hljs-keyword">if</span> (source.<span class="hljs-property">length</span> &gt; limits.<span class="hljs-property">payload</span> || encoder.<span class="hljs-title">encode</span>(source).<span class="hljs-property">length</span> &gt; limits.<span class="hljs-property">payload</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'payload limit'</span>); }
+        <span class="hljs-keyword">const</span> model = <span class="hljs-title">JSON</span>.<span class="hljs-title">parse</span>(source);
+        <span class="hljs-keyword">if</span> (!<span class="hljs-title">record</span>(model) || model.<span class="hljs-property">version</span> !== <span class="hljs-number">1</span> || !<span class="hljs-title">record</span>(model.<span class="hljs-property">parts</span>) || !<span class="hljs-title">record</span>(model.<span class="hljs-property">families</span>)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'invalid model'</span>); }
+        <span class="hljs-keyword">return</span> model;
+    } <span class="hljs-keyword">catch</span> (_) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">unavailable</span>: <span class="hljs-literal">true</span> }; }
+}
+</code></pre>
+
+</div>
+</div><p>Baseline authority comes only from anchors outside owned panels. Conflicting
+destinations for one target remain unavailable, including when a later anchor
+repeats one of the conflicting values.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200062006100730065006c0069006e00650020006c0069006e006b0073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200062006100730065006c0069006e00650020006c0069006e006b0073"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200062006100730065006c0069006e00650020006c0069006e006b0073" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200062006100730065006c0069006e00650020006c0069006e006b0073" aria-label="Definition of exploration browser baseline links">&lt;&lt;exploration browser baseline links&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">baselineLinks</span>(<span class="hljs-params">root</span>) {
+    <span class="hljs-keyword">const</span> links = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>();
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> anchor <span class="hljs-keyword">of</span> root.<span class="hljs-title">querySelectorAll</span>(<span class="hljs-string">'a'</span>)) {
+        <span class="hljs-keyword">if</span> (<span class="hljs-title">inPanel</span>(anchor)) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">const</span> target = anchor.<span class="hljs-title">getAttribute</span>(<span class="hljs-string">'data-literate-target'</span>);
+        <span class="hljs-keyword">if</span> (!<span class="hljs-title">identifier</span>(target)) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">const</span> href = <span class="hljs-title">safeHref</span>(anchor.<span class="hljs-title">getAttribute</span>(<span class="hljs-string">'href'</span>), target, <span class="hljs-literal">true</span>);
+        links.<span class="hljs-title">set</span>(target, links.<span class="hljs-title">has</span>(target) &amp;&amp; links.<span class="hljs-title">get</span>(target) !== href ? <span class="hljs-literal">undefined</span> : href);
+    }
+    <span class="hljs-keyword">return</span> links;
+}
+</code></pre>
+
+</div>
+</div><h3>Reconcile ownership after document changes</h3>
+<p>A scan retires vanished roots, refreshes live contexts and checks owned nodes.
+Teardown records a focus request before destroying controls; restoration waits
+until the surviving document and disclosures have been reconciled.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e" aria-label="Definition of exploration browser scan">&lt;&lt;exploration browser scan&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">scan</span>() {
+    <span class="hljs-keyword">let</span> request;
+    <span class="hljs-keyword">const</span> <span class="hljs-title">retire</span> = control =&gt; {
+        <span class="hljs-keyword">if</span> (<span class="hljs-title">focusWithin</span>(control)) { request = control; }
+        <span class="hljs-title">destroy</span>(control);
+    };
+    <span class="hljs-keyword">const</span> live = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>(<span class="hljs-variable">document</span>.<span class="hljs-title">querySelectorAll</span>(<span class="hljs-string">'.literate-document'</span>));
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [root, context] <span class="hljs-keyword">of</span> roots) {
+        <span class="hljs-keyword">if</span> (!live.<span class="hljs-title">has</span>(root)) {
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> control <span class="hljs-keyword">of</span> [...context.<span class="hljs-property">controls</span>.<span class="hljs-title">values</span>()]) { <span class="hljs-title">retire</span>(control); }
+            roots.<span class="hljs-title">delete</span>(root);
+        }
+    }
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e00200072006f006f00740073"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e00200072006f006f00740073" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e00200072006f006f00740073" aria-label="Definition of exploration browser scan roots">&lt;&lt;exploration browser scan roots&gt;&gt;</a></span>
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e0020006e0065007300740065006400200063006f006e00740072006f006c0073"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e0020006e0065007300740065006400200063006f006e00740072006f006c0073" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e0020006e0065007300740065006400200063006f006e00740072006f006c0073" aria-label="Definition of exploration browser scan nested controls">&lt;&lt;exploration browser scan nested controls&gt;&gt;</a></span>
+    <span data-literate-explore="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e002000640065007400610063006800650064002000700061006e0065006c0073"><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e002000640065007400610063006800650064002000700061006e0065006c0073" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e002000640065007400610063006800650064002000700061006e0065006c0073" aria-label="Definition of exploration browser scan detached panels">&lt;&lt;exploration browser scan detached panels&gt;&gt;</a></span>
+    <span class="hljs-title">restore</span>(request);
+}
+</code></pre>
+
+</div>
+</div><p>Each live root needs its inert payload. Payload replacement or baseline-link
+changes retire existing views before updating context; source uses are then
+matched by signature and adjacency before missing disclosures are installed.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e00200072006f006f00740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e00200072006f006f00740073"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e00200072006f006f00740073" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e00200072006f006f00740073" aria-label="Definition of exploration browser scan roots">&lt;&lt;exploration browser scan roots&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> root <span class="hljs-keyword">of</span> live) {
+    <span class="hljs-keyword">const</span> payload = root.<span class="hljs-title">querySelector</span>(<span class="hljs-string">'script.literate-exploration-data[type=&quot;application/json&quot;]'</span>);
+    <span class="hljs-keyword">let</span> context = roots.<span class="hljs-title">get</span>(root);
+    <span class="hljs-keyword">if</span> (!payload) {
+        <span class="hljs-keyword">if</span> (context) { <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> control <span class="hljs-keyword">of</span> [...context.<span class="hljs-property">controls</span>.<span class="hljs-title">values</span>()]) { <span class="hljs-title">retire</span>(control); } roots.<span class="hljs-title">delete</span>(root); }
+        <span class="hljs-keyword">continue</span>;
+    }
+    <span class="hljs-keyword">const</span> source = payload.<span class="hljs-property">textContent</span>;
+    <span class="hljs-keyword">const</span> links = <span class="hljs-title">baselineLinks</span>(root);
+    <span class="hljs-keyword">if</span> (!context) {
+        context = { root, payload, source, links, <span class="hljs-attr">model</span>: <span class="hljs-title">readModel</span>(source), <span class="hljs-attr">controls</span>: <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>() };
+        roots.<span class="hljs-title">set</span>(root, context);
+    } <span class="hljs-keyword">else</span> {
+        <span class="hljs-keyword">const</span> changed = context.<span class="hljs-property">payload</span> !== payload || context.<span class="hljs-property">source</span> !== source;
+        <span class="hljs-keyword">const</span> relink = links.<span class="hljs-property">size</span> !== context.<span class="hljs-property">links</span>.<span class="hljs-property">size</span> || [...links].<span class="hljs-title">some</span>(<span class="hljs-function">(</span><span class="hljs-params">[key, value]</span><span class="hljs-function">) =&gt;</span>
+                            !context.<span class="hljs-property">links</span>.<span class="hljs-title">has</span>(key) || context.<span class="hljs-property">links</span>.<span class="hljs-title">get</span>(key) !== value);
+        <span class="hljs-keyword">if</span> (changed || relink) { <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> control <span class="hljs-keyword">of</span> [...context.<span class="hljs-property">controls</span>.<span class="hljs-title">values</span>()]) { <span class="hljs-title">retire</span>(control); } }
+        <span class="hljs-keyword">if</span> (changed) { context.<span class="hljs-property">model</span> = <span class="hljs-title">readModel</span>(source); }
+        <span class="hljs-title">Object</span>.<span class="hljs-title">assign</span>(context, { payload, source, links });
+    }
+    <span class="hljs-keyword">const</span> uses = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>([...root.<span class="hljs-title">querySelectorAll</span>(<span class="hljs-string">'[data-literate-explore]'</span>)].<span class="hljs-title">filter</span>(<span class="hljs-params">use</span><span class="hljs-function"> =&gt;</span> !<span class="hljs-title">inPanel</span>(use)));
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [use, control] <span class="hljs-keyword">of</span> [...context.<span class="hljs-property">controls</span>]) {
+        <span class="hljs-keyword">const</span> identity = <span class="hljs-title">signature</span>(use);
+        <span class="hljs-keyword">if</span> (!uses.<span class="hljs-title">has</span>(use) || control.<span class="hljs-property">button</span>.<span class="hljs-property">previousSibling</span> !== use || control.<span class="hljs-property">note</span>.<span class="hljs-property">previousSibling</span> !== control.<span class="hljs-property">button</span>
+            || identity.<span class="hljs-title">some</span>(<span class="hljs-function">(</span><span class="hljs-params">value, index</span><span class="hljs-function">) =&gt;</span> value !== control.<span class="hljs-property">identity</span>[index])) { <span class="hljs-title">retire</span>(control); }
+    }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> use <span class="hljs-keyword">of</span> uses) { <span class="hljs-keyword">if</span> (!controls.<span class="hljs-title">has</span>(use)) { <span class="hljs-title">enhance</span>(use, context); } }
+}
+</code></pre>
+
+</div>
+</div><p>A detached or altered nested use invalidates its top-level panel. Checking that
+the control is still registered avoids processing descendants already destroyed
+by an earlier teardown in the same scan.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e0020006e0065007300740065006400200063006f006e00740072006f006c0073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e0020006e0065007300740065006400200063006f006e00740072006f006c0073"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e0020006e0065007300740065006400200063006f006e00740072006f006c0073" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e0020006e0065007300740065006400200063006f006e00740072006f006c0073" aria-label="Definition of exploration browser scan nested controls">&lt;&lt;exploration browser scan nested controls&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> control <span class="hljs-keyword">of</span> [...controls.<span class="hljs-title">values</span>()]) {
+    <span class="hljs-keyword">if</span> (!control.<span class="hljs-property">parent</span> || controls.<span class="hljs-title">get</span>(control.<span class="hljs-property">use</span>) !== control) { <span class="hljs-keyword">continue</span>; }
+    <span class="hljs-keyword">const</span> identity = <span class="hljs-title">signature</span>(control.<span class="hljs-property">use</span>);
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">connected</span>(control.<span class="hljs-property">use</span>) || control.<span class="hljs-property">button</span>.<span class="hljs-property">previousSibling</span> !== control.<span class="hljs-property">use</span>
+        || identity.<span class="hljs-title">some</span>(<span class="hljs-function">(</span><span class="hljs-params">value, index</span><span class="hljs-function">) =&gt;</span> value !== control.<span class="hljs-property">identity</span>[index])) {
+        <span class="hljs-keyword">let</span> top = control;
+        <span class="hljs-keyword">while</span> (top.<span class="hljs-property">parent</span>) { top = top.<span class="hljs-property">parent</span>; }
+        <span class="hljs-keyword">if</span> (<span class="hljs-title">focusWithin</span>(top)) { request = top; }
+        <span class="hljs-title">close</span>(top);
+    }
+}
+</code></pre>
+
+</div>
+</div><p>Externally detached panels still carry a private charge. Reconciliation closes
+their owners and preserves top-level focus intent without trusting any DOM
+accounting metadata.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e002000640065007400610063006800650064002000700061006e0065006c0073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e002000640065007400610063006800650064002000700061006e0065006c0073"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e002000640065007400610063006800650064002000700061006e0065006c0073" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020007300630061006e002000640065007400610063006800650064002000700061006e0065006c0073" aria-label="Definition of exploration browser scan detached panels">&lt;&lt;exploration browser scan detached panels&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [panel, { owner }] <span class="hljs-keyword">of</span> [...panels]) {
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">connected</span>(panel)) {
+        <span class="hljs-keyword">let</span> top = owner;
+        <span class="hljs-keyword">while</span> (top.<span class="hljs-property">parent</span>) { top = top.<span class="hljs-property">parent</span>; }
+        <span class="hljs-keyword">if</span> (<span class="hljs-title">focusWithin</span>(top)) { request = top; }
+        <span class="hljs-title">close</span>(owner);
+    }
+}
+</code></pre>
+
+</div>
+</div><h3>Observe without changing the entry contract</h3>
+<p>Focus events remember only top-level ownership. An initial scan and the existing
+document, preview and mutation notifications keep the optional controls current;
+the observer watches the attributes used by identity and link validation.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006f00620073006500720076006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006f00620073006500720076006100740069006f006e"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006f00620073006500720076006100740069006f006e" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f00770073006500720020006f00620073006500720076006100740069006f006e" aria-label="Definition of exploration browser observation">&lt;&lt;exploration browser observation&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-variable">document</span>.<span class="hljs-title">addEventListener</span>(<span class="hljs-string">'focusin'</span>, <span class="hljs-params">event</span><span class="hljs-function"> =&gt;</span> {
+    focused = <span class="hljs-literal">undefined</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> control <span class="hljs-keyword">of</span> controls.<span class="hljs-title">values</span>()) {
+        <span class="hljs-keyword">if</span> (!control.<span class="hljs-property">parent</span> &amp;&amp; (control.<span class="hljs-property">button</span> === event.<span class="hljs-property">target</span> || control.<span class="hljs-property">panel</span>?.<span class="hljs-title">contains</span>(event.<span class="hljs-property">target</span>))) {
+            focused = { <span class="hljs-attr">top</span>: control }; <span class="hljs-keyword">break</span>;
+        }
+    }
+});
+<span class="hljs-title">scan</span>();
+<span class="hljs-variable">document</span>.<span class="hljs-title">addEventListener</span>(<span class="hljs-string">'DOMContentLoaded'</span>, scan);
+view.<span class="hljs-title">addEventListener</span>(<span class="hljs-string">'vscode.markdown.updateContent'</span>, scan);
+<span class="hljs-keyword">new</span> view.<span class="hljs-title">MutationObserver</span>(scan).<span class="hljs-title">observe</span>(<span class="hljs-variable">document</span>.<span class="hljs-property">documentElement</span>, {
+    <span class="hljs-attr">childList</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">characterData</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">subtree</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">attributes</span>: <span class="hljs-literal">true</span>,
+    <span class="hljs-attr">attributeFilter</span>: [<span class="hljs-string">'data-literate-explore'</span>, <span class="hljs-string">'data-literate-target'</span>, <span class="hljs-string">'href'</span>, <span class="hljs-string">'type'</span>, <span class="hljs-string">'class'</span>]
+});
+</code></pre>
+
+</div>
+</div><p>The same function remains available to CommonJS consumers and initializes
+directly when loaded in a browser. No additional wrapper state is required by
+the standalone function serialization.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200065006e00740072007900200070006f0069006e00740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006500780070006c006f0072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200065006e00740072007900200070006f0069006e00740073"></span><a class="literate-tag-name" href="#f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200065006e00740072007900200070006f0069006e00740073" data-literate-target="f-006500780070006c006f0072006100740069006f006e002000620072006f007700730065007200200065006e00740072007900200070006f0069006e00740073" aria-label="Definition of exploration browser entry points">&lt;&lt;exploration browser entry points&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> <span class="hljs-variable">module</span> !== <span class="hljs-string">'undefined'</span> &amp;&amp; <span class="hljs-variable">module</span>.<span class="hljs-property">exports</span>) { <span class="hljs-variable">module</span>.<span class="hljs-property">exports</span> = { initializePublicationExploration }; }
+<span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> <span class="hljs-variable">document</span> !== <span class="hljs-string">'undefined'</span>) { <span class="hljs-title">initializePublicationExploration</span>(<span class="hljs-variable">document</span>); }
+</code></pre>
+
+</div>
+</div><script type="application/json" class="literate-exploration-data">{"version":1,"parts":{},"families":{},"unavailable":"Exploration payload exceeds the one MiB limit."}</script><script>(
+// Closure-free: standalone HTML embeds this source without the module wrapper.
+function initializePublicationExploration(document) {
+    const view = document.defaultView;
+    if (!view || document.__literateExploration) { return; }
+    document.__literateExploration = true;
+    const limits = { payload: 1048576, layers: 8, bytes: 262144, panels: 200, parts: 200, segments: 4096 };
+    const roots = new Map();
+    const controls = new Map();
+    const panels = new Map();
+    const encoder = new view.TextEncoder();
+    const own = (object, key) => object && Object.prototype.hasOwnProperty.call(object, key) ? object[key] : undefined;
+    const record = value => value && typeof value === 'object' && !Array.isArray(value);
+    const identifier = value => typeof value === 'string' && value.length <= 4096 && /^[A-Za-z0-9_-]+$/.test(value);
+    const connected = node => !!node && document.documentElement.contains(node);
+    let usedBytes = 0, serial = 0, focused;
+    const element = (tag, text) => {
+        const node = document.createElement(tag);
+        if (text !== undefined) { node.textContent = text; }
+        return node;
+    };
+    function inPanel(node) {
+        for (let parent = node; parent; parent = parent.parentNode) { if (panels.has(parent)) { return true; } }
+        return false;
+    }
+    function safeHref(href, target, baseline = false) {
+        if (typeof href !== 'string' || href.length > 4096 || /[\s\u0000-\u001f\u007f\\]/.test(href)) { return undefined; }
+        if (identifier(target) && href === '#' + target) { return href; }
+        if (identifier(target) && href.endsWith('#' + target)) {
+            const path = href.slice(0, -target.length - 1);
+            if (path.startsWith('./') && path.endsWith('.html') && path.slice(2).split('/').every(
+                part => /^(?:[A-Za-z0-9_~.!'()*-]|%[0-9a-fA-F]{2})+$/.test(part))) { return href; }
+        }
+        if (/^vscode(?:-insiders)?:\/\/jesterking\.literate\/navigate\/[a-f0-9]{48}\/[a-f0-9]{48}(?:\?[^#]*)?$/.test(href)) { return href; }
+        // HTTPS transport shapes belong to the host. Never authorize one from JSON alone.
+        if (baseline && /^https:\/\//.test(href)) {
+            try {
+                const url = new view.URL(href);
+                if (url.protocol === 'https:' && url.hostname && !url.username && !url.password) { return href; }
+            } catch (_) { /* Invalid URLs remain plain text. */ }
+        }
+        return undefined;
+    }
+    function linkFor(context, model, target) {
+        if (context.links.has(target)) { return context.links.get(target); }
+        return safeHref(own(model.families, target)?.href, target);
+    }
+    function focusWithin(control) {
+        const active = document.activeElement;
+        if (control.button === active || control.panel?.contains(active)) { return true; }
+        return focused?.top === control && (!active || active === document.body || !connected(active));
+    }
+    function close(control) {
+        if (!control.panel) { return; }
+        for (const child of [...control.children]) { destroy(child); }
+        const cost = panels.get(control.panel)?.cost;
+        if (cost !== undefined) { usedBytes -= cost; panels.delete(control.panel); }
+        control.panel.remove(); control.panel = undefined;
+        control.button.setAttribute('aria-expanded', 'false');
+        control.button.removeAttribute('aria-controls');
+        control.note.textContent = '';
+    }
+    function destroy(control) {
+        close(control);
+        controls.delete(control.use);
+        control.parent?.children.delete(control);
+        control.context.controls.delete(control.use);
+        control.button.remove(); control.note.remove();
+    }
+    function restore(request) {
+        if (!request) { return; }
+        const replacement = controls.get(request.use) || [...controls.values()].find(control =>
+            !control.parent && control.target === request.target);
+        const anchor = [request.use.querySelector('a'), request.context.root.querySelector('a'),
+            ...document.querySelectorAll('a')].find(node => connected(node) && node.getAttribute('href'));
+        const destination = replacement?.button || anchor;
+        focused = undefined;
+        if (destination) { destination.focus(); }
+    }
+    // Account for serialized text/attributes without constructing candidate DOM or expanded strings.
+    function escapedCost(text) {
+        if (typeof text !== 'string' || text.length > limits.bytes) { return Infinity; }
+        let cost = encoder.encode(text).length;
+        for (const character of text) {
+            if (character === '&') { cost += 4; }
+            else if (character === '<' || character === '>') { cost += 3; }
+            else if (character === '"' || character === "'") { cost += 5; }
+        }
+        return cost;
+    }
+    function plan(control) {
+        const { model, target, path, context } = control;
+        const family = own(model.families, target);
+        if (model.unavailable) { return { reason: 'Exploration data is unavailable.' }; }
+        if (!identifier(target) || !record(family) || typeof family.name !== 'string' || family.name.length > 1024 || !Array.isArray(family.parts)) {
+            return { reason: 'Fragment is unavailable in this snapshot.' };
+        }
+        if (path.includes(target)) { return { reason: 'Cycle: this fragment is already open on this path.' }; }
+        if (path.length >= limits.layers) { return { reason: 'Exploration is limited to eight layers.' }; }
+        if (panels.size >= limits.panels) { return { reason: 'Exploration panel limit reached; collapse a panel first.' }; }
+        const failure = { reason: 'Exploration DOM budget or contribution limit reached. No code was truncated.' };
+        if (family.parts.length > limits.parts) { return failure; }
+        const parts = [], seen = new Set();
+        let cost = 512 + escapedCost(family.name), count = 0;
+        for (const id of family.parts) {
+            if (!identifier(id) || seen.has(id)) { return failure; }
+            seen.add(id);
+            const segments = own(model.parts, id);
+            if (!Array.isArray(segments) || (count += segments.length) > limits.segments) { return failure; }
+            cost += 96;
+            const entries = [];
+            for (const segment of segments) {
+                if (!record(segment) || typeof segment.text !== 'string') { return failure; }
+                const reference = segment.reference === true;
+                const destination = segment.target === undefined ? '' : segment.target;
+                if (reference && destination !== '' && !identifier(destination)) { return failure; }
+                const href = reference ? linkFor(context, model, destination) : undefined;
+                cost += 96 + escapedCost(segment.text);
+                if (reference) {
+                    cost += 1024 + escapedCost(segment.text.slice(0, 512)) + escapedCost(destination) * 2;
+                    if (href) { cost += escapedCost(href); }
+                }
+                if (cost + usedBytes > limits.bytes) { return failure; }
+                entries.push({ text: segment.text, reference, target: destination, href });
+            }
+            if (cost + usedBytes > limits.bytes) { return failure; }
+            parts.push(entries);
+        }
+        return cost + usedBytes <= limits.bytes ? { name: family.name, parts, cost } : failure;
+    }
+    function open(control) {
+        const accepted = plan(control);
+        if (accepted.reason) { control.note.textContent = accepted.reason + ' Definition links remain available.'; return; }
+        const candidate = element('span');
+        candidate.style.display = 'block';
+        candidate.setAttribute('role', 'group');
+        candidate.setAttribute('aria-label', 'Unexpanded fragment ' + accepted.name);
+        candidate.append(element('span', 'Unexpanded fragment — plain text; explore references separately.\n'));
+        for (const entries of accepted.parts) {
+            const code = element('span'); code.style.whiteSpace = 'pre-wrap';
+            for (const entry of entries) {
+                const text = element(entry.href ? 'a' : 'span', entry.text);
+                if (entry.href) { text.setAttribute('href', entry.href); text.setAttribute('data-literate-target', entry.target); }
+                code.append(text);
+                if (entry.reference) {
+                    text.setAttribute('data-literate-explore', entry.target);
+                    enhance(text, control.context, [...control.path, control.target], control);
+                }
+            }
+            candidate.append(code);
+        }
+        do { candidate.id = 'literate-exploration-' + (++serial); } while (document.getElementById(candidate.id));
+        // Diagnostic metadata is never read back for ownership or accounting.
+        candidate.setAttribute('data-literate-panel-bytes', String(accepted.cost));
+        usedBytes += accepted.cost;
+        panels.set(candidate, { cost: accepted.cost, owner: control });
+        control.panel = candidate;
+        control.note.textContent = ''; control.note.after(candidate);
+        control.button.setAttribute('aria-controls', candidate.id);
+        control.button.setAttribute('aria-expanded', 'true');
+    }
+    function signature(use) {
+        const anchor = use.matches('a') ? use : use.querySelector('a');
+        return [use.getAttribute('data-literate-explore'), use.textContent.slice(0, 512), anchor,
+            anchor?.getAttribute('href'), anchor?.getAttribute('data-literate-target')];
+    }
+    function enhance(use, context, path = [], parent) {
+        const identity = signature(use);
+        const button = element('button', 'Explore fragment'); button.type = 'button';
+        button.setAttribute('aria-label', 'Explore ' + identity[1]);
+        button.setAttribute('aria-expanded', 'false');
+        const note = element('span'); note.setAttribute('role', 'status');
+        use.after(button, note);
+        const control = { use, context, model: context.model, identity, target: identity[0], path,
+            button, note, parent, children: new Set(), panel: undefined };
+        controls.set(use, control);
+        if (parent) { parent.children.add(control); } else { context.controls.set(use, control); }
+        button.addEventListener('click', () => {
+            scan();
+            if (controls.get(use) !== control) { return; }
+            if (control.panel) {
+                if (focusWithin(control)) { button.focus(); }
+                close(control);
+            } else { open(control); }
+        });
+        return control;
+    }
+    function readModel(source) {
+        try {
+            if (source.length > limits.payload || encoder.encode(source).length > limits.payload) { throw new Error('payload limit'); }
+            const model = JSON.parse(source);
+            if (!record(model) || model.version !== 1 || !record(model.parts) || !record(model.families)) { throw new Error('invalid model'); }
+            return model;
+        } catch (_) { return { unavailable: true }; }
+    }
+    function baselineLinks(root) {
+        const links = new Map();
+        for (const anchor of root.querySelectorAll('a')) {
+            if (inPanel(anchor)) { continue; }
+            const target = anchor.getAttribute('data-literate-target');
+            if (!identifier(target)) { continue; }
+            const href = safeHref(anchor.getAttribute('href'), target, true);
+            links.set(target, links.has(target) && links.get(target) !== href ? undefined : href);
+        }
+        return links;
+    }
+    function scan() {
+        let request;
+        const retire = control => {
+            if (focusWithin(control)) { request = control; }
+            destroy(control);
+        };
+        const live = new Set(document.querySelectorAll('.literate-document'));
+        for (const [root, context] of roots) {
+            if (!live.has(root)) {
+                for (const control of [...context.controls.values()]) { retire(control); }
+                roots.delete(root);
+            }
+        }
+        for (const root of live) {
+            const payload = root.querySelector('script.literate-exploration-data[type="application/json"]');
+            let context = roots.get(root);
+            if (!payload) {
+                if (context) { for (const control of [...context.controls.values()]) { retire(control); } roots.delete(root); }
+                continue;
+            }
+            const source = payload.textContent;
+            const links = baselineLinks(root);
+            if (!context) {
+                context = { root, payload, source, links, model: readModel(source), controls: new Map() };
+                roots.set(root, context);
+            } else {
+                const changed = context.payload !== payload || context.source !== source;
+                const relink = links.size !== context.links.size || [...links].some(([key, value]) =>
+                                    !context.links.has(key) || context.links.get(key) !== value);
+                if (changed || relink) { for (const control of [...context.controls.values()]) { retire(control); } }
+                if (changed) { context.model = readModel(source); }
+                Object.assign(context, { payload, source, links });
+            }
+            const uses = new Set([...root.querySelectorAll('[data-literate-explore]')].filter(use => !inPanel(use)));
+            for (const [use, control] of [...context.controls]) {
+                const identity = signature(use);
+                if (!uses.has(use) || control.button.previousSibling !== use || control.note.previousSibling !== control.button
+                    || identity.some((value, index) => value !== control.identity[index])) { retire(control); }
+            }
+            for (const use of uses) { if (!controls.has(use)) { enhance(use, context); } }
+        }
+        for (const control of [...controls.values()]) {
+            if (!control.parent || controls.get(control.use) !== control) { continue; }
+            const identity = signature(control.use);
+            if (!connected(control.use) || control.button.previousSibling !== control.use
+                || identity.some((value, index) => value !== control.identity[index])) {
+                let top = control;
+                while (top.parent) { top = top.parent; }
+                if (focusWithin(top)) { request = top; }
+                close(top);
+            }
+        }
+        for (const [panel, { owner }] of [...panels]) {
+            if (!connected(panel)) {
+                let top = owner;
+                while (top.parent) { top = top.parent; }
+                if (focusWithin(top)) { request = top; }
+                close(owner);
+            }
+        }
+        restore(request);
+    }
+    document.addEventListener('focusin', event => {
+        focused = undefined;
+        for (const control of controls.values()) {
+            if (!control.parent && (control.button === event.target || control.panel?.contains(event.target))) {
+                focused = { top: control }; break;
+            }
+        }
+    });
+    scan();
+    document.addEventListener('DOMContentLoaded', scan);
+    view.addEventListener('vscode.markdown.updateContent', scan);
+    new view.MutationObserver(scan).observe(document.documentElement, {
+        childList: true, characterData: true, subtree: true, attributes: true,
+        attributeFilter: ['data-literate-explore', 'data-literate-target', 'href', 'type', 'class']
+    });
+}
+)(document);</script></div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

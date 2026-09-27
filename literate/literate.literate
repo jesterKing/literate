@@ -1560,7 +1560,8 @@ function installPreviewDocument(md: MarkdownIt, repository: FragmentRepository, 
             literateUseTargets: screenTermUseAnchors(tokens, snapshot.annotations, snapshot.path) };
     const style = snapshot.annotations.terms.length || snapshot.annotations.notes.length ? `<style>${screenStyle}</style>` : '';
     const body = style + originalRender.call(this, tokens, options, renderEnv)
-      + renderScreenIndexes(literateScreen, snapshot.paths);
+      + renderScreenIndexes(literateScreen, snapshot.paths)
+            + renderScreenExploration(snapshot.publication, snapshot.path, 'preview', destination);
     const theme = snapshot.theme;
     return `<div class="literate-document" data-literate-theme="${md.utils.escapeHtml(theme)}">${body}</div>`;
   };
@@ -2379,7 +2380,7 @@ import { parseProject, discoveryExcludedDirectories, generateProject, resolvePro
 import { collectFragmentOccurrences, planFragmentRename, FragmentOccurrence } from './symbols';
 import { defaultThemeName } from './themes';
 import { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAnnotation,
-  installScreenTermLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle } from './publication-screen';
+  installScreenTermLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle, renderScreenExploration } from './publication-screen';
 import { registerPublicationCommands } from './publication-extension';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');

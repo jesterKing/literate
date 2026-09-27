@@ -8,6 +8,7 @@ import type { PandocDocument, PandocBlock, PublicationAsset } from './publicatio
 import { defaultThemeName, getTheme } from './themes';
 import type { LiterateTheme } from './themes';
 import { highlightContribution, syntaxStyle } from './publication-highlight';
+export const publicationTemplateVersion = 1;
 export interface LatexOptions {
     assetPath?: (asset: PublicationAsset) => string;
     theme?: string;
@@ -156,7 +157,7 @@ function slantFeatures(font: PortableFont): string {
 }
 function template(body: string, options: CheckedOptions, definitions: string[], rail: string): string {
     const c = options.theme.colors;
-    return themeNotice() + String.raw`\newcommand{\DoNotLoadEpstopdf}{}
+    return `% Literate publication template v${publicationTemplateVersion}\n` + themeNotice() + String.raw`\newcommand{\DoNotLoadEpstopdf}{}
     \documentclass[11pt,oneside,openany]{scrbook}
 ${'\\usepackage'}{fontspec}
 ${fontCommand('\\setmainfont', options.bodyFont, options)}
@@ -185,6 +186,9 @@ function templateCodeSettings(): string {
     return String.raw`\fvset{fontsize=\small,breaklines=true,breakanywhere=true,
 breakautoindent=false,breaksymbolleft={},breaksymbolright={},
 breakanywheresymbolpre={},breakanywheresymbolpost={},frame=none}
+\DeclareRobustCommand{\LitInlineCode}[1]{\texttt{#1}}
+
+\setlength{\emergencystretch}{3em}
 \providecommand{\st}[1]{\sout{#1}}
 \DefineVerbatimEnvironment{Highlighting}{Verbatim}{}
 \RecustomVerbatimEnvironment{verbatim}{Verbatim}{}
@@ -305,9 +309,31 @@ function documentAnchor(block: Extract<PandocBlock, { t: 'Div' }>, theme: Litera
     }
     return { t: 'Div', c: [attributes, children] };
 }
+function inlineCode(inlines: PandocInline[]): PandocInline[] {
+    return inlines.map(inline => {
+        if (inline.t === 'Code') {
+            const characters = Array.from(inline.c[1]);
+            const text = characters.map((character, index) => {
+                if (character === ' ') { return '\\hspace{\\fontdimen2\\font}\\allowbreak{}'; }
+                const boundary = index > 0 && /^[!-~]$/.test(characters[index - 1]) && /^[!-~]$/.test(character);
+                return (boundary ? '\\allowbreak{}' : '') + tex(character);
+            }).join('');
+            return rawInline(`\\LitInlineCode{${text}}`);
+        }
+        if (inline.t === 'Emph' || inline.t === 'Strong' || inline.t === 'Strikeout') {
+            return { ...inline, c: inlineCode(inline.c) };
+        }
+        if (inline.t === 'Link') {
+            return { ...inline, c: [inline.c[0], inlineCode(inline.c[1]), inline.c[2]] };
+        }
+        return inline;
+    });
+}
 function ordinaryCode(blocks: PandocBlock[], theme: LiterateTheme): PandocBlock[] {
     return blocks.map(block => {
         switch (block.t) {
+            case 'Para': case 'Plain': return { ...block, c: inlineCode(block.c) };
+
             case 'CodeBlock': {
                 const text = block.c[1];
                 const data: Highlighted = { text, references: [],
