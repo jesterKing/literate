@@ -172,15 +172,15 @@ project fails rather than passing vacuously.</p>
     [<span class="hljs-string">'--margin'</span>, <span class="hljs-string">'marginMm'</span>], [<span class="hljs-string">'--margin-top'</span>, <span class="hljs-string">'marginTopMm'</span>], [<span class="hljs-string">'--margin-right'</span>, <span class="hljs-string">'marginRightMm'</span>],
     [<span class="hljs-string">'--margin-bottom'</span>, <span class="hljs-string">'marginBottomMm'</span>], [<span class="hljs-string">'--margin-left'</span>, <span class="hljs-string">'marginLeftMm'</span>]
 ] <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span>;
-<span class="hljs-keyword">const</span> latexValueFlags = [<span class="hljs-string">'--output'</span>, <span class="hljs-string">'--paper'</span>, <span class="hljs-string">'--font-manifest'</span>, ...latexMarginOptions.<span class="hljs-title">map</span>(<span class="hljs-function">(</span><span class="hljs-params">[flag]</span><span class="hljs-function">) =&gt;</span> flag)];
+<span class="hljs-keyword">const</span> latexValueFlags = [<span class="hljs-string">'--output'</span>, <span class="hljs-string">'--paper'</span>, <span class="hljs-string">'--font-manifest'</span>, <span class="hljs-string">'--browser'</span>, ...latexMarginOptions.<span class="hljs-title">map</span>(<span class="hljs-function">(</span><span class="hljs-params">[flag]</span><span class="hljs-function">) =&gt;</span> flag)];
 <span class="hljs-keyword">const</span> latexUsage = <span class="hljs-string">'latex [root] --output path.tex [--paper a4|a5|letter|legal] [--margin 20mm]'</span>
-    + <span class="hljs-string">' [--margin-top Nmm] [--margin-right Nmm] [--margin-bottom Nmm] [--margin-left Nmm] [--font-manifest path.json] [--json]'</span>;
+    + <span class="hljs-string">' [--margin-top Nmm] [--margin-right Nmm] [--margin-bottom Nmm] [--margin-left Nmm] [--font-manifest path.json] [--browser /absolute/path] [--json]'</span>;
 <span class="hljs-keyword">const</span> usage = <span class="hljs-string">'Usage: node out/cli.js generate|check|inspect|self-check [root] [--json]</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>
     + <span class="hljs-string">`       node out/cli.js </span><span class="hljs-subst">${latexUsage}</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>
     + <span class="hljs-string">'       node out/cli.js &lt;command&gt; --help [--json]</span><span class="hljs-string">\n</span><span class="hljs-string">       node out/cli.js --help [--json]</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>;
 <span class="hljs-keyword">const</span> <span class="hljs-attr">descriptions</span>: <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; = <span class="hljs-title">Object</span>.<span class="hljs-title">fromEntries</span>([
     [<span class="hljs-string">'generate'</span>, <span class="hljs-string">'Write missing or changed generated files.'</span>],
-    [<span class="hljs-string">'latex'</span>, <span class="hljs-string">'Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving at least an 80 × 100 mm body. Each side overrides --margin; unspecified sides use --margin or 20mm. Fonts resolve from root index.literate SETTINGS. No TeX/PDF execution. --font-manifest opts into explicit font/license companions.'</span>],
+    [<span class="hljs-string">'latex'</span>, <span class="hljs-string">'Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving at least an 80 × 100 mm body. Each side overrides --margin; unspecified sides use --margin or 20mm. Fonts resolve from root index.literate SETTINGS. No TeX/book PDF execution. --font-manifest opts into explicit font/license companions. --browser explicitly selects a sandbox-capable system Chromium for Mermaid PDF/SVG assets; no browser download.'</span>],
     [<span class="hljs-string">'check'</span>, <span class="hljs-string">'Report missing or stale generated files without writing.'</span>],
     [<span class="hljs-string">'inspect'</span>, <span class="hljs-string">'Report documents, templates, and fragment definitions and dependencies without reading outputs or writing.'</span>],
     [<span class="hljs-string">'self-check'</span>, <span class="hljs-string">'Verify this repository’s trusted self-hosting code without generating files; all outputs must already be current.'</span>]
@@ -234,6 +234,8 @@ load compiler tooling until verification is requested.</p>
 <span class="hljs-keyword">import</span> { spawn } <span class="hljs-keyword">from</span> <span class="hljs-string">'child_process'</span>;
 <span class="hljs-keyword">import</span> { renderLatex, <span class="hljs-title">LatexConverter</span>, <span class="hljs-title">LatexOptions</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-latex'</span>;
 <span class="hljs-keyword">import</span> { planFonts } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-fonts'</span>;
+<span class="hljs-keyword">import</span> { collectAssets, planAssets, assetKey, maximumAssetBytes } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-assets'</span>;
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">DiagramRenderer</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-mermaid'</span>;
 <span class="hljs-keyword">import</span> { resolvePublicationSettings } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-settings'</span>;
 <span class="hljs-keyword">import</span> { commitOutputs, <span class="hljs-title">OutputTransactionError</span>, <span class="hljs-title">TransactionIO</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./output-transactions'</span>;
 <span class="hljs-keyword">import</span> { discoveryExcludedDirectories, generateProject, parseProject, resolveProjectTheme, safeRelativePath, templateReferences, <span class="hljs-title">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
@@ -624,7 +626,8 @@ Transaction failures retain the recovery/committed-cleanup semantics above.</p>
 <div class="fragmentname" id="c-0063006c00690020004c006100540065005800200070006c0061006e-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1"><span id="f-0063006c00690020004c006100540065005800200070006c0061006e"></span><a class="literate-tag-name" href="#f-0063006c00690020004c006100540065005800200070006c0061006e" data-literate-target="f-0063006c00690020004c006100540065005800200070006c0061006e" aria-label="Definition of cli LaTeX plan">&lt;&lt;cli LaTeX plan&gt;&gt;=</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">planLatex</span>(<span class="hljs-params">root: </span><span class="hljs-built_in">string</span><span class="hljs-params">, documents: SourceDocument[], output: </span><span class="hljs-built_in">string</span><span class="hljs-params">,
-    options: LatexOptions, convert: LatexConverter, manifest?: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">Promise</span>&lt;{
+    options: LatexOptions, convert: LatexConverter, manifest: </span><span class="hljs-built_in">string</span><span class="hljs-params"> | </span><span class="hljs-literal">undefined</span><span class="hljs-params">,
+        browser: </span><span class="hljs-built_in">string</span><span class="hljs-params"> | </span><span class="hljs-literal">undefined</span><span class="hljs-params">, diagrams: DiagramRenderer</span>): <span class="hljs-title">Promise</span>&lt;{
         <span class="hljs-attr">files</span>: { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span> | <span class="hljs-title">Uint8Array</span> }[]; <span class="hljs-attr">diagnostics</span>: <span class="hljs-title">Generation</span>[<span class="hljs-string">'diagnostics'</span>];
         inspection?: <span class="hljs-title">Generation</span>[<span class="hljs-string">'inspection'</span>];
     }&gt; {
@@ -633,38 +636,167 @@ Transaction failures retain the recovery/committed-cleanup semantics above.</p>
     <span class="hljs-keyword">const</span> project = <span class="hljs-title">parseProject</span>(documents);
     <span class="hljs-keyword">const</span> settings = <span class="hljs-title">resolvePublicationSettings</span>(project);
     <span class="hljs-keyword">if</span> (settings.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">files</span>: [], <span class="hljs-attr">diagnostics</span>: settings.<span class="hljs-property">diagnostics</span> }; }
-    <span class="hljs-keyword">const</span> companions = manifest ? <span class="hljs-keyword">await</span> <span class="hljs-title">planFonts</span>(manifest, output, <span class="hljs-title">Object</span>.<span class="hljs-title">values</span>(settings.<span class="hljs-property">fonts</span>), {
-        <span class="hljs-keyword">async</span> <span class="hljs-title">requireFile</span>(<span class="hljs-params">value</span>) {
-            <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">await</span> <span class="hljs-title">inspect</span>(root, value)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Missing file: </span><span class="hljs-subst">${value}</span><span class="hljs-string">`</span>); }
-        },
-        <span class="hljs-keyword">async</span> <span class="hljs-title">read</span>(<span class="hljs-params">value</span>) {
-            <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">await</span> <span class="hljs-title">inspect</span>(root, value)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Input disappeared: </span><span class="hljs-subst">${value}</span><span class="hljs-string">`</span>); }
-            <span class="hljs-keyword">return</span> fs.<span class="hljs-title">readFile</span>(path.<span class="hljs-title">join</span>(root, value));
-        }
-    }) : <span class="hljs-literal">undefined</span>;
-    <span class="hljs-keyword">const</span> inputs = [...documents.<span class="hljs-title">map</span>(<span class="hljs-params">document</span><span class="hljs-function"> =&gt;</span> <span class="hljs-variable">document</span>.<span class="hljs-property">path</span>), ...<span class="hljs-title">templateReferences</span>(documents),
-        ...(companions?.<span class="hljs-property">inputs</span> ?? [])];
-    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> destination <span class="hljs-keyword">of</span> [output, ...(companions?.<span class="hljs-property">files</span>.<span class="hljs-title">map</span>(<span class="hljs-params">file</span><span class="hljs-function"> =&gt;</span> file.<span class="hljs-property">path</span>) ?? [])]) {
-        <span class="hljs-keyword">const</span> target = destination.<span class="hljs-title">toLowerCase</span>();
-        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> input <span class="hljs-keyword">of</span> inputs) {
-            <span class="hljs-keyword">const</span> source = <span class="hljs-title">relative</span>(input).<span class="hljs-title">toLowerCase</span>();
-            <span class="hljs-keyword">if</span> (target === source || target.<span class="hljs-title">startsWith</span>(source + <span class="hljs-string">'/'</span>) || source.<span class="hljs-title">startsWith</span>(target + <span class="hljs-string">'/'</span>)) {
-                <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`LaTeX output conflicts with input: </span><span class="hljs-subst">${input}</span><span class="hljs-string"> (output </span><span class="hljs-subst">${destination}</span><span class="hljs-string">)`</span>);
-            }
-        }
-        <span class="hljs-keyword">await</span> <span class="hljs-title">inspect</span>(root, destination);
-    }
-    <span class="hljs-keyword">const</span> rendered = <span class="hljs-keyword">await</span> <span class="hljs-title">renderLatex</span>(project, { ...options, <span class="hljs-attr">theme</span>: theme.<span class="hljs-property">name</span>,
-        <span class="hljs-attr">portableFonts</span>: companions?.<span class="hljs-property">fonts</span> }, convert);
-    <span class="hljs-keyword">if</span> (!rendered.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span> &amp;&amp; rendered.<span class="hljs-property">latex</span> === <span class="hljs-literal">undefined</span>) {
-        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'LaTeX renderer returned no document'</span>);
-    }
-    <span class="hljs-keyword">return</span> { <span class="hljs-attr">diagnostics</span>: rendered.<span class="hljs-property">diagnostics</span>, <span class="hljs-attr">files</span>: rendered.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span> ? []
-        : [{ <span class="hljs-attr">path</span>: output, <span class="hljs-attr">content</span>: rendered.<span class="hljs-property">latex</span>! }, ...(companions?.<span class="hljs-property">files</span> ?? [])] };
+    <span class="hljs-keyword">const</span> collected = <span class="hljs-title">collectAssets</span>(project);
+    <span class="hljs-keyword">if</span> (collected.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">files</span>: [], <span class="hljs-attr">diagnostics</span>: collected.<span class="hljs-property">diagnostics</span> }; }
+    <a class="literate-tag-name" href="#f-0063006c0069002000620072006f007700730065007200200069006e007000750074" data-literate-target="f-0063006c0069002000620072006f007700730065007200200069006e007000750074" aria-label="Definition of cli browser input">&lt;&lt;cli browser input&gt;&gt;</a>
+    <a class="literate-tag-name" href="#f-0063006c006900200069006d00610067006500200069006e0070007500740073" data-literate-target="f-0063006c006900200069006d00610067006500200069006e0070007500740073" aria-label="Definition of cli image inputs">&lt;&lt;cli image inputs&gt;&gt;</a>
+    <a class="literate-tag-name" href="#f-0063006c006900200066006f006e007400200069006e0070007500740073" data-literate-target="f-0063006c006900200066006f006e007400200069006e0070007500740073" aria-label="Definition of cli font inputs">&lt;&lt;cli font inputs&gt;&gt;</a>
+    <a class="literate-tag-name" href="#f-0063006c00690020007000750062006c00690063006100740069006f006e002000640065007300740069006e006100740069006f006e0073" data-literate-target="f-0063006c00690020007000750062006c00690063006100740069006f006e002000640065007300740069006e006100740069006f006e0073" aria-label="Definition of cli publication destinations">&lt;&lt;cli publication destinations&gt;&gt;</a>
+    <a class="literate-tag-name" href="#f-0063006c00690020007000750062006c00690063006100740069006f006e002000720065006e0064006500720069006e0067" data-literate-target="f-0063006c00690020007000750062006c00690063006100740069006f006e002000720065006e0064006500720069006e0067" aria-label="Definition of cli publication rendering">&lt;&lt;cli publication rendering&gt;&gt;</a>
 }
 </code></pre>
 
 </div>
+<nav class="fragment-navigation" aria-label="Contributions of cli LaTeX plan"><a class="literate-tag-name" href="#c-0063006c00690020004c006100540065005800200070006c0061006e-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-2" data-literate-target="c-0063006c00690020004c006100540065005800200070006c0061006e-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-2" aria-label="Next contribution of cli LaTeX plan">Next</a></nav>
+</div><p>The explicitly trusted browser may be a symlink, unlike project sources. Resolve
+its target and identity only when Mermaid is present; ordinary books do not look
+up the browser. Keep both path names protected as well as hard-link aliases.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0063006c0069002000620072006f007700730065007200200069006e007000750074-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1"><span id="f-0063006c0069002000620072006f007700730065007200200069006e007000750074"></span><a class="literate-tag-name" href="#f-0063006c0069002000620072006f007700730065007200200069006e007000750074" data-literate-target="f-0063006c0069002000620072006f007700730065007200200069006e007000750074" aria-label="Definition of cli browser input">&lt;&lt;cli browser input&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> browserTarget = browser &amp;&amp; collected.<span class="hljs-property">assets</span>.<span class="hljs-title">some</span>(<span class="hljs-params">asset</span><span class="hljs-function"> =&gt;</span> asset.<span class="hljs-property">kind</span> === <span class="hljs-string">'mermaid'</span>)
+    ? <span class="hljs-keyword">await</span> fs.<span class="hljs-title">realpath</span>(browser) : <span class="hljs-literal">undefined</span>;
+<span class="hljs-keyword">const</span> browserInput = browserTarget
+    ? { <span class="hljs-attr">path</span>: browserTarget, <span class="hljs-attr">stat</span>: <span class="hljs-keyword">await</span> fs.<span class="hljs-title">stat</span>(browserTarget) } : <span class="hljs-literal">undefined</span>;
+</code></pre>
+
+</div>
+</div><p>The image adapter rejects symlinks and checks the file size before allocating a
+buffer. The planner checks returned bytes as well; filesystem checks and planner
+limits protect different boundaries.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0063006c006900200069006d00610067006500200069006e0070007500740073-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1"><span id="f-0063006c006900200069006d00610067006500200069006e0070007500740073"></span><a class="literate-tag-name" href="#f-0063006c006900200069006d00610067006500200069006e0070007500740073" data-literate-target="f-0063006c006900200069006d00610067006500200069006e0070007500740073" aria-label="Definition of cli image inputs">&lt;&lt;cli image inputs&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> assets = <span class="hljs-keyword">await</span> <span class="hljs-title">planAssets</span>(collected.<span class="hljs-property">assets</span>, output, {
+    <span class="hljs-keyword">async</span> <span class="hljs-title">requireFile</span>(<span class="hljs-params">value</span>) {
+        <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">await</span> <span class="hljs-title">inspect</span>(root, value)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Missing image: </span><span class="hljs-subst">${value}</span><span class="hljs-string">`</span>); }
+    },
+    <span class="hljs-keyword">async</span> <span class="hljs-title">read</span>(<span class="hljs-params">value</span>) {
+        <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">await</span> <span class="hljs-title">inspect</span>(root, value)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Image disappeared: </span><span class="hljs-subst">${value}</span><span class="hljs-string">`</span>); }
+        <span class="hljs-keyword">const</span> size = (<span class="hljs-keyword">await</span> fs.<span class="hljs-title">stat</span>(path.<span class="hljs-title">join</span>(root, value))).<span class="hljs-property">size</span>;
+        <span class="hljs-keyword">if</span> (size &gt; maximumAssetBytes) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Image exceeds 32 MiB: </span><span class="hljs-subst">${value}</span><span class="hljs-string">`</span>); }
+        <span class="hljs-keyword">return</span> fs.<span class="hljs-title">readFile</span>(path.<span class="hljs-title">join</span>(root, value));
+    }
+}, <span class="hljs-params">requests</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">diagrams</span>(requests, theme.<span class="hljs-property">name</span>, browser));
+</code></pre>
+
+</div>
+</div><p>Font packaging uses explicit manifest paths only. Every declared input remains
+protected, even if its family is not selected for this book.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0063006c006900200066006f006e007400200069006e0070007500740073-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1"><span id="f-0063006c006900200066006f006e007400200069006e0070007500740073"></span><a class="literate-tag-name" href="#f-0063006c006900200066006f006e007400200069006e0070007500740073" data-literate-target="f-0063006c006900200066006f006e007400200069006e0070007500740073" aria-label="Definition of cli font inputs">&lt;&lt;cli font inputs&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> companions = manifest ? <span class="hljs-keyword">await</span> <span class="hljs-title">planFonts</span>(manifest, output, <span class="hljs-title">Object</span>.<span class="hljs-title">values</span>(settings.<span class="hljs-property">fonts</span>), {
+    <span class="hljs-keyword">async</span> <span class="hljs-title">requireFile</span>(<span class="hljs-params">value</span>) {
+        <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">await</span> <span class="hljs-title">inspect</span>(root, value)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Missing file: </span><span class="hljs-subst">${value}</span><span class="hljs-string">`</span>); }
+    },
+    <span class="hljs-keyword">async</span> <span class="hljs-title">read</span>(<span class="hljs-params">value</span>) {
+        <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">await</span> <span class="hljs-title">inspect</span>(root, value)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Input disappeared: </span><span class="hljs-subst">${value}</span><span class="hljs-string">`</span>); }
+        <span class="hljs-keyword">return</span> fs.<span class="hljs-title">readFile</span>(path.<span class="hljs-title">join</span>(root, value));
+    }
+}) : <span class="hljs-literal">undefined</span>;
+</code></pre>
+
+</div>
+</div><p>Validate the complete destination set against all source categories before
+conversion. Lexical ancestry checks supplement filesystem identity checks so
+missing destinations cannot become input directories or overwrite templates.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0063006c00690020007000750062006c00690063006100740069006f006e002000640065007300740069006e006100740069006f006e0073-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1"><span id="f-0063006c00690020007000750062006c00690063006100740069006f006e002000640065007300740069006e006100740069006f006e0073"></span><a class="literate-tag-name" href="#f-0063006c00690020007000750062006c00690063006100740069006f006e002000640065007300740069006e006100740069006f006e0073" data-literate-target="f-0063006c00690020007000750062006c00690063006100740069006f006e002000640065007300740069006e006100740069006f006e0073" aria-label="Definition of cli publication destinations">&lt;&lt;cli publication destinations&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> inputs = [...documents.<span class="hljs-title">map</span>(<span class="hljs-params">document</span><span class="hljs-function"> =&gt;</span> <span class="hljs-variable">document</span>.<span class="hljs-property">path</span>), ...<span class="hljs-title">templateReferences</span>(documents),
+    ...(companions?.<span class="hljs-property">inputs</span> ?? []), ...assets.<span class="hljs-property">inputs</span>];
+<span class="hljs-keyword">const</span> destinations = [output, ...(companions?.<span class="hljs-property">files</span>.<span class="hljs-title">map</span>(<span class="hljs-params">file</span><span class="hljs-function"> =&gt;</span> file.<span class="hljs-property">path</span>) ?? []),
+    ...assets.<span class="hljs-property">files</span>.<span class="hljs-title">map</span>(<span class="hljs-params">file</span><span class="hljs-function"> =&gt;</span> file.<span class="hljs-property">path</span>)];
+<span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> destination <span class="hljs-keyword">of</span> destinations) {
+    <span class="hljs-keyword">const</span> target = destination.<span class="hljs-title">toLowerCase</span>();
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> input <span class="hljs-keyword">of</span> inputs) {
+        <span class="hljs-keyword">const</span> source = <span class="hljs-title">relative</span>(input).<span class="hljs-title">toLowerCase</span>();
+        <span class="hljs-keyword">if</span> (target === source || target.<span class="hljs-title">startsWith</span>(source + <span class="hljs-string">'/'</span>) || source.<span class="hljs-title">startsWith</span>(target + <span class="hljs-string">'/'</span>)) {
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`LaTeX output conflicts with input: </span><span class="hljs-subst">${input}</span><span class="hljs-string"> (output </span><span class="hljs-subst">${destination}</span><span class="hljs-string">)`</span>);
+        }
+    }
+    <a class="literate-tag-name" href="#f-0063006c0069002000620072006f0077007300650072002000640065007300740069006e006100740069006f006e002000700072006f00740065006300740069006f006e" data-literate-target="f-0063006c0069002000620072006f0077007300650072002000640065007300740069006e006100740069006f006e002000700072006f00740065006300740069006f006e" aria-label="Definition of cli browser destination protection">&lt;&lt;cli browser destination protection&gt;&gt;</a>
+    <span class="hljs-keyword">await</span> <span class="hljs-title">inspect</span>(root, destination);
+}
+<span class="hljs-keyword">await</span> <span class="hljs-title">protectLatexAliases</span>(root, inputs, destinations, browserInput);
+</code></pre>
+
+</div>
+</div><p>Compare absolute browser paths with absolute destinations. Checking ancestry in
+both directions also protects targets beneath an output path; project inspection
+still rejects symlinks in every destination and ordinary source.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0063006c0069002000620072006f0077007300650072002000640065007300740069006e006100740069006f006e002000700072006f00740065006300740069006f006e-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1"><span id="f-0063006c0069002000620072006f0077007300650072002000640065007300740069006e006100740069006f006e002000700072006f00740065006300740069006f006e"></span><a class="literate-tag-name" href="#f-0063006c0069002000620072006f0077007300650072002000640065007300740069006e006100740069006f006e002000700072006f00740065006300740069006f006e" data-literate-target="f-0063006c0069002000620072006f0077007300650072002000640065007300740069006e006100740069006f006e002000700072006f00740065006300740069006f006e" aria-label="Definition of cli browser destination protection">&lt;&lt;cli browser destination protection&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">if</span> (browserInput) {
+    <span class="hljs-keyword">const</span> targetPath = path.<span class="hljs-title">resolve</span>(root, destination).<span class="hljs-title">toLowerCase</span>();
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> input <span class="hljs-keyword">of</span> [browser!, browserInput.<span class="hljs-property">path</span>]) {
+        <span class="hljs-keyword">const</span> sourcePath = path.<span class="hljs-title">resolve</span>(input).<span class="hljs-title">toLowerCase</span>();
+        <span class="hljs-keyword">if</span> (targetPath === sourcePath || targetPath.<span class="hljs-title">startsWith</span>(sourcePath + path.<span class="hljs-property">sep</span>)
+            || sourcePath.<span class="hljs-title">startsWith</span>(targetPath + path.<span class="hljs-property">sep</span>)) {
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`LaTeX output conflicts with browser input: </span><span class="hljs-subst">${input}</span><span class="hljs-string"> (output </span><span class="hljs-subst">${destination}</span><span class="hljs-string">)`</span>);
+        }
+    }
+}
+</code></pre>
+
+</div>
+</div><p>The renderer can resolve only already-planned images. Its successful text joins
+the companion bytes in one output plan; diagnostics discard the entire plan.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0063006c00690020007000750062006c00690063006100740069006f006e002000720065006e0064006500720069006e0067-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1"><span id="f-0063006c00690020007000750062006c00690063006100740069006f006e002000720065006e0064006500720069006e0067"></span><a class="literate-tag-name" href="#f-0063006c00690020007000750062006c00690063006100740069006f006e002000720065006e0064006500720069006e0067" data-literate-target="f-0063006c00690020007000750062006c00690063006100740069006f006e002000720065006e0064006500720069006e0067" aria-label="Definition of cli publication rendering">&lt;&lt;cli publication rendering&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> rendered = <span class="hljs-keyword">await</span> <span class="hljs-title">renderLatex</span>(project, { ...options, <span class="hljs-attr">theme</span>: theme.<span class="hljs-property">name</span>,
+    <span class="hljs-attr">portableFonts</span>: companions?.<span class="hljs-property">fonts</span>, <span class="hljs-attr">assetPath</span>: <span class="hljs-params">asset</span><span class="hljs-function"> =&gt;</span> {
+        <span class="hljs-keyword">const</span> companion = assets.<span class="hljs-property">paths</span>.<span class="hljs-title">get</span>(<span class="hljs-title">assetKey</span>(asset));
+        <span class="hljs-keyword">if</span> (!companion) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Unplanned publication image'</span>); }
+        <span class="hljs-keyword">return</span> companion;
+    } }, convert);
+<span class="hljs-keyword">if</span> (!rendered.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span> &amp;&amp; rendered.<span class="hljs-property">latex</span> === <span class="hljs-literal">undefined</span>) {
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'LaTeX renderer returned no document'</span>);
+}
+<span class="hljs-keyword">return</span> { <span class="hljs-attr">diagnostics</span>: rendered.<span class="hljs-property">diagnostics</span>, <span class="hljs-attr">files</span>: rendered.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span> ? []
+    : [{ <span class="hljs-attr">path</span>: output, <span class="hljs-attr">content</span>: rendered.<span class="hljs-property">latex</span>! }, ...(companions?.<span class="hljs-property">files</span> ?? []), ...assets.<span class="hljs-property">files</span>] };
+</code></pre>
+
+</div>
+</div><p>Asset collection validates the complete bridge before reading image bytes. Every
+source alias remains protected after content deduplication. Existing hard-link
+aliases are checked by device/inode identity as well as the lexical and symlink
+checks; this preflight assumes no concurrent filesystem mutation. Images, fonts
+and TeX enter the same transaction. Only Mermaid requests invoke the lazy CLI
+browser adapter; its temporary files are not publication outputs.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0063006c00690020004c006100540065005800200070006c0061006e-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-0063006c00690020004c006100540065005800200070006c0061006e" data-literate-target="f-0063006c00690020004c006100540065005800200070006c0061006e" aria-label="Definition of cli LaTeX plan">&lt;&lt;cli LaTeX plan&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">protectLatexAliases</span>(<span class="hljs-params">root: </span><span class="hljs-built_in">string</span><span class="hljs-params">, inputs: </span><span class="hljs-built_in">string</span><span class="hljs-params">[], outputs: </span><span class="hljs-built_in">string</span><span class="hljs-params">[],
+    browser?: </span><span class="hljs-params">{ path: </span><span class="hljs-built_in">string</span><span class="hljs-params">; stat: </span><span class="hljs-params">{ dev: </span><span class="hljs-built_in">number</span><span class="hljs-params">; ino: </span><span class="hljs-built_in">number</span><span class="hljs-params"> }</span><span class="hljs-params"> }</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; {
+    <span class="hljs-keyword">const</span> identities = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;();
+    <span class="hljs-keyword">if</span> (browser) { identities.<span class="hljs-title">set</span>(<span class="hljs-string">`</span><span class="hljs-subst">${browser.stat.dev}</span><span class="hljs-string">:</span><span class="hljs-subst">${browser.stat.ino}</span><span class="hljs-string">`</span>, browser.<span class="hljs-property">path</span>); }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> input <span class="hljs-keyword">of</span> inputs) {
+        <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">await</span> <span class="hljs-title">inspect</span>(root, input)) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">const</span> stat = <span class="hljs-keyword">await</span> fs.<span class="hljs-title">stat</span>(path.<span class="hljs-title">join</span>(root, input));
+        identities.<span class="hljs-title">set</span>(<span class="hljs-string">`</span><span class="hljs-subst">${stat.dev}</span><span class="hljs-string">:</span><span class="hljs-subst">${stat.ino}</span><span class="hljs-string">`</span>, input);
+    }
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">seen</span>: <span class="hljs-built_in">string</span>[] = [];
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> output <span class="hljs-keyword">of</span> outputs) {
+        <span class="hljs-keyword">const</span> name = output.<span class="hljs-title">toLowerCase</span>();
+        <span class="hljs-keyword">if</span> (seen.<span class="hljs-title">some</span>(<span class="hljs-params">other</span><span class="hljs-function"> =&gt;</span> name === other || name.<span class="hljs-title">startsWith</span>(other + <span class="hljs-string">'/'</span>) || other.<span class="hljs-title">startsWith</span>(name + <span class="hljs-string">'/'</span>))) {
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`LaTeX outputs conflict: </span><span class="hljs-subst">${output}</span><span class="hljs-string">`</span>);
+        }
+        seen.<span class="hljs-title">push</span>(name);
+        <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">await</span> <span class="hljs-title">inspect</span>(root, output)) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">const</span> stat = <span class="hljs-keyword">await</span> fs.<span class="hljs-title">stat</span>(path.<span class="hljs-title">join</span>(root, output));
+        <span class="hljs-keyword">const</span> key = <span class="hljs-string">`</span><span class="hljs-subst">${stat.dev}</span><span class="hljs-string">:</span><span class="hljs-subst">${stat.ino}</span><span class="hljs-string">`</span>;
+        <span class="hljs-keyword">if</span> (identities.<span class="hljs-title">has</span>(key)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`LaTeX output aliases input/output: </span><span class="hljs-subst">${output}</span><span class="hljs-string"> (</span><span class="hljs-subst">${identities.get(key)}</span><span class="hljs-string">)`</span>); }
+        identities.<span class="hljs-title">set</span>(key, output);
+    }
+}
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of cli LaTeX plan"><a class="literate-tag-name" href="#c-0063006c00690020004c006100540065005800200070006c0061006e-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1" data-literate-target="c-0063006c00690020004c006100540065005800200070006c0061006e-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1" aria-label="Previous contribution of cli LaTeX plan">Previous</a> · <a class="literate-tag-name" href="#c-0063006c00690020004c006100540065005800200070006c0061006e-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1" data-literate-target="c-0063006c00690020004c006100540065005800200070006c0061006e-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1" aria-label="Base contribution of cli LaTeX plan">Base</a></nav>
 </div><h2>The command lifecycle</h2>
 <p>The orchestration keeps the write boundary visible. Argument errors and help
 return before reading the project; inspection returns before touching output
@@ -675,7 +807,9 @@ sets the exit status and emits a JSON response exactly once.</p>
 <div class="code">
 <pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">run</span>(<span class="hljs-params">args: </span><span class="hljs-built_in">string</span><span class="hljs-params">[], io: CliIO = defaultIO,
     transactionIO: </span><span class="hljs-params">(root: </span><span class="hljs-built_in">string</span><span class="hljs-params">)</span><span class="hljs-params"> =&gt; TransactionIO = createTransactionIO,
-    convert: LatexConverter = runPandoc</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">number</span>&gt; {
+    convert: LatexConverter = runPandoc,
+    diagrams: DiagramRenderer = </span><span class="hljs-keyword">async</span><span class="hljs-params"> </span><span class="hljs-params">(...args)</span><span class="hljs-params"> =&gt; </span><span class="hljs-params">(</span><span class="hljs-keyword">await</span><span class="hljs-params"> </span><span class="hljs-keyword">import</span><span class="hljs-params">(</span><span class="hljs-string">'./publication-mermaid'</span><span class="hljs-params">)</span><span class="hljs-params">)</span><span class="hljs-params">.renderDiagrams</span><span class="hljs-params">(...args)</span><span class="hljs-params">
+</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">number</span>&gt; {
     <a class="literate-tag-name" href="#f-0063006c006900200072006500730070006f006e00730065002000730065007400750070" data-literate-target="f-0063006c006900200072006500730070006f006e00730065002000730065007400750070" aria-label="Definition of cli response setup">&lt;&lt;cli response setup&gt;&gt;</a>
     <a class="literate-tag-name" href="#f-0063006c006900200061007200670075006d0065006e0074002000700061007200730069006e0067" data-literate-target="f-0063006c006900200061007200670075006d0065006e0074002000700061007200730069006e0067" aria-label="Definition of cli argument parsing">&lt;&lt;cli argument parsing&gt;&gt;</a>
     <a class="literate-tag-name" href="#f-0063006c006900200061007200670075006d0065006e0074002000760061006c00690064006100740069006f006e00200061006e0064002000680065006c0070" data-literate-target="f-0063006c006900200061007200670075006d0065006e0074002000760061006c00690064006100740069006f006e00200061006e0064002000680065006c0070" aria-label="Definition of cli argument validation and help">&lt;&lt;cli argument validation and help&gt;&gt;</a>
@@ -795,6 +929,10 @@ leave enough width.</p>
     response.<span class="hljs-property">errors</span>.<span class="hljs-title">push</span>(<span class="hljs-string">`</span><span class="hljs-subst">${latexValueFlags.join(</span><span class="hljs-string">', '</span><span class="hljs-subst">)}</span><span class="hljs-string"> are only valid for latex`</span>);
 }
 <span class="hljs-keyword">if</span> (topic === <span class="hljs-string">'latex'</span>) {
+    <span class="hljs-keyword">const</span> browser = values.<span class="hljs-title">get</span>(<span class="hljs-string">'--browser'</span>);
+    <span class="hljs-keyword">if</span> (browser !== <span class="hljs-literal">undefined</span> &amp;&amp; (!path.<span class="hljs-title">isAbsolute</span>(browser) || <span class="hljs-regexp">/</span><span class="hljs-regexp">[</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">0000-</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">001f]</span><span class="hljs-regexp">/</span>.<span class="hljs-title">test</span>(browser))) {
+        response.<span class="hljs-property">errors</span>.<span class="hljs-title">push</span>(<span class="hljs-string">'--browser requires an absolute system Chromium executable path'</span>);
+    }
     <span class="hljs-keyword">const</span> manifest = values.<span class="hljs-title">get</span>(<span class="hljs-string">'--font-manifest'</span>);
     <span class="hljs-keyword">if</span> (manifest !== <span class="hljs-literal">undefined</span> &amp;&amp; !<span class="hljs-title">safeRelativePath</span>(manifest)) {
         response.<span class="hljs-property">errors</span>.<span class="hljs-title">push</span>(<span class="hljs-string">'--font-manifest requires a safe root-relative JSON file path'</span>);
@@ -882,7 +1020,8 @@ Other commands stop on any diagnostic before examining or writing output files.<
 <div class="code">
 <pre><code><span class="hljs-keyword">const</span> result = command === <span class="hljs-string">'latex'</span>
     ? <span class="hljs-keyword">await</span> <span class="hljs-title">planLatex</span>(root, documents, latexOutput, latexOptions, convert,
-        values.<span class="hljs-title">has</span>(<span class="hljs-string">'--font-manifest'</span>) ? <span class="hljs-title">relative</span>(values.<span class="hljs-title">get</span>(<span class="hljs-string">'--font-manifest'</span>)!) : <span class="hljs-literal">undefined</span>)
+        values.<span class="hljs-title">has</span>(<span class="hljs-string">'--font-manifest'</span>) ? <span class="hljs-title">relative</span>(values.<span class="hljs-title">get</span>(<span class="hljs-string">'--font-manifest'</span>)!) : <span class="hljs-literal">undefined</span>,
+                values.<span class="hljs-title">get</span>(<span class="hljs-string">'--browser'</span>), diagrams)
     : <span class="hljs-title">generateProject</span>(documents, templates);
 response.<span class="hljs-property">diagnostics</span> = result.<span class="hljs-property">diagnostics</span>;
 <span class="hljs-keyword">if</span> (command === <span class="hljs-string">'inspect'</span>) {

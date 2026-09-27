@@ -34,10 +34,15 @@ export type PandocBlock = PandocLeafBlock
     | { t: 'Div'; c: [PandocAttr, PandocBlock[]] };
 type PendingBlock = PandocLeafBlock
     | { t: 'Contribution'; part: PublicationContribution }
+    | { t: 'Asset'; asset: PublicationAsset }
     | { t: 'BlockQuote'; c: PendingBlock[] }
     | { t: 'BulletList'; c: PendingBlock[][] }
     | { t: 'OrderedList'; c: [PandocListAttributes, PendingBlock[][]] }
     | { t: 'Div'; c: [PandocAttr, PendingBlock[]] };
+export interface PublicationAsset {
+    kind: 'image' | 'mermaid'; source: string; caption: string; at: PublicationLocation;
+}
+export type AssetRenderer = (asset: PublicationAsset) => PandocBlock[];
 type ContributionRenderer = (part: PublicationContribution) => PandocBlock[];
 const maximumNesting = 128;
 function emptyAttributes(): PandocAttr { return ['', [], []]; }
@@ -266,6 +271,7 @@ interface BlockReader {
     document: ParsedDocument;
     index: number;
     contributions: Map<number, PublicationContribution>;
+    assets: boolean;
     targets: PublicationTargets;
     diagnostics: GenerationDiagnostic[];
 }
@@ -306,7 +312,7 @@ function readBlocks(reader: BlockReader, stop?: string, depth = 0): PendingBlock
 }
 function readBlock(reader: BlockReader, token: Token, index: number, depth: number): PendingBlock[] {
     switch (token.type) {
-        case 'paragraph_open': return [{ t: token.hidden ? 'Plain' : 'Para', c: readTextBlock(reader, token) }];
+        case 'paragraph_open': return readParagraph(reader, token);
         case 'heading_open': return [readHeading(reader, token)];
         case 'hr': return [{ t: 'HorizontalRule' }];
         case 'blockquote_open': return [{ t: 'BlockQuote', c: readBlocks(reader, 'blockquote_close', depth + 1) }];
@@ -316,6 +322,24 @@ function readBlock(reader: BlockReader, token: Token, index: number, depth: numb
         case 'code_block': return [{ t: 'CodeBlock', c: [emptyAttributes(), token.content] }];
         default: unsupported(reader.diagnostics, tokenLocation(reader.document, token), token.type); return [];
     }
+}
+function readParagraph(reader: BlockReader, opening: Token): PendingBlock[] {
+    const inline = reader.document.tokens[reader.index];
+    const children = inline?.children ?? [];
+    const image = children.length === 1 && children[0].type === 'image' ? children[0] : undefined;
+    if (!image || !reader.assets) {
+        return [{ t: opening.hidden ? 'Plain' : 'Para', c: readTextBlock(reader, opening) }];
+    }
+    const at = tokenLocation(reader.document, inline);
+    const caption = image.children ?? [];
+    if (caption.some(child => child.type !== 'text')) {
+        report(reader.diagnostics, at, 'unsupported-image-caption', 'Image alt text must be plain text');
+    }
+    reader.index++;
+    if (reader.document.tokens[reader.index]?.type === 'paragraph_close') { reader.index++; }
+    else { report(reader.diagnostics, at, 'invalid-markdown-structure', 'Expected paragraph_close'); }
+    return [{ t: 'Asset', asset: { kind: 'image', at, source: image.attrGet('src') ?? '',
+        caption: image.attrGet('title') || caption.map(child => child.content).join('') } }];
 }
 function readTextBlock(reader: BlockReader, opening: Token): PandocInline[] {
     const token = reader.document.tokens[reader.index];
@@ -365,28 +389,36 @@ function readFence(reader: BlockReader, token: Token, index: number): PendingBlo
     const part = reader.contributions.get(index);
     const language = part?.language ?? token.info.trim().split(/\s+/)[0];
     if (language.toLowerCase() === 'mermaid') {
+        if (!part && reader.assets && token.info.trim().toLowerCase() === 'mermaid') {
+            return [{ t: 'Asset', asset: { kind: 'mermaid', source: token.content, caption: '',
+                at: tokenLocation(reader.document, token) } }];
+        }
         report(reader.diagnostics, tokenLocation(reader.document, token), 'unsupported-mermaid',
-            'Mermaid publication is unsupported; no diagram was rendered');
+            'Mermaid requires an ordinary fence and a publication asset renderer');
         return [];
     }
     if (part) { return [{ t: 'Contribution', part }]; }
     return [{ t: 'CodeBlock', c: [['', language ? [language] : [], []], token.content] }];
 }
 function materialize(
-    pending: PendingBlock[], render: ContributionRenderer, diagnostics: GenerationDiagnostic[]
+    pending: PendingBlock[], render: ContributionRenderer, diagnostics: GenerationDiagnostic[], asset?: AssetRenderer
 ): PandocBlock[] {
     const result: PandocBlock[] = [];
     for (const block of pending) {
         if (diagnostics.length) { break; }
         switch (block.t) {
+            case 'Asset':
+                try { result.push(...asset!(block.asset)); }
+                catch (error) { report(diagnostics, block.asset.at, 'asset-render-failed', String(error)); }
+                break;
             case 'Contribution':
-                            for (const rendered of renderPart(block.part, render, diagnostics)) { result.push(rendered); }
-                            break;
-            case 'BlockQuote': result.push({ t: 'BlockQuote', c: materialize(block.c, render, diagnostics) }); break;
-            case 'BulletList': result.push({ t: 'BulletList', c: block.c.map(item => materialize(item, render, diagnostics)) }); break;
+                for (const rendered of renderPart(block.part, render, diagnostics)) { result.push(rendered); }
+                break;
+            case 'BlockQuote': result.push({ t: 'BlockQuote', c: materialize(block.c, render, diagnostics, asset) }); break;
+            case 'BulletList': result.push({ t: 'BulletList', c: block.c.map(item => materialize(item, render, diagnostics, asset)) }); break;
             case 'OrderedList': result.push({ t: 'OrderedList', c: [block.c[0],
-                block.c[1].map(item => materialize(item, render, diagnostics))] }); break;
-            case 'Div': result.push({ t: 'Div', c: [block.c[0], materialize(block.c[1], render, diagnostics)] }); break;
+                block.c[1].map(item => materialize(item, render, diagnostics, asset))] }); break;
+            case 'Div': result.push({ t: 'Div', c: [block.c[0], materialize(block.c[1], render, diagnostics, asset)] }); break;
             default: result.push(block);
         }
     }
@@ -406,7 +438,8 @@ function renderPart(
     }
 }
 export function preparePandoc(
-    project: ParsedProject, renderContribution: (part: PublicationContribution) => PandocBlock[]
+    project: ParsedProject, renderContribution: (part: PublicationContribution) => PandocBlock[],
+    renderAsset?: AssetRenderer
 ): PandocPreparationResult {
     const diagnostics = project.diagnostics.map(diagnostic => ({ ...diagnostic }));
     if (diagnostics.length) { return { diagnostics }; }
@@ -415,11 +448,11 @@ export function preparePandoc(
     const parts = new Map(project.publication.contributions.map(part => [part.target, part]));
     const pending: PendingBlock[] = project.documents.map(document => {
         const contributions = contributionIndex(document, parts, diagnostics);
-        const body = readBlocks({ document, index: 0, contributions, targets, diagnostics });
+        const body = readBlocks({ document, index: 0, contributions, targets, diagnostics, assets: !!renderAsset });
         return { t: 'Div', c: [[targets.get(document.path)!.id, [], []], body] };
     });
     if (diagnostics.length) { return { diagnostics }; }
-    const blocks = materialize(pending, renderContribution, diagnostics);
+    const blocks = materialize(pending, renderContribution, diagnostics, renderAsset);
     if (diagnostics.length) { return { diagnostics }; }
 // eslint-disable-next-line @typescript-eslint/naming-convention -- Pandoc's wire-format key.
     return { document: { 'pandoc-api-version': [1, 23, 1], meta: {}, blocks }, diagnostics };

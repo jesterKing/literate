@@ -67,7 +67,7 @@ test('LaTeX links full hanging names, distinct contribution labels and navigatio
     assert.equal(labels.length, 5); assert.equal(new Set(labels).size, 5);
     assert.ok(latex.indexOf('before') < latex.indexOf('\\LitReferenceA{}'));
     assert.ok(latex.indexOf('\\LitReferenceA{}') < latex.indexOf('after'));
-    assert.doesNotMatch(latex, /\\parbox/);
+    assert.doesNotMatch(latex.slice(latex.indexOf('\\begin{document}')), /\\parbox/);
 });
 
 test('LaTeX moves document anchors after opening headings without mutating parsed input', async () => {

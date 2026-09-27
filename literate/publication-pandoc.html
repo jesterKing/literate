@@ -223,10 +223,15 @@ string placeholders that could collide with author text.</p>
 <div class="code">
 <pre><code><span class="hljs-keyword">type</span> <span class="hljs-title">PendingBlock</span> = <span class="hljs-title">PandocLeafBlock</span>
     | { <span class="hljs-attr">t</span>: <span class="hljs-string">'Contribution'</span>; <span class="hljs-attr">part</span>: <span class="hljs-title">PublicationContribution</span> }
+    | { <span class="hljs-attr">t</span>: <span class="hljs-string">'Asset'</span>; <span class="hljs-attr">asset</span>: <span class="hljs-title">PublicationAsset</span> }
     | { <span class="hljs-attr">t</span>: <span class="hljs-string">'BlockQuote'</span>; <span class="hljs-attr">c</span>: <span class="hljs-title">PendingBlock</span>[] }
     | { <span class="hljs-attr">t</span>: <span class="hljs-string">'BulletList'</span>; <span class="hljs-attr">c</span>: <span class="hljs-title">PendingBlock</span>[][] }
     | { <span class="hljs-attr">t</span>: <span class="hljs-string">'OrderedList'</span>; <span class="hljs-attr">c</span>: [<span class="hljs-title">PandocListAttributes</span>, <span class="hljs-title">PendingBlock</span>[][]] }
     | { <span class="hljs-attr">t</span>: <span class="hljs-string">'Div'</span>; <span class="hljs-attr">c</span>: [<span class="hljs-title">PandocAttr</span>, <span class="hljs-title">PendingBlock</span>[]] };
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationAsset</span> {
+    <span class="hljs-attr">kind</span>: <span class="hljs-string">'image'</span> | <span class="hljs-string">'mermaid'</span>; <span class="hljs-attr">source</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">caption</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">at</span>: <span class="hljs-title">PublicationLocation</span>;
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title">AssetRenderer</span> = <span class="hljs-function">(</span><span class="hljs-params">asset: PublicationAsset</span><span class="hljs-function">) =&gt;</span> <span class="hljs-title">PandocBlock</span>[];
 <span class="hljs-keyword">type</span> <span class="hljs-title">ContributionRenderer</span> = <span class="hljs-function">(</span><span class="hljs-params">part: PublicationContribution</span><span class="hljs-function">) =&gt;</span> <span class="hljs-title">PandocBlock</span>[];
 <span class="hljs-keyword">const</span> maximumNesting = <span class="hljs-number">128</span>;
 <span class="hljs-keyword">function</span> <span class="hljs-title">emptyAttributes</span>(): <span class="hljs-title">PandocAttr</span> { <span class="hljs-keyword">return</span> [<span class="hljs-string">''</span>, [], []]; }
@@ -628,6 +633,7 @@ cursor, preserving nesting and authored order across each contribution.</p>
     <span class="hljs-attr">document</span>: <span class="hljs-title">ParsedDocument</span>;
     <span class="hljs-attr">index</span>: <span class="hljs-built_in">number</span>;
     <span class="hljs-attr">contributions</span>: <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">number</span>, <span class="hljs-title">PublicationContribution</span>&gt;;
+    <span class="hljs-attr">assets</span>: <span class="hljs-built_in">boolean</span>;
     <span class="hljs-attr">targets</span>: <span class="hljs-title">PublicationTargets</span>;
     <span class="hljs-attr">diagnostics</span>: <span class="hljs-title">GenerationDiagnostic</span>[];
 }
@@ -689,7 +695,7 @@ Blockquotes and lists recurse over the same cursor, not isolated token slices.</
 <div class="code">
 <pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">readBlock</span>(<span class="hljs-params">reader: BlockReader, token: Token, index: </span><span class="hljs-built_in">number</span><span class="hljs-params">, depth: </span><span class="hljs-built_in">number</span>): <span class="hljs-title">PendingBlock</span>[] {
     <span class="hljs-keyword">switch</span> (token.<span class="hljs-property">type</span>) {
-        <span class="hljs-keyword">case</span> <span class="hljs-string">'paragraph_open'</span>: <span class="hljs-keyword">return</span> [{ <span class="hljs-attr">t</span>: token.<span class="hljs-property">hidden</span> ? <span class="hljs-string">'Plain'</span> : <span class="hljs-string">'Para'</span>, <span class="hljs-attr">c</span>: <span class="hljs-title">readTextBlock</span>(reader, token) }];
+        <span class="hljs-keyword">case</span> <span class="hljs-string">'paragraph_open'</span>: <span class="hljs-keyword">return</span> <span class="hljs-title">readParagraph</span>(reader, token);
         <span class="hljs-keyword">case</span> <span class="hljs-string">'heading_open'</span>: <span class="hljs-keyword">return</span> [<span class="hljs-title">readHeading</span>(reader, token)];
         <span class="hljs-keyword">case</span> <span class="hljs-string">'hr'</span>: <span class="hljs-keyword">return</span> [{ <span class="hljs-attr">t</span>: <span class="hljs-string">'HorizontalRule'</span> }];
         <span class="hljs-keyword">case</span> <span class="hljs-string">'blockquote_open'</span>: <span class="hljs-keyword">return</span> [{ <span class="hljs-attr">t</span>: <span class="hljs-string">'BlockQuote'</span>, <span class="hljs-attr">c</span>: <span class="hljs-title">readBlocks</span>(reader, <span class="hljs-string">'blockquote_close'</span>, depth + <span class="hljs-number">1</span>) }];
@@ -710,7 +716,8 @@ would introduce a different interpretation of escaping and links.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200062006c006f0063006b0020007200650061006400650072-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00700061006e0064006f0063002e006c0069007400650072006100740065-4"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200062006c006f0063006b0020007200650061006400650072" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200062006c006f0063006b0020007200650061006400650072" aria-label="Definition of publication Pandoc block reader">&lt;&lt;publication Pandoc block reader&gt;&gt;=+</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">readTextBlock</span>(<span class="hljs-params">reader: BlockReader, opening: Token</span>): <span class="hljs-title">PandocInline</span>[] {
+<pre><code><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200069006d0061006700650020007000610072006100670072006100700068" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200069006d0061006700650020007000610072006100670072006100700068" aria-label="Definition of publication Pandoc image paragraph">&lt;&lt;publication Pandoc image paragraph&gt;&gt;</a>
+<span class="hljs-keyword">function</span> <span class="hljs-title">readTextBlock</span>(<span class="hljs-params">reader: BlockReader, opening: Token</span>): <span class="hljs-title">PandocInline</span>[] {
     <span class="hljs-keyword">const</span> token = reader.<span class="hljs-property">document</span>.<span class="hljs-property">tokens</span>[reader.<span class="hljs-property">index</span>];
     <span class="hljs-keyword">const</span> at = <span class="hljs-title">tokenLocation</span>(reader.<span class="hljs-property">document</span>, token, opening.<span class="hljs-property">map</span>?.[<span class="hljs-number">0</span>] ?? <span class="hljs-number">0</span>);
     <span class="hljs-keyword">const</span> stop = opening.<span class="hljs-property">type</span> === <span class="hljs-string">'heading_open'</span> ? <span class="hljs-string">'heading_close'</span> : <span class="hljs-string">'paragraph_close'</span>;
@@ -779,8 +786,12 @@ a tag-looking string there is not a contribution or dependency.</p>
     <span class="hljs-keyword">const</span> part = reader.<span class="hljs-property">contributions</span>.<span class="hljs-title">get</span>(index);
     <span class="hljs-keyword">const</span> language = part?.<span class="hljs-property">language</span> ?? token.<span class="hljs-property">info</span>.<span class="hljs-title">trim</span>().<span class="hljs-title">split</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\s</span><span class="hljs-regexp">+/</span>)[<span class="hljs-number">0</span>];
     <span class="hljs-keyword">if</span> (language.<span class="hljs-title">toLowerCase</span>() === <span class="hljs-string">'mermaid'</span>) {
+        <span class="hljs-keyword">if</span> (!part &amp;&amp; reader.<span class="hljs-property">assets</span> &amp;&amp; token.<span class="hljs-property">info</span>.<span class="hljs-title">trim</span>().<span class="hljs-title">toLowerCase</span>() === <span class="hljs-string">'mermaid'</span>) {
+            <span class="hljs-keyword">return</span> [{ <span class="hljs-attr">t</span>: <span class="hljs-string">'Asset'</span>, <span class="hljs-attr">asset</span>: { <span class="hljs-attr">kind</span>: <span class="hljs-string">'mermaid'</span>, <span class="hljs-attr">source</span>: token.<span class="hljs-property">content</span>, <span class="hljs-attr">caption</span>: <span class="hljs-string">''</span>,
+                <span class="hljs-attr">at</span>: <span class="hljs-title">tokenLocation</span>(reader.<span class="hljs-property">document</span>, token) } }];
+        }
         <span class="hljs-title">report</span>(reader.<span class="hljs-property">diagnostics</span>, <span class="hljs-title">tokenLocation</span>(reader.<span class="hljs-property">document</span>, token), <span class="hljs-string">'unsupported-mermaid'</span>,
-            <span class="hljs-string">'Mermaid publication is unsupported; no diagram was rendered'</span>);
+            <span class="hljs-string">'Mermaid requires an ordinary fence and a publication asset renderer'</span>);
         <span class="hljs-keyword">return</span> [];
     }
     <span class="hljs-keyword">if</span> (part) { <span class="hljs-keyword">return</span> [{ <span class="hljs-attr">t</span>: <span class="hljs-string">'Contribution'</span>, part }]; }
@@ -790,6 +801,36 @@ a tag-looking string there is not a contribution or dependency.</p>
 
 </div>
 <nav class="fragment-navigation" aria-label="Contributions of publication Pandoc block reader"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200062006c006f0063006b0020007200650061006400650072-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00700061006e0064006f0063002e006c0069007400650072006100740065-5" data-literate-target="c-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200062006c006f0063006b0020007200650061006400650072-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00700061006e0064006f0063002e006c0069007400650072006100740065-5" aria-label="Previous contribution of publication Pandoc block reader">Previous</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200062006c006f0063006b0020007200650061006400650072-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00700061006e0064006f0063002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200062006c006f0063006b0020007200650061006400650072-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00700061006e0064006f0063002e006c0069007400650072006100740065-1" aria-label="Base contribution of publication Pandoc block reader">Base</a></nav>
+</div><h2>Standalone local image requests</h2>
+<p>An image occupies its own paragraph, including inside lists and quotes. Inline
+images remain unsupported instead of silently losing surrounding prose. Captions
+use the title when present, otherwise concatenate decoded plain-text children so
+entities and escaped punctuation print correctly; formatted alt text is an explicit error. The optional trusted asset callback runs only after full token
+validation. Without it, the existing unsupported-image diagnostic is retained.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200069006d0061006700650020007000610072006100670072006100700068-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00700061006e0064006f0063002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200069006d0061006700650020007000610072006100670072006100700068"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200069006d0061006700650020007000610072006100670072006100700068" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200069006d0061006700650020007000610072006100670072006100700068" aria-label="Definition of publication Pandoc image paragraph">&lt;&lt;publication Pandoc image paragraph&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">readParagraph</span>(<span class="hljs-params">reader: BlockReader, opening: Token</span>): <span class="hljs-title">PendingBlock</span>[] {
+    <span class="hljs-keyword">const</span> inline = reader.<span class="hljs-property">document</span>.<span class="hljs-property">tokens</span>[reader.<span class="hljs-property">index</span>];
+    <span class="hljs-keyword">const</span> children = inline?.<span class="hljs-property">children</span> ?? [];
+    <span class="hljs-keyword">const</span> image = children.<span class="hljs-property">length</span> === <span class="hljs-number">1</span> &amp;&amp; children[<span class="hljs-number">0</span>].<span class="hljs-property">type</span> === <span class="hljs-string">'image'</span> ? children[<span class="hljs-number">0</span>] : <span class="hljs-literal">undefined</span>;
+    <span class="hljs-keyword">if</span> (!image || !reader.<span class="hljs-property">assets</span>) {
+        <span class="hljs-keyword">return</span> [{ <span class="hljs-attr">t</span>: opening.<span class="hljs-property">hidden</span> ? <span class="hljs-string">'Plain'</span> : <span class="hljs-string">'Para'</span>, <span class="hljs-attr">c</span>: <span class="hljs-title">readTextBlock</span>(reader, opening) }];
+    }
+    <span class="hljs-keyword">const</span> at = <span class="hljs-title">tokenLocation</span>(reader.<span class="hljs-property">document</span>, inline);
+    <span class="hljs-keyword">const</span> caption = image.<span class="hljs-property">children</span> ?? [];
+    <span class="hljs-keyword">if</span> (caption.<span class="hljs-title">some</span>(<span class="hljs-params">child</span><span class="hljs-function"> =&gt;</span> child.<span class="hljs-property">type</span> !== <span class="hljs-string">'text'</span>)) {
+        <span class="hljs-title">report</span>(reader.<span class="hljs-property">diagnostics</span>, at, <span class="hljs-string">'unsupported-image-caption'</span>, <span class="hljs-string">'Image alt text must be plain text'</span>);
+    }
+    reader.<span class="hljs-property">index</span>++;
+    <span class="hljs-keyword">if</span> (reader.<span class="hljs-property">document</span>.<span class="hljs-property">tokens</span>[reader.<span class="hljs-property">index</span>]?.<span class="hljs-property">type</span> === <span class="hljs-string">'paragraph_close'</span>) { reader.<span class="hljs-property">index</span>++; }
+    <span class="hljs-keyword">else</span> { <span class="hljs-title">report</span>(reader.<span class="hljs-property">diagnostics</span>, at, <span class="hljs-string">'invalid-markdown-structure'</span>, <span class="hljs-string">'Expected paragraph_close'</span>); }
+    <span class="hljs-keyword">return</span> [{ <span class="hljs-attr">t</span>: <span class="hljs-string">'Asset'</span>, <span class="hljs-attr">asset</span>: { <span class="hljs-attr">kind</span>: <span class="hljs-string">'image'</span>, at, <span class="hljs-attr">source</span>: image.<span class="hljs-title">attrGet</span>(<span class="hljs-string">'src'</span>) ?? <span class="hljs-string">''</span>,
+        <span class="hljs-attr">caption</span>: image.<span class="hljs-title">attrGet</span>(<span class="hljs-string">'title'</span>) || caption.<span class="hljs-title">map</span>(<span class="hljs-params">child</span><span class="hljs-function"> =&gt;</span> child.<span class="hljs-property">content</span>).<span class="hljs-title">join</span>(<span class="hljs-string">''</span>) } }];
+}
+</code></pre>
+
+</div>
 </div><h2>Materializing trusted contributions</h2>
 <p>Only validated pending trees reach this phase. Contributions are replaced in
 place with zero or more callback blocks, preserving surrounding containers. The
@@ -801,20 +842,24 @@ mutate the shared parsed snapshot.</p>
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500061006e0064006f00630020006d006100740065007200690061006c0069007a006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00700061006e0064006f0063002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e002000500061006e0064006f00630020006d006100740065007200690061006c0069007a006100740069006f006e"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500061006e0064006f00630020006d006100740065007200690061006c0069007a006100740069006f006e" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500061006e0064006f00630020006d006100740065007200690061006c0069007a006100740069006f006e" aria-label="Definition of publication Pandoc materialization">&lt;&lt;publication Pandoc materialization&gt;&gt;=</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">materialize</span>(<span class="hljs-params">
-    pending: PendingBlock[], render: ContributionRenderer, diagnostics: GenerationDiagnostic[]
+    pending: PendingBlock[], render: ContributionRenderer, diagnostics: GenerationDiagnostic[], asset?: AssetRenderer
 </span>): <span class="hljs-title">PandocBlock</span>[] {
     <span class="hljs-keyword">const</span> <span class="hljs-attr">result</span>: <span class="hljs-title">PandocBlock</span>[] = [];
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> block <span class="hljs-keyword">of</span> pending) {
         <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">break</span>; }
         <span class="hljs-keyword">switch</span> (block.<span class="hljs-property">t</span>) {
+            <span class="hljs-keyword">case</span> <span class="hljs-string">'Asset'</span>:
+                <span class="hljs-keyword">try</span> { result.<span class="hljs-title">push</span>(...asset!(block.<span class="hljs-property">asset</span>)); }
+                <span class="hljs-keyword">catch</span> (error) { <span class="hljs-title">report</span>(diagnostics, block.<span class="hljs-property">asset</span>.<span class="hljs-property">at</span>, <span class="hljs-string">'asset-render-failed'</span>, <span class="hljs-title">String</span>(error)); }
+                <span class="hljs-keyword">break</span>;
             <span class="hljs-keyword">case</span> <span class="hljs-string">'Contribution'</span>:
-                            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> rendered <span class="hljs-keyword">of</span> <span class="hljs-title">renderPart</span>(block.<span class="hljs-property">part</span>, render, diagnostics)) { result.<span class="hljs-title">push</span>(rendered); }
-                            <span class="hljs-keyword">break</span>;
-            <span class="hljs-keyword">case</span> <span class="hljs-string">'BlockQuote'</span>: result.<span class="hljs-title">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">'BlockQuote'</span>, <span class="hljs-attr">c</span>: <span class="hljs-title">materialize</span>(block.<span class="hljs-property">c</span>, render, diagnostics) }); <span class="hljs-keyword">break</span>;
-            <span class="hljs-keyword">case</span> <span class="hljs-string">'BulletList'</span>: result.<span class="hljs-title">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">'BulletList'</span>, <span class="hljs-attr">c</span>: block.<span class="hljs-property">c</span>.<span class="hljs-title">map</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">materialize</span>(item, render, diagnostics)) }); <span class="hljs-keyword">break</span>;
+                <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> rendered <span class="hljs-keyword">of</span> <span class="hljs-title">renderPart</span>(block.<span class="hljs-property">part</span>, render, diagnostics)) { result.<span class="hljs-title">push</span>(rendered); }
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> <span class="hljs-string">'BlockQuote'</span>: result.<span class="hljs-title">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">'BlockQuote'</span>, <span class="hljs-attr">c</span>: <span class="hljs-title">materialize</span>(block.<span class="hljs-property">c</span>, render, diagnostics, asset) }); <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> <span class="hljs-string">'BulletList'</span>: result.<span class="hljs-title">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">'BulletList'</span>, <span class="hljs-attr">c</span>: block.<span class="hljs-property">c</span>.<span class="hljs-title">map</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">materialize</span>(item, render, diagnostics, asset)) }); <span class="hljs-keyword">break</span>;
             <span class="hljs-keyword">case</span> <span class="hljs-string">'OrderedList'</span>: result.<span class="hljs-title">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">'OrderedList'</span>, <span class="hljs-attr">c</span>: [block.<span class="hljs-property">c</span>[<span class="hljs-number">0</span>],
-                block.<span class="hljs-property">c</span>[<span class="hljs-number">1</span>].<span class="hljs-title">map</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">materialize</span>(item, render, diagnostics))] }); <span class="hljs-keyword">break</span>;
-            <span class="hljs-keyword">case</span> <span class="hljs-string">'Div'</span>: result.<span class="hljs-title">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">'Div'</span>, <span class="hljs-attr">c</span>: [block.<span class="hljs-property">c</span>[<span class="hljs-number">0</span>], <span class="hljs-title">materialize</span>(block.<span class="hljs-property">c</span>[<span class="hljs-number">1</span>], render, diagnostics)] }); <span class="hljs-keyword">break</span>;
+                block.<span class="hljs-property">c</span>[<span class="hljs-number">1</span>].<span class="hljs-title">map</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">materialize</span>(item, render, diagnostics, asset))] }); <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> <span class="hljs-string">'Div'</span>: result.<span class="hljs-title">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">'Div'</span>, <span class="hljs-attr">c</span>: [block.<span class="hljs-property">c</span>[<span class="hljs-number">0</span>], <span class="hljs-title">materialize</span>(block.<span class="hljs-property">c</span>[<span class="hljs-number">1</span>], render, diagnostics, asset)] }); <span class="hljs-keyword">break</span>;
             <span class="hljs-attr">default</span>: result.<span class="hljs-title">push</span>(block);
         }
     }
@@ -859,7 +904,8 @@ so callers receive both graph and content diagnostics in deterministic order.</p
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500061006e0064006f00630020007000720065007000610072006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00700061006e0064006f0063002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e002000500061006e0064006f00630020007000720065007000610072006100740069006f006e"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500061006e0064006f00630020007000720065007000610072006100740069006f006e" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500061006e0064006f00630020007000720065007000610072006100740069006f006e" aria-label="Definition of publication Pandoc preparation">&lt;&lt;publication Pandoc preparation&gt;&gt;=</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">preparePandoc</span>(<span class="hljs-params">
-    project: ParsedProject, renderContribution: </span><span class="hljs-params">(part: PublicationContribution)</span><span class="hljs-params"> =&gt; PandocBlock[]
+    project: ParsedProject, renderContribution: </span><span class="hljs-params">(part: PublicationContribution)</span><span class="hljs-params"> =&gt; PandocBlock[],
+    renderAsset?: AssetRenderer
 </span>): <span class="hljs-title">PandocPreparationResult</span> {
     <span class="hljs-keyword">const</span> diagnostics = project.<span class="hljs-property">diagnostics</span>.<span class="hljs-title">map</span>(<span class="hljs-params">diagnostic</span><span class="hljs-function"> =&gt;</span> ({ ...diagnostic }));
     <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { diagnostics }; }
@@ -868,11 +914,11 @@ so callers receive both graph and content diagnostics in deterministic order.</p
     <span class="hljs-keyword">const</span> parts = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>(project.<span class="hljs-property">publication</span>.<span class="hljs-property">contributions</span>.<span class="hljs-title">map</span>(<span class="hljs-params">part</span><span class="hljs-function"> =&gt;</span> [part.<span class="hljs-property">target</span>, part]));
     <span class="hljs-keyword">const</span> <span class="hljs-attr">pending</span>: <span class="hljs-title">PendingBlock</span>[] = project.<span class="hljs-property">documents</span>.<span class="hljs-title">map</span>(<span class="hljs-params">document</span><span class="hljs-function"> =&gt;</span> {
         <span class="hljs-keyword">const</span> contributions = <span class="hljs-title">contributionIndex</span>(<span class="hljs-variable">document</span>, parts, diagnostics);
-        <span class="hljs-keyword">const</span> body = <span class="hljs-title">readBlocks</span>({ <span class="hljs-variable">document</span>, <span class="hljs-attr">index</span>: <span class="hljs-number">0</span>, contributions, targets, diagnostics });
+        <span class="hljs-keyword">const</span> body = <span class="hljs-title">readBlocks</span>({ <span class="hljs-variable">document</span>, <span class="hljs-attr">index</span>: <span class="hljs-number">0</span>, contributions, targets, diagnostics, <span class="hljs-attr">assets</span>: !!renderAsset });
         <span class="hljs-keyword">return</span> { <span class="hljs-attr">t</span>: <span class="hljs-string">'Div'</span>, <span class="hljs-attr">c</span>: [[targets.<span class="hljs-title">get</span>(<span class="hljs-variable">document</span>.<span class="hljs-property">path</span>)!.<span class="hljs-property">id</span>, [], []], body] };
     });
     <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { diagnostics }; }
-    <span class="hljs-keyword">const</span> blocks = <span class="hljs-title">materialize</span>(pending, renderContribution, diagnostics);
+    <span class="hljs-keyword">const</span> blocks = <span class="hljs-title">materialize</span>(pending, renderContribution, diagnostics, renderAsset);
     <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { diagnostics }; }
 
     <span class="hljs-keyword">return</span> { <span class="hljs-attr">document</span>: { <span class="hljs-string">'pandoc-api-version'</span>: [<span class="hljs-number">1</span>, <span class="hljs-number">23</span>, <span class="hljs-number">1</span>], <span class="hljs-attr">meta</span>: {}, blocks }, diagnostics };

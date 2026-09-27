@@ -4,6 +4,8 @@ import { randomUUID } from 'crypto';
 import { spawn } from 'child_process';
 import { renderLatex, LatexConverter, LatexOptions } from './publication-latex';
 import { planFonts } from './publication-fonts';
+import { collectAssets, planAssets, assetKey, maximumAssetBytes } from './publication-assets';
+import type { DiagramRenderer } from './publication-mermaid';
 import { resolvePublicationSettings } from './publication-settings';
 import { commitOutputs, OutputTransactionError, TransactionIO } from './output-transactions';
 import { discoveryExcludedDirectories, generateProject, parseProject, resolveProjectTheme, safeRelativePath, templateReferences, SourceDocument } from './engine';
@@ -33,15 +35,15 @@ const latexMarginOptions = [
     ['--margin', 'marginMm'], ['--margin-top', 'marginTopMm'], ['--margin-right', 'marginRightMm'],
     ['--margin-bottom', 'marginBottomMm'], ['--margin-left', 'marginLeftMm']
 ] as const;
-const latexValueFlags = ['--output', '--paper', '--font-manifest', ...latexMarginOptions.map(([flag]) => flag)];
+const latexValueFlags = ['--output', '--paper', '--font-manifest', '--browser', ...latexMarginOptions.map(([flag]) => flag)];
 const latexUsage = 'latex [root] --output path.tex [--paper a4|a5|letter|legal] [--margin 20mm]'
-    + ' [--margin-top Nmm] [--margin-right Nmm] [--margin-bottom Nmm] [--margin-left Nmm] [--font-manifest path.json] [--json]';
+    + ' [--margin-top Nmm] [--margin-right Nmm] [--margin-bottom Nmm] [--margin-left Nmm] [--font-manifest path.json] [--browser /absolute/path] [--json]';
 const usage = 'Usage: node out/cli.js generate|check|inspect|self-check [root] [--json]\n'
     + `       node out/cli.js ${latexUsage}\n`
     + '       node out/cli.js <command> --help [--json]\n       node out/cli.js --help [--json]\n';
 const descriptions: Record<string, string> = Object.fromEntries([
     ['generate', 'Write missing or changed generated files.'],
-    ['latex', 'Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving at least an 80 × 100 mm body. Each side overrides --margin; unspecified sides use --margin or 20mm. Fonts resolve from root index.literate SETTINGS. No TeX/PDF execution. --font-manifest opts into explicit font/license companions.'],
+    ['latex', 'Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving at least an 80 × 100 mm body. Each side overrides --margin; unspecified sides use --margin or 20mm. Fonts resolve from root index.literate SETTINGS. No TeX/book PDF execution. --font-manifest opts into explicit font/license companions. --browser explicitly selects a sandbox-capable system Chromium for Mermaid PDF/SVG assets; no browser download.'],
     ['check', 'Report missing or stale generated files without writing.'],
     ['inspect', 'Report documents, templates, and fragment definitions and dependencies without reading outputs or writing.'],
     ['self-check', 'Verify this repository’s trusted self-hosting code without generating files; all outputs must already be current.']
@@ -225,7 +227,8 @@ export const runPandoc: LatexConverter = async document => {
     });
 };
 async function planLatex(root: string, documents: SourceDocument[], output: string,
-    options: LatexOptions, convert: LatexConverter, manifest?: string): Promise<{
+    options: LatexOptions, convert: LatexConverter, manifest: string | undefined,
+        browser: string | undefined, diagrams: DiagramRenderer): Promise<{
         files: { path: string; content: string | Uint8Array }[]; diagnostics: Generation['diagnostics'];
         inspection?: Generation['inspection'];
     }> {
@@ -234,6 +237,23 @@ async function planLatex(root: string, documents: SourceDocument[], output: stri
     const project = parseProject(documents);
     const settings = resolvePublicationSettings(project);
     if (settings.diagnostics.length) { return { files: [], diagnostics: settings.diagnostics }; }
+    const collected = collectAssets(project);
+    if (collected.diagnostics.length) { return { files: [], diagnostics: collected.diagnostics }; }
+    const browserTarget = browser && collected.assets.some(asset => asset.kind === 'mermaid')
+        ? await fs.realpath(browser) : undefined;
+    const browserInput = browserTarget
+        ? { path: browserTarget, stat: await fs.stat(browserTarget) } : undefined;
+    const assets = await planAssets(collected.assets, output, {
+        async requireFile(value) {
+            if (!await inspect(root, value)) { throw new Error(`Missing image: ${value}`); }
+        },
+        async read(value) {
+            if (!await inspect(root, value)) { throw new Error(`Image disappeared: ${value}`); }
+            const size = (await fs.stat(path.join(root, value))).size;
+            if (size > maximumAssetBytes) { throw new Error(`Image exceeds 32 MiB: ${value}`); }
+            return fs.readFile(path.join(root, value));
+        }
+    }, requests => diagrams(requests, theme.name, browser));
     const companions = manifest ? await planFonts(manifest, output, Object.values(settings.fonts), {
         async requireFile(value) {
             if (!await inspect(root, value)) { throw new Error(`Missing file: ${value}`); }
@@ -244,8 +264,10 @@ async function planLatex(root: string, documents: SourceDocument[], output: stri
         }
     }) : undefined;
     const inputs = [...documents.map(document => document.path), ...templateReferences(documents),
-        ...(companions?.inputs ?? [])];
-    for (const destination of [output, ...(companions?.files.map(file => file.path) ?? [])]) {
+        ...(companions?.inputs ?? []), ...assets.inputs];
+    const destinations = [output, ...(companions?.files.map(file => file.path) ?? []),
+        ...assets.files.map(file => file.path)];
+    for (const destination of destinations) {
         const target = destination.toLowerCase();
         for (const input of inputs) {
             const source = relative(input).toLowerCase();
@@ -253,19 +275,59 @@ async function planLatex(root: string, documents: SourceDocument[], output: stri
                 throw new Error(`LaTeX output conflicts with input: ${input} (output ${destination})`);
             }
         }
+        if (browserInput) {
+            const targetPath = path.resolve(root, destination).toLowerCase();
+            for (const input of [browser!, browserInput.path]) {
+                const sourcePath = path.resolve(input).toLowerCase();
+                if (targetPath === sourcePath || targetPath.startsWith(sourcePath + path.sep)
+                    || sourcePath.startsWith(targetPath + path.sep)) {
+                    throw new Error(`LaTeX output conflicts with browser input: ${input} (output ${destination})`);
+                }
+            }
+        }
         await inspect(root, destination);
     }
+    await protectLatexAliases(root, inputs, destinations, browserInput);
     const rendered = await renderLatex(project, { ...options, theme: theme.name,
-        portableFonts: companions?.fonts }, convert);
+        portableFonts: companions?.fonts, assetPath: asset => {
+            const companion = assets.paths.get(assetKey(asset));
+            if (!companion) { throw new Error('Unplanned publication image'); }
+            return companion;
+        } }, convert);
     if (!rendered.diagnostics.length && rendered.latex === undefined) {
         throw new Error('LaTeX renderer returned no document');
     }
     return { diagnostics: rendered.diagnostics, files: rendered.diagnostics.length ? []
-        : [{ path: output, content: rendered.latex! }, ...(companions?.files ?? [])] };
+        : [{ path: output, content: rendered.latex! }, ...(companions?.files ?? []), ...assets.files] };
+}
+async function protectLatexAliases(root: string, inputs: string[], outputs: string[],
+    browser?: { path: string; stat: { dev: number; ino: number } }): Promise<void> {
+    const identities = new Map<string, string>();
+    if (browser) { identities.set(`${browser.stat.dev}:${browser.stat.ino}`, browser.path); }
+    for (const input of inputs) {
+        if (!await inspect(root, input)) { continue; }
+        const stat = await fs.stat(path.join(root, input));
+        identities.set(`${stat.dev}:${stat.ino}`, input);
+    }
+    const seen: string[] = [];
+    for (const output of outputs) {
+        const name = output.toLowerCase();
+        if (seen.some(other => name === other || name.startsWith(other + '/') || other.startsWith(name + '/'))) {
+            throw new Error(`LaTeX outputs conflict: ${output}`);
+        }
+        seen.push(name);
+        if (!await inspect(root, output)) { continue; }
+        const stat = await fs.stat(path.join(root, output));
+        const key = `${stat.dev}:${stat.ino}`;
+        if (identities.has(key)) { throw new Error(`LaTeX output aliases input/output: ${output} (${identities.get(key)})`); }
+        identities.set(key, output);
+    }
 }
 export async function run(args: string[], io: CliIO = defaultIO,
     transactionIO: (root: string) => TransactionIO = createTransactionIO,
-    convert: LatexConverter = runPandoc): Promise<number> {
+    convert: LatexConverter = runPandoc,
+    diagrams: DiagramRenderer = async (...args) => (await import('./publication-mermaid')).renderDiagrams(...args)
+): Promise<number> {
     const json = args.includes('--json');
     const positional: string[] = [];
     const flags = new Set<string>();
@@ -311,6 +373,10 @@ export async function run(args: string[], io: CliIO = defaultIO,
         response.errors.push(`${latexValueFlags.join(', ')} are only valid for latex`);
     }
     if (topic === 'latex') {
+        const browser = values.get('--browser');
+        if (browser !== undefined && (!path.isAbsolute(browser) || /[\u0000-\u001f]/.test(browser))) {
+            response.errors.push('--browser requires an absolute system Chromium executable path');
+        }
         const manifest = values.get('--font-manifest');
         if (manifest !== undefined && !safeRelativePath(manifest)) {
             response.errors.push('--font-manifest requires a safe root-relative JSON file path');
@@ -373,7 +439,8 @@ export async function run(args: string[], io: CliIO = defaultIO,
         }
         const result = command === 'latex'
             ? await planLatex(root, documents, latexOutput, latexOptions, convert,
-                values.has('--font-manifest') ? relative(values.get('--font-manifest')!) : undefined)
+                values.has('--font-manifest') ? relative(values.get('--font-manifest')!) : undefined,
+                        values.get('--browser'), diagrams)
             : generateProject(documents, templates);
         response.diagnostics = result.diagnostics;
         if (command === 'inspect') {

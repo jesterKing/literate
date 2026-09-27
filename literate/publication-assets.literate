@@ -1,0 +1,192 @@
+# Portable publication images
+
+A portable book carries its illustrations alongside its text. Pre-rendered PNG,
+JPEG and PDF images need neither a browser nor a conversion utility: the exporter
+copies their bytes and lets LaTeX fit them to the page. This boundary separates
+asset transport from diagram rendering. Ordinary Mermaid fences use an optional
+explicit system-browser adapter; an unavailable renderer is an error, never a
+reason to print diagram source as code or silently omit the figure.
+
+A standalone Markdown image is resolved relative to its source chapter. Titles
+become plain captions, falling back to plain alt text. Inline images, formatted
+alt text, raw SVG, remote URLs, queries and fragments are rejected. PDF inclusion
+uses page one; authors must supply a single-page figure when that distinction
+matters. Binary signatures are checked, not full file validity: these are trusted
+publication inputs, not a PDF/image malware sanitizer.
+
+```ts : <<publication assets.*>>= ./src/publication-assets.ts $
+<<publication asset imports>>
+<<publication asset path>>
+<<publication asset format>>
+<<publication asset plan>>
+<<publication asset collection>>
+```
+
+## Narrow filesystem contract
+
+All filesystem access is injected. The CLI checks every component for symlinks,
+requires regular files and bounds reads before allocating buffers. The planner
+also bounds returned bytes, so test adapters cannot accidentally bypass its limit.
+It prepares bytes only; the existing output transaction owns publication.
+
+```ts : <<publication asset imports>>=
+import { createHash } from 'crypto';
+import { posix } from 'path';
+import { safeRelativePath, ParsedProject } from './engine';
+import { preparePandoc, PublicationAsset } from './publication-pandoc';
+import type { FontInputIO } from './publication-fonts';
+import type { DiagramBytes } from './publication-mermaid';
+export const maximumAssetBytes = 32 * 1024 * 1024;
+export interface AssetPlan {
+    inputs: string[];
+    files: { path: string; content: Uint8Array }[];
+    paths: Map<string, string>;
+}
+export const assetKey = (asset: PublicationAsset): string => JSON.stringify([asset.kind, asset.at.path, asset.source]);
+const hash = (data: string | Uint8Array): string => createHash('sha256').update(data).digest('hex');
+```
+
+Decode URI escaping exactly once, reject URL syntax before and after decoding,
+then normalize relative to the chapter directory. Parent steps are allowed only
+when the resulting portable path stays within the project root. No absolute path,
+backslash or platform-dependent drive syntax reaches the filesystem adapter.
+
+```ts : <<publication asset path>>=
+export function assetInput(asset: PublicationAsset): string {
+    let source: string;
+    try { source = decodeURIComponent(asset.source); }
+    catch { throw new Error('Image path has invalid URI escaping'); }
+    const invalid = (value: string): boolean => !value || /^[\/]/.test(value) || /[\\:?#\u0000-\u001f\u007f]/.test(value);
+    if (invalid(asset.source) || invalid(source)) {
+        throw new Error('Image requires a local relative path without queries or fragments');
+    }
+    const result = safeRelativePath(posix.join(posix.dirname(asset.at.path), source));
+    if (!result) { throw new Error('Image path escapes the project or is not portable'); }
+    return result;
+}
+```
+
+Extensions must match signatures. JPEG spellings share one canonical suffix;
+identical content deduplicates even when source names differ. Full SHA-256 names
+contain no author-controlled TeX syntax and remain stable on relocation.
+
+```ts : <<publication asset format>>=
+function assetFormat(input: string, bytes: Uint8Array): string {
+    if (!bytes.length || bytes.length > maximumAssetBytes) { throw new Error('Image must be 1–33554432 bytes'); }
+    const data = Buffer.from(bytes);
+    const ext = posix.extname(input).toLowerCase();
+    if (ext === '.png' && data.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))) { return 'png'; }
+    if (/^\.jpe?g$/.test(ext) && data[0] === 255 && data[1] === 216 && data[2] === 255) { return 'jpg'; }
+    if (ext === '.pdf' && data.subarray(0, 5).toString('ascii') === '%PDF-') { return 'pdf'; }
+    throw new Error('Image must be PNG, JPEG or PDF with a matching signature; SVG is unsupported');
+}
+```
+
+The total plan is bounded at 128 MiB of unique content and 1024 requests. All
+aliases remain protected inputs even when their bytes deduplicate. Failures name
+the source chapter and line; no partially planned output is published.
+
+```ts : <<publication asset plan>>=
+export async function planAssets(assets: readonly PublicationAsset[], output: string, io: FontInputIO,
+    render?: (assets: PublicationAsset[]) => Promise<Map<string, DiagramBytes>>): Promise<AssetPlan> {
+    if (assets.length > 1024) { throw new Error('Publication exceeds 1024 image requests'); }
+    const directory = `lit-assets-${hash(posix.basename(output))}`;
+    const plan: AssetPlan = { inputs: [], files: [], paths: new Map() };
+    const inputs = new Map<string, string>(), files = new Set<string>();
+    let total = 0;
+    <<publication asset addition>>
+    for (const asset of assets.filter(asset => asset.kind === 'image')) {
+        try {
+            <<publication asset prepare one>>
+        } catch (error) { throw new Error(`${asset.at.path}:${asset.at.line + 1}: ${String(error)}`); }
+    }
+    plan.inputs = [...inputs.keys()];
+    <<publication diagram companions>>
+    return plan;
+}
+```
+
+Each source file is read once. A new filename with the same content gets the same
+companion; each occurrence retains its own caption and container width.
+
+```ts : <<publication asset prepare one>>=
+const input = assetInput(asset);
+let companion = inputs.get(input);
+if (!companion) {
+    await io.requireFile(input);
+    const content = await io.read(input);
+    companion = add(content, assetFormat(input, content));
+    inputs.set(input, companion);
+}
+plan.paths.set(assetKey(asset), companion);
+```
+
+Collection uses the same bridge and validation as rendering, not a second token
+scanner. Unsupported late content prevents all callbacks, so callers can validate
+before doing any asset I/O. Contribution rendering here is deliberately inert.
+
+```ts : <<publication asset collection>>=
+export function collectAssets(project: ParsedProject): {
+    assets: PublicationAsset[]; diagnostics: ReturnType<typeof preparePandoc>['diagnostics'];
+} {
+    const assets: PublicationAsset[] = [];
+    const prepared = preparePandoc(project, () => [], asset => { assets.push(asset); return []; });
+    return { assets, diagnostics: prepared.diagnostics };
+}
+```
+
+Generated diagrams and local images share the same content-addressed namespace.
+The addition step bounds all retained companion bytes and emits each path once.
+SVG is accepted only from the trusted diagram adapter, never as a local image.
+
+```ts : <<publication asset addition>>=
+const add = (content: Uint8Array, extension: string): string => {
+    const companion = `${directory}/${hash(content)}.${extension}`;
+    if (!files.has(companion)) {
+        total += content.length;
+        if (total > 128 * 1024 * 1024) { throw new Error('Publication images exceed 128 MiB'); }
+        files.add(companion);
+        plan.files.push({ path: posix.join(posix.dirname(output), companion), content });
+    }
+    return companion;
+};
+```
+
+Local files are validated before the optional renderer is invoked. The browser
+adapter returns both vector formats, but only the PDF enters the LaTeX body.
+Each occurrence retains its location while identical diagram sources render once.
+
+```ts : <<publication diagram companions>>=
+const diagrams = assets.filter(asset => asset.kind === 'mermaid');
+if (diagrams.length) {
+    if (!render) { throw new Error('Mermaid publication requires an explicit browser renderer'); }
+    const rendered = await render(diagrams);
+    for (const asset of diagrams) {
+        const bytes = rendered.get(asset.source);
+        if (!bytes || bytes.pdf.length > 16 * 1024 * 1024 || bytes.svg.length > 4 * 1024 * 1024
+            || !Buffer.from(bytes.svg).toString('utf8').startsWith('<svg')) {
+            throw new Error(`${asset.at.path}:${asset.at.line + 1}: Missing or invalid Mermaid artifacts`);
+        }
+        assetFormat('diagram.pdf', bytes.pdf);
+        plan.paths.set(assetKey(asset), add(bytes.pdf, 'pdf'));
+        add(bytes.svg, 'svg');
+    }
+}
+```
+
+## Layout and portability contract
+
+LaTeX measures the escaped caption at the current `\linewidth`, then subtracts
+its actual height, depth and spacing from `\textheight`. A graphic fits both the
+remaining height and the current width with its aspect ratio preserved. The
+non-floating box moves intact to the next page when necessary, including in lists
+and quotes. This uses geometry's actual body, never the browser paper size: A5
+with top/right/bottom/left 18/16/22/20 mm has a 112 × 170 mm body. Captions consuming
+all but 24 pt of the page fail compilation explicitly. Very dense figures can be
+unreadable when reduced; no minimum-readable-scale policy is claimed. PDF CropBox
+content outside the author-supplied box is not recoverable by layout.
+
+The output `.tex`, fonts and assets share one recoverable binary transaction.
+Relocation requires moving the entire output directory. No shell escape is used.
+Old orphan companions are not deleted automatically. Concurrent external writers
+remain unsupported, as documented by the transaction adapter.

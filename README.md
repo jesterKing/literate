@@ -133,7 +133,7 @@ browser/CDN rendering path; offline, embedded-SVG HTML export is the next milest
 
 ## Command-line development
 
-From a checkout, use Node.js 22 LTS and the pinned Yarn version through Corepack:
+From a checkout, use Node.js 22 LTS (>=22.12) and the pinned Yarn version through Corepack:
 
 ```sh
 yarn install --immutable
@@ -176,10 +176,14 @@ Run
 `yarn literate latex --help` for bounds, or add `--json` for machine-readable
 results. Arguments use separate values rather than `--option=value`.
 
-Export requires **Pandoc on PATH** (tested with 3.7.0.2), but does not require or
-run a TeX engine. It writes the requested LaTeX file and, only with
-`--font-manifest`, font/license companions—not tangled source, HTML, or PDF. Export is always explicit; extension activation and saves do not
-publish books. Existing source/template paths are protected, and writes use the
+Export requires **Pandoc on PATH** (tested with 3.7.0.2), but never runs a TeX
+engine. Mermaid additionally requires the explicit system browser described below;
+exports without diagrams need no browser. It writes the requested LaTeX file,
+local image/diagram companions and, only with `--font-manifest`, font/license
+companions—not tangled source, HTML, or a compiled book PDF. Export is always
+explicit: ordinary generation, extension activation and saves never launch the
+publication browser. There is no extension export action or automatic PDF compilation. Source, template, font and image inputs are protected
+(including existing hard-link aliases), and all writes use the
 same transaction/recovery mechanism as generation. Re-exporting identical content
 leaves the output unchanged. Do not run concurrent writers.
 
@@ -289,7 +293,7 @@ quiescent project.
 
 To compile later, install the named fonts (or export companions) and LuaLaTeX packages `fontspec`,
 `geometry`, `fvextra`, `needspace`, `xcolor`, `microtype`, `amsmath`, `amssymb`,
-`ulem`, `hyperref`, and KOMA-Script (`scrbook`), then explicitly run, for example:
+`ulem`, `hyperref`, `graphicx`, and KOMA-Script (`scrbook`), then explicitly run, for example:
 
 ```sh
 latexmk -cd -lualatex -interaction=nonstopmode -halt-on-error -no-shell-escape books/book.tex
@@ -297,6 +301,81 @@ latexmk -cd -lualatex -interaction=nonstopmode -halt-on-error -no-shell-escape b
 
 Compile trusted projects only: disabling shell escape is not a complete TeX
 sandbox. No fonts or packages are downloaded by the export command.
+
+### Portable local illustrations
+
+Put a PNG, JPEG or single-page PDF image in its own Markdown paragraph:
+
+```markdown
+![Plain caption](../images/diagram.pdf)
+
+> ![Alternative text](../images/photo.jpg "Caption takes precedence")
+```
+
+Paths are **relative to the source chapter**, unlike font-manifest paths. Parent
+steps are allowed only within the project root. Remote URLs, absolute paths,
+queries/fragments, malformed URI escaping, symlink components and non-regular
+files are rejected. Inline images, formatted alt text, raw SVG and other formats
+are explicitly unsupported. PDF inclusion uses page one; supply a single-page
+figure. Extensions must match binary signatures, but export is not a full image
+validator or a sanitizer: compile trusted assets only.
+
+Identical bytes share a companion under `lit-assets-<hash>` beside the `.tex`.
+Original names never enter TeX. All source aliases remain protected inputs.
+The limits are 1024 image occurrences, 32 MiB per image, 128 MiB unique bytes and
+4096 caption characters. Missing/invalid inputs and converter failures prevent
+publication; text, font/license and image companions use one rollback transaction.
+Old orphan companions are not automatically removed.
+
+Move the **whole export directory** and compile there. The graphic fits both the
+current list/quote width and the page text height minus a measured caption and
+spacing budget, preserving aspect ratio. Every paper size and all four margins
+participate through LaTeX geometry: A5 with top/right/bottom/left 18/16/22/20 mm
+has a 112 × 170 mm body. A tall figure may move to a new page, leaving a preceding
+heading behind. Captions leaving less than 24 pt for the graphic fail compilation.
+Long unbreakable caption words can still cause TeX warnings, and extremely dense
+figures may become unreadable when reduced; inspect compiler logs and the PDF.
+No clipping or rasterization is added by the fitting code. An input PDF's own
+CropBox still determines its visible content.
+
+### M3: explicit Mermaid vector export
+
+Ordinary Mermaid fences can become local SVG+PDF companions; LaTeX includes the
+PDF using the same width/height fitting as local illustrations. For example:
+
+```sh
+yarn literate latex path/to/project --output books/book.tex \
+  --browser /usr/bin/chromium-browser
+```
+
+Supply an **absolute path to an installed, sandbox-capable system Chromium**.
+The verified path is `/usr/bin/chromium-browser`; `puppeteer-core` neither downloads
+nor discovers a browser. Install the checkout's development dependencies and use
+**Node >=22.12 on POSIX**; Windows is rejected because worker/browser process-tree
+cleanup relies on POSIX process groups. Without `--browser`, Mermaid export fails
+explicitly; pre-rendered local PNG/JPEG/PDF figures remain a browser-free option.
+
+The publication bundle includes the full pinned **Mermaid 12.0.0** families,
+registering **ZenUML 1.0.1** and **tidy-tree 1.0.1**, with no family allowlist.
+Rendering uses the selected palette and system **sans-serif** fonts, separate from
+book font roles and `--font-manifest`. Browser/font differences can affect layout;
+not every theme/family configuration has been exhaustively verified.
+
+Remote assets, image/icon resources, directives/frontmatter, authored HTML/CSS,
+and interactions are blocked. Double-quote labels containing command words such
+as `style`, `classDef`, `linkStyle`, `click`, `link` or `links` (for example,
+`A["click to continue"]`): quoted text and comments are masked for the keyword
+scan, not exempted from the other safety checks. Limits are 64 unique diagrams,
+50,000 source characters each, Mermaid's 500-edge cap, 16,384 px per side and
+16 million pixels of geometry; artifacts are capped at 4 MiB SVG, 16 MiB PDF and
+32 MiB combined per batch. The worker has a 120-second batch deadline, 15-second
+browser-operation timeouts and a 64 KiB log cap.
+
+Generated SVG+PDF companions join the same rollback transaction as TeX, local
+images and optional fonts/licenses. Move the whole export directory to compile;
+**raw local SVG input remains unsupported**. See
+[M3 acceptance](CONTRIBUTING.md#m3-mermaid-acceptance) for fixture and security
+evidence, including full-book compilation with remaining typography issues.
 
 ### Heading destinations and links
 
@@ -343,18 +422,18 @@ Missing documents (`missing-publication-document`), missing headings
 (`ambiguous-publication-heading`) and unsupported URL forms
 (`unsupported-publication-link`) report source locations **before conversion**.
 
-**Current limits:** Mermaid, images, tables and raw author tokens produce
+**Current limits:** inline/unsupported images, tables and raw author tokens produce
 diagnostics rather than disappearing. Missing fragments and cycles also block
-export. The repository's own book currently contains Mermaid diagrams, so it is
-not yet a supported whole-book export. Missing tools, conversion failures, and
-publication diagnostics leave existing output untouched.
+export. Missing tools, browser/conversion failures and publication diagnostics
+leave existing output untouched. Full-book compilation is not a clean-typography
+guarantee; inspect compiler logs and the resulting PDF.
 
 ### M1 scope and screen compatibility
 
-The first publication milestone provides explicit CLI export of the supported
-prose/fragment subset to a portable LaTeX book, with optional licensed font
-companions. It does **not** promise export of this entire Mermaid-containing
-repository or compilation on a machine without the documented fonts/packages.
+Historically, M1 provided explicit CLI export of the supported prose/fragment
+subset to a portable LaTeX book, with optional licensed font companions. Its
+sign-off excluded whole-repository Mermaid export (now covered separately by M3)
+and compilation on a machine without the documented fonts/packages.
 See the [criterion-by-criterion acceptance review](CONTRIBUTING.md#m1-acceptance-review)
 for evidence and remaining limitations.
 

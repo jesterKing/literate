@@ -3,11 +3,12 @@ import { preparePandoc } from './publication-pandoc';
 import { resolvePublicationSettings } from './publication-settings';
 import { checkFontFace, fontFaces, fontFile, PortableFont } from './publication-fonts';
 import type { PublicationSettingsResult } from './publication-settings';
-import type { PandocDocument, PandocBlock } from './publication-pandoc';
+import type { PandocDocument, PandocBlock, PublicationAsset } from './publication-pandoc';
 import { defaultThemeName, getTheme } from './themes';
 import type { LiterateTheme } from './themes';
 import { highlightContribution, syntaxStyle } from './publication-highlight';
 export interface LatexOptions {
+    assetPath?: (asset: PublicationAsset) => string;
     theme?: string;
     paper?: 'A4' | 'A5' | 'letter' | 'legal';
     marginMm?: number;
@@ -154,7 +155,8 @@ function slantFeatures(font: PortableFont): string {
 }
 function template(body: string, options: CheckedOptions, definitions: string[]): string {
     const c = options.theme.colors;
-    return themeNotice() + String.raw`\documentclass[11pt,oneside,openany]{scrbook}
+    return themeNotice() + String.raw`\newcommand{\DoNotLoadEpstopdf}{}
+    \documentclass[11pt,oneside,openany]{scrbook}
 ${'\\usepackage'}{fontspec}
 ${fontCommand('\\setmainfont', options.bodyFont, options)}
 ${fontCommand('\\newfontfamily\\headingfont', options.headingFont, options)}
@@ -162,7 +164,7 @@ ${fontCommand('\\newfontfamily\\fragmentfont', options.fragmentFont, options)}
 ${fontCommand('\\newfontfamily\\notefont', options.noteFont, options)}
 ${fontCommand('\\setmonofont', options.codeFont, options, true)}
 ${'\\usepackage'}[${options.paper},${options.geometry}]{geometry}
-${'\\usepackage'}{fvextra,needspace,xcolor,microtype,amssymb,amsmath}
+${'\\usepackage'}{fvextra,needspace,xcolor,microtype,amssymb,amsmath,graphicx}
 ${'\\usepackage'}[normalem]{ulem}
 ${'\\usepackage'}[hidelinks]{hyperref}
 \definecolor{publicationBackground}{HTML}{${color(c.background)}}
@@ -175,7 +177,7 @@ ${'\\usepackage'}[hidelinks]{hyperref}
 \providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 \providecommand{\passthrough}[1]{#1}
 \providecommand{\pandocbounded}[1]{#1}
-` + templateCodeSettings() + '\n' + definitions.join('\n') +
+` + templateCodeSettings() + '\n' + templateImageSettings() + '\n' + definitions.join('\n') +
         '\n\\begin{document}\n\\tableofcontents\n' + body + '\n\\end{document}\n';
 }
 function templateCodeSettings(): string {
@@ -213,6 +215,22 @@ function themeNotice(): string {
         'TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE',
         'OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.'
     ].map(line => '% ' + line).join('\n') + '\n';
+}
+function templateImageSettings(): string {
+    return String.raw`\newsavebox{\LitCaptionBox}
+\newlength{\LitImageHeight}
+\newcommand{\LitImage}[2]{\par\penalty0\addvspace{6pt}%
+\begingroup
+\sbox{\LitCaptionBox}{\parbox{\linewidth}{\small\raggedright #2\par}}%
+\setlength{\LitImageHeight}{\dimexpr\textheight-\ht\LitCaptionBox-\dp\LitCaptionBox-24pt\relax}%
+\ifdim\LitImageHeight<24pt
+  \PackageError{literate}{Image caption leaves no space for graphic}{Shorten the caption.}%
+\else
+  \noindent\vbox{\hbox to\linewidth{\hfil
+    \includegraphics[width=\linewidth,height=\LitImageHeight,keepaspectratio]{#1}\hfil}%
+    \kern6pt\nointerlineskip\hbox{${'\\usebox'}{\LitCaptionBox}}\kern0pt}%
+\fi
+\par\endgroup\addvspace{6pt}}`;
 }
 type Highlighted = ReturnType<typeof highlightContribution>;
 function verbatimText(text: string): string {
@@ -304,6 +322,14 @@ function ordinaryCode(blocks: PandocBlock[], theme: LiterateTheme): PandocBlock[
         }
     });
 }
+function imageBlock(asset: PublicationAsset, resolve: (asset: PublicationAsset) => string): PandocBlock[] {
+    const file = resolve(asset);
+    if (!/^lit-assets-[a-f0-9]{64}\/[a-f0-9]{64}\.(png|jpg|pdf)$/.test(file)) {
+        throw new Error('Image adapter must return a safe publication companion path');
+    }
+    if (Array.from(asset.caption).length > 4096) { throw new Error('Image caption exceeds 4096 characters'); }
+    return [{ t: 'RawBlock', c: ['latex', `\\LitImage{${file}}{${tex(asset.caption)}}`] }];
+}
 function contribution(part: PublicationContribution, project: ParsedProject,
     theme: LiterateTheme, definitions: string[]): PandocBlock[] {
     const family = project.publication.fragments.find(item => item.target === part.fragmentTarget);
@@ -364,7 +390,8 @@ export async function renderLatex(parsed: ParsedProject, options: LatexOptions,
         const definitions: string[] = [];
         stage = 'latex-preparation';
         const prepared = preparePandoc(parsed, part =>
-            contribution(part, parsed, checked.theme, definitions));
+            contribution(part, parsed, checked.theme, definitions), options.assetPath
+                ? asset => imageBlock(asset, options.assetPath!) : undefined);
         if (!prepared.document) { return { diagnostics: prepared.diagnostics }; }
         prepared.document.blocks = ordinaryCode(prepared.document.blocks, checked.theme);
         stage = 'latex-conversion';

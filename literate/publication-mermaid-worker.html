@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>A browser that produces assets</h1>
+<p>Chromium supplies SVG layout and PDF vector printing; it does not typeset the
+book. The worker loads the exact local Mermaid distribution through Puppeteer
+Core, whose package contains no browser downloader. Each diagram gets a new
+browser context, preventing one diagram's DOM and Mermaid counters from affecting
+another. The controller owns the deadline, process group and temporary directory.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-004d00650072006d006100690064002000620072006f007700730065007200200077006f0072006b00650072002e002a-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d006100690064002000620072006f007700730065007200200077006f0072006b00650072002e002a"></span><a class="literate-tag-name" href="#f-004d00650072006d006100690064002000620072006f007700730065007200200077006f0072006b00650072002e002a" data-literate-target="f-004d00650072006d006100690064002000620072006f007700730065007200200077006f0072006b00650072002e002a" aria-label="Definition of Mermaid browser worker.*">&lt;&lt;Mermaid browser worker.*&gt;&gt;= src/publication-mermaid-worker.mjs $</a></div>
+<div class="code">
+<pre><code><a class="literate-tag-name" href="#f-004d00650072006d00610069006400200077006f0072006b0065007200200069006d0070006f007200740073" data-literate-target="f-004d00650072006d00610069006400200077006f0072006b0065007200200069006d0070006f007200740073" aria-label="Definition of Mermaid worker imports">&lt;&lt;Mermaid worker imports&gt;&gt;</a>
+
+<a class="literate-tag-name" href="#f-004d00650072006d00610069006400200070006100670065002000690073006f006c006100740069006f006e" data-literate-target="f-004d00650072006d00610069006400200070006100670065002000690073006f006c006100740069006f006e" aria-label="Definition of Mermaid page isolation">&lt;&lt;Mermaid page isolation&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-004d00650072006d0061006900640020005300560047002000670065006f006d0065007400720079" data-literate-target="f-004d00650072006d0061006900640020005300560047002000670065006f006d0065007400720079" aria-label="Definition of Mermaid SVG geometry">&lt;&lt;Mermaid SVG geometry&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-004d00650072006d00610069006400200076006500630074006f0072002000720065006e0064006500720069006e0067" data-literate-target="f-004d00650072006d00610069006400200076006500630074006f0072002000720065006e0064006500720069006e0067" aria-label="Definition of Mermaid vector rendering">&lt;&lt;Mermaid vector rendering&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-004d00650072006d006100690064002000620072006f0077007300650072002000620061007400630068" data-literate-target="f-004d00650072006d006100690064002000620072006f0077007300650072002000620061007400630068" aria-label="Definition of Mermaid browser batch">&lt;&lt;Mermaid browser batch&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073" data-literate-target="f-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073" aria-label="Definition of Mermaid owned browser process">&lt;&lt;Mermaid owned browser process&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-004d00650072006d00610069006400200077006f0072006b0065007200200065006e007400720079" data-literate-target="f-004d00650072006d00610069006400200077006f0072006b0065007200200065006e007400720079" aria-label="Definition of Mermaid worker entry">&lt;&lt;Mermaid worker entry&gt;&gt;</a>
+</code></pre>
+
+</div>
+</div><h2>Complete offline renderer graph</h2>
+<p>Mermaid distributes renderer definitions as lazy ESM chunks. Bundling the complete
+ESM graph into one IIFE preserves their deferred initialization without making
+network requests when a family is first used. ZenUML needs a separately registered
+plugin; tidy-tree supplies an optional layout, not a new diagram family. Their
+pinned packages are the same integrations offered by the Mermaid CLI. The plugin's
+prebundled ESM distribution avoids importing its Node-facing rendering helpers.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020004d00650072006d006100690064002000620072006f0077007300650072002000620075006e0064006c0065002e002a-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020004d00650072006d006100690064002000620072006f0077007300650072002000620075006e0064006c0065002e002a"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020004d00650072006d006100690064002000620072006f0077007300650072002000620075006e0064006c0065002e002a" data-literate-target="f-007000750062006c00690063006100740069006f006e0020004d00650072006d006100690064002000620072006f0077007300650072002000620075006e0064006c0065002e002a" aria-label="Definition of publication Mermaid browser bundle.*">&lt;&lt;publication Mermaid browser bundle.*&gt;&gt;= src/publication-mermaid-browser.mjs $</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> mermaid <span class="hljs-keyword">from</span> <span class="hljs-string">'mermaid/dist/mermaid.esm.mjs'</span>;
+<span class="hljs-keyword">import</span> zenuml <span class="hljs-keyword">from</span> <span class="hljs-string">'@mermaid-js/mermaid-zenuml/dist/mermaid-zenuml.esm.mjs'</span>;
+<span class="hljs-keyword">import</span> tidyTree <span class="hljs-keyword">from</span> <span class="hljs-string">'@mermaid-js/layout-tidy-tree'</span>;
+<span class="hljs-keyword">const</span> offlineZenuml = { ...zenuml, <span class="hljs-attr">loader</span>: <span class="hljs-keyword">async</span> () =&gt; {
+    <span class="hljs-keyword">const</span> existingStyles = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>(<span class="hljs-variable">document</span>.<span class="hljs-title">querySelectorAll</span>(<span class="hljs-string">'style'</span>));
+    <span class="hljs-keyword">const</span> definition = <span class="hljs-keyword">await</span> zenuml.<span class="hljs-title">loader</span>();
+    <span class="hljs-keyword">const</span> bundledFont = <span class="hljs-string">'@font-face{font-family:MS Sans Serif;src:url(/fonts/MS%20Sans%20Serif.ttf) format(&quot;truetype&quot;)}'</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> style <span class="hljs-keyword">of</span> <span class="hljs-variable">document</span>.<span class="hljs-title">querySelectorAll</span>(<span class="hljs-string">'style'</span>)) {
+        <span class="hljs-keyword">if</span> (!existingStyles.<span class="hljs-title">has</span>(style) &amp;&amp; style.<span class="hljs-property">textContent</span>.<span class="hljs-title">includes</span>(bundledFont)) {
+            style.<span class="hljs-property">textContent</span> = style.<span class="hljs-property">textContent</span>.<span class="hljs-title">replaceAll</span>(bundledFont, <span class="hljs-string">''</span>);
+        }
+    }
+    <span class="hljs-keyword">return</span> definition;
+} };
+mermaid.<span class="hljs-title">registerLayoutLoaders</span>(tidyTree);
+globalThis.<span class="hljs-property">mermaid</span> = mermaid;
+globalThis.<span class="hljs-property">publicationMermaidReady</span> = mermaid.<span class="hljs-title">registerExternalDiagrams</span>([offlineZenuml]);
+</code></pre>
+
+</div>
+</div><p>The pinned ZenUML definition injects CSS containing a neon-theme font face whose
+source is <code>/fonts/MS%20Sans%20Serif.ttf</code>. Forcing a sans-serif family does not remove
+that downloadable face from the browser's font set. Before any diagram renders,
+we remove only that exact rule from style elements introduced by the trusted
+plugin loader. This is not a sanitizer for author CSS or arbitrary resources:
+other rules remain unchanged, and a changed plugin rule still fails closed under
+CSP and request interception. No font request or recorded violation is excused.</p>
+<p>No diagram-type allowlist stands in front of Mermaid's detector. Unknown syntax
+or unregistered third-party renderers fail explicitly. Remote icon registries,
+external images, executable callbacks and author configuration remain disabled,
+regardless of the family requesting them. A new renderer does not gain new browser
+permissions merely by being registered.</p>
+<h2>Local, fixed configuration</h2>
+<p>Only catalogue colors and fixed security settings enter initialization. Source
+text cannot supply scripts, styles, callbacks, directives or configuration. Stable
+IDs depend on source and theme, not processing order or wall-clock time. Classic
+shapes and disabled filters avoid Chromium's rasterization of decorative shadows;
+the selected palette still controls colors.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-004d00650072006d00610069006400200077006f0072006b0065007200200069006d0070006f007200740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d00610069006400200077006f0072006b0065007200200069006d0070006f007200740073"></span><a class="literate-tag-name" href="#f-004d00650072006d00610069006400200077006f0072006b0065007200200069006d0070006f007200740073" data-literate-target="f-004d00650072006d00610069006400200077006f0072006b0065007200200069006d0070006f007200740073" aria-label="Definition of Mermaid worker imports">&lt;&lt;Mermaid worker imports&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> fs <span class="hljs-keyword">from</span> <span class="hljs-string">'node:fs/promises'</span>;
+<span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> path <span class="hljs-keyword">from</span> <span class="hljs-string">'node:path'</span>;
+<span class="hljs-keyword">import</span> { createHash } <span class="hljs-keyword">from</span> <span class="hljs-string">'node:crypto'</span>;
+<span class="hljs-keyword">import</span> { createRequire } <span class="hljs-keyword">from</span> <span class="hljs-string">'node:module'</span>;
+<span class="hljs-keyword">import</span> { fileURLToPath } <span class="hljs-keyword">from</span> <span class="hljs-string">'node:url'</span>;
+<span class="hljs-keyword">import</span> { spawn } <span class="hljs-keyword">from</span> <span class="hljs-string">'node:child_process'</span>;
+<span class="hljs-keyword">import</span> { getTheme, mermaidTheme } <span class="hljs-keyword">from</span> <span class="hljs-string">'./themes'</span>;
+<span class="hljs-keyword">import</span> { diagramLimits, validateDiagram } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-mermaid'</span>;
+<span class="hljs-keyword">const</span> <span class="hljs-built_in">require</span> = <span class="hljs-title">createRequire</span>(<span class="hljs-keyword">import</span>.<span class="hljs-property">meta</span>.<span class="hljs-property">url</span>);
+<span class="hljs-keyword">const</span> <span class="hljs-title">hash</span> = value =&gt; <span class="hljs-title">createHash</span>(<span class="hljs-string">'sha256'</span>).<span class="hljs-title">update</span>(value).<span class="hljs-title">digest</span>(<span class="hljs-string">'hex'</span>);
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">configuration</span>(<span class="hljs-params">theme, seed</span>) {
+    <span class="hljs-keyword">return</span> { ...<span class="hljs-title">mermaidTheme</span>(<span class="hljs-title">getTheme</span>(theme)), <span class="hljs-attr">startOnLoad</span>: <span class="hljs-literal">false</span>,
+        <span class="hljs-attr">securityLevel</span>: <span class="hljs-string">'strict'</span>, <span class="hljs-attr">look</span>: <span class="hljs-string">'classic'</span>, <span class="hljs-attr">suppressErrorRendering</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">maxTextSize</span>: <span class="hljs-number">50000</span>,
+        <span class="hljs-attr">maxEdges</span>: <span class="hljs-number">500</span>, <span class="hljs-attr">htmlLabels</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">flowchart</span>: { <span class="hljs-attr">htmlLabels</span>: <span class="hljs-literal">false</span> },
+        <span class="hljs-attr">fontFamily</span>: <span class="hljs-string">'sans-serif'</span>, <span class="hljs-attr">deterministicIds</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">deterministicIDSeed</span>: seed,
+        <span class="hljs-attr">secure</span>: [<span class="hljs-string">'secure'</span>, <span class="hljs-string">'securityLevel'</span>, <span class="hljs-string">'startOnLoad'</span>, <span class="hljs-string">'suppressErrorRendering'</span>,
+            <span class="hljs-string">'maxTextSize'</span>, <span class="hljs-string">'maxEdges'</span>, <span class="hljs-string">'theme'</span>, <span class="hljs-string">'themeVariables'</span>, <span class="hljs-string">'fontFamily'</span>,
+            <span class="hljs-string">'htmlLabels'</span>, <span class="hljs-string">'flowchart'</span>, <span class="hljs-string">'look'</span>, <span class="hljs-string">'deterministicIds'</span>, <span class="hljs-string">'deterministicIDSeed'</span>] };
+}
+</code></pre>
+
+</div>
+</div><p>A reserved origin is fulfilled once from an in-memory bootstrap document; no
+DNS request or server is involved. This gives plugins an isolated storage origin
+instead of the inaccessible storage of about:blank. The bundle is injected as
+trusted code. CSP denies connections, files, images, fonts, frames and forms;
+interception aborts every request other than that one bootstrap. Attempted
+resources or navigation fail the diagram instead of producing an incomplete asset.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-004d00650072006d00610069006400200070006100670065002000690073006f006c006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d00610069006400200070006100670065002000690073006f006c006100740069006f006e"></span><a class="literate-tag-name" href="#f-004d00650072006d00610069006400200070006100670065002000690073006f006c006100740069006f006e" data-literate-target="f-004d00650072006d00610069006400200070006100670065002000690073006f006c006100740069006f006e" aria-label="Definition of Mermaid page isolation">&lt;&lt;Mermaid page isolation&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">isolatePage</span>(<span class="hljs-params">page</span>) {
+    <span class="hljs-keyword">const</span> violations = [];
+    <span class="hljs-keyword">const</span> origin = <span class="hljs-string">'https://literate.invalid/'</span>;
+    <span class="hljs-keyword">let</span> bootstrap = <span class="hljs-literal">true</span>;
+    page.<span class="hljs-title">setDefaultTimeout</span>(<span class="hljs-number">15000</span>);
+    <span class="hljs-keyword">await</span> page.<span class="hljs-title">setRequestInterception</span>(<span class="hljs-literal">true</span>);
+    <a class="literate-tag-name" href="#f-004d00650072006d00610069006400200062006f006f00740073007400720061007000200069006e00740065007200630065007000740069006f006e" data-literate-target="f-004d00650072006d00610069006400200062006f006f00740073007400720061007000200069006e00740065007200630065007000740069006f006e" aria-label="Definition of Mermaid bootstrap interception">&lt;&lt;Mermaid bootstrap interception&gt;&gt;</a>
+    page.<span class="hljs-title">on</span>(<span class="hljs-string">'framenavigated'</span>, <span class="hljs-params">frame</span><span class="hljs-function"> =&gt;</span> {
+        <span class="hljs-keyword">if</span> (frame.<span class="hljs-title">url</span>() !== origin) { violations.<span class="hljs-title">push</span>(<span class="hljs-string">'navigation'</span>); }
+    });
+    page.<span class="hljs-title">on</span>(<span class="hljs-string">'popup'</span>, <span class="hljs-params">popup</span><span class="hljs-function"> =&gt;</span> { violations.<span class="hljs-title">push</span>(<span class="hljs-string">'popup'</span>); <span class="hljs-keyword">void</span> popup.<span class="hljs-title">close</span>().<span class="hljs-title">catch</span>(<span class="hljs-function">() =&gt;</span> {}); });
+    <span class="hljs-keyword">await</span> page.<span class="hljs-title">setBypassServiceWorker</span>(<span class="hljs-literal">true</span>);
+    <span class="hljs-keyword">await</span> page.<span class="hljs-title">goto</span>(origin, { <span class="hljs-attr">waitUntil</span>: <span class="hljs-string">'load'</span> });
+    <a class="literate-tag-name" href="#f-004d00650072006d00610069006400200043005300500020006f00620073006500720076006100740069006f006e" data-literate-target="f-004d00650072006d00610069006400200043005300500020006f00620073006500720076006100740069006f006e" aria-label="Definition of Mermaid CSP observation">&lt;&lt;Mermaid CSP observation&gt;&gt;</a>
+    <span class="hljs-keyword">return</span> violations;
+}
+</code></pre>
+
+</div>
+</div><p>The bootstrap response is fixed renderer code, never project HTML. Its CSP sandbox
+allows scripts and same-origin storage, but not popups, forms or top navigation.
+Every context has fresh storage. Neither plugin initialization nor diagram content
+can use the bootstrap URL to request another document.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-004d00650072006d00610069006400200062006f006f00740073007400720061007000200069006e00740065007200630065007000740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d00610069006400200062006f006f00740073007400720061007000200069006e00740065007200630065007000740069006f006e"></span><a class="literate-tag-name" href="#f-004d00650072006d00610069006400200062006f006f00740073007400720061007000200069006e00740065007200630065007000740069006f006e" data-literate-target="f-004d00650072006d00610069006400200062006f006f00740073007400720061007000200069006e00740065007200630065007000740069006f006e" aria-label="Definition of Mermaid bootstrap interception">&lt;&lt;Mermaid bootstrap interception&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>page.<span class="hljs-title">on</span>(<span class="hljs-string">'request'</span>, <span class="hljs-params">request</span><span class="hljs-function"> =&gt;</span> {
+    <span class="hljs-keyword">if</span> (bootstrap &amp;&amp; request.<span class="hljs-title">url</span>() === origin &amp;&amp; request.<span class="hljs-title">isNavigationRequest</span>()
+        &amp;&amp; request.<span class="hljs-title">frame</span>() === page.<span class="hljs-title">mainFrame</span>()) {
+        bootstrap = <span class="hljs-literal">false</span>;
+        <span class="hljs-keyword">void</span> request.<span class="hljs-title">respond</span>({ <span class="hljs-attr">status</span>: <span class="hljs-number">200</span>, <span class="hljs-attr">contentType</span>: <span class="hljs-string">'text/html'</span>, <span class="hljs-attr">headers</span>: {
+            <span class="hljs-string">'Content-Security-Policy'</span>: <span class="hljs-string">&quot;default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; &quot;</span>
+                + <span class="hljs-string">&quot;connect-src 'none'; img-src 'none'; font-src 'none'; frame-src 'none'; object-src 'none'; &quot;</span>
+                + <span class="hljs-string">&quot;base-uri 'none'; form-action 'none'; sandbox allow-scripts allow-same-origin&quot;</span>
+        }, <span class="hljs-attr">body</span>: <span class="hljs-string">'&lt;!doctype html&gt;&lt;style&gt;html,body{margin:0;padding:0}svg{display:block}'</span>
+                    + <span class="hljs-string">'*,*::before,*::after{font-family:sans-serif!important}&lt;/style&gt;&lt;body&gt;&lt;/body&gt;'</span>
+        }).<span class="hljs-title">catch</span>(<span class="hljs-params">error</span><span class="hljs-function"> =&gt;</span> violations.<span class="hljs-title">push</span>(<span class="hljs-title">String</span>(error)));
+    } <span class="hljs-keyword">else</span> {
+        violations.<span class="hljs-title">push</span>(<span class="hljs-string">'resource request'</span>);
+        <span class="hljs-keyword">void</span> request.<span class="hljs-title">abort</span>(<span class="hljs-string">'blockedbyclient'</span>).<span class="hljs-title">catch</span>(<span class="hljs-function">() =&gt;</span> {});
+    }
+});
+</code></pre>
+
+</div>
+</div><p>CSP can stop a fetch before it reaches request interception. The page records
+those violations too. Code injected through the protocol is controlled by this
+worker; there are no source-derived JavaScript strings or event bindings.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-004d00650072006d00610069006400200043005300500020006f00620073006500720076006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d00610069006400200043005300500020006f00620073006500720076006100740069006f006e"></span><a class="literate-tag-name" href="#f-004d00650072006d00610069006400200043005300500020006f00620073006500720076006100740069006f006e" data-literate-target="f-004d00650072006d00610069006400200043005300500020006f00620073006500720076006100740069006f006e" aria-label="Definition of Mermaid CSP observation">&lt;&lt;Mermaid CSP observation&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">await</span> page.evaluate(<span class="hljs-function">() =&gt;</span> {
+    globalThis.<span class="hljs-property">publicationViolations</span> = [];
+    <span class="hljs-variable">document</span>.<span class="hljs-title">addEventListener</span>(<span class="hljs-string">'securitypolicyviolation'</span>, <span class="hljs-params">event</span><span class="hljs-function"> =&gt;</span> {
+        globalThis.<span class="hljs-property">publicationViolations</span>.<span class="hljs-title">push</span>(event.<span class="hljs-property">violatedDirective</span> + <span class="hljs-string">': '</span> + event.<span class="hljs-property">blockedURI</span>.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">200</span>));
+    });
+});
+</code></pre>
+
+</div>
+</div><h2>Validate the produced vector</h2>
+<p>Strict Mermaid rendering is not the only boundary. Reject active SVG elements,
+external references and event handlers. Passive XHTML labels inside foreignObject
+are permitted because some renderers require them even with htmlLabels disabled;
+active HTML and all external resources remain forbidden. Local fragment references remain available
+for markers and glyphs. CSS URLs must also refer to local fragments. These checks
+run before printing or handing the SVG to the parent.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-004d00650072006d0061006900640020005300560047002000670065006f006d0065007400720079-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d0061006900640020005300560047002000670065006f006d0065007400720079"></span><a class="literate-tag-name" href="#f-004d00650072006d0061006900640020005300560047002000670065006f006d0065007400720079" data-literate-target="f-004d00650072006d0061006900640020005300560047002000670065006f006d0065007400720079" aria-label="Definition of Mermaid SVG geometry">&lt;&lt;Mermaid SVG geometry&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">measureSvg</span>() {
+    <span class="hljs-keyword">const</span> svg = <span class="hljs-variable">document</span>.<span class="hljs-title">querySelector</span>(<span class="hljs-string">'body &gt; svg'</span>);
+    <span class="hljs-keyword">if</span> (!svg) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Mermaid returned no root SVG'</span>); }
+    <span class="hljs-keyword">if</span> (svg.<span class="hljs-title">querySelector</span>(<span class="hljs-string">'script,image,img,a,iframe,object,embed,video,audio,animate,animateMotion,animateTransform,set,form,input,button'</span>)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Mermaid SVG contains unsupported active or external content'</span>);
+    }
+    <span class="hljs-keyword">const</span> <span class="hljs-title">checkCss</span> = value =&gt; {
+        <span class="hljs-keyword">if</span> (<span class="hljs-regexp">/@import/i</span>.<span class="hljs-title">test</span>(value)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'External SVG CSS is disabled'</span>); }
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> match <span class="hljs-keyword">of</span> value.<span class="hljs-title">matchAll</span>(<span class="hljs-regexp">/url</span><span class="hljs-regexp">\(</span><span class="hljs-regexp">(</span><span class="hljs-regexp">[^)]</span><span class="hljs-regexp">*)</span><span class="hljs-regexp">\)</span><span class="hljs-regexp">/gi</span>)) {
+            <span class="hljs-keyword">if</span> (!match[<span class="hljs-number">1</span>].<span class="hljs-title">trim</span>().<span class="hljs-title">replace</span>(<span class="hljs-regexp">/^</span><span class="hljs-regexp">[&quot;']</span><span class="hljs-regexp">|</span><span class="hljs-regexp">[&quot;']</span><span class="hljs-regexp">$/g</span>, <span class="hljs-string">''</span>).<span class="hljs-title">startsWith</span>(<span class="hljs-string">'#'</span>)) {
+                <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'External SVG CSS resource is disabled'</span>);
+            }
+        }
+    };
+    <a class="literate-tag-name" href="#f-004d00650072006d0061006900640020005300560047002000610074007400720069006200750074006500200070006f006c006900630079" data-literate-target="f-004d00650072006d0061006900640020005300560047002000610074007400720069006200750074006500200070006f006c006900630079" aria-label="Definition of Mermaid SVG attribute policy">&lt;&lt;Mermaid SVG attribute policy&gt;&gt;</a>
+    <a class="literate-tag-name" href="#f-004d00650072006d006100690064002000530056004700200062006f0075006e00640073" data-literate-target="f-004d00650072006d006100690064002000530056004700200062006f0075006e00640073" aria-label="Definition of Mermaid SVG bounds">&lt;&lt;Mermaid SVG bounds&gt;&gt;</a>
+}
+</code></pre>
+
+</div>
+</div><p>Presentation attributes are checked alongside style elements: an external paint
+server must not bypass the style policy. The SVG is serialized only after its
+geometry is fixed. No callback returned by Mermaid is installed.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-004d00650072006d0061006900640020005300560047002000610074007400720069006200750074006500200070006f006c006900630079-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d0061006900640020005300560047002000610074007400720069006200750074006500200070006f006c006900630079"></span><a class="literate-tag-name" href="#f-004d00650072006d0061006900640020005300560047002000610074007400720069006200750074006500200070006f006c006900630079" data-literate-target="f-004d00650072006d0061006900640020005300560047002000610074007400720069006200750074006500200070006f006c006900630079" aria-label="Definition of Mermaid SVG attribute policy">&lt;&lt;Mermaid SVG attribute policy&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> element <span class="hljs-keyword">of</span> [svg, ...svg.<span class="hljs-title">querySelectorAll</span>(<span class="hljs-string">'*'</span>)]) {
+    <span class="hljs-keyword">if</span> (element.<span class="hljs-property">namespaceURI</span> === <span class="hljs-string">'http://www.w3.org/1999/xhtml'</span>
+        &amp;&amp; ![<span class="hljs-string">'div'</span>, <span class="hljs-string">'span'</span>, <span class="hljs-string">'p'</span>, <span class="hljs-string">'br'</span>, <span class="hljs-string">'b'</span>, <span class="hljs-string">'strong'</span>, <span class="hljs-string">'i'</span>, <span class="hljs-string">'em'</span>, <span class="hljs-string">'small'</span>, <span class="hljs-string">'code'</span>, <span class="hljs-string">'pre'</span>,
+            <span class="hljs-string">'table'</span>, <span class="hljs-string">'thead'</span>, <span class="hljs-string">'tbody'</span>, <span class="hljs-string">'tr'</span>, <span class="hljs-string">'td'</span>, <span class="hljs-string">'th'</span>, <span class="hljs-string">'ul'</span>, <span class="hljs-string">'ol'</span>, <span class="hljs-string">'li'</span>].<span class="hljs-title">includes</span>(element.<span class="hljs-property">localName</span>)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Unsupported active HTML in Mermaid label'</span>);
+    }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> attribute <span class="hljs-keyword">of</span> element.<span class="hljs-property">attributes</span>) {
+        <span class="hljs-keyword">if</span> (<span class="hljs-regexp">/^on/i</span>.<span class="hljs-title">test</span>(attribute.<span class="hljs-property">name</span>) || (<span class="hljs-regexp">/href$/i</span>.<span class="hljs-title">test</span>(attribute.<span class="hljs-property">name</span>) &amp;&amp; !attribute.<span class="hljs-property">value</span>.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'#'</span>))) {
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Mermaid SVG interaction or external reference is disabled'</span>);
+        }
+        <span class="hljs-title">checkCss</span>(attribute.<span class="hljs-property">value</span>);
+    }
+    <span class="hljs-keyword">if</span> (element.<span class="hljs-property">localName</span> === <span class="hljs-string">'style'</span>) { <span class="hljs-title">checkCss</span>(element.<span class="hljs-property">textContent</span>); }
+}
+<span class="hljs-keyword">const</span> fixed = <span class="hljs-variable">document</span>.<span class="hljs-title">createElementNS</span>(<span class="hljs-string">'http://www.w3.org/2000/svg'</span>, <span class="hljs-string">'style'</span>);
+fixed.<span class="hljs-property">textContent</span> = <span class="hljs-string">'*,*::before,*::after{animation:none!important;transition:none!important;filter:none!important;font-family:sans-serif!important}'</span>;
+svg.<span class="hljs-title">prepend</span>(fixed);
+</code></pre>
+
+</div>
+</div><p>Use the union of the declared view box and measured contents, plus an eight-pixel
+safety border for strokes. Both dimensions and area are capped before printing.
+The PDF paper matches this diagram rectangle, not the requested book paper.
+The later LaTeX inclusion preserves its aspect ratio at the available body size.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-004d00650072006d006100690064002000530056004700200062006f0075006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d006100690064002000530056004700200062006f0075006e00640073"></span><a class="literate-tag-name" href="#f-004d00650072006d006100690064002000530056004700200062006f0075006e00640073" data-literate-target="f-004d00650072006d006100690064002000530056004700200062006f0075006e00640073" aria-label="Definition of Mermaid SVG bounds">&lt;&lt;Mermaid SVG bounds&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> box = svg.<span class="hljs-title">getBBox</span>(), view = svg.<span class="hljs-property">viewBox</span>.<span class="hljs-property">baseVal</span>;
+<span class="hljs-keyword">const</span> x = <span class="hljs-title">Math</span>.<span class="hljs-title">min</span>(box.<span class="hljs-property">x</span>, view.<span class="hljs-property">x</span>) - <span class="hljs-number">8</span>, y = <span class="hljs-title">Math</span>.<span class="hljs-title">min</span>(box.<span class="hljs-property">y</span>, view.<span class="hljs-property">y</span>) - <span class="hljs-number">8</span>;
+<span class="hljs-keyword">const</span> width = <span class="hljs-title">Math</span>.<span class="hljs-title">ceil</span>(<span class="hljs-title">Math</span>.<span class="hljs-title">max</span>(box.<span class="hljs-property">x</span> + box.<span class="hljs-property">width</span>, view.<span class="hljs-property">x</span> + view.<span class="hljs-property">width</span>) - x + <span class="hljs-number">8</span>);
+<span class="hljs-keyword">const</span> height = <span class="hljs-title">Math</span>.<span class="hljs-title">ceil</span>(<span class="hljs-title">Math</span>.<span class="hljs-title">max</span>(box.<span class="hljs-property">y</span> + box.<span class="hljs-property">height</span>, view.<span class="hljs-property">y</span> + view.<span class="hljs-property">height</span>) - y + <span class="hljs-number">8</span>);
+<span class="hljs-keyword">if</span> (![x, y, width, height].<span class="hljs-title">every</span>(<span class="hljs-title">Number</span>.<span class="hljs-property">isFinite</span>) || width &lt; <span class="hljs-number">1</span> || height &lt; <span class="hljs-number">1</span>
+    || width &gt; <span class="hljs-number">16384</span> || height &gt; <span class="hljs-number">16384</span> || width * height &gt; <span class="hljs-number">16000000</span>) {
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Mermaid geometry exceeds 16384 px per side or 16 million pixels'</span>);
+}
+svg.<span class="hljs-title">setAttribute</span>(<span class="hljs-string">'viewBox'</span>, <span class="hljs-string">`</span><span class="hljs-subst">${x}</span><span class="hljs-string"> </span><span class="hljs-subst">${y}</span><span class="hljs-string"> </span><span class="hljs-subst">${width}</span><span class="hljs-string"> </span><span class="hljs-subst">${height}</span><span class="hljs-string">`</span>);
+svg.<span class="hljs-title">setAttribute</span>(<span class="hljs-string">'width'</span>, <span class="hljs-title">String</span>(width)); svg.<span class="hljs-title">setAttribute</span>(<span class="hljs-string">'height'</span>, <span class="hljs-title">String</span>(height));
+svg.<span class="hljs-property">style</span>.<span class="hljs-property">maxWidth</span> = <span class="hljs-string">'none'</span>;
+<span class="hljs-keyword">return</span> { width, height, <span class="hljs-attr">svg</span>: svg.<span class="hljs-property">outerHTML</span> };
+</code></pre>
+
+</div>
+</div><h2>Print one diagram</h2>
+<p>A context is closed even when parsing, SVG validation or PDF printing fails.
+The parent deadline still owns a hung context close. The page's font wait concerns
+installed system fonts only; CSP forbids font downloads. PDF metadata timestamps
+are normalized without changing byte lengths, preserving cross-reference offsets.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-004d00650072006d00610069006400200076006500630074006f0072002000720065006e0064006500720069006e0067-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d00610069006400200076006500630074006f0072002000720065006e0064006500720069006e0067"></span><a class="literate-tag-name" href="#f-004d00650072006d00610069006400200076006500630074006f0072002000720065006e0064006500720069006e0067" data-literate-target="f-004d00650072006d00610069006400200076006500630074006f0072002000720065006e0064006500720069006e0067" aria-label="Definition of Mermaid vector rendering">&lt;&lt;Mermaid vector rendering&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">renderVector</span>(<span class="hljs-params">browser, source, theme, bundle</span>) {
+    <span class="hljs-keyword">const</span> context = <span class="hljs-keyword">await</span> browser.<span class="hljs-title">createBrowserContext</span>();
+    <span class="hljs-keyword">try</span> {
+        <span class="hljs-keyword">const</span> page = <span class="hljs-keyword">await</span> context.<span class="hljs-title">newPage</span>();
+        <span class="hljs-keyword">await</span> page.<span class="hljs-title">setViewport</span>({ <span class="hljs-attr">width</span>: <span class="hljs-number">1200</span>, <span class="hljs-attr">height</span>: <span class="hljs-number">900</span>, <span class="hljs-attr">deviceScaleFactor</span>: <span class="hljs-number">1</span> });
+        <span class="hljs-keyword">const</span> violations = <span class="hljs-keyword">await</span> <span class="hljs-title">isolatePage</span>(page);
+        <span class="hljs-keyword">await</span> page.<span class="hljs-title">addScriptTag</span>({ <span class="hljs-attr">content</span>: bundle });
+        <span class="hljs-keyword">const</span> seed = <span class="hljs-title">hash</span>(<span class="hljs-title">JSON</span>.<span class="hljs-title">stringify</span>([source, theme]));
+        <a class="literate-tag-name" href="#f-004d00650072006d00610069006400200070006100670065002000720065006e0064006500720069006e0067" data-literate-target="f-004d00650072006d00610069006400200070006100670065002000720065006e0064006500720069006e0067" aria-label="Definition of Mermaid page rendering">&lt;&lt;Mermaid page rendering&gt;&gt;</a>
+        <a class="literate-tag-name" href="#f-004d00650072006d00610069006400200050004400460020007000720069006e00740069006e0067" data-literate-target="f-004d00650072006d00610069006400200050004400460020007000720069006e00740069006e0067" aria-label="Definition of Mermaid PDF printing">&lt;&lt;Mermaid PDF printing&gt;&gt;</a>
+    } <span class="hljs-keyword">finally</span> { <span class="hljs-keyword">await</span> context.<span class="hljs-title">close</span>(); }
+}
+</code></pre>
+
+</div>
+</div><p>Source is passed as structured protocol data, never interpolated into HTML or
+JavaScript. Mermaid's returned markup is trusted only after the policy checks;
+HTML labels are disabled. After the trusted bundle loads, a second CSP disables
+all further script and event-handler execution. Frames and resource attempts are checked again after
+PDF printing, since print layout can otherwise trigger a delayed request.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-004d00650072006d00610069006400200070006100670065002000720065006e0064006500720069006e0067-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d00610069006400200070006100670065002000720065006e0064006500720069006e0067"></span><a class="literate-tag-name" href="#f-004d00650072006d00610069006400200070006100670065002000720065006e0064006500720069006e0067" data-literate-target="f-004d00650072006d00610069006400200070006100670065002000720065006e0064006500720069006e0067" aria-label="Definition of Mermaid page rendering">&lt;&lt;Mermaid page rendering&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">await</span> page.evaluate(<span class="hljs-keyword">async</span> (source, config, id) =&gt; {
+    <span class="hljs-keyword">const</span> policy = <span class="hljs-variable">document</span>.<span class="hljs-title">createElement</span>(<span class="hljs-string">'meta'</span>);
+    policy.<span class="hljs-property">httpEquiv</span> = <span class="hljs-string">'Content-Security-Policy'</span>; policy.<span class="hljs-property">content</span> = <span class="hljs-string">&quot;script-src 'none'&quot;</span>;
+    <span class="hljs-variable">document</span>.<span class="hljs-property">head</span>.<span class="hljs-title">append</span>(policy);
+    <span class="hljs-keyword">await</span> globalThis.<span class="hljs-property">publicationMermaidReady</span>;
+    globalThis.<span class="hljs-property">mermaid</span>.<span class="hljs-title">initialize</span>(config);
+    <span class="hljs-keyword">await</span> globalThis.<span class="hljs-property">mermaid</span>.<span class="hljs-title">parse</span>(source);
+    <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">await</span> globalThis.<span class="hljs-property">mermaid</span>.<span class="hljs-title">render</span>(id, source);
+    <span class="hljs-keyword">if</span> (!result.<span class="hljs-property">svg</span>.<span class="hljs-title">trim</span>()) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Mermaid returned empty SVG: '</span> + <span class="hljs-title">JSON</span>.<span class="hljs-title">stringify</span>(result)); }
+
+    <span class="hljs-variable">document</span>.<span class="hljs-property">body</span>.<span class="hljs-property">style</span>.<span class="hljs-property">backgroundColor</span> = config.<span class="hljs-property">themeVariables</span>.<span class="hljs-property">background</span>;
+    <span class="hljs-variable">document</span>.<span class="hljs-property">body</span>.<span class="hljs-property">innerHTML</span> = result.<span class="hljs-property">svg</span>;
+    <span class="hljs-keyword">const</span> svg = <span class="hljs-variable">document</span>.<span class="hljs-property">body</span>.<span class="hljs-title">querySelector</span>(<span class="hljs-string">'svg'</span>);
+    <span class="hljs-keyword">if</span> (svg) { svg.<span class="hljs-property">style</span>.<span class="hljs-property">backgroundColor</span> = config.<span class="hljs-property">themeVariables</span>.<span class="hljs-property">background</span>; }
+    <span class="hljs-keyword">await</span> <span class="hljs-variable">document</span>.<span class="hljs-property">fonts</span>.<span class="hljs-property">ready</span>;
+}, source, <span class="hljs-title">configuration</span>(theme, seed), <span class="hljs-string">'diagram-'</span> + seed);
+<span class="hljs-keyword">const</span> geometry = <span class="hljs-keyword">await</span> page.evaluate(measureSvg);
+<span class="hljs-keyword">if</span> (<span class="hljs-title">Buffer</span>.<span class="hljs-title">byteLength</span>(geometry.<span class="hljs-property">svg</span>) &gt; diagramLimits.<span class="hljs-property">svg</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Mermaid SVG exceeds 4 MiB'</span>); }
+</code></pre>
+
+</div>
+</div><p>The PDF remains a vector asset. The browser is not permitted to return a partial
+page range for an oversized diagram: geometry is bounded, and the page is sized
+to the complete SVG. A small rounding allowance prevents a trailing blank page.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-004d00650072006d00610069006400200050004400460020007000720069006e00740069006e0067-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d00610069006400200050004400460020007000720069006e00740069006e0067"></span><a class="literate-tag-name" href="#f-004d00650072006d00610069006400200050004400460020007000720069006e00740069006e0067" data-literate-target="f-004d00650072006d00610069006400200050004400460020007000720069006e00740069006e0067" aria-label="Definition of Mermaid PDF printing">&lt;&lt;Mermaid PDF printing&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> bytes = <span class="hljs-keyword">await</span> page.<span class="hljs-title">pdf</span>({ <span class="hljs-attr">width</span>: <span class="hljs-string">`</span><span class="hljs-subst">${geometry.width + </span><span class="hljs-number">1</span><span class="hljs-subst">}</span><span class="hljs-string">px`</span>, <span class="hljs-attr">height</span>: <span class="hljs-string">`</span><span class="hljs-subst">${geometry.height + </span><span class="hljs-number">1</span><span class="hljs-subst">}</span><span class="hljs-string">px`</span>,
+    <span class="hljs-attr">margin</span>: { <span class="hljs-attr">top</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">bottom</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">left</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">right</span>: <span class="hljs-number">0</span> }, <span class="hljs-attr">printBackground</span>: <span class="hljs-literal">true</span>,
+    <span class="hljs-attr">preferCSSPageSize</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">timeout</span>: <span class="hljs-number">15000</span> });
+<span class="hljs-keyword">const</span> blocked = <span class="hljs-keyword">await</span> page.evaluate(<span class="hljs-function">() =&gt;</span> globalThis.<span class="hljs-property">publicationViolations</span>);
+<span class="hljs-keyword">if</span> (violations.<span class="hljs-property">length</span> || blocked.<span class="hljs-property">length</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Mermaid attempted a blocked resource or navigation: '</span> + [...violations, ...blocked].<span class="hljs-title">join</span>(<span class="hljs-string">', '</span>)); }
+<span class="hljs-keyword">if</span> (bytes.<span class="hljs-property">length</span> &gt; diagramLimits.<span class="hljs-property">pdf</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Mermaid PDF exceeds 16 MiB'</span>); }
+<span class="hljs-keyword">const</span> pdf = <span class="hljs-title">Buffer</span>.<span class="hljs-title">from</span>(<span class="hljs-title">Buffer</span>.<span class="hljs-title">from</span>(bytes).<span class="hljs-title">toString</span>(<span class="hljs-string">'latin1'</span>).<span class="hljs-title">replace</span>(
+    <span class="hljs-regexp">/</span><span class="hljs-regexp">\/</span><span class="hljs-regexp">(CreationDate|ModDate) </span><span class="hljs-regexp">\(</span><span class="hljs-regexp">D:</span><span class="hljs-regexp">\d</span><span class="hljs-regexp">{14}</span><span class="hljs-regexp">[^)]</span><span class="hljs-regexp">*</span><span class="hljs-regexp">\)</span><span class="hljs-regexp">/g</span>,
+    <span class="hljs-params">match</span><span class="hljs-function"> =&gt;</span> match.<span class="hljs-title">replace</span>(<span class="hljs-regexp">/D:</span><span class="hljs-regexp">\d</span><span class="hljs-regexp">{14}/</span>, <span class="hljs-string">'D:20000101000000'</span>)), <span class="hljs-string">'latin1'</span>);
+<span class="hljs-keyword">return</span> { pdf, <span class="hljs-attr">svg</span>: <span class="hljs-title">Buffer</span>.<span class="hljs-title">from</span>(geometry.<span class="hljs-property">svg</span>) };
+</code></pre>
+
+</div>
+</div><h2>Browser ownership</h2>
+<p>Puppeteer is imported only in the child. The browser sandbox remains enabled;
+there is no fallback to <code>--no-sandbox</code>. The private profile, disabled background
+services and failed DNS resolution complement page-level request blocking.
+JavaScript heaps are capped, but this is not a hard operating-system RSS quota.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-004d00650072006d006100690064002000620072006f0077007300650072002000620061007400630068-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d006100690064002000620072006f0077007300650072002000620061007400630068"></span><a class="literate-tag-name" href="#f-004d00650072006d006100690064002000620072006f0077007300650072002000620061007400630068" data-literate-target="f-004d00650072006d006100690064002000620072006f0077007300650072002000620061007400630068" aria-label="Definition of Mermaid browser batch">&lt;&lt;Mermaid browser batch&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">browserBatch</span>(<span class="hljs-params">directory, executable, launch</span>) {
+    <span class="hljs-keyword">const</span> request = <span class="hljs-title">JSON</span>.<span class="hljs-title">parse</span>(<span class="hljs-keyword">await</span> fs.<span class="hljs-title">readFile</span>(path.<span class="hljs-title">join</span>(directory, <span class="hljs-string">'request.json'</span>), <span class="hljs-string">'utf8'</span>));
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">getTheme</span>(request.<span class="hljs-property">theme</span>) || !<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(request.<span class="hljs-property">sources</span>) || request.<span class="hljs-property">sources</span>.<span class="hljs-property">length</span> &gt; <span class="hljs-number">64</span>) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Invalid Mermaid worker request'</span>);
+    }
+    request.<span class="hljs-property">sources</span>.<span class="hljs-title">forEach</span>(validateDiagram);
+    <span class="hljs-keyword">const</span> manifest = <span class="hljs-built_in">require</span>.<span class="hljs-title">resolve</span>(<span class="hljs-string">'mermaid/package.json'</span>);
+    <span class="hljs-keyword">if</span> (<span class="hljs-title">JSON</span>.<span class="hljs-title">parse</span>(<span class="hljs-keyword">await</span> fs.<span class="hljs-title">readFile</span>(manifest, <span class="hljs-string">'utf8'</span>)).<span class="hljs-property">version</span> !== <span class="hljs-string">'12.0.0'</span>) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Publication requires the pinned Mermaid 12.0.0 bundle'</span>);
+    }
+    <span class="hljs-keyword">const</span> bundle = <span class="hljs-keyword">await</span> fs.<span class="hljs-title">readFile</span>(path.<span class="hljs-title">join</span>(path.<span class="hljs-title">dirname</span>(<span class="hljs-title">fileURLToPath</span>(<span class="hljs-keyword">import</span>.<span class="hljs-property">meta</span>.<span class="hljs-property">url</span>)),
+            <span class="hljs-string">'publication-mermaid-browser.js'</span>), <span class="hljs-string">'utf8'</span>);
+    <span class="hljs-keyword">const</span> browser = <span class="hljs-keyword">await</span> <span class="hljs-title">launch</span>({ <span class="hljs-attr">executablePath</span>: executable, <span class="hljs-attr">headless</span>: <span class="hljs-literal">true</span>,
+        <span class="hljs-attr">userDataDir</span>: path.<span class="hljs-title">join</span>(directory, <span class="hljs-string">'profile'</span>), <span class="hljs-attr">timeout</span>: <span class="hljs-number">15000</span>, <span class="hljs-attr">protocolTimeout</span>: <span class="hljs-number">15000</span>,
+        <span class="hljs-attr">args</span>: [<span class="hljs-string">'--disable-background-networking'</span>, <span class="hljs-string">'--disable-component-update'</span>, <span class="hljs-string">'--disable-sync'</span>,
+            <span class="hljs-string">'--no-first-run'</span>, <span class="hljs-string">'--host-resolver-rules=MAP * ~NOTFOUND'</span>,
+            <span class="hljs-string">'--js-flags=--max-old-space-size=256'</span>, <span class="hljs-string">'--renderer-process-limit=1'</span>] });
+    <a class="literate-tag-name" href="#f-004d00650072006d0061006900640020006200610074006300680020006100720074006900660061006300740073" data-literate-target="f-004d00650072006d0061006900640020006200610074006300680020006100720074006900660061006300740073" aria-label="Definition of Mermaid batch artifacts">&lt;&lt;Mermaid batch artifacts&gt;&gt;</a>
+}
+</code></pre>
+
+</div>
+</div><p>Each result is complete before either artifact is written. These are private
+scratch files, not publication outputs. An indexed diagnostic maps back to the
+source location held by the controller; aggregate limits bound retained bytes.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-004d00650072006d0061006900640020006200610074006300680020006100720074006900660061006300740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d0061006900640020006200610074006300680020006100720074006900660061006300740073"></span><a class="literate-tag-name" href="#f-004d00650072006d0061006900640020006200610074006300680020006100720074006900660061006300740073" data-literate-target="f-004d00650072006d0061006900640020006200610074006300680020006100720074006900660061006300740073" aria-label="Definition of Mermaid batch artifacts">&lt;&lt;Mermaid batch artifacts&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">try</span> {
+    <span class="hljs-keyword">let</span> total = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [index, source] <span class="hljs-keyword">of</span> request.<span class="hljs-property">sources</span>.<span class="hljs-title">entries</span>()) {
+        <span class="hljs-keyword">try</span> {
+            <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">await</span> <span class="hljs-title">renderVector</span>(browser, source, request.<span class="hljs-property">theme</span>, bundle);
+            total += result.<span class="hljs-property">pdf</span>.<span class="hljs-property">length</span> + result.<span class="hljs-property">svg</span>.<span class="hljs-property">length</span>;
+            <span class="hljs-keyword">if</span> (total &gt; diagramLimits.<span class="hljs-property">total</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Mermaid artifacts exceed 32 MiB'</span>); }
+            <span class="hljs-keyword">await</span> fs.<span class="hljs-title">writeFile</span>(path.<span class="hljs-title">join</span>(directory, <span class="hljs-string">`</span><span class="hljs-subst">${index}</span><span class="hljs-string">.pdf`</span>), result.<span class="hljs-property">pdf</span>);
+            <span class="hljs-keyword">await</span> fs.<span class="hljs-title">writeFile</span>(path.<span class="hljs-title">join</span>(directory, <span class="hljs-string">`</span><span class="hljs-subst">${index}</span><span class="hljs-string">.svg`</span>), result.<span class="hljs-property">svg</span>);
+        } <span class="hljs-keyword">catch</span> (error) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Diagram </span><span class="hljs-subst">${index + </span><span class="hljs-number">1</span><span class="hljs-subst">}</span><span class="hljs-string">: </span><span class="hljs-subst">${</span><span class="hljs-built_in">String</span><span class="hljs-subst">(error)}</span><span class="hljs-string">`</span>); }
+    }
+} <span class="hljs-keyword">finally</span> { <span class="hljs-keyword">await</span> browser.<span class="hljs-title">close</span>(); }
+</code></pre>
+
+</div>
+</div><p>Puppeteer's normal launcher detaches Chromium into a separate process group.
+Instead, this worker spawns Chromium without detaching, using Puppeteer's fixed
+default arguments, and connects over a loopback-only debugging endpoint. Thus
+the controller's process-group kill also covers launch failures and hung closes.
+The endpoint is never available to diagram page content, whose connections are
+blocked by CSP and request interception; other local processes under the same user
+remain outside this isolation model.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073"></span><a class="literate-tag-name" href="#f-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073" data-literate-target="f-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073" aria-label="Definition of Mermaid owned browser process">&lt;&lt;Mermaid owned browser process&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">connectOwnedBrowser</span>(<span class="hljs-params">puppeteer, options</span>) {
+    <span class="hljs-keyword">const</span> args = <span class="hljs-keyword">await</span> puppeteer.<span class="hljs-title">defaultArgs</span>({ ...options, <span class="hljs-attr">args</span>: [...options.<span class="hljs-property">args</span>,
+        <span class="hljs-string">'--remote-debugging-port=0'</span>, <span class="hljs-string">'--remote-debugging-address=127.0.0.1'</span>] });
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(args) || !args.<span class="hljs-title">includes</span>(<span class="hljs-string">`--user-data-dir=</span><span class="hljs-subst">${options.userDataDir}</span><span class="hljs-string">`</span>)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Puppeteer did not provide the isolated browser arguments'</span>);
+    }
+    <span class="hljs-keyword">const</span> home = path.<span class="hljs-title">dirname</span>(options.<span class="hljs-property">userDataDir</span>);
+    <span class="hljs-keyword">const</span> child = <span class="hljs-title">spawn</span>(options.<span class="hljs-property">executablePath</span>, args, { <span class="hljs-attr">detached</span>: <span class="hljs-literal">false</span>,
+        <span class="hljs-attr">env</span>: { ...process.<span class="hljs-property">env</span>, <span class="hljs-attr">HOME</span>: home, <span class="hljs-attr">XDG_CONFIG_HOME</span>: path.<span class="hljs-title">join</span>(home, <span class="hljs-string">'config'</span>),
+            <span class="hljs-attr">XDG_CACHE_HOME</span>: path.<span class="hljs-title">join</span>(home, <span class="hljs-string">'cache'</span>), <span class="hljs-attr">XDG_DATA_HOME</span>: path.<span class="hljs-title">join</span>(home, <span class="hljs-string">'data'</span>),
+            <span class="hljs-attr">CHROMIUM_USER_FLAGS</span>: <span class="hljs-string">' '</span> }, <span class="hljs-attr">stdio</span>: [<span class="hljs-string">'ignore'</span>, <span class="hljs-string">'ignore'</span>, <span class="hljs-string">'pipe'</span>] });
+    <span class="hljs-keyword">try</span> {
+        <span class="hljs-keyword">const</span> endpoint = <span class="hljs-keyword">await</span> <span class="hljs-title">browserEndpoint</span>(child);
+        <span class="hljs-keyword">return</span> <span class="hljs-keyword">await</span> puppeteer.<span class="hljs-title">connect</span>({ <span class="hljs-attr">browserWSEndpoint</span>: endpoint, <span class="hljs-attr">protocolTimeout</span>: <span class="hljs-number">15000</span> });
+    } <span class="hljs-keyword">catch</span> (error) { child.<span class="hljs-title">kill</span>(<span class="hljs-string">'SIGKILL'</span>); <span class="hljs-keyword">throw</span> error; }
+}
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of Mermaid owned browser process"><a class="literate-tag-name" href="#c-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-2" data-literate-target="c-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-2" aria-label="Next contribution of Mermaid owned browser process">Next</a></nav>
+</div><p>The endpoint announcement has its own deadline and bounded stderr accumulator.
+Only a loopback WebSocket endpoint is accepted. The stderr listener remains after
+connection to drain the pipe, but retains no additional browser log data.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073" data-literate-target="f-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073" aria-label="Definition of Mermaid owned browser process">&lt;&lt;Mermaid owned browser process&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">browserEndpoint</span>(<span class="hljs-params">child</span>) {
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Promise</span>(<span class="hljs-function">(</span><span class="hljs-params">resolve, reject</span><span class="hljs-function">) =&gt;</span> {
+        <span class="hljs-keyword">let</span> log = <span class="hljs-string">''</span>, done = <span class="hljs-literal">false</span>;
+        <span class="hljs-keyword">const</span> <span class="hljs-title">finish</span> = (<span class="hljs-params">error, endpoint</span>) =&gt; {
+            <span class="hljs-keyword">if</span> (done) { <span class="hljs-keyword">return</span>; }
+            done = <span class="hljs-literal">true</span>; <span class="hljs-built_in">clearTimeout</span>(timer);
+            <span class="hljs-keyword">if</span> (error) { <span class="hljs-title">reject</span>(error); } <span class="hljs-keyword">else</span> { <span class="hljs-title">resolve</span>(endpoint); }
+        };
+        <span class="hljs-keyword">const</span> timer = <span class="hljs-built_in">setTimeout</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title">finish</span>(<span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Chromium launch deadline exceeded: </span><span class="hljs-subst">${log}</span><span class="hljs-string">`</span>)), <span class="hljs-number">15000</span>);
+        child.<span class="hljs-title">once</span>(<span class="hljs-string">'error'</span>, <span class="hljs-params">error</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">finish</span>(error));
+        child.<span class="hljs-title">once</span>(<span class="hljs-string">'exit'</span>, <span class="hljs-params">code</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">finish</span>(<span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Chromium exited </span><span class="hljs-subst">${code}</span><span class="hljs-string">: </span><span class="hljs-subst">${log}</span><span class="hljs-string">`</span>)));
+        child.<span class="hljs-property">stderr</span>.<span class="hljs-title">on</span>(<span class="hljs-string">'data'</span>, <span class="hljs-params">bytes</span><span class="hljs-function"> =&gt;</span> {
+            <span class="hljs-keyword">if</span> (done) { <span class="hljs-keyword">return</span>; }
+            log += bytes.<span class="hljs-title">toString</span>(<span class="hljs-string">'utf8'</span>);
+            <span class="hljs-keyword">if</span> (log.<span class="hljs-property">length</span> &gt; <span class="hljs-number">32768</span>) { <span class="hljs-title">finish</span>(<span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Chromium launch log exceeds 32 KiB'</span>)); <span class="hljs-keyword">return</span>; }
+            <span class="hljs-keyword">const</span> match = <span class="hljs-regexp">/DevTools listening on (ws:</span><span class="hljs-regexp">\/</span><span class="hljs-regexp">\/</span><span class="hljs-regexp">127</span><span class="hljs-regexp">\.</span><span class="hljs-regexp">0</span><span class="hljs-regexp">\.</span><span class="hljs-regexp">0</span><span class="hljs-regexp">\.</span><span class="hljs-regexp">1:</span><span class="hljs-regexp">\d</span><span class="hljs-regexp">+</span><span class="hljs-regexp">\/</span><span class="hljs-regexp">devtools</span><span class="hljs-regexp">\/</span><span class="hljs-regexp">browser</span><span class="hljs-regexp">\/</span><span class="hljs-regexp">[</span><span class="hljs-regexp">\w</span><span class="hljs-regexp">-]</span><span class="hljs-regexp">+)/</span>.<span class="hljs-title">exec</span>(log);
+            <span class="hljs-keyword">if</span> (match) { <span class="hljs-title">finish</span>(<span class="hljs-literal">undefined</span>, match[<span class="hljs-number">1</span>]); }
+        });
+    });
+}
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of Mermaid owned browser process"><a class="literate-tag-name" href="#c-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1" data-literate-target="c-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1" aria-label="Previous contribution of Mermaid owned browser process">Previous</a> · <a class="literate-tag-name" href="#c-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1" data-literate-target="c-004d00650072006d0061006900640020006f0077006e00650064002000620072006f0077007300650072002000700072006f0063006500730073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1" aria-label="Base contribution of Mermaid owned browser process">Base</a></nav>
+</div><p>Missing optional dependencies and browser launch failures stay actionable. The
+worker never chooses a browser or retries with weakened security. A bounded
+message is sufficient because the parent retains the publication's source context.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-004d00650072006d00610069006400200077006f0072006b0065007200200065006e007400720079-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d00610069006400200077006f0072006b0065007200200065006e007400720079"></span><a class="literate-tag-name" href="#f-004d00650072006d00610069006400200077006f0072006b0065007200200065006e007400720079" data-literate-target="f-004d00650072006d00610069006400200077006f0072006b0065007200200065006e007400720079" aria-label="Definition of Mermaid worker entry">&lt;&lt;Mermaid worker entry&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">main</span>() {
+    <span class="hljs-keyword">try</span> {
+        <span class="hljs-keyword">const</span> { <span class="hljs-attr">default</span>: puppeteer } = <span class="hljs-keyword">await</span> <span class="hljs-keyword">import</span>(<span class="hljs-string">'puppeteer-core'</span>);
+        <span class="hljs-keyword">await</span> <span class="hljs-title">browserBatch</span>(process.<span class="hljs-property">argv</span>[<span class="hljs-number">2</span>], process.<span class="hljs-property">argv</span>[<span class="hljs-number">3</span>], <span class="hljs-params">options</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">connectOwnedBrowser</span>(puppeteer, options));
+    } <span class="hljs-keyword">catch</span> (error) {
+        process.<span class="hljs-property">stderr</span>.<span class="hljs-title">write</span>((<span class="hljs-string">'Mermaid browser failed (install dev dependencies; supply a sandbox-capable system browser): '</span>
+            + <span class="hljs-title">String</span>(error)).<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">16000</span>) + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>, <span class="hljs-function">() =&gt;</span> process.<span class="hljs-title">exit</span>(<span class="hljs-number">1</span>));
+    }
+}
+<span class="hljs-keyword">if</span> (process.<span class="hljs-property">argv</span>[<span class="hljs-number">1</span>] === <span class="hljs-title">fileURLToPath</span>(<span class="hljs-keyword">import</span>.<span class="hljs-property">meta</span>.<span class="hljs-property">url</span>)) { <span class="hljs-keyword">void</span> <span class="hljs-title">main</span>(); }
+</code></pre>
+
+</div>
+</div></div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

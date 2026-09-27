@@ -1,6 +1,6 @@
 # Developing Literate
 
-Use Node.js 22 LTS, Corepack, and the Yarn version pinned in `package.json`.
+Use Node.js 22 LTS (>=22.12), Corepack, and the Yarn version pinned in `package.json`.
 If Corepack is unavailable, install it with `npm install --global corepack`, then
 run `corepack enable`. Do not install a global TypeScript compiler.
 
@@ -106,12 +106,96 @@ accented Latin in prose. Long unbreakable **inline prose code** can still overru
 (Pandoc's `texttt`), unlike breakable fenced code. Ligatures remain enabled and
 PDF copying is not source-lossless. The harness does not test every palette,
 font, supported geometry, maximum-length heading at every page position, or a
-reference taller than a page. The repository's Mermaid-containing full book is
-still explicitly unsupported by LaTeX export. The screen integration boundary and
-M1 acceptance assessment below do not broaden this PDF fixture's guarantees.
+reference taller than a page. Full-book Mermaid export is covered separately by
+M3 below. The screen integration boundary and historical M1 acceptance assessment
+do not broaden this PDF fixture's guarantees.
+
+## Opt-in portable image acceptance
+
+```sh
+yarn test:assets --font-manifest /absolute/path/to/font-project/fonts.json \
+  --ulem /absolute/path/to/existing/ulem.sty
+```
+
+The optional `--ulem` and explicit local font manifest use the same contract as
+`test:publication`. This harness additionally requires `pdftocairo` and `pdftoppm`.
+It creates trusted wide/tall vector PDFs and real PNG/JPEG fixtures, exports with
+the production CLI/Pandoc, checks deduplication and unchanged re-export, moves the
+export directory and hides source images before LuaLaTeX compilation. No browser,
+font, package or host installation is performed. All subprocesses have timeouts.
+
+Evidence is retained in a fresh ignored `out/assets-acceptance-*`: export JSON,
+relocated PDFs/TeX/companions, final logs, Poppler XML, per-figure SVG and 144-dpi
+PPM measurements, and `acceptance.json`. Both A4 and A5 use asymmetric
+18/16/22/20 mm margins. Checks cover plain and list/quote-contained figures,
+10:1 wide and 1:15 tall aspect ratios, body bounds, reduced nested width,
+caption/figure co-location, no vector rasterization, and clean final compiler
+logs. A separate oversized-caption fixture must fail with the explicit caption
+budget error rather than producing clipped output. Pixel measurements allow rounding tolerance; this is a bounded fixture,
+not a general PDF parser or proof for arbitrary image contents or captions.
+A full-height figure may leave a preceding heading on the previous page.
+
+Normal tests inject filesystem, converter and transaction adapters. They require
+neither Pandoc, TeX nor a browser and cover unsafe/missing inputs, content naming,
+limits, input aliases, converter failure and rollback after image installation
+alongside text and font changes. Mermaid rendering and browser-failure acceptance
+are separate from this image harness; see M3 below.
+
+## M3 Mermaid acceptance
+
+M3 adds transactional local PNG/JPEG/PDF and generated Mermaid SVG+PDF companions
+to explicit CLI LaTeX export. See [README](README.md#m3-explicit-mermaid-vector-export)
+for browser requirements, source restrictions and caps. Ordinary generation and
+extension use do not launch the publication browser; there is still no extension
+export action or automatic book PDF compilation.
+
+Run the opt-in checks with **Node >=22.12 on POSIX**, checkout development
+dependencies (`puppeteer-core`, no browser download), and an explicitly installed,
+sandbox-capable system Chromium:
+
+```sh
+yarn test:mermaid --browser /usr/bin/chromium-browser \
+  --font-manifest /absolute/path/to/font-project/fonts.json \
+  --ulem /absolute/path/to/existing/ulem.sty --full-repo
+yarn test:browser-security /usr/bin/chromium-browser
+node src/test/acceptance/mermaid-families.mjs /usr/bin/chromium-browser
+```
+
+`test:mermaid` builds the CLI and uses the publication harness's Python/Pandoc/
+LuaLaTeX/font prerequisites plus Poppler's `pdfimages`; `--ulem` remains the
+optional, disclosed local workaround above. The family runner needs compiled
+modules, the worker bundle, `pdfinfo` and `pdfimages` (run `yarn compile` and
+`yarn build:mermaid-worker` first when invoking it alone). Browser rendering uses
+system sans fonts, not the portable book-font manifest.
+
+`yarn install --immutable` currently succeeds with a transitive peer warning:
+`@zenuml/core` does not provide Tailwind to `@headlessui/tailwindcss`. Publication
+imports ZenUML's prebundled ESM, not that CSS-build plugin; the offline bundle and
+browser checks above pass without adding a Tailwind toolchain. The warning is
+not suppressed. New renderer packages declare MIT licenses; Puppeteer Core
+uses Apache-2.0, and its license remains in the installed dependency.
+
+Retained acceptance evidence:
+
+- `out/mermaid-families-4Ayxrs`: **39 family/dialect fixtures passed**, using the
+  full pinned Mermaid 12 bundle with ZenUML and tidy-tree registration, no family
+  allowlist. This is not exhaustive coverage of every theme/family configuration.
+- `out/mermaid-security-c8c2oN`: security checks passed with **zero trap hits**.
+- `out/mermaid-acceptance-on87g_rc`: portable A4/A5 six-figure fixtures passed:
+  wide/tall flowcharts, nested list/quote variants, sequence and ER diagrams,
+  deterministic re-export, relocation and no rasterization in the compiled PDFs.
+  The full repository's **eight diagrams** also exported, relocated and compiled,
+  but its final log has **61 issues: 52 missing-glyph entries and nine overfull
+  lines**. This proves compilation, **not clean full-book typography**.
+
+The current recorded full test result is **918 passed, 2 skipped**. Normal tests
+use injected adapters and do not launch Chromium; these opt-in browser/PDF checks
+are separate evidence, not implied by a headless-suite pass. Each harness retains
+its own ignored `out/` evidence directory for diagnosis.
 
 ## M1 acceptance review
 
+This is the historical M1 sign-off; M3's image/diagram support is assessed above.
 M1 is complete **for the documented supported-subset CLI LaTeX export**, not a
 universal book/layout or screen-parity guarantee. Work items 1–7 supply the shared
 parsed model/identity policy, controlled Pandoc bridge, styled book renderer,
@@ -158,13 +242,13 @@ Acceptance criteria, with their evidence and bounds:
    cover diagnostics, process failures, protected paths, staging and rollback.
    The PDF harness relocates unmodified TeX and font/license bytes and verifies
    unchanged re-export. Packages still need installation; this host's disclosed
-   local `ulem` workaround is not a shipped companion. Images, tables, raw author
-   tokens and Mermaid fail explicitly rather than being silently omitted.
+   local `ulem` workaround is not a shipped companion. Unsupported images, tables,
+   raw author tokens and Mermaid failed explicitly in M1 rather than being silently omitted.
 
 No further M1 task is identified within those bounds. Universal Unicode/layout
 acceptance and clean-machine compilation without prerequisites remain unproven,
-not implicitly accepted. Supported assets currently mean explicit font/license
-companions; general publication images/diagrams remain later work. A complete
+not implicitly accepted. Portable local PNG/JPEG/PDF images are covered separately
+by the image acceptance harness above; Mermaid rendering is covered by M3. A complete
 term/index or note-column layout is not implemented; a separate note-font role
 reserves styling without claiming those features.
 
@@ -534,7 +618,7 @@ The automated browser checks above do not replace this remaining manual coverage
 
 Implementation, automated contract acceptance and the installed-host keyboard/click test
 are separate from this remaining manual UX validation. The optional fragment index, heading-ID parity and Mermaid
-asset work are deliberately deferred. No new portable PDF build is implied by
+asset work were outside M2's scope (M3 now covers LaTeX diagram assets). No new portable PDF build is implied by
 M2's real-Pandoc tests; the earlier M1 PDF evidence above remains historical.
 
 ## Line endings across platforms

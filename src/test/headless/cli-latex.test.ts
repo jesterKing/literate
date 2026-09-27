@@ -253,7 +253,7 @@ test('latex JSON writes only the selected-root book and preserves identical byte
 
 for (const [name, text] of [
     ['syntax', '```text: <<broken>>\nmalformed header\n```\n'],
-    ['Mermaid', '```mermaid\ngraph TD; A-->B\n```\n'],
+    ['Mermaid contribution', '```mermaid: <<diagram>>=\ngraph TD; A-->B\n```\n'],
     ['missing heading', '[go](#absent)\n\n# Present'],
     ['missing heading document', '[go](missing.html#absent)'],
     ['ambiguous heading', '[go](#same)\n\n# Same\n\n# Same'],
