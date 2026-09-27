@@ -37,6 +37,7 @@ shared contracts and helpers for both generation and its adapters.
 <<engine literal template substitution>>
 <<engine default HTML template>>
 <<engine generation orchestration>>
+<<engine language collection>>
 ```
 
 ## Contracts at the adapter boundary
@@ -1076,6 +1077,12 @@ collisions but retains valid paths and reserves them even after a diagnostic,
 exactly as before. Invalid path syntax never reaches the hook.
 
 ```ts : <<engine generation collection policy>>=+
+<<engine generation collection policy reservation>>
+```
+
+The source-only collector uses this same reservation policy.
+
+```ts : <<engine generation collection policy reservation>>=
 reserve(path, location) {
     const key = pathKey(path);
     if (inputKeys.has(key)) { report(location, `Output collides with input: ${path}`); }
@@ -1296,4 +1303,45 @@ for (const path of order) {
     const content = htmlTemplate.includes('[THEME]') ? wrapper : theme + wrapper;
     files.push({ path: safeRelativePath(path.replace(/\.literate$/, '.html'))!, content: substitute(htmlTemplate, { content, authors: metaAuthors, theme }) });
 }
+```
+
+## Source projection collection
+
+The language adapter shares collection and destination policy with generation,
+including template admission and theme validation, but never constructs HTML.
+This internal bridge exposes collected parts only to the mapped source builder.
+The reservation fragment is shared verbatim, keeping portable collisions aligned.
+
+```ts : <<engine language collection>>=
+/** @internal Collected source graph for the pure language projection adapter. */
+export function collectLanguageProject(documents: SourceDocument[], templates: Record<string, string>) {
+    const diagnostics: GenerationDiagnostic[] = [];
+    const report = (location: Location, message: string): void => { diagnostics.push({ ...location, message }); };
+    const templateMap = new Map<string, string>();
+    const templateKeys = new Set<string>();
+    const outputs = new Set<string>();
+    let inputKeys = new Set<string>();
+    return collectProject(documents, {
+        diagnostics,
+        acceptInputs(sourceKeys) {
+            <<engine accept template inputs>>
+            inputKeys = new Set([...sourceKeys, ...templateKeys]);
+        },
+        settings(sources) { diagnostics.push(...resolveProjectTheme(sources).diagnostics); },
+        loadTemplate(path, location) {
+            if (!templateMap.has(path)) { report(location, `Missing template: ${path}`); }
+            return templateMap.get(path);
+        },
+        setAuthors() {},
+        setHtmlTemplate() {},
+        <<engine projection reservation>>
+    });
+}
+```
+
+Projection reserves documentation destinations too, since a project that would
+clobber a source during normal generation must not masquerade as valid code.
+
+```ts : <<engine projection reservation>>=
+<<engine generation collection policy reservation>>
 ```

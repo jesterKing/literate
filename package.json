@@ -55,8 +55,21 @@
       "./out/publication-exploration-preview.js"
     ],
     "configuration": {
-      "title": "Literate publication",
+      "title": "Literate",
       "properties": {
+        "literate.languageServers": {
+          "type": "object", "default": {}, "scope": "machine", "restricted": true,
+          "description": "Direct stdio language servers keyed by language ID (for example typescript or zig). User settings only, trusted local workspaces only. Executables are not installed automatically; each server runs separately from other extensions.",
+          "additionalProperties": {
+            "type": "object", "required": ["command"], "additionalProperties": false,
+            "properties": {
+              "command": { "type": "string", "description": "Absolute executable path. No shell expansion." },
+              "args": { "type": "array", "items": { "type": "string" }, "default": [] },
+              "initializationOptions": { "type": "object", "default": {} },
+              "configuration": { "type": "object", "default": {}, "description": "Server settings returned by workspace/configuration requests." }
+            }
+          }
+        },
         "literate.publication.nodePath": {
           "type": "string", "default": "", "scope": "machine", "restricted": true,
           "description": "Absolute path to external Node.js >=22.12 for explicit publication. Electron is unsupported; workspace overrides are ignored."
@@ -72,6 +85,7 @@
       }
     },
     "commands": [
+      { "command": "literate.restartLanguageServers", "title": "Literate: Restart Language Servers", "enablement": "isWorkspaceTrusted" },
       { "command": "literate.exportLatex", "title": "Literate: Export LaTeX", "enablement": "isWorkspaceTrusted" },
       { "command": "literate.exportPdf", "title": "Literate: Export PDF", "enablement": "isWorkspaceTrusted" },
       {

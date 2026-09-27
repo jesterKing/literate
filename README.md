@@ -77,6 +77,66 @@ folders. Edits to referenced source/HTML templates also regenerate automatically
 external input create/change/delete events are debounced per workspace. Associate
 `*.literate` files with Markdown to enable the editor providers.
 
+## Language hover and completion inside fragments
+
+Associate `*.literate` with **Markdown**, open a trusted local workspace, and
+configure `literate.languageServers` in **User settings**. Hover over a code symbol
+or press **Ctrl+Space** inside a named fragment. Fragment-name suggestions remain
+available inside unfinished `<<` tags.
+
+Each entry is keyed by a canonical VS Code language ID and contains an **absolute
+server executable path**, optional `args`, optional `initializationOptions`, and
+optional `configuration` returned to server configuration requests. For example,
+a TypeScript entry uses `typescript` and a Zig entry uses `zig`. Fence aliases
+`ts`/`js`/`tsx`/`jsx` normalize to their corresponding language IDs. Configure each
+language ID you want to request services for; a TypeScript-family session receives
+all TypeScript/JavaScript-family output overlays for import resolution.
+
+Executable settings are global-only; workspace overrides are ignored. Literate
+launches its own stdio LSP process per workspace/language on demand, without a
+shell. It does not attach to another extension's private server, install tools,
+or download servers. Installing a language extension alone is **not sufficient**:
+its server must be available as a standalone stdio LSP executable. Configured
+servers are trusted programs with normal access to the workspace, not sandboxed.
+Remote extension hosts and non-file workspaces are not supported.
+
+Verified server configurations:
+
+- **TypeScript 7:** `TypeScriptTeam.native-preview` supplies a server executable
+  inside its installation. The tested build uses `lib/tsc` with arguments
+  `["--lsp", "--stdio"]`. `code --locate-extension TypeScriptTeam.native-preview`
+  reports the extension directory. This is not the older JavaScript `tsc` command.
+- **Zig:** use the ZLS executable selected by `ziglang.vscode-zig`, with no
+  arguments. Its **ZLS language server** output channel identifies the path after
+  activation. Set `initializationOptions.zig_exe_path` to the absolute Zig compiler
+  path when necessary. Tested with ZLS/Zig 0.16.0; TypeScript was 7.0.2.
+
+Server paths may change when an owning extension updates. Failed sessions remain
+stopped rather than repeatedly launching; consult **Literate Language Servers**
+in the Output panel and run **Literate: Restart Language Servers** after fixing
+configuration. Changing `literate.languageServers` also resets sessions.
+
+The server sees assembled outputs at their intended `file:` URIs, populated from
+current literate buffers. Requests neither save nor generate files; ordinary
+edit-triggered generation remains unchanged. Same-language generated dependencies
+are synchronized too, even if their output files do not exist. Physical imports
+and project configuration are read by the server.
+
+Initial boundaries:
+- Only named fragments reachable from a valid output receive services. Invalid
+  fragment graphs, source-template outputs, and expansion-limit violations return
+  no results. A repeatedly used fragment selects its first deterministic expansion.
+- Simple single-line completion replacement ranges must remain within the active
+  source mapping. Snippets, commands, auxiliary edits/auto-imports and completion
+  resolution are not supported. No language-specific trigger characters are
+  registered; use Ctrl+Space to request suggestions.
+- Hover Markdown is untrusted; unsafe mapped ranges are rejected. UTF-16 position
+  support and document open/change/close synchronization are required from servers.
+- Requests are serialized; overlapping requests can return no result. Cancelled
+  or stale results are discarded. Diagnostics, rename, definitions and general
+  server filesystem-watch registration are not forwarded. Restart servers if
+  external dependency or project-configuration changes are not picked up.
+
 ## Exploring fragment references
 
 Preview and generated HTML retain ordinary fragment-navigation links and add

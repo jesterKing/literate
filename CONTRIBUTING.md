@@ -11,6 +11,36 @@ yarn test
 yarn esbuild
 ```
 
+## Direct language-server acceptance
+
+`literate/language-projection.literate`, `literate/language-client.literate` and
+`literate/language-features.literate` own the mapping, transport and editor adapter.
+Their headless tests cover projection parity, UTF-16/line endings/indentation,
+repeated references and empty appends, framing and synchronization, lifecycle,
+trust/configuration, cancellation/staleness, and conservative response mapping.
+All implementation fragments in these chapters are at most 30 lines.
+
+The installed-host acceptance is opt-in and downloads nothing. Build first with
+`yarn esbuild`, then set `LANGUAGE_HOST_TYPESCRIPT` and `LANGUAGE_HOST_ZLS` to the
+absolute installed server executables and run
+`node src/test/acceptance/language-host-run.js`. Optional executable overrides are
+`LANGUAGE_HOST_CODE` and `LANGUAGE_HOST_ZIG`; TypeScript arguments can be supplied
+as a JSON array in `LANGUAGE_HOST_TYPESCRIPT_ARGS` (default `--lsp --stdio`). The
+runner uses an isolated profile and workspace with a bounded host lifetime.
+
+Validated on VS Code 1.138.0/Linux ARM64 with TypeScript 7.0.2 and ZLS/Zig 0.16.0:
+19 acceptance checks passed, including 14 read-only completion/hover requests,
+source-only completion application, physical and generated imports, tsconfig
+aliases, unsaved type changes and retained fragment-name completion. Ordinary
+edits still trigger generation. The harness waits for that generation to settle,
+then removes only isolated generated fixtures before requesting language services;
+each request must leave those files absent and source/dependency contents and
+mtimes unchanged. Evidence is retained beneath ignored `out/language-host-*`.
+
+This does not establish compatibility with every LSP server. Dynamic registration,
+filesystem-watch forwarding, completion resolve, source templates, diagnostics,
+remote workspaces and Zig build/package graphs remain outside initial acceptance.
+
 ## M7 publication closure
 
 The agreed book-publication scope is complete, including bounded screen fragment

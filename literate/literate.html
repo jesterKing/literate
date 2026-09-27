@@ -263,6 +263,7 @@ as an explicit clear.</p>
 <div class="code">
 <pre><code>  <span class="hljs-title">dispose</span>()
   {
+    <span class="hljs-variable">this</span>.
     <span class="hljs-variable">this</span>.<span class="hljs-property">map</span>.<span class="hljs-title">clear</span>();
   }
 };
@@ -2539,7 +2540,32 @@ fallback to stale disk content for either documents or templates.</p>
 </code></pre>
 
 </div>
-<nav class="fragment-navigation" aria-label="Contributions of utility functions"><a class="literate-tag-name" href="#c-007500740069006c006900740079002000660075006e006300740069006f006e0073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-1" data-literate-target="c-007500740069006c006900740079002000660075006e006300740069006f006e0073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-1" aria-label="Previous contribution of utility functions">Previous</a> · <a class="literate-tag-name" href="#c-007500740069006c006900740079002000660075006e006300740069006f006e0073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-1" data-literate-target="c-007500740069006c006900740079002000660075006e006300740069006f006e0073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-1" aria-label="Base contribution of utility functions">Base</a></nav>
+<nav class="fragment-navigation" aria-label="Contributions of utility functions"><a class="literate-tag-name" href="#c-007500740069006c006900740079002000660075006e006300740069006f006e0073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-1" data-literate-target="c-007500740069006c006900740079002000660075006e006300740069006f006e0073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-1" aria-label="Previous contribution of utility functions">Previous</a> · <a class="literate-tag-name" href="#c-007500740069006c006900740079002000660075006e006300740069006f006e0073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-1" data-literate-target="c-007500740069006c006900740079002000660075006e006300740069006f006e0073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-1" aria-label="Base contribution of utility functions">Base</a> · <a class="literate-tag-name" href="#c-007500740069006c006900740079002000660075006e006300740069006f006e0073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-3" data-literate-target="c-007500740069006c006900740079002000660075006e006300740069006f006e0073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-3" aria-label="Next contribution of utility functions">Next</a></nav>
+</div><p>Language requests capture source buffers independently of generation. Reading
+all texts after discovery avoids mixing asynchronous disk reads with earlier
+buffer versions: current open documents replace disk text in one synchronous
+pass. The language adapter rejects the snapshot if an editor changes during
+capture. It neither processes the repository nor saves generated files.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007500740069006c006900740079002000660075006e006300740069006f006e0073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-3"><a class="literate-tag-name" href="#f-007500740069006c006900740079002000660075006e006300740069006f006e0073" data-literate-target="f-007500740069006c006900740079002000660075006e006300740069006f006e0073" aria-label="Definition of utility functions">&lt;&lt;utility functions&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">captureLanguageSources</span>(<span class="hljs-params">folder: vscode.WorkspaceFolder</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">SourceDocument</span>[]&gt; {
+  <span class="hljs-keyword">const</span> uris = <span class="hljs-keyword">await</span> <span class="hljs-title">getLiterateFileUris</span>(folder);
+  <span class="hljs-keyword">const</span> documents = <span class="hljs-keyword">await</span> <span class="hljs-title">Promise</span>.<span class="hljs-title">all</span>(uris.<span class="hljs-title">map</span>(<span class="hljs-keyword">async</span> uri =&gt; ({
+    <span class="hljs-attr">path</span>: path.<span class="hljs-property">posix</span>.<span class="hljs-title">relative</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>, uri.<span class="hljs-property">path</span>),
+    <span class="hljs-attr">text</span>: <span class="hljs-keyword">await</span> <span class="hljs-title">getFileContent</span>(uri)
+  })));
+  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> <span class="hljs-variable">document</span> <span class="hljs-keyword">of</span> documents) {
+    <span class="hljs-keyword">const</span> uri = vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title">joinPath</span>(folder.<span class="hljs-property">uri</span>, <span class="hljs-variable">document</span>.<span class="hljs-property">path</span>).<span class="hljs-title">toString</span>();
+    <span class="hljs-keyword">const</span> open = vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">textDocuments</span>.<span class="hljs-title">find</span>(<span class="hljs-params">value</span><span class="hljs-function"> =&gt;</span> !value.<span class="hljs-property">isClosed</span> &amp;&amp; value.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>() === uri);
+    <span class="hljs-keyword">if</span> (open) { <span class="hljs-variable">document</span>.<span class="hljs-property">text</span> = open.<span class="hljs-title">getText</span>(); }
+  }
+  <span class="hljs-keyword">return</span> documents;
+}
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of utility functions"><a class="literate-tag-name" href="#c-007500740069006c006900740079002000660075006e006300740069006f006e0073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-2" data-literate-target="c-007500740069006c006900740079002000660075006e006300740069006f006e0073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-2" aria-label="Previous contribution of utility functions">Previous</a> · <a class="literate-tag-name" href="#c-007500740069006c006900740079002000660075006e006300740069006f006e0073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-1" data-literate-target="c-007500740069006c006900740079002000660075006e006300740069006f006e0073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-1" aria-label="Base contribution of utility functions">Base</a></nav>
 </div><h2>The extension</h2>
 <p>Our Visual Studio Code entry file is the <code>extension.ts</code> file. While developing
 the plug-in the JavaScript version created from this, in <code>out/extension.js</code> is
@@ -2696,6 +2722,7 @@ just an empty-bodied implementation for it.</p>
 <span class="hljs-keyword">import</span> { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAnnotation,
   installScreenTermLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle, renderScreenExploration } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-screen'</span>;
 <span class="hljs-keyword">import</span> { registerPublicationCommands } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-extension'</span>;
+<span class="hljs-keyword">import</span> { registerLanguageFeatures } <span class="hljs-keyword">from</span> <span class="hljs-string">'./language-features'</span>;
 
 <span class="hljs-keyword">import</span> <span class="hljs-title">StateCore</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">'markdown-it/lib/rules_core/state_core'</span>);
 <span class="hljs-keyword">import</span> <span class="hljs-title">Token</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">'markdown-it/lib/token'</span>);
@@ -2751,6 +2778,7 @@ generation template is reported by the repository queue without disabling export
 <pre><code>  theOneRepository = <span class="hljs-keyword">new</span> <span class="hljs-title">FragmentRepository</span>(context);
   context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title">push</span>(theOneRepository);
   <span class="hljs-title">registerPublicationCommands</span>(context, <span class="hljs-params">operation</span><span class="hljs-function"> =&gt;</span> theOneRepository.<span class="hljs-title">withPublicationOperation</span>(operation));
+  <span class="hljs-title">registerLanguageFeatures</span>(context, captureLanguageSources);
   <span class="hljs-keyword">await</span> theOneRepository.<span class="hljs-title">processLiterateFiles</span>(<span class="hljs-literal">undefined</span>, <span class="hljs-literal">false</span>).<span class="hljs-title">catch</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-literal">undefined</span>);
     <span class="hljs-keyword">const</span> navigation = <span class="hljs-keyword">new</span> <span class="hljs-title">PreviewNavigation</span>();
     context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title">push</span>(navigation, vscode.<span class="hljs-property">window</span>.<span class="hljs-title">registerUriHandler</span>(navigation));

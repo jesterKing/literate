@@ -23,6 +23,7 @@ import { defaultThemeName } from './themes';
 import { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAnnotation,
   installScreenTermLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle, renderScreenExploration } from './publication-screen';
 import { registerPublicationCommands } from './publication-extension';
+import { registerLanguageFeatures } from './language-features';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');
 import Token = require('markdown-it/lib/token');
@@ -630,6 +631,7 @@ class FragmentMap {
 
   dispose()
   {
+    this.
     this.map.clear();
   }
 };
@@ -1377,6 +1379,7 @@ export async function activate(context: vscode.ExtensionContext) {
   theOneRepository = new FragmentRepository(context);
   context.subscriptions.push(theOneRepository);
   registerPublicationCommands(context, operation => theOneRepository.withPublicationOperation(operation));
+  registerLanguageFeatures(context, captureLanguageSources);
   await theOneRepository.processLiterateFiles(undefined, false).catch(() => undefined);
     const navigation = new PreviewNavigation();
     context.subscriptions.push(navigation, vscode.window.registerUriHandler(navigation));
@@ -1409,9 +1412,11 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.languages.registerCompletionItemProvider('markdown', {
       async provideCompletionItems(
         document : vscode.TextDocument,
-        ..._
+        position: vscode.Position
       )
       {
+        const prefix = document.lineAt(position.line).text.slice(0, position.character);
+        if (!/\x3c\x3c[^>]*$/.test(prefix)) { return []; }
         let completionItems : Array<vscode.CompletionItem> =
             new Array<vscode.CompletionItem>();
         const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
@@ -1492,6 +1497,19 @@ async function getFileContent(file: vscode.Uri): Promise<string> {
     document => document.uri.toString() === file.toString());
   if (document !== undefined) { return document.getText(); }
   return new TextDecoder('utf-8').decode(await vscode.workspace.fs.readFile(file));
+}
+async function captureLanguageSources(folder: vscode.WorkspaceFolder): Promise<SourceDocument[]> {
+  const uris = await getLiterateFileUris(folder);
+  const documents = await Promise.all(uris.map(async uri => ({
+    path: path.posix.relative(folder.uri.path, uri.path),
+    text: await getFileContent(uri)
+  })));
+  for (const document of documents) {
+    const uri = vscode.Uri.joinPath(folder.uri, document.path).toString();
+    const open = vscode.workspace.textDocuments.find(value => !value.isClosed && value.uri.toString() === uri);
+    if (open) { document.text = open.getText(); }
+  }
+  return documents;
 }
 function createFragmentForTag(range? : vscode.Range)
 {

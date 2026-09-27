@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Mapped language sources</h1>
+<p>Direct language-server requests need tangled code, not rendered documentation.
+<code>projectLanguageSources</code> uses the engine's collected graph and validation policy.
+It performs no I/O. Template roots are deliberately omitted, even when their
+supplied templates are valid; ordinary roots still project. All fragments,
+including unused ones, must have valid dependencies before any file is returned.</p>
+<p>Offsets are absolute UTF-16 string indexes, in original source or generated code.
+Mappings describe contiguous, equal-length literal segments. Inserted indentation,
+reference tags, headers, prose, and removed escape slashes have no mapping.
+Markdown-normalized newlines retain their original source positions. A partially
+consumed container tab maps only its unchanged suffix, never synthesized spaces.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e0067007500610067006500200073006f0075007200630065002000700072006f006a0065006300740069006f006e002e002a-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006c0061006e0067007500610067006500200073006f0075007200630065002000700072006f006a0065006300740069006f006e002e002a"></span><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200073006f0075007200630065002000700072006f006a0065006300740069006f006e002e002a" data-literate-target="f-006c0061006e0067007500610067006500200073006f0075007200630065002000700072006f006a0065006300740069006f006e002e002a" aria-label="Definition of language source projection.*">&lt;&lt;language source projection.*&gt;&gt;= src/language-projection.ts $</a></div>
+<div class="code">
+<pre><code><span data-literate-explore="f-00700072006f006a0065006300740069006f006e00200063006f006e007400720061006300740073"><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200063006f006e007400720061006300740073" data-literate-target="f-00700072006f006a0065006300740069006f006e00200063006f006e007400720061006300740073" aria-label="Definition of projection contracts">&lt;&lt;projection contracts&gt;&gt;</a></span>
+<span data-literate-explore="f-00700072006f006a0065006300740069006f006e00200065006e007400720079"><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200065006e007400720079" data-literate-target="f-00700072006f006a0065006300740069006f006e00200065006e007400720079" aria-label="Definition of projection entry">&lt;&lt;projection entry&gt;&gt;</a></span>
+<span data-literate-explore="f-00700072006f006a0065006300740069006f006e00200064006500700065006e00640065006e00630079002000760061006c00690064006100740069006f006e"><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200064006500700065006e00640065006e00630079002000760061006c00690064006100740069006f006e" data-literate-target="f-00700072006f006a0065006300740069006f006e00200064006500700065006e00640065006e00630079002000760061006c00690064006100740069006f006e" aria-label="Definition of projection dependency validation">&lt;&lt;projection dependency validation&gt;&gt;</a></span>
+<span data-literate-explore="f-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073"><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073" data-literate-target="f-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073" aria-label="Definition of projection literal segments">&lt;&lt;projection literal segments&gt;&gt;</a></span>
+<span data-literate-explore="f-00700072006f006a0065006300740069006f006e00200065007800700061006e00730069006f006e"><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200065007800700061006e00730069006f006e" data-literate-target="f-00700072006f006a0065006300740069006f006e00200065007800700061006e00730069006f006e" aria-label="Definition of projection expansion">&lt;&lt;projection expansion&gt;&gt;</a></span>
+<span data-literate-explore="f-00700072006f006a0065006300740069006f006e00200065006d0069007300730069006f006e"><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200065006d0069007300730069006f006e" data-literate-target="f-00700072006f006a0065006300740069006f006e00200065006d0069007300730069006f006e" aria-label="Definition of projection emission">&lt;&lt;projection emission&gt;&gt;</a></span>
+<span data-literate-explore="f-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073"><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073" data-literate-target="f-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073" aria-label="Definition of projection position helpers">&lt;&lt;projection position helpers&gt;&gt;</a></span>
+</code></pre>
+
+</div>
+</div><h2>A segment is the request context</h2>
+<p>Forward lookup chooses the first occurrence in deterministic project/expansion
+order. The returned mapping object must accompany the server response. Reverse
+lookup accepts only ranges within that exact segment in that exact file: it does
+not guess across repeated occurrences, indentation, escapes, or reference seams.
+This conservative rule can omit a multiline hover range while preserving its text.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f006a0065006300740069006f006e00200063006f006e007400720061006300740073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00700072006f006a0065006300740069006f006e00200063006f006e007400720061006300740073"></span><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200063006f006e007400720061006300740073" data-literate-target="f-00700072006f006a0065006300740069006f006e00200063006f006e007400720061006300740073" aria-label="Definition of projection contracts">&lt;&lt;projection contracts&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> { collectLanguageProject, <span class="hljs-title">GenerationDiagnostic</span>, safeRelativePath, <span class="hljs-title">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">ProjectionMapping</span> {
+    <span class="hljs-attr">sourcePath</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">sourceStart</span>: <span class="hljs-built_in">number</span>;
+    <span class="hljs-attr">sourceEnd</span>: <span class="hljs-built_in">number</span>;
+    <span class="hljs-attr">generatedStart</span>: <span class="hljs-built_in">number</span>;
+    <span class="hljs-attr">generatedEnd</span>: <span class="hljs-built_in">number</span>;
+    <span class="hljs-attr">endCursor</span>: <span class="hljs-built_in">boolean</span>;
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">LanguageProjection</span> {
+    <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">language</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">mappings</span>: <span class="hljs-title">ProjectionMapping</span>[];
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">SourceProjectionPosition</span> {
+    <span class="hljs-attr">file</span>: <span class="hljs-title">LanguageProjection</span>;
+    <span class="hljs-attr">offset</span>: <span class="hljs-built_in">number</span>;
+    <span class="hljs-attr">mapping</span>: <span class="hljs-title">ProjectionMapping</span>;
+}
+<span class="hljs-keyword">interface</span> <span class="hljs-title">Piece</span> { <span class="hljs-attr">text</span>: <span class="hljs-built_in">string</span>; path?: <span class="hljs-built_in">string</span>; <span class="hljs-attr">start</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">endCursor</span>: <span class="hljs-built_in">boolean</span>; }
+</code></pre>
+
+</div>
+</div><h2>Bound intermediate work, not just the final file</h2>
+<p>The per-call budget counts copied UTF-16 storage (at two bytes per unit) and
+segments across all intermediate expansions and outputs. Depth is bounded too;
+exceeding any limit produces an atomic diagnostic rather than partial code.
+These limits keep exponential reference graphs from allocating huge completions.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f006a0065006300740069006f006e00200065006e007400720079-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00700072006f006a0065006300740069006f006e00200065006e007400720079"></span><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200065006e007400720079" data-literate-target="f-00700072006f006a0065006300740069006f006e00200065006e007400720079" aria-label="Definition of projection entry">&lt;&lt;projection entry&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">projectLanguageSources</span>(<span class="hljs-params">documents: SourceDocument[], templates: Record&lt;</span><span class="hljs-built_in">string</span><span class="hljs-params">, </span><span class="hljs-built_in">string</span><span class="hljs-params">&gt; = </span><span class="hljs-params">{}</span>): {
+    <span class="hljs-attr">files</span>: <span class="hljs-title">LanguageProjection</span>[]; <span class="hljs-attr">diagnostics</span>: <span class="hljs-title">GenerationDiagnostic</span>[];
+} {
+    <span class="hljs-keyword">const</span> graph = <span class="hljs-title">collectLanguageProject</span>(documents, templates);
+    <span class="hljs-keyword">const</span> diagnostics = graph.<span class="hljs-property">parsed</span>.<span class="hljs-property">diagnostics</span>;
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">files</span>: <span class="hljs-title">LanguageProjection</span>[] = [];
+    <span class="hljs-keyword">const</span> report = (<span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+        diagnostics.<span class="hljs-title">push</span>({ <span class="hljs-attr">path</span>: graph.<span class="hljs-property">parsed</span>.<span class="hljs-property">documents</span>[<span class="hljs-number">0</span>]?.<span class="hljs-property">path</span> || <span class="hljs-string">''</span>, <span class="hljs-attr">line</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span>, message });
+    };
+    <span class="hljs-keyword">let</span> bytes = <span class="hljs-number">0</span>, segments = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">const</span> emit = (<span class="hljs-attr">into</span>: <span class="hljs-title">Piece</span>[], <span class="hljs-attr">piece</span>: <span class="hljs-title">Piece</span>): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+        bytes += piece.<span class="hljs-property">text</span>.<span class="hljs-property">length</span> * <span class="hljs-number">2</span>;
+        <span class="hljs-keyword">if</span> (bytes &gt; <span class="hljs-number">8</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span> || ++segments &gt; <span class="hljs-number">100000</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Language projection expansion limit exceeded'</span>); }
+        into.<span class="hljs-title">push</span>(piece);
+    };
+    <span class="hljs-keyword">const</span> sources = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>(graph.<span class="hljs-property">parsed</span>.<span class="hljs-property">documents</span>.<span class="hljs-title">map</span>(<span class="hljs-params">document</span><span class="hljs-function"> =&gt;</span> [<span class="hljs-variable">document</span>.<span class="hljs-property">path</span>, <span class="hljs-variable">document</span>.<span class="hljs-property">source</span>]));
+    <span class="hljs-keyword">const</span> lines = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>(<span class="hljs-title">Array</span>.<span class="hljs-title">from</span>(sources, <span class="hljs-function">(</span><span class="hljs-params">[path, text]</span><span class="hljs-function">) =&gt;</span> {
+        <span class="hljs-keyword">const</span> starts = [<span class="hljs-number">0</span>];
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> match <span class="hljs-keyword">of</span> text.<span class="hljs-title">matchAll</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">|</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">|</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">/g</span>)) { starts.<span class="hljs-title">push</span>(match.<span class="hljs-property">index</span>! + match[<span class="hljs-number">0</span>].<span class="hljs-property">length</span>); }
+        <span class="hljs-keyword">return</span> [path, starts] <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span>;
+    }));
+    <span class="hljs-keyword">type</span> <span class="hljs-title">Fragment</span> = <span class="hljs-title">NonNullable</span>&lt;<span class="hljs-title">ReturnType</span>&lt;<span class="hljs-keyword">typeof</span> graph.<span class="hljs-property">fragments</span>.<span class="hljs-property">get</span>&gt;&gt;;
+    <span class="hljs-keyword">type</span> <span class="hljs-title">Part</span> = <span class="hljs-title">Fragment</span>[<span class="hljs-string">'parts'</span>][<span class="hljs-built_in">number</span>];
+</code></pre>
+
+</div>
+</div><p>Validation walks edges without expanding strings. Explicit enter/leave frames
+handle deep graphs without using the JavaScript call stack. A missing dependency,
+cycle, or reference operator anywhere blocks all projections.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f006a0065006300740069006f006e00200064006500700065006e00640065006e00630079002000760061006c00690064006100740069006f006e-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00700072006f006a0065006300740069006f006e00200064006500700065006e00640065006e00630079002000760061006c00690064006100740069006f006e"></span><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200064006500700065006e00640065006e00630079002000760061006c00690064006100740069006f006e" data-literate-target="f-00700072006f006a0065006300740069006f006e00200064006500700065006e00640065006e00630079002000760061006c00690064006100740069006f006e" aria-label="Definition of projection dependency validation">&lt;&lt;projection dependency validation&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">const</span> done = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;(), active = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> name <span class="hljs-keyword">of</span> graph.<span class="hljs-property">fragments</span>.<span class="hljs-title">keys</span>()) {
+        <span class="hljs-keyword">const</span> stack = [{ name, <span class="hljs-attr">leave</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">at</span>: graph.<span class="hljs-property">fragments</span>.<span class="hljs-title">get</span>(name)!.<span class="hljs-property">location</span> }];
+        <span class="hljs-keyword">while</span> (stack.<span class="hljs-property">length</span>) {
+            <span class="hljs-keyword">const</span> frame = stack.<span class="hljs-title">pop</span>()!;
+            <span class="hljs-keyword">if</span> (frame.<span class="hljs-property">leave</span>) { active.<span class="hljs-title">delete</span>(frame.<span class="hljs-property">name</span>); done.<span class="hljs-title">add</span>(frame.<span class="hljs-property">name</span>); <span class="hljs-keyword">continue</span>; }
+            <span class="hljs-keyword">if</span> (active.<span class="hljs-title">has</span>(frame.<span class="hljs-property">name</span>)) { diagnostics.<span class="hljs-title">push</span>({ ...frame.<span class="hljs-property">at</span>, <span class="hljs-attr">message</span>: <span class="hljs-string">`Fragment cycle: </span><span class="hljs-subst">${frame.name}</span><span class="hljs-string">`</span> }); <span class="hljs-keyword">continue</span>; }
+            <span class="hljs-keyword">if</span> (done.<span class="hljs-title">has</span>(frame.<span class="hljs-property">name</span>)) { <span class="hljs-keyword">continue</span>; }
+            <span class="hljs-keyword">const</span> fragment = graph.<span class="hljs-property">fragments</span>.<span class="hljs-title">get</span>(frame.<span class="hljs-property">name</span>);
+            <span class="hljs-keyword">if</span> (!fragment) { diagnostics.<span class="hljs-title">push</span>({ ...frame.<span class="hljs-property">at</span>, <span class="hljs-attr">message</span>: <span class="hljs-string">`Missing fragment: </span><span class="hljs-subst">${frame.name}</span><span class="hljs-string">`</span>, <span class="hljs-attr">code</span>: <span class="hljs-string">'missing-fragment'</span> }); <span class="hljs-keyword">continue</span>; }
+            active.<span class="hljs-title">add</span>(frame.<span class="hljs-property">name</span>);
+            stack.<span class="hljs-title">push</span>({ ...frame, <span class="hljs-attr">leave</span>: <span class="hljs-literal">true</span> });
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> part <span class="hljs-keyword">of</span> [...fragment.<span class="hljs-property">parts</span>].<span class="hljs-title">reverse</span>()) {
+                <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> ref <span class="hljs-keyword">of</span> [...graph.<span class="hljs-title">references</span>(part)].<span class="hljs-title">reverse</span>()) {
+                    <span class="hljs-keyword">if</span> (ref.<span class="hljs-property">modifier</span>) { diagnostics.<span class="hljs-title">push</span>({ ...ref.<span class="hljs-property">at</span>, <span class="hljs-attr">message</span>: <span class="hljs-string">`Invalid definition operator on reference: </span><span class="hljs-subst">${ref.name}</span><span class="hljs-string">`</span> }); }
+                    stack.<span class="hljs-title">push</span>({ <span class="hljs-attr">name</span>: ref.<span class="hljs-property">name</span>, <span class="hljs-attr">leave</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">at</span>: ref.<span class="hljs-property">at</span> });
+                }
+            }
+        }
+    }
+    <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">files</span>: [], diagnostics }; }
+</code></pre>
+
+</div>
+</div><p>Each literal slice is split at original lines. The unchanged suffix calculation
+excludes virtual spaces introduced when Markdown consumes only part of a tab.
+Newlines are separate segments, so CRLF never pretends to be a one-unit source
+range. Empty lines retain their newline position as a completion anchor.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073"></span><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073" data-literate-target="f-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073" aria-label="Definition of projection literal segments">&lt;&lt;projection literal segments&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">interface</span> <span class="hljs-title">LiteralLine</span> { <span class="hljs-attr">offset</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">body</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">lineStart</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">original</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">suffix</span>: <span class="hljs-built_in">number</span>; }
+    <span class="hljs-keyword">const</span> literalLines = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-title">Part</span>, <span class="hljs-title">LiteralLine</span>[]&gt;();
+    <span class="hljs-keyword">function</span> <span class="hljs-title">prepare</span>(<span class="hljs-params">part: Part</span>): <span class="hljs-title">LiteralLine</span>[] {
+        <span class="hljs-keyword">const</span> cached = literalLines.<span class="hljs-title">get</span>(part);
+        <span class="hljs-keyword">if</span> (cached) { <span class="hljs-keyword">return</span> cached; }
+        <span class="hljs-keyword">const</span> source = sources.<span class="hljs-title">get</span>(part.<span class="hljs-property">location</span>.<span class="hljs-property">path</span>)!, starts = lines.<span class="hljs-title">get</span>(part.<span class="hljs-property">location</span>.<span class="hljs-property">path</span>)!;
+        <span class="hljs-keyword">const</span> <span class="hljs-attr">result</span>: <span class="hljs-title">LiteralLine</span>[] = [];
+        <span class="hljs-keyword">let</span> offset = <span class="hljs-number">0</span>;
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [index, body] <span class="hljs-keyword">of</span> part.<span class="hljs-property">content</span>.<span class="hljs-title">split</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>).<span class="hljs-title">entries</span>()) {
+            <span class="hljs-keyword">const</span> lineStart = starts[part.<span class="hljs-property">location</span>.<span class="hljs-property">line</span> + index];
+            <span class="hljs-keyword">if</span> (lineStart === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">break</span>; }
+            <span class="hljs-keyword">const</span> original = source.<span class="hljs-title">slice</span>(lineStart, starts[part.<span class="hljs-property">location</span>.<span class="hljs-property">line</span> + index + <span class="hljs-number">1</span>]).<span class="hljs-title">replace</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">[</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">]</span><span class="hljs-regexp">+$/</span>, <span class="hljs-string">''</span>);
+            <span class="hljs-keyword">let</span> suffix = <span class="hljs-number">0</span>;
+            <span class="hljs-keyword">while</span> (suffix &lt; <span class="hljs-title">Math</span>.<span class="hljs-title">min</span>(body.<span class="hljs-property">length</span>, original.<span class="hljs-property">length</span>)
+                &amp;&amp; body[body.<span class="hljs-property">length</span> - suffix - <span class="hljs-number">1</span>] === original[original.<span class="hljs-property">length</span> - suffix - <span class="hljs-number">1</span>]) { suffix++; }
+            result.<span class="hljs-title">push</span>({ offset, body, lineStart, original, suffix });
+            offset += body.<span class="hljs-property">length</span> + <span class="hljs-number">1</span>;
+        }
+        literalLines.<span class="hljs-title">set</span>(part, result);
+        <span class="hljs-keyword">return</span> result;
+    }
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of projection literal segments"><a class="literate-tag-name" href="#c-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-2" data-literate-target="c-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-2" aria-label="Next contribution of projection literal segments">Next</a></nav>
+</div><p>Cache line metadata once per collected part. Binary search enters each literal
+slice at its first line, so many inline references do not repeatedly scan the
+entire fence or copy its body just to locate a small source range.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073" data-literate-target="f-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073" aria-label="Definition of projection literal segments">&lt;&lt;projection literal segments&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">function</span> <span class="hljs-title">literal</span>(<span class="hljs-params">part: Part, </span><span class="hljs-keyword">from</span><span class="hljs-params">: </span><span class="hljs-built_in">number</span><span class="hljs-params">, to: </span><span class="hljs-built_in">number</span><span class="hljs-params">, into: Piece[]</span>): <span class="hljs-built_in">void</span> {
+        <span class="hljs-keyword">const</span> source = sources.<span class="hljs-title">get</span>(part.<span class="hljs-property">location</span>.<span class="hljs-property">path</span>)!, records = <span class="hljs-title">prepare</span>(part);
+        <span class="hljs-keyword">if</span> (!part.<span class="hljs-property">content</span> &amp;&amp; lines.<span class="hljs-title">get</span>(part.<span class="hljs-property">location</span>.<span class="hljs-property">path</span>)![part.<span class="hljs-property">location</span>.<span class="hljs-property">line</span>] === source.<span class="hljs-property">length</span>) {
+            <span class="hljs-title">emit</span>(into, { <span class="hljs-attr">text</span>: <span class="hljs-string">''</span>, <span class="hljs-attr">path</span>: part.<span class="hljs-property">location</span>.<span class="hljs-property">path</span>, <span class="hljs-attr">start</span>: source.<span class="hljs-property">length</span>, <span class="hljs-attr">endCursor</span>: <span class="hljs-literal">true</span> });
+        }
+        <span class="hljs-keyword">let</span> low = <span class="hljs-number">0</span>, high = records.<span class="hljs-property">length</span>;
+        <span class="hljs-keyword">while</span> (low &lt; high) {
+            <span class="hljs-keyword">const</span> mid = (low + high) &gt;&gt;&gt; <span class="hljs-number">1</span>;
+            <span class="hljs-keyword">if</span> (records[mid].<span class="hljs-property">offset</span> + records[mid].<span class="hljs-property">body</span>.<span class="hljs-property">length</span> &lt; <span class="hljs-keyword">from</span>) { low = mid + <span class="hljs-number">1</span>; }
+            <span class="hljs-keyword">else</span> { high = mid; }
+        }
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = low; index &lt; records.<span class="hljs-property">length</span> &amp;&amp; records[index].<span class="hljs-property">offset</span> &lt; to; index++) {
+            <span class="hljs-keyword">const</span> { offset, body, lineStart, original, suffix } = records[index];
+            <span class="hljs-keyword">const</span> a = <span class="hljs-title">Math</span>.<span class="hljs-title">max</span>(<span class="hljs-keyword">from</span>, offset), b = <span class="hljs-title">Math</span>.<span class="hljs-title">min</span>(to, offset + body.<span class="hljs-property">length</span>);
+            <span class="hljs-keyword">const</span> mapped = <span class="hljs-title">Math</span>.<span class="hljs-title">max</span>(a, offset + body.<span class="hljs-property">length</span> - suffix);
+            <span class="hljs-keyword">if</span> (a &lt; <span class="hljs-title">Math</span>.<span class="hljs-title">min</span>(b, mapped)) { <span class="hljs-title">emit</span>(into, { <span class="hljs-attr">text</span>: part.<span class="hljs-property">content</span>.<span class="hljs-title">slice</span>(a, <span class="hljs-title">Math</span>.<span class="hljs-title">min</span>(b, mapped)), <span class="hljs-attr">start</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">endCursor</span>: <span class="hljs-literal">false</span> }); }
+            <span class="hljs-keyword">if</span> (mapped &lt; b) {
+                <span class="hljs-title">emit</span>(into, { <span class="hljs-attr">text</span>: part.<span class="hljs-property">content</span>.<span class="hljs-title">slice</span>(mapped, b), <span class="hljs-attr">path</span>: part.<span class="hljs-property">location</span>.<span class="hljs-property">path</span>,
+                    <span class="hljs-attr">start</span>: lineStart + original.<span class="hljs-property">length</span> - body.<span class="hljs-property">length</span> + mapped - offset, <span class="hljs-attr">endCursor</span>: b === offset + body.<span class="hljs-property">length</span> });
+            }
+            <span class="hljs-keyword">const</span> newline = offset + body.<span class="hljs-property">length</span>;
+            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">from</span> &lt;= newline &amp;&amp; newline &lt; to) {
+                <span class="hljs-keyword">const</span> end = lineStart + original.<span class="hljs-property">length</span>;
+                <span class="hljs-keyword">const</span> start = source[end] === <span class="hljs-string">'</span><span class="hljs-string">\r</span><span class="hljs-string">'</span> &amp;&amp; source[end + <span class="hljs-number">1</span>] === <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> ? end + <span class="hljs-number">1</span> : end;
+                <span class="hljs-keyword">if</span> (!body.<span class="hljs-property">length</span> &amp;&amp; start !== end) { <span class="hljs-title">emit</span>(into, { <span class="hljs-attr">text</span>: <span class="hljs-string">''</span>, <span class="hljs-attr">path</span>: part.<span class="hljs-property">location</span>.<span class="hljs-property">path</span>, <span class="hljs-attr">start</span>: end, <span class="hljs-attr">endCursor</span>: <span class="hljs-literal">true</span> }); }
+                <span class="hljs-title">emit</span>(into, { <span class="hljs-attr">text</span>: <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>, <span class="hljs-attr">path</span>: start &lt; source.<span class="hljs-property">length</span> ? part.<span class="hljs-property">location</span>.<span class="hljs-property">path</span> : <span class="hljs-literal">undefined</span>, start, <span class="hljs-attr">endCursor</span>: <span class="hljs-literal">false</span> });
+            }
+
+        }
+    }
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of projection literal segments"><a class="literate-tag-name" href="#c-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-1" aria-label="Previous contribution of projection literal segments">Previous</a> · <a class="literate-tag-name" href="#c-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-1" aria-label="Base contribution of projection literal segments">Base</a></nav>
+</div><p>Expansion follows the engine's ordering exactly: append parts, replace each
+reference, remove one child trailing newline, then insert the reference's trailing
+whitespace after each remaining child newline. Inserted indentation is unmapped.
+A trimmed newline retains a zero-length anchor for an empty referenced body line.
+Trailing empty append anchors do not count as text: trimming finds the last
+nonempty piece and leaves those anchors in sequence at the shortened endpoint.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f006a0065006300740069006f006e00200065007800700061006e00730069006f006e-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00700072006f006a0065006300740069006f006e00200065007800700061006e00730069006f006e"></span><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200065007800700061006e00730069006f006e" data-literate-target="f-00700072006f006a0065006300740069006f006e00200065007800700061006e00730069006f006e" aria-label="Definition of projection expansion">&lt;&lt;projection expansion&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">function</span> <span class="hljs-title">expand</span>(<span class="hljs-params">name: </span><span class="hljs-built_in">string</span><span class="hljs-params">, depth: </span><span class="hljs-built_in">number</span>): <span class="hljs-title">Piece</span>[] {
+        <span class="hljs-keyword">if</span> (depth &gt; <span class="hljs-number">128</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Language projection depth limit exceeded'</span>); }
+        <span class="hljs-keyword">const</span> <span class="hljs-attr">result</span>: <span class="hljs-title">Piece</span>[] = [];
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> part <span class="hljs-keyword">of</span> graph.<span class="hljs-property">fragments</span>.<span class="hljs-title">get</span>(name)!.<span class="hljs-property">parts</span>) {
+            <span class="hljs-keyword">let</span> cursor = <span class="hljs-number">0</span>;
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> ref <span class="hljs-keyword">of</span> graph.<span class="hljs-title">references</span>(part)) {
+                <span class="hljs-title">literal</span>(part, cursor, ref.<span class="hljs-property">start</span>, result);
+                <span class="hljs-keyword">const</span> child = <span class="hljs-title">expand</span>(ref.<span class="hljs-property">name</span>, depth + <span class="hljs-number">1</span>);
+                <span class="hljs-keyword">let</span> lastIndex = child.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>;
+                <span class="hljs-keyword">while</span> (lastIndex &gt;= <span class="hljs-number">0</span> &amp;&amp; !child[lastIndex].<span class="hljs-property">text</span>.<span class="hljs-property">length</span>) { lastIndex--; }
+                <span class="hljs-keyword">const</span> last = child[lastIndex];
+                <span class="hljs-keyword">if</span> (last?.<span class="hljs-property">text</span>.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>)) { last.<span class="hljs-property">text</span> = last.<span class="hljs-property">text</span>.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, -<span class="hljs-number">1</span>); last.<span class="hljs-property">endCursor</span> = <span class="hljs-literal">true</span>; }
+                <span class="hljs-keyword">const</span> indent = <span class="hljs-regexp">/</span><span class="hljs-regexp">[ </span><span class="hljs-regexp">\t</span><span class="hljs-regexp">]</span><span class="hljs-regexp">*$/</span>.<span class="hljs-title">exec</span>(ref.<span class="hljs-property">prefix</span>)![<span class="hljs-number">0</span>];
+                <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> piece <span class="hljs-keyword">of</span> child) {
+                    <span class="hljs-title">emit</span>(result, piece);
+                    <span class="hljs-keyword">if</span> (piece.<span class="hljs-property">text</span>.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>) &amp;&amp; indent) { <span class="hljs-title">emit</span>(result, { <span class="hljs-attr">text</span>: indent, <span class="hljs-attr">start</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">endCursor</span>: <span class="hljs-literal">false</span> }); }
+                }
+                cursor = ref.<span class="hljs-property">end</span>;
+            }
+            <span class="hljs-title">literal</span>(part, cursor, part.<span class="hljs-property">content</span>.<span class="hljs-property">length</span>, result);
+        }
+        <span class="hljs-keyword">return</span> result;
+    }
+</code></pre>
+
+</div>
+</div><p>Escapes are removed once, after complete expansion, including escapes formed
+across a reference boundary. Splitting at the removed slash preserves literal
+source offsets rather than shifting the rest of a line. Mappings are fresh per
+output occurrence; identity is never shared between repeated expansions.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f006a0065006300740069006f006e00200065006d0069007300730069006f006e-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00700072006f006a0065006300740069006f006e00200065006d0069007300730069006f006e"></span><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200065006d0069007300730069006f006e" data-literate-target="f-00700072006f006a0065006300740069006f006e00200065006d0069007300730069006f006e" aria-label="Definition of projection emission">&lt;&lt;projection emission&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">try</span> {
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> fragment <span class="hljs-keyword">of</span> graph.<span class="hljs-property">fragments</span>.<span class="hljs-title">values</span>()) {
+            <span class="hljs-keyword">if</span> (!fragment.<span class="hljs-property">header</span>.<span class="hljs-property">output</span> || fragment.<span class="hljs-property">header</span>.<span class="hljs-property">template</span> !== <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">continue</span>; }
+            <span class="hljs-keyword">const</span> pieces = <span class="hljs-title">expand</span>(fragment.<span class="hljs-property">header</span>.<span class="hljs-property">name</span>, <span class="hljs-number">0</span>);
+            <span class="hljs-keyword">const</span> raw = pieces.<span class="hljs-title">map</span>(<span class="hljs-params">piece</span><span class="hljs-function"> =&gt;</span> piece.<span class="hljs-property">text</span>).<span class="hljs-title">join</span>(<span class="hljs-string">''</span>);
+            <span class="hljs-keyword">const</span> removed = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>(<span class="hljs-title">Array</span>.<span class="hljs-title">from</span>(raw.<span class="hljs-title">matchAll</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\\</span><span class="hljs-regexp">\x</span><span class="hljs-regexp">3c</span><span class="hljs-regexp">\x</span><span class="hljs-regexp">3c/g</span>), <span class="hljs-params">match</span><span class="hljs-function"> =&gt;</span> match.<span class="hljs-property">index</span>!));
+            <span class="hljs-keyword">const</span> <span class="hljs-attr">file</span>: <span class="hljs-title">LanguageProjection</span> = { <span class="hljs-attr">path</span>: fragment.<span class="hljs-property">header</span>.<span class="hljs-property">output</span>, <span class="hljs-attr">language</span>: fragment.<span class="hljs-property">header</span>.<span class="hljs-property">language</span>, <span class="hljs-attr">content</span>: <span class="hljs-string">''</span>, <span class="hljs-attr">mappings</span>: [] };
+            <span class="hljs-keyword">let</span> rawOffset = <span class="hljs-number">0</span>;
+            <span class="hljs-keyword">const</span> <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span>[] = [];
+            <span class="hljs-keyword">let</span> generated = <span class="hljs-number">0</span>;
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> piece <span class="hljs-keyword">of</span> pieces) {
+                <span data-literate-explore="f-00700072006f006a0065006300740069006f006e002000660069006e0061006c0069007a0065002000700069006500630065"><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e002000660069006e0061006c0069007a0065002000700069006500630065" data-literate-target="f-00700072006f006a0065006300740069006f006e002000660069006e0061006c0069007a0065002000700069006500630065" aria-label="Definition of projection finalize piece">&lt;&lt;projection finalize piece&gt;&gt;</a></span>
+            }
+            file.<span class="hljs-property">content</span> = content.<span class="hljs-title">join</span>(<span class="hljs-string">''</span>);
+            files.<span class="hljs-title">push</span>(file);
+        }
+    } <span class="hljs-keyword">catch</span> (error) { <span class="hljs-title">report</span>(error <span class="hljs-keyword">instanceof</span> <span class="hljs-title">Error</span> ? error.<span class="hljs-property">message</span> : <span class="hljs-title">String</span>(error)); }
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">files</span>: diagnostics.<span class="hljs-property">length</span> ? [] : files, diagnostics };
+}
+</code></pre>
+
+</div>
+</div><p>Final segment creation also consumes the segment budget: a line with many escaped
+openers must not bypass the limit by splitting only during emission.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f006a0065006300740069006f006e002000660069006e0061006c0069007a0065002000700069006500630065-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00700072006f006a0065006300740069006f006e002000660069006e0061006c0069007a0065002000700069006500630065"></span><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e002000660069006e0061006c0069007a0065002000700069006500630065" data-literate-target="f-00700072006f006a0065006300740069006f006e002000660069006e0061006c0069007a0065002000700069006500630065" aria-label="Definition of projection finalize piece">&lt;&lt;projection finalize piece&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">let</span> start = <span class="hljs-number">0</span>;
+<span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> end = <span class="hljs-number">0</span>; end &lt;= piece.<span class="hljs-property">text</span>.<span class="hljs-property">length</span>; end++) {
+    <span class="hljs-keyword">if</span> (end !== piece.<span class="hljs-property">text</span>.<span class="hljs-property">length</span> &amp;&amp; !removed.<span class="hljs-title">has</span>(rawOffset + end)) { <span class="hljs-keyword">continue</span>; }
+    <span class="hljs-keyword">const</span> text = piece.<span class="hljs-property">text</span>.<span class="hljs-title">slice</span>(start, end);
+    <span class="hljs-keyword">if</span> (text || (piece.<span class="hljs-property">text</span>.<span class="hljs-property">length</span> === <span class="hljs-number">0</span> &amp;&amp; piece.<span class="hljs-property">endCursor</span>)) {
+        <span class="hljs-keyword">if</span> (++segments &gt; <span class="hljs-number">100000</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Language projection segment limit exceeded'</span>); }
+        content.<span class="hljs-title">push</span>(text);
+        <span class="hljs-keyword">if</span> (piece.<span class="hljs-property">path</span>) { file.<span class="hljs-property">mappings</span>.<span class="hljs-title">push</span>({ <span class="hljs-attr">sourcePath</span>: piece.<span class="hljs-property">path</span>, <span class="hljs-attr">sourceStart</span>: piece.<span class="hljs-property">start</span> + start,
+            <span class="hljs-attr">sourceEnd</span>: piece.<span class="hljs-property">start</span> + end, <span class="hljs-attr">generatedStart</span>: generated, <span class="hljs-attr">generatedEnd</span>: generated + text.<span class="hljs-property">length</span>,
+            <span class="hljs-attr">endCursor</span>: end === piece.<span class="hljs-property">text</span>.<span class="hljs-property">length</span> &amp;&amp; piece.<span class="hljs-property">endCursor</span> }); }
+        generated += text.<span class="hljs-property">length</span>;
+    }
+    start = end + <span class="hljs-number">1</span>;
+}
+rawOffset += piece.<span class="hljs-property">text</span>.<span class="hljs-property">length</span>;
+</code></pre>
+
+</div>
+</div><h2>Translate only unambiguous literal positions</h2>
+<p>Paths are canonicalized like engine inputs. Integers outside a mapped literal
+are rejected. Endpoint cursors are allowed at text ends, not at reference starts;
+zero-length reverse ranges support completion insertions. Callers convert LSP
+line/character pairs using the corresponding original/generated string, preserving
+UTF-16 rather than counting Unicode code points.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073"></span><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073" data-literate-target="f-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073" aria-label="Definition of projection position helpers">&lt;&lt;projection position helpers&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">mapSourcePosition</span>(<span class="hljs-params">files: LanguageProjection[], sourcePath: </span><span class="hljs-built_in">string</span><span class="hljs-params">, offset: </span><span class="hljs-built_in">number</span>): <span class="hljs-title">SourceProjectionPosition</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">Number</span>.<span class="hljs-title">isInteger</span>(offset) || offset &lt; <span class="hljs-number">0</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">const</span> path = <span class="hljs-title">safeRelativePath</span>(sourcePath);
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> files) {
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> mapping <span class="hljs-keyword">of</span> file.<span class="hljs-property">mappings</span>) {
+            <span class="hljs-keyword">if</span> (mapping.<span class="hljs-property">sourcePath</span> === path &amp;&amp; offset &gt;= mapping.<span class="hljs-property">sourceStart</span>
+                &amp;&amp; (offset &lt; mapping.<span class="hljs-property">sourceEnd</span> || (offset === mapping.<span class="hljs-property">sourceEnd</span> &amp;&amp; mapping.<span class="hljs-property">endCursor</span>))) {
+                <span class="hljs-keyword">return</span> { file, <span class="hljs-attr">offset</span>: mapping.<span class="hljs-property">generatedStart</span> + offset - mapping.<span class="hljs-property">sourceStart</span>, mapping };
+            }
+        }
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
+}
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">mapGeneratedRange</span>(<span class="hljs-params">file: LanguageProjection, start: </span><span class="hljs-built_in">number</span><span class="hljs-params">, end: </span><span class="hljs-built_in">number</span><span class="hljs-params">, mapping: ProjectionMapping</span>): { <span class="hljs-attr">start</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">end</span>: <span class="hljs-built_in">number</span> } | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">if</span> (!file.<span class="hljs-property">mappings</span>.<span class="hljs-title">includes</span>(mapping) || !<span class="hljs-title">Number</span>.<span class="hljs-title">isInteger</span>(start) || !<span class="hljs-title">Number</span>.<span class="hljs-title">isInteger</span>(end)
+        || start &gt; end || start &lt; mapping.<span class="hljs-property">generatedStart</span> || end &gt; mapping.<span class="hljs-property">generatedEnd</span>
+        || (start === end &amp;&amp; start === mapping.<span class="hljs-property">generatedEnd</span> &amp;&amp; !mapping.<span class="hljs-property">endCursor</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">start</span>: mapping.<span class="hljs-property">sourceStart</span> + start - mapping.<span class="hljs-property">generatedStart</span>, <span class="hljs-attr">end</span>: mapping.<span class="hljs-property">sourceStart</span> + end - mapping.<span class="hljs-property">generatedStart</span> };
+}
+</code></pre>
+
+</div>
+</div><script type="application/json" class="literate-exploration-data">{"version":1,"parts":{},"families":{},"unavailable":"Exploration payload exceeds the one MiB limit."}</script><script>(
+// Closure-free: standalone HTML embeds this source without the module wrapper.
+function initializePublicationExploration(document) {
+    const view = document.defaultView;
+    if (!view || document.__literateExploration) { return; }
+    document.__literateExploration = true;
+    const limits = { payload: 1048576, layers: 8, bytes: 262144, panels: 200, parts: 200, segments: 4096 };
+    const roots = new Map();
+    const controls = new Map();
+    const panels = new Map();
+    const encoder = new view.TextEncoder();
+    const own = (object, key) => object && Object.prototype.hasOwnProperty.call(object, key) ? object[key] : undefined;
+    const record = value => value && typeof value === 'object' && !Array.isArray(value);
+    const identifier = value => typeof value === 'string' && value.length <= 4096 && /^[A-Za-z0-9_-]+$/.test(value);
+    const connected = node => !!node && document.documentElement.contains(node);
+    let usedBytes = 0, serial = 0, focused;
+    const element = (tag, text) => {
+        const node = document.createElement(tag);
+        if (text !== undefined) { node.textContent = text; }
+        return node;
+    };
+    function inPanel(node) {
+        for (let parent = node; parent; parent = parent.parentNode) { if (panels.has(parent)) { return true; } }
+        return false;
+    }
+    function safeHref(href, target, baseline = false) {
+        if (typeof href !== 'string' || href.length > 4096 || /[\s\u0000-\u001f\u007f\\]/.test(href)) { return undefined; }
+        if (identifier(target) && href === '#' + target) { return href; }
+        if (identifier(target) && href.endsWith('#' + target)) {
+            const path = href.slice(0, -target.length - 1);
+            if (path.startsWith('./') && path.endsWith('.html') && path.slice(2).split('/').every(
+                part => /^(?:[A-Za-z0-9_~.!'()*-]|%[0-9a-fA-F]{2})+$/.test(part))) { return href; }
+        }
+        if (/^vscode(?:-insiders)?:\/\/jesterking\.literate\/navigate\/[a-f0-9]{48}\/[a-f0-9]{48}(?:\?[^#]*)?$/.test(href)) { return href; }
+        // HTTPS transport shapes belong to the host. Never authorize one from JSON alone.
+        if (baseline && /^https:\/\//.test(href)) {
+            try {
+                const url = new view.URL(href);
+                if (url.protocol === 'https:' && url.hostname && !url.username && !url.password) { return href; }
+            } catch (_) { /* Invalid URLs remain plain text. */ }
+        }
+        return undefined;
+    }
+    function linkFor(context, model, target) {
+        if (context.links.has(target)) { return context.links.get(target); }
+        return safeHref(own(model.families, target)?.href, target);
+    }
+    function focusWithin(control) {
+        const active = document.activeElement;
+        if (control.button === active || control.panel?.contains(active)) { return true; }
+        return focused?.top === control && (!active || active === document.body || !connected(active));
+    }
+    function close(control) {
+        if (!control.panel) { return; }
+        for (const child of [...control.children]) { destroy(child); }
+        const cost = panels.get(control.panel)?.cost;
+        if (cost !== undefined) { usedBytes -= cost; panels.delete(control.panel); }
+        control.panel.remove(); control.panel = undefined;
+        control.button.setAttribute('aria-expanded', 'false');
+        control.button.removeAttribute('aria-controls');
+        control.note.textContent = '';
+    }
+    function destroy(control) {
+        close(control);
+        controls.delete(control.use);
+        control.parent?.children.delete(control);
+        control.context.controls.delete(control.use);
+        control.button.remove(); control.note.remove();
+    }
+    function restore(request) {
+        if (!request) { return; }
+        const replacement = controls.get(request.use) || [...controls.values()].find(control =>
+            !control.parent && control.target === request.target);
+        const anchor = [request.use.querySelector('a'), request.context.root.querySelector('a'),
+            ...document.querySelectorAll('a')].find(node => connected(node) && node.getAttribute('href'));
+        const destination = replacement?.button || anchor;
+        focused = undefined;
+        if (destination) { destination.focus(); }
+    }
+    // Account for serialized text/attributes without constructing candidate DOM or expanded strings.
+    function escapedCost(text) {
+        if (typeof text !== 'string' || text.length > limits.bytes) { return Infinity; }
+        let cost = encoder.encode(text).length;
+        for (const character of text) {
+            if (character === '&') { cost += 4; }
+            else if (character === '<' || character === '>') { cost += 3; }
+            else if (character === '"' || character === "'") { cost += 5; }
+        }
+        return cost;
+    }
+    function plan(control) {
+        const { model, target, path, context } = control;
+        const family = own(model.families, target);
+        if (model.unavailable) { return { reason: 'Exploration data is unavailable.' }; }
+        if (!identifier(target) || !record(family) || typeof family.name !== 'string' || family.name.length > 1024 || !Array.isArray(family.parts)) {
+            return { reason: 'Fragment is unavailable in this snapshot.' };
+        }
+        if (path.includes(target)) { return { reason: 'Cycle: this fragment is already open on this path.' }; }
+        if (path.length >= limits.layers) { return { reason: 'Exploration is limited to eight layers.' }; }
+        if (panels.size >= limits.panels) { return { reason: 'Exploration panel limit reached; collapse a panel first.' }; }
+        const failure = { reason: 'Exploration DOM budget or contribution limit reached. No code was truncated.' };
+        if (family.parts.length > limits.parts) { return failure; }
+        const parts = [], seen = new Set();
+        let cost = 512 + escapedCost(family.name), count = 0;
+        for (const id of family.parts) {
+            if (!identifier(id) || seen.has(id)) { return failure; }
+            seen.add(id);
+            const segments = own(model.parts, id);
+            if (!Array.isArray(segments) || (count += segments.length) > limits.segments) { return failure; }
+            cost += 96;
+            const entries = [];
+            for (const segment of segments) {
+                if (!record(segment) || typeof segment.text !== 'string') { return failure; }
+                const reference = segment.reference === true;
+                const destination = segment.target === undefined ? '' : segment.target;
+                if (reference && destination !== '' && !identifier(destination)) { return failure; }
+                const href = reference ? linkFor(context, model, destination) : undefined;
+                cost += 96 + escapedCost(segment.text);
+                if (reference) {
+                    cost += 1024 + escapedCost(segment.text.slice(0, 512)) + escapedCost(destination) * 2;
+                    if (href) { cost += escapedCost(href); }
+                }
+                if (cost + usedBytes > limits.bytes) { return failure; }
+                entries.push({ text: segment.text, reference, target: destination, href });
+            }
+            if (cost + usedBytes > limits.bytes) { return failure; }
+            parts.push(entries);
+        }
+        return cost + usedBytes <= limits.bytes ? { name: family.name, parts, cost } : failure;
+    }
+    function open(control) {
+        const accepted = plan(control);
+        if (accepted.reason) { control.note.textContent = accepted.reason + ' Definition links remain available.'; return; }
+        const candidate = element('span');
+        candidate.style.display = 'block';
+        candidate.setAttribute('role', 'group');
+        candidate.setAttribute('aria-label', 'Unexpanded fragment ' + accepted.name);
+        candidate.append(element('span', 'Unexpanded fragment — plain text; explore references separately.\n'));
+        for (const entries of accepted.parts) {
+            const code = element('span'); code.style.whiteSpace = 'pre-wrap';
+            for (const entry of entries) {
+                const text = element(entry.href ? 'a' : 'span', entry.text);
+                if (entry.href) { text.setAttribute('href', entry.href); text.setAttribute('data-literate-target', entry.target); }
+                code.append(text);
+                if (entry.reference) {
+                    text.setAttribute('data-literate-explore', entry.target);
+                    enhance(text, control.context, [...control.path, control.target], control);
+                }
+            }
+            candidate.append(code);
+        }
+        do { candidate.id = 'literate-exploration-' + (++serial); } while (document.getElementById(candidate.id));
+        // Diagnostic metadata is never read back for ownership or accounting.
+        candidate.setAttribute('data-literate-panel-bytes', String(accepted.cost));
+        usedBytes += accepted.cost;
+        panels.set(candidate, { cost: accepted.cost, owner: control });
+        control.panel = candidate;
+        control.note.textContent = ''; control.note.after(candidate);
+        control.button.setAttribute('aria-controls', candidate.id);
+        control.button.setAttribute('aria-expanded', 'true');
+    }
+    function signature(use) {
+        const anchor = use.matches('a') ? use : use.querySelector('a');
+        return [use.getAttribute('data-literate-explore'), use.textContent.slice(0, 512), anchor,
+            anchor?.getAttribute('href'), anchor?.getAttribute('data-literate-target')];
+    }
+    function enhance(use, context, path = [], parent) {
+        const identity = signature(use);
+        const button = element('button', 'Explore fragment'); button.type = 'button';
+        button.setAttribute('aria-label', 'Explore ' + identity[1]);
+        button.setAttribute('aria-expanded', 'false');
+        const note = element('span'); note.setAttribute('role', 'status');
+        use.after(button, note);
+        const control = { use, context, model: context.model, identity, target: identity[0], path,
+            button, note, parent, children: new Set(), panel: undefined };
+        controls.set(use, control);
+        if (parent) { parent.children.add(control); } else { context.controls.set(use, control); }
+        button.addEventListener('click', () => {
+            scan();
+            if (controls.get(use) !== control) { return; }
+            if (control.panel) {
+                if (focusWithin(control)) { button.focus(); }
+                close(control);
+            } else { open(control); }
+        });
+        return control;
+    }
+    function readModel(source) {
+        try {
+            if (source.length > limits.payload || encoder.encode(source).length > limits.payload) { throw new Error('payload limit'); }
+            const model = JSON.parse(source);
+            if (!record(model) || model.version !== 1 || !record(model.parts) || !record(model.families)) { throw new Error('invalid model'); }
+            return model;
+        } catch (_) { return { unavailable: true }; }
+    }
+    function baselineLinks(root) {
+        const links = new Map();
+        for (const anchor of root.querySelectorAll('a')) {
+            if (inPanel(anchor)) { continue; }
+            const target = anchor.getAttribute('data-literate-target');
+            if (!identifier(target)) { continue; }
+            const href = safeHref(anchor.getAttribute('href'), target, true);
+            links.set(target, links.has(target) && links.get(target) !== href ? undefined : href);
+        }
+        return links;
+    }
+    function scan() {
+        let request;
+        const retire = control => {
+            if (focusWithin(control)) { request = control; }
+            destroy(control);
+        };
+        const live = new Set(document.querySelectorAll('.literate-document'));
+        for (const [root, context] of roots) {
+            if (!live.has(root)) {
+                for (const control of [...context.controls.values()]) { retire(control); }
+                roots.delete(root);
+            }
+        }
+        for (const root of live) {
+            const payload = root.querySelector('script.literate-exploration-data[type="application/json"]');
+            let context = roots.get(root);
+            if (!payload) {
+                if (context) { for (const control of [...context.controls.values()]) { retire(control); } roots.delete(root); }
+                continue;
+            }
+            const source = payload.textContent;
+            const links = baselineLinks(root);
+            if (!context) {
+                context = { root, payload, source, links, model: readModel(source), controls: new Map() };
+                roots.set(root, context);
+            } else {
+                const changed = context.payload !== payload || context.source !== source;
+                const relink = links.size !== context.links.size || [...links].some(([key, value]) =>
+                                    !context.links.has(key) || context.links.get(key) !== value);
+                if (changed || relink) { for (const control of [...context.controls.values()]) { retire(control); } }
+                if (changed) { context.model = readModel(source); }
+                Object.assign(context, { payload, source, links });
+            }
+            const uses = new Set([...root.querySelectorAll('[data-literate-explore]')].filter(use => !inPanel(use)));
+            for (const [use, control] of [...context.controls]) {
+                const identity = signature(use);
+                if (!uses.has(use) || control.button.previousSibling !== use || control.note.previousSibling !== control.button
+                    || identity.some((value, index) => value !== control.identity[index])) { retire(control); }
+            }
+            for (const use of uses) { if (!controls.has(use)) { enhance(use, context); } }
+        }
+        for (const control of [...controls.values()]) {
+            if (!control.parent || controls.get(control.use) !== control) { continue; }
+            const identity = signature(control.use);
+            if (!connected(control.use) || control.button.previousSibling !== control.use
+                || identity.some((value, index) => value !== control.identity[index])) {
+                let top = control;
+                while (top.parent) { top = top.parent; }
+                if (focusWithin(top)) { request = top; }
+                close(top);
+            }
+        }
+        for (const [panel, { owner }] of [...panels]) {
+            if (!connected(panel)) {
+                let top = owner;
+                while (top.parent) { top = top.parent; }
+                if (focusWithin(top)) { request = top; }
+                close(owner);
+            }
+        }
+        restore(request);
+    }
+    document.addEventListener('focusin', event => {
+        focused = undefined;
+        for (const control of controls.values()) {
+            if (!control.parent && (control.button === event.target || control.panel?.contains(event.target))) {
+                focused = { top: control }; break;
+            }
+        }
+    });
+    scan();
+    document.addEventListener('DOMContentLoaded', scan);
+    view.addEventListener('vscode.markdown.updateContent', scan);
+    new view.MutationObserver(scan).observe(document.documentElement, {
+        childList: true, characterData: true, subtree: true, attributes: true,
+        attributeFilter: ['data-literate-explore', 'data-literate-target', 'href', 'type', 'class']
+    });
+}
+)(document);</script></div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

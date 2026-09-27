@@ -19,16 +19,18 @@ context.subscriptions.push(completionItemProvider);
 
 ## Providing completion items
 
-The completion item provider will generate a `CompletionItem` for each fragment
-we currently know of. Although the provider gets passed in the `TextDocument`
-for which it was triggered we will present fragments from the entire project.
+Inside an unfinished fragment tag, the provider offers a `CompletionItem` for
+each known fragment in the project. Elsewhere it returns no fragment suggestions,
+leaving ordinary code completion to the configured language server.
 
 ``` ts : <<implement provide completion items>>=
 async provideCompletionItems(
   document : vscode.TextDocument,
-  ..._
+  position: vscode.Position
 )
 {
+  const prefix = document.lineAt(position.line).text.slice(0, position.character);
+  if (!/\x3c\x3c[^>]*$/.test(prefix)) { return []; }
 ```
 
 After setting up the necessary variables with

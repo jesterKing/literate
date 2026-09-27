@@ -638,3 +638,45 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
     for (const file of files) { file.content = file.content.replace(/\r\n|\r/g, '\n'); }
     return { files, diagnostics, inspection, publication };
 }
+/** @internal Collected source graph for the pure language projection adapter. */
+export function collectLanguageProject(documents: SourceDocument[], templates: Record<string, string>) {
+    const diagnostics: GenerationDiagnostic[] = [];
+    const report = (location: Location, message: string): void => { diagnostics.push({ ...location, message }); };
+    const templateMap = new Map<string, string>();
+    const templateKeys = new Set<string>();
+    const outputs = new Set<string>();
+    let inputKeys = new Set<string>();
+    return collectProject(documents, {
+        diagnostics,
+        acceptInputs(sourceKeys) {
+            for (const key of Object.keys(templates).sort()) {
+                const path = safeRelativePath(key);
+                const location = { path: key, line: 0, column: 0 };
+                if (!path) { report(location, 'Invalid template path'); continue; }
+                if (templateKeys.has(pathKey(path))) { report(location, `Duplicate template path: ${path}`); continue; }
+                templateKeys.add(pathKey(path));
+                templateMap.set(path, templates[key]);
+            }
+            inputKeys = new Set([...sourceKeys, ...templateKeys]);
+        },
+        settings(sources) { diagnostics.push(...resolveProjectTheme(sources).diagnostics); },
+        loadTemplate(path, location) {
+            if (!templateMap.has(path)) { report(location, `Missing template: ${path}`); }
+            return templateMap.get(path);
+        },
+        setAuthors() {},
+        setHtmlTemplate() {},
+        reserve(path, location) {
+            const key = pathKey(path);
+            if (inputKeys.has(key)) { report(location, `Output collides with input: ${path}`); }
+            if (outputs.has(key)) { report(location, `Duplicate output path: ${path}`); }
+            for (const input of inputKeys) {
+                if (ancestorConflict(key, input)) { report(location, `Output/input ancestor conflict: ${path} and ${input}`); }
+            }
+            for (const output of outputs) {
+                if (ancestorConflict(key, output)) { report(location, `Output ancestor conflict: ${path} and ${output}`); }
+            }
+            outputs.add(key);
+        }
+    });
+}

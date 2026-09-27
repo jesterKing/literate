@@ -220,8 +220,12 @@ export function fixture(workspaceUri = 'file:///project') {
             return { dispose: () => changeListeners.delete(callback) };
         },
         onDidChangeWorkspaceFolders: workspaceEvents.event,
+        onDidChangeConfiguration: () => disposable(),
+        onDidOpenTextDocument: () => disposable(),
+        onDidCloseTextDocument: () => disposable(),
+        getConfiguration: () => ({ inspect: () => undefined }),
         createFileSystemWatcher(pattern: string) {
-            assert.equal(pattern, '**/*');
+            assert.ok(pattern === '**/*' || pattern === '**/*.literate');
             return { onDidCreate: fileEvents.create.event, onDidChange: fileEvents.change.event,
                 onDidDelete: fileEvents.delete.event,
                 dispose() { for (const event of Object.values(fileEvents)) { event.dispose(); } } };
@@ -357,7 +361,7 @@ export function fixture(workspaceUri = 'file:///project') {
             return controls.externalUri ? controls.externalUri(uri) : Uri.parse(uri.toString() + '?windowId%3D1');
         } },
         window: {
-            createOutputChannel: () => ({ appendLine() {}, show() {}, dispose() {} }),
+            createOutputChannel: () => ({ appendLine() {}, clear() {}, show() {}, dispose() {} }),
             registerUriHandler(handler: { handleUri(uri: Uri): Promise<void> }) {
                 assert.equal(uriHandler, undefined, 'one URI handler per activation');
                 uriHandler = handler;

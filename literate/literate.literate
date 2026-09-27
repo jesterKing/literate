@@ -2249,6 +2249,28 @@ async function getFileContent(file: vscode.Uri): Promise<string> {
 }
 ```
 
+Language requests capture source buffers independently of generation. Reading
+all texts after discovery avoids mixing asynchronous disk reads with earlier
+buffer versions: current open documents replace disk text in one synchronous
+pass. The language adapter rejects the snapshot if an editor changes during
+capture. It neither processes the repository nor saves generated files.
+
+```ts : <<utility functions>>=+
+async function captureLanguageSources(folder: vscode.WorkspaceFolder): Promise<SourceDocument[]> {
+  const uris = await getLiterateFileUris(folder);
+  const documents = await Promise.all(uris.map(async uri => ({
+    path: path.posix.relative(folder.uri.path, uri.path),
+    text: await getFileContent(uri)
+  })));
+  for (const document of documents) {
+    const uri = vscode.Uri.joinPath(folder.uri, document.path).toString();
+    const open = vscode.workspace.textDocuments.find(value => !value.isClosed && value.uri.toString() === uri);
+    if (open) { document.text = open.getText(); }
+  }
+  return documents;
+}
+```
+
 ## The extension
 
 Our Visual Studio Code entry file is the `extension.ts` file. While developing
@@ -2382,6 +2404,7 @@ import { defaultThemeName } from './themes';
 import { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAnnotation,
   installScreenTermLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle, renderScreenExploration } from './publication-screen';
 import { registerPublicationCommands } from './publication-extension';
+import { registerLanguageFeatures } from './language-features';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');
 import Token = require('markdown-it/lib/token');
@@ -2433,6 +2456,7 @@ With that done we place our repository in the `context.subscriptions`.
   theOneRepository = new FragmentRepository(context);
   context.subscriptions.push(theOneRepository);
   registerPublicationCommands(context, operation => theOneRepository.withPublicationOperation(operation));
+  registerLanguageFeatures(context, captureLanguageSources);
   await theOneRepository.processLiterateFiles(undefined, false).catch(() => undefined);
     const navigation = new PreviewNavigation();
     context.subscriptions.push(navigation, vscode.window.registerUriHandler(navigation));

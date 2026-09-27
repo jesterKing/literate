@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Direct, mapped language features</h1>
+<p>The parent supplies a pure captured disk-and-buffer snapshot, never generation.
+Only trusted local folders and globally inspected executable settings may start a
+server. A session owns one folder and canonical language; JavaScript/TypeScript
+siblings are synchronized together so imports can see the captured project.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e00670075006100670065002000660065006100740075007200650073002e002a-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e00670075006100670065002000660065006100740075007200650073002e002a"></span><a class="literate-tag-name" href="#f-006c0061006e00670075006100670065002000660065006100740075007200650073002e002a" data-literate-target="f-006c0061006e00670075006100670065002000660065006100740075007200650073002e002a" aria-label="Definition of language features.*">&lt;&lt;language features.*&gt;&gt;= src/language-features.ts $</a></div>
+<div class="code">
+<pre><code><span data-literate-explore="f-006c0061006e006700750061006700650020006600650061007400750072006500200069006d0070006f007200740073"><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200069006d0070006f007200740073" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200069006d0070006f007200740073" aria-label="Definition of language feature imports">&lt;&lt;language feature imports&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e0067007500610067006500200066006500610074007500720065002000730065007400740069006e00670073"><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200066006500610074007500720065002000730065007400740069006e00670073" data-literate-target="f-006c0061006e0067007500610067006500200066006500610074007500720065002000730065007400740069006e00670073" aria-label="Definition of language feature settings">&lt;&lt;language feature settings&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e006700750061006700650020006600650061007400750072006500200070006f0073006900740069006f006e0073"><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200070006f0073006900740069006f006e0073" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200070006f0073006900740069006f006e0073" aria-label="Definition of language feature positions">&lt;&lt;language feature positions&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e0067007500610067006500200066006500610074007500720065002000720061006e006700650073"><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200066006500610074007500720065002000720061006e006700650073" data-literate-target="f-006c0061006e0067007500610067006500200066006500610074007500720065002000720061006e006700650073" aria-label="Definition of language feature ranges">&lt;&lt;language feature ranges&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e006700750061006700650020006600650061007400750072006500200077006f007200640073"><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200077006f007200640073" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200077006f007200640073" aria-label="Definition of language feature words">&lt;&lt;language feature words&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e002000670075006100720064"><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e002000670075006100720064" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e002000670075006100720064" aria-label="Definition of language feature completion guard">&lt;&lt;language feature completion guard&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e002000650064006900740073"><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e002000650064006900740073" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e002000650064006900740073" aria-label="Definition of language feature completion edits">&lt;&lt;language feature completion edits&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e0020006d0065007400610064006100740061"><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e0020006d0065007400610064006100740061" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e0020006d0065007400610064006100740061" aria-label="Definition of language feature completion metadata">&lt;&lt;language feature completion metadata&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e006700750061006700650020006600650061007400750072006500200068006f00760065007200200074006500780074"><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200068006f00760065007200200074006500780074" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200068006f00760065007200200074006500780074" aria-label="Definition of language feature hover text">&lt;&lt;language feature hover text&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e006700750061006700650020006600650061007400750072006500200068006f00760065007200200072006500730075006c0074"><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200068006f00760065007200200072006500730075006c0074" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200068006f00760065007200200072006500730075006c0074" aria-label="Definition of language feature hover result">&lt;&lt;language feature hover result&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e00670075006100670065002000660065006100740075007200650020006c006900660065006300790063006c0065"><a class="literate-tag-name" href="#f-006c0061006e00670075006100670065002000660065006100740075007200650020006c006900660065006300790063006c0065" data-literate-target="f-006c0061006e00670075006100670065002000660065006100740075007200650020006c006900660065006300790063006c0065" aria-label="Definition of language feature lifecycle">&lt;&lt;language feature lifecycle&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e006700750061006700650020006600650061007400750072006500200064006900610067006e006f00730074006900630073"><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200064006900610067006e006f00730074006900630073" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200064006900610067006e006f00730074006900630073" aria-label="Definition of language feature diagnostics">&lt;&lt;language feature diagnostics&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e00670075006100670065002000660065006100740075007200650020006500760065006e00740073"><a class="literate-tag-name" href="#f-006c0061006e00670075006100670065002000660065006100740075007200650020006500760065006e00740073" data-literate-target="f-006c0061006e00670075006100670065002000660065006100740075007200650020006500760065006e00740073" aria-label="Definition of language feature events">&lt;&lt;language feature events&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e00670075006100670065002000660065006100740075007200650020007200650071007500650073007400200067006100740065"><a class="literate-tag-name" href="#f-006c0061006e00670075006100670065002000660065006100740075007200650020007200650071007500650073007400200067006100740065" data-literate-target="f-006c0061006e00670075006100670065002000660065006100740075007200650020007200650071007500650073007400200067006100740065" aria-label="Definition of language feature request gate">&lt;&lt;language feature request gate&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e006700750061006700650020006600650061007400750072006500200073006e0061007000730068006f0074"><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200073006e0061007000730068006f0074" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200073006e0061007000730068006f0074" aria-label="Definition of language feature snapshot">&lt;&lt;language feature snapshot&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e0067007500610067006500200066006500610074007500720065002000730079006e006300680072006f006e0069007a006100740069006f006e"><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200066006500610074007500720065002000730079006e006300680072006f006e0069007a006100740069006f006e" data-literate-target="f-006c0061006e0067007500610067006500200066006500610074007500720065002000730079006e006300680072006f006e0069007a006100740069006f006e" aria-label="Definition of language feature synchronization">&lt;&lt;language feature synchronization&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e00670075006100670065002000660065006100740075007200650020006600610069006c007500720065"><a class="literate-tag-name" href="#f-006c0061006e00670075006100670065002000660065006100740075007200650020006600610069006c007500720065" data-literate-target="f-006c0061006e00670075006100670065002000660065006100740075007200650020006600610069006c007500720065" aria-label="Definition of language feature failure">&lt;&lt;language feature failure&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e0067007500610067006500200066006500610074007500720065002000700072006f007600690064006500720073"><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200066006500610074007500720065002000700072006f007600690064006500720073" data-literate-target="f-006c0061006e0067007500610067006500200066006500610074007500720065002000700072006f007600690064006500720073" aria-label="Definition of language feature providers">&lt;&lt;language feature providers&gt;&gt;</a></span>
+</code></pre>
+
+</div>
+</div><h2>Keep authority outside the project</h2>
+<p>No merged configuration getter is used. Invalid entries receive a fixed diagnostic;
+aliases normalize fence labels, not configuration keys. Omitted arguments mean an
+empty array. Executables run without a shell through the existing client. Output
+never includes configuration values, source, protocol errors or stderr.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e006700750061006700650020006600650061007400750072006500200069006d0070006f007200740073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e006700750061006700650020006600650061007400750072006500200069006d0070006f007200740073"></span><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200069006d0070006f007200740073" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200069006d0070006f007200740073" aria-label="Definition of language feature imports">&lt;&lt;language feature imports&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> vscode <span class="hljs-keyword">from</span> <span class="hljs-string">'vscode'</span>;
+<span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> path <span class="hljs-keyword">from</span> <span class="hljs-string">'node:path'</span>;
+<span class="hljs-keyword">import</span> { <span class="hljs-title">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
+<span class="hljs-keyword">import</span> { <span class="hljs-title">LanguageClient</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./language-client'</span>;
+<span class="hljs-keyword">import</span> { mapGeneratedRange, mapSourcePosition, projectLanguageSources, <span class="hljs-title">SourceProjectionPosition</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./language-projection'</span>;
+
+<span class="hljs-keyword">type</span> <span class="hljs-title">ObjectValue</span> = <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">unknown</span>&gt;;
+<span class="hljs-keyword">const</span> <span class="hljs-built_in">object</span> = (<span class="hljs-attr">value</span>: <span class="hljs-built_in">unknown</span>): value is <span class="hljs-title">ObjectValue</span> =&gt; value !== <span class="hljs-literal">null</span> &amp;&amp; <span class="hljs-keyword">typeof</span> value === <span class="hljs-string">'object'</span> &amp;&amp; !<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(value);
+<span class="hljs-keyword">const</span> <span class="hljs-attr">aliases</span>: <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; = { <span class="hljs-attr">ts</span>: <span class="hljs-string">'typescript'</span>, <span class="hljs-attr">js</span>: <span class="hljs-string">'javascript'</span>, <span class="hljs-attr">tsx</span>: <span class="hljs-string">'typescriptreact'</span>, <span class="hljs-attr">jsx</span>: <span class="hljs-string">'javascriptreact'</span>,
+    
+    <span class="hljs-attr">py</span>: <span class="hljs-string">'python'</span>, <span class="hljs-attr">rb</span>: <span class="hljs-string">'ruby'</span>, <span class="hljs-attr">sh</span>: <span class="hljs-string">'shellscript'</span>, <span class="hljs-attr">bash</span>: <span class="hljs-string">'shellscript'</span>, <span class="hljs-attr">yml</span>: <span class="hljs-string">'yaml'</span>, <span class="hljs-attr">cs</span>: <span class="hljs-string">'csharp'</span>, <span class="hljs-string">'c++'</span>: <span class="hljs-string">'cpp'</span>, <span class="hljs-attr">rs</span>: <span class="hljs-string">'rust'</span> };
+<span class="hljs-keyword">const</span> language = (<span class="hljs-attr">value</span>: <span class="hljs-built_in">string</span>): <span class="hljs-params">string</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">Object</span>.<span class="hljs-keyword">prototype</span>.<span class="hljs-property">hasOwnProperty</span>.<span class="hljs-title">call</span>(aliases, value.<span class="hljs-title">toLowerCase</span>())
+    ? aliases[value.<span class="hljs-title">toLowerCase</span>()] : value.<span class="hljs-title">toLowerCase</span>();
+<span class="hljs-keyword">const</span> family = (<span class="hljs-attr">value</span>: <span class="hljs-built_in">string</span>): <span class="hljs-params">boolean</span><span class="hljs-function"> =&gt;</span> [<span class="hljs-string">'typescript'</span>, <span class="hljs-string">'javascript'</span>, <span class="hljs-string">'typescriptreact'</span>, <span class="hljs-string">'javascriptreact'</span>].<span class="hljs-title">includes</span>(value);
+<span class="hljs-keyword">interface</span> <span class="hljs-title">Server</span> { <span class="hljs-attr">command</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">args</span>: <span class="hljs-built_in">string</span>[]; initializationOptions?: <span class="hljs-title">ObjectValue</span>; configuration?: <span class="hljs-title">ObjectValue</span>; }
+<span class="hljs-keyword">interface</span> <span class="hljs-title">RequestView</span> { <span class="hljs-attr">document</span>: vscode.<span class="hljs-property">TextDocument</span>; <span class="hljs-attr">position</span>: vscode.<span class="hljs-property">Position</span>; <span class="hljs-attr">hit</span>: <span class="hljs-title">SourceProjectionPosition</span>; }
+</code></pre>
+
+</div>
+</div><div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e0067007500610067006500200066006500610074007500720065002000730065007400740069006e00670073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e0067007500610067006500200066006500610074007500720065002000730065007400740069006e00670073"></span><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200066006500610074007500720065002000730065007400740069006e00670073" data-literate-target="f-006c0061006e0067007500610067006500200066006500610074007500720065002000730065007400740069006e00670073" aria-label="Definition of language feature settings">&lt;&lt;language feature settings&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">servers</span>(<span class="hljs-params">invalid: </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span><span class="hljs-params"> = </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-literal">undefined</span>): <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">Server</span>&gt; {
+    <span class="hljs-keyword">const</span> raw = vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">getConfiguration</span>(<span class="hljs-string">'literate'</span>).<span class="hljs-property">inspect</span>&lt;<span class="hljs-built_in">unknown</span>&gt;(<span class="hljs-string">'languageServers'</span>)?.<span class="hljs-property">globalValue</span>;
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">result</span>: <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">Server</span>&gt; = <span class="hljs-title">Object</span>.<span class="hljs-title">create</span>(<span class="hljs-literal">null</span>);
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">object</span>(raw)) { <span class="hljs-keyword">if</span> (raw !== <span class="hljs-literal">undefined</span>) { <span class="hljs-title">invalid</span>(); } <span class="hljs-keyword">return</span> result; }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [id, entry] <span class="hljs-keyword">of</span> <span class="hljs-title">Object</span>.<span class="hljs-title">entries</span>(raw)) {
+        <span class="hljs-keyword">if</span> (!<span class="hljs-regexp">/^</span><span class="hljs-regexp">[a-z]</span><span class="hljs-regexp">[a-z0-9+-]</span><span class="hljs-regexp">*$/</span>.<span class="hljs-title">test</span>(id) || <span class="hljs-title">language</span>(id) !== id || !<span class="hljs-title">object</span>(entry)
+            || <span class="hljs-keyword">typeof</span> entry.<span class="hljs-property">command</span> !== <span class="hljs-string">'string'</span> || !path.<span class="hljs-title">isAbsolute</span>(entry.<span class="hljs-property">command</span>) || entry.<span class="hljs-property">command</span>.<span class="hljs-title">includes</span>(<span class="hljs-string">'</span><span class="hljs-string">\0</span><span class="hljs-string">'</span>)
+            || (entry.<span class="hljs-property">args</span> !== <span class="hljs-literal">undefined</span> &amp;&amp; (!<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(entry.<span class="hljs-property">args</span>)
+                || !entry.<span class="hljs-property">args</span>.<span class="hljs-title">every</span>(<span class="hljs-params">arg</span><span class="hljs-function"> =&gt;</span> <span class="hljs-keyword">typeof</span> arg === <span class="hljs-string">'string'</span> &amp;&amp; !arg.<span class="hljs-title">includes</span>(<span class="hljs-string">'</span><span class="hljs-string">\0</span><span class="hljs-string">'</span>))))
+            || (entry.<span class="hljs-property">initializationOptions</span> !== <span class="hljs-literal">undefined</span> &amp;&amp; !<span class="hljs-title">object</span>(entry.<span class="hljs-property">initializationOptions</span>))
+            || (entry.<span class="hljs-property">configuration</span> !== <span class="hljs-literal">undefined</span> &amp;&amp; !<span class="hljs-title">object</span>(entry.<span class="hljs-property">configuration</span>))) { <span class="hljs-title">invalid</span>(); <span class="hljs-keyword">continue</span>; }
+        result[id] = { <span class="hljs-attr">command</span>: entry.<span class="hljs-property">command</span>, <span class="hljs-attr">args</span>: entry.<span class="hljs-property">args</span> === <span class="hljs-literal">undefined</span> ? [] : [...entry.<span class="hljs-property">args</span> <span class="hljs-keyword">as</span> <span class="hljs-built_in">string</span>[]],
+            <span class="hljs-attr">initializationOptions</span>: entry.<span class="hljs-property">initializationOptions</span> <span class="hljs-keyword">as</span> <span class="hljs-title">ObjectValue</span> | <span class="hljs-literal">undefined</span>,
+            <span class="hljs-attr">configuration</span>: entry.<span class="hljs-property">configuration</span> <span class="hljs-keyword">as</span> <span class="hljs-title">ObjectValue</span> | <span class="hljs-literal">undefined</span> };
+    }
+    <span class="hljs-keyword">return</span> result;
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title">local</span>(<span class="hljs-params">folder: vscode.WorkspaceFolder, </span><span class="hljs-variable">document</span><span class="hljs-params">: vscode.TextDocument</span>): <span class="hljs-built_in">boolean</span> {
+    <span class="hljs-keyword">return</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">isTrusted</span> &amp;&amp; !vscode.<span class="hljs-property">env</span>.<span class="hljs-property">remoteName</span> &amp;&amp; folder.<span class="hljs-property">uri</span>.<span class="hljs-property">scheme</span> === <span class="hljs-string">'file'</span> &amp;&amp; !folder.<span class="hljs-property">uri</span>.<span class="hljs-property">authority</span>
+        &amp;&amp; <span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">scheme</span> === <span class="hljs-string">'file'</span> &amp;&amp; !<span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">authority</span> &amp;&amp; !<span class="hljs-variable">document</span>.<span class="hljs-property">isClosed</span>
+        &amp;&amp; <span class="hljs-variable">document</span>.<span class="hljs-property">languageId</span> === <span class="hljs-string">'markdown'</span> &amp;&amp; <span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">fsPath</span>.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'.literate'</span>)
+        &amp;&amp; !!vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span>?.<span class="hljs-title">includes</span>(folder)
+        &amp;&amp; vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">getWorkspaceFolder</span>(<span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>) === folder;
+}
+</code></pre>
+
+</div>
+</div><h2>Treat replies as untrusted data</h2>
+<p>Positions use UTF-16 indexes and reject out-of-line coordinates rather than
+clamping them. Every edit must stay in the original occurrence, on the cursor's
+line, and contain the cursor. Unsupported completion defaults reject the list;
+commands, snippets and auxiliary edits reject the item, never becoming plaintext.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e006700750061006700650020006600650061007400750072006500200070006f0073006900740069006f006e0073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e006700750061006700650020006600650061007400750072006500200070006f0073006900740069006f006e0073"></span><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200070006f0073006900740069006f006e0073" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200070006f0073006900740069006f006e0073" aria-label="Definition of language feature positions">&lt;&lt;language feature positions&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">offset</span>(<span class="hljs-params">text: </span><span class="hljs-built_in">string</span><span class="hljs-params">, value: </span><span class="hljs-built_in">unknown</span>): <span class="hljs-built_in">number</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">object</span>(value) || !<span class="hljs-title">Number</span>.<span class="hljs-title">isSafeInteger</span>(value.<span class="hljs-property">line</span>) || !<span class="hljs-title">Number</span>.<span class="hljs-title">isSafeInteger</span>(value.<span class="hljs-property">character</span>)
+        || (value.<span class="hljs-property">line</span> <span class="hljs-keyword">as</span> <span class="hljs-built_in">number</span>) &lt; <span class="hljs-number">0</span> || (value.<span class="hljs-property">character</span> <span class="hljs-keyword">as</span> <span class="hljs-built_in">number</span>) &lt; <span class="hljs-number">0</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">const</span> lines = text.<span class="hljs-title">split</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">|</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">|</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">/</span>);
+    <span class="hljs-keyword">const</span> line = value.<span class="hljs-property">line</span> <span class="hljs-keyword">as</span> <span class="hljs-built_in">number</span>, character = value.<span class="hljs-property">character</span> <span class="hljs-keyword">as</span> <span class="hljs-built_in">number</span>;
+    <span class="hljs-keyword">if</span> (line &gt;= lines.<span class="hljs-property">length</span> || character &gt; lines[line].<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">let</span> start = <span class="hljs-number">0</span>, index = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> match <span class="hljs-keyword">of</span> text.<span class="hljs-title">matchAll</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">|</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">|</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">/g</span>)) {
+        <span class="hljs-keyword">if</span> (index++ === line) { <span class="hljs-keyword">break</span>; }
+        start = match.<span class="hljs-property">index</span>! + match[<span class="hljs-number">0</span>].<span class="hljs-property">length</span>;
+    }
+    <span class="hljs-keyword">return</span> start + character;
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title">position</span>(<span class="hljs-params">text: </span><span class="hljs-built_in">string</span><span class="hljs-params">, at: </span><span class="hljs-built_in">number</span>): { <span class="hljs-attr">line</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">character</span>: <span class="hljs-built_in">number</span> } {
+    <span class="hljs-keyword">const</span> lines = text.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, at).<span class="hljs-title">split</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">|</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">|</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">/</span>);
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">line</span>: lines.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>, <span class="hljs-attr">character</span>: lines[lines.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>].<span class="hljs-property">length</span> };
+}
+</code></pre>
+
+</div>
+</div><div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e0067007500610067006500200066006500610074007500720065002000720061006e006700650073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e0067007500610067006500200066006500610074007500720065002000720061006e006700650073"></span><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200066006500610074007500720065002000720061006e006700650073" data-literate-target="f-006c0061006e0067007500610067006500200066006500610074007500720065002000720061006e006700650073" aria-label="Definition of language feature ranges">&lt;&lt;language feature ranges&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">mappedRange</span>(<span class="hljs-params">view: RequestView, value: </span><span class="hljs-built_in">unknown</span>): vscode.<span class="hljs-property">Range</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">object</span>(value)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">const</span> { file, mapping } = view.<span class="hljs-property">hit</span>;
+    <span class="hljs-keyword">const</span> start = <span class="hljs-title">offset</span>(file.<span class="hljs-property">content</span>, value.<span class="hljs-property">start</span>), end = <span class="hljs-title">offset</span>(file.<span class="hljs-property">content</span>, value.<span class="hljs-property">end</span>);
+    <span class="hljs-keyword">if</span> (start === <span class="hljs-literal">undefined</span> || end === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">const</span> mapped = <span class="hljs-title">mapGeneratedRange</span>(file, start, end, mapping);
+    <span class="hljs-keyword">if</span> (!mapped) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">const</span> range = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">Range</span>(view.<span class="hljs-property">document</span>.<span class="hljs-title">positionAt</span>(mapped.<span class="hljs-property">start</span>), view.<span class="hljs-property">document</span>.<span class="hljs-title">positionAt</span>(mapped.<span class="hljs-property">end</span>));
+    <span class="hljs-keyword">return</span> range.<span class="hljs-property">start</span>.<span class="hljs-property">line</span> === range.<span class="hljs-property">end</span>.<span class="hljs-property">line</span> &amp;&amp; range.<span class="hljs-property">start</span>.<span class="hljs-property">line</span> === view.<span class="hljs-property">position</span>.<span class="hljs-property">line</span> &amp;&amp; range.<span class="hljs-title">contains</span>(view.<span class="hljs-property">position</span>)
+        ? range : <span class="hljs-literal">undefined</span>;
+}
+</code></pre>
+
+</div>
+</div><p>A default edit uses the source word, not the whole prefix preceding the cursor.
+The explicit identifier expression excludes dots even under Markdown word rules.
+An absent or unsafe word becomes a zero-width insertion inside the active mapping.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e006700750061006700650020006600650061007400750072006500200077006f007200640073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e006700750061006700650020006600650061007400750072006500200077006f007200640073"></span><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200077006f007200640073" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200077006f007200640073" aria-label="Definition of language feature words">&lt;&lt;language feature words&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">wordRange</span>(<span class="hljs-params">view: RequestView</span>): vscode.<span class="hljs-property">Range</span> {
+    <span class="hljs-keyword">const</span> { <span class="hljs-variable">document</span>, <span class="hljs-attr">position</span>: cursor, hit } = view;
+    <span class="hljs-keyword">const</span> word = <span class="hljs-variable">document</span>.<span class="hljs-title">getWordRangeAtPosition</span>(cursor, <span class="hljs-regexp">/</span><span class="hljs-regexp">[</span><span class="hljs-regexp">\p</span><span class="hljs-regexp">{L}</span><span class="hljs-regexp">\p</span><span class="hljs-regexp">{N}_$]</span><span class="hljs-regexp">+/u</span>);
+    <span class="hljs-keyword">if</span> (word &amp;&amp; word.<span class="hljs-property">start</span>.<span class="hljs-property">line</span> === cursor.<span class="hljs-property">line</span> &amp;&amp; word.<span class="hljs-property">end</span>.<span class="hljs-property">line</span> === cursor.<span class="hljs-property">line</span> &amp;&amp; word.<span class="hljs-title">contains</span>(cursor)
+        &amp;&amp; <span class="hljs-variable">document</span>.<span class="hljs-title">offsetAt</span>(word.<span class="hljs-property">start</span>) &gt;= hit.<span class="hljs-property">mapping</span>.<span class="hljs-property">sourceStart</span>
+        &amp;&amp; <span class="hljs-variable">document</span>.<span class="hljs-title">offsetAt</span>(word.<span class="hljs-property">end</span>) &lt;= hit.<span class="hljs-property">mapping</span>.<span class="hljs-property">sourceEnd</span>) { <span class="hljs-keyword">return</span> word; }
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">Range</span>(cursor, cursor);
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title">completions</span>(<span class="hljs-params">view: RequestView, reply: </span><span class="hljs-built_in">unknown</span>): vscode.<span class="hljs-property">CompletionItem</span>[] | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">if</span> (<span class="hljs-title">object</span>(reply) &amp;&amp; (<span class="hljs-string">'itemDefaults'</span> <span class="hljs-keyword">in</span> reply || <span class="hljs-string">'editDefaults'</span> <span class="hljs-keyword">in</span> reply)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">const</span> items = <span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(reply) ? reply : <span class="hljs-title">object</span>(reply) &amp;&amp; <span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(reply.<span class="hljs-property">items</span>) ? reply.<span class="hljs-property">items</span> : <span class="hljs-literal">undefined</span>;
+    <span class="hljs-keyword">return</span> items?.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">1000</span>).<span class="hljs-title">flatMap</span>(<span class="hljs-params">value</span><span class="hljs-function"> =&gt;</span> {
+        <span class="hljs-keyword">const</span> item = <span class="hljs-title">completion</span>(view, value);
+        <span class="hljs-keyword">return</span> item ? [item] : [];
+    });
+}
+</code></pre>
+
+</div>
+</div><div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e002000670075006100720064-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e002000670075006100720064"></span><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e002000670075006100720064" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e002000670075006100720064" aria-label="Definition of language feature completion guard">&lt;&lt;language feature completion guard&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">completion</span>(<span class="hljs-params">view: RequestView, value: </span><span class="hljs-built_in">unknown</span>): vscode.<span class="hljs-property">CompletionItem</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">object</span>(value) || <span class="hljs-keyword">typeof</span> value.<span class="hljs-property">label</span> !== <span class="hljs-string">'string'</span> || !value.<span class="hljs-property">label</span>.<span class="hljs-property">length</span> || value.<span class="hljs-property">label</span>.<span class="hljs-property">length</span> &gt; <span class="hljs-number">4096</span>
+        || <span class="hljs-string">'command'</span> <span class="hljs-keyword">in</span> value || <span class="hljs-string">'editDefaults'</span> <span class="hljs-keyword">in</span> value || <span class="hljs-string">'textEditText'</span> <span class="hljs-keyword">in</span> value || value.<span class="hljs-property">kind</span> === <span class="hljs-number">15</span>
+        || (value.<span class="hljs-property">insertTextFormat</span> !== <span class="hljs-literal">undefined</span> &amp;&amp; value.<span class="hljs-property">insertTextFormat</span> !== <span class="hljs-number">1</span>)
+        || (value.<span class="hljs-property">insertTextMode</span> !== <span class="hljs-literal">undefined</span> &amp;&amp; value.<span class="hljs-property">insertTextMode</span> !== <span class="hljs-number">1</span>)
+        || (value.<span class="hljs-property">additionalTextEdits</span> !== <span class="hljs-literal">undefined</span> &amp;&amp; (!<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(value.<span class="hljs-property">additionalTextEdits</span>) || value.<span class="hljs-property">additionalTextEdits</span>.<span class="hljs-property">length</span>))
+        || (value.<span class="hljs-property">insertText</span> !== <span class="hljs-literal">undefined</span> &amp;&amp; <span class="hljs-keyword">typeof</span> value.<span class="hljs-property">insertText</span> !== <span class="hljs-string">'string'</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">const</span> item = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">CompletionItem</span>(value.<span class="hljs-property">label</span>);
+    <span class="hljs-keyword">let</span> text = <span class="hljs-keyword">typeof</span> value.<span class="hljs-property">insertText</span> === <span class="hljs-string">'string'</span> ? value.<span class="hljs-property">insertText</span> : value.<span class="hljs-property">label</span>;
+    item.<span class="hljs-property">range</span> = <span class="hljs-title">wordRange</span>(view);
+</code></pre>
+
+</div>
+</div><div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e002000650064006900740073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e002000650064006900740073"></span><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e002000650064006900740073" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e002000650064006900740073" aria-label="Definition of language feature completion edits">&lt;&lt;language feature completion edits&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">if</span> (value.<span class="hljs-property">textEdit</span> !== <span class="hljs-literal">undefined</span>) {
+        <span class="hljs-keyword">const</span> edit = value.<span class="hljs-property">textEdit</span>;
+        <span class="hljs-keyword">if</span> (!<span class="hljs-title">object</span>(edit) || <span class="hljs-keyword">typeof</span> edit.<span class="hljs-property">newText</span> !== <span class="hljs-string">'string'</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+        text = edit.<span class="hljs-property">newText</span>;
+        <span class="hljs-keyword">if</span> (<span class="hljs-string">'range'</span> <span class="hljs-keyword">in</span> edit) {
+            <span class="hljs-keyword">if</span> (<span class="hljs-string">'insert'</span> <span class="hljs-keyword">in</span> edit || <span class="hljs-string">'replace'</span> <span class="hljs-keyword">in</span> edit) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+            <span class="hljs-keyword">const</span> range = <span class="hljs-title">mappedRange</span>(view, edit.<span class="hljs-property">range</span>);
+            <span class="hljs-keyword">if</span> (!range) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+            item.<span class="hljs-property">range</span> = range;
+        } <span class="hljs-keyword">else</span> {
+            <span class="hljs-keyword">const</span> inserting = <span class="hljs-title">mappedRange</span>(view, edit.<span class="hljs-property">insert</span>), replacing = <span class="hljs-title">mappedRange</span>(view, edit.<span class="hljs-property">replace</span>);
+            <span class="hljs-keyword">if</span> (!inserting || !replacing || !inserting.<span class="hljs-property">start</span>.<span class="hljs-title">isEqual</span>(replacing.<span class="hljs-property">start</span>)
+                || !replacing.<span class="hljs-title">contains</span>(inserting)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+            item.<span class="hljs-property">range</span> = { inserting, replacing };
+        }
+    }
+    <span class="hljs-keyword">if</span> (text.<span class="hljs-property">length</span> &gt; <span class="hljs-number">65536</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    item.<span class="hljs-property">insertText</span> = text;
+</code></pre>
+
+</div>
+</div><div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e0020006d0065007400610064006100740061-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e0020006d0065007400610064006100740061"></span><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e0020006d0065007400610064006100740061" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200063006f006d0070006c006500740069006f006e0020006d0065007400610064006100740061" aria-label="Definition of language feature completion metadata">&lt;&lt;language feature completion metadata&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> key <span class="hljs-keyword">of</span> [<span class="hljs-string">'sortText'</span>, <span class="hljs-string">'filterText'</span>, <span class="hljs-string">'detail'</span>] <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span>) {
+        <span class="hljs-keyword">const</span> text = value[key];
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> text === <span class="hljs-string">'string'</span>) { item[key] = text.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">4096</span>); }
+    }
+    <span class="hljs-keyword">const</span> kinds = [vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Text</span>, vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Method</span>, vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Function</span>,
+        vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Constructor</span>, vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Field</span>, vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Variable</span>,
+        vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Class</span>, vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Interface</span>, vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Module</span>,
+        vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Property</span>, vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Unit</span>, vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Value</span>,
+        vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Enum</span>, vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Keyword</span>, vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Snippet</span>,
+        vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Color</span>, vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">File</span>, vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Reference</span>,
+        vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Folder</span>, vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">EnumMember</span>, vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Constant</span>,
+        vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Struct</span>, vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Event</span>, vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Operator</span>,
+        vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">TypeParameter</span>];
+    <span class="hljs-keyword">if</span> (<span class="hljs-title">Number</span>.<span class="hljs-title">isInteger</span>(value.<span class="hljs-property">kind</span>) &amp;&amp; (value.<span class="hljs-property">kind</span> <span class="hljs-keyword">as</span> <span class="hljs-built_in">number</span>) &gt;= <span class="hljs-number">1</span> &amp;&amp; (value.<span class="hljs-property">kind</span> <span class="hljs-keyword">as</span> <span class="hljs-built_in">number</span>) &lt;= kinds.<span class="hljs-property">length</span>) {
+        item.<span class="hljs-property">kind</span> = kinds[(value.<span class="hljs-property">kind</span> <span class="hljs-keyword">as</span> <span class="hljs-built_in">number</span>) - <span class="hljs-number">1</span>];
+    }
+    <span class="hljs-keyword">return</span> item;
+}
+</code></pre>
+
+</div>
+</div><p>Hover text is bounded and explicitly untrusted, including legacy marked strings.
+Explicit unsafe hover ranges discard the hover. There is no completion resolution,
+server command forwarding, diagnostics publication or automatic trigger support.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e006700750061006700650020006600650061007400750072006500200068006f00760065007200200074006500780074-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e006700750061006700650020006600650061007400750072006500200068006f00760065007200200074006500780074"></span><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200068006f00760065007200200074006500780074" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200068006f00760065007200200074006500780074" aria-label="Definition of language feature hover text">&lt;&lt;language feature hover text&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">hoverText</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">unknown</span>): vscode.<span class="hljs-property">MarkdownString</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">const</span> markdown = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">MarkdownString</span>();
+    markdown.<span class="hljs-property">isTrusted</span> = <span class="hljs-literal">false</span>;
+    markdown.<span class="hljs-property">supportHtml</span> = <span class="hljs-literal">false</span>;
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> value === <span class="hljs-string">'string'</span>) { markdown.<span class="hljs-title">appendMarkdown</span>(value.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">8192</span>)); }
+    <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (<span class="hljs-title">object</span>(value) &amp;&amp; <span class="hljs-keyword">typeof</span> value.<span class="hljs-property">value</span> === <span class="hljs-string">'string'</span>) {
+        <span class="hljs-keyword">const</span> text = value.<span class="hljs-property">value</span>.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">8192</span>);
+        <span class="hljs-keyword">if</span> (value.<span class="hljs-property">kind</span> === <span class="hljs-string">'plaintext'</span>) { markdown.<span class="hljs-title">appendText</span>(text); }
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (value.<span class="hljs-property">kind</span> === <span class="hljs-string">'markdown'</span>) { markdown.<span class="hljs-title">appendMarkdown</span>(text); }
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> value.<span class="hljs-property">language</span> === <span class="hljs-string">'string'</span> &amp;&amp; <span class="hljs-regexp">/^</span><span class="hljs-regexp">[</span><span class="hljs-regexp">\w</span><span class="hljs-regexp">+-]</span><span class="hljs-regexp">{1,40}$/</span>.<span class="hljs-title">test</span>(value.<span class="hljs-property">language</span>)) {
+            markdown.<span class="hljs-title">appendCodeblock</span>(text, value.<span class="hljs-property">language</span>);
+        } <span class="hljs-keyword">else</span> { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    } <span class="hljs-keyword">else</span> { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">return</span> markdown.<span class="hljs-property">value</span> ? markdown : <span class="hljs-literal">undefined</span>;
+}
+</code></pre>
+
+</div>
+</div><div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e006700750061006700650020006600650061007400750072006500200068006f00760065007200200072006500730075006c0074-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e006700750061006700650020006600650061007400750072006500200068006f00760065007200200072006500730075006c0074"></span><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200068006f00760065007200200072006500730075006c0074" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200068006f00760065007200200072006500730075006c0074" aria-label="Definition of language feature hover result">&lt;&lt;language feature hover result&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">hover</span>(<span class="hljs-params">view: RequestView, reply: </span><span class="hljs-built_in">unknown</span>): vscode.<span class="hljs-property">Hover</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">object</span>(reply)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">const</span> values = <span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(reply.<span class="hljs-property">contents</span>) ? reply.<span class="hljs-property">contents</span>.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">8</span>) : [reply.<span class="hljs-property">contents</span>];
+    <span class="hljs-keyword">const</span> contents = values.<span class="hljs-title">map</span>(hoverText).<span class="hljs-title">filter</span>((value): value is vscode.<span class="hljs-property">MarkdownString</span> =&gt; !!value);
+    <span class="hljs-keyword">if</span> (!contents.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">const</span> range = reply.<span class="hljs-property">range</span> === <span class="hljs-literal">undefined</span> ? <span class="hljs-title">wordRange</span>(view) : <span class="hljs-title">mappedRange</span>(view, reply.<span class="hljs-property">range</span>);
+    <span class="hljs-keyword">if</span> (!range) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">Hover</span>(contents, range);
+}
+</code></pre>
+
+</div>
+</div><h2>One operation, no waiting queue</h2>
+<p>Dropping overlapping requests bounds both snapshot work and protocol pressure.
+The operation owns initialization, full synchronization and its reply as one unit.
+Every asynchronous boundary checks document version, the global revision epoch,
+folder membership, trust, configuration and cancellation. Document and disk events
+invalidate all outstanding work, including changes to other imported fragments.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e00670075006100670065002000660065006100740075007200650020006c006900660065006300790063006c0065-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e00670075006100670065002000660065006100740075007200650020006c006900660065006300790063006c0065"></span><a class="literate-tag-name" href="#f-006c0061006e00670075006100670065002000660065006100740075007200650020006c006900660065006300790063006c0065" data-literate-target="f-006c0061006e00670075006100670065002000660065006100740075007200650020006c006900660065006300790063006c0065" aria-label="Definition of language feature lifecycle">&lt;&lt;language feature lifecycle&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">registerLanguageFeatures</span>(<span class="hljs-params">context: vscode.ExtensionContext,
+    snapshot: </span><span class="hljs-params">(folder: vscode.WorkspaceFolder)</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">Promise</span><span class="hljs-params">&lt;SourceDocument[]&gt;</span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">type</span> <span class="hljs-title">Session</span> = { <span class="hljs-attr">client</span>: <span class="hljs-title">LanguageClient</span>; <span class="hljs-attr">failed</span>: <span class="hljs-built_in">boolean</span> };
+    <span class="hljs-keyword">const</span> sessions = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">Session</span>&gt;();
+    <span class="hljs-keyword">let</span> epoch = <span class="hljs-number">0</span>, busy = <span class="hljs-literal">false</span>, disposed = <span class="hljs-literal">false</span>;
+    <span class="hljs-keyword">let</span> <span class="hljs-attr">active</span>: <span class="hljs-title">AbortController</span> | <span class="hljs-literal">undefined</span>;
+    <span class="hljs-keyword">const</span> invalidate = (): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> { epoch++; active?.<span class="hljs-title">abort</span>(); };
+    <span class="hljs-keyword">const</span> close = (<span class="hljs-attr">client</span>: <span class="hljs-title">LanguageClient</span>): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> { <span class="hljs-built_in">void</span> client.<span class="hljs-title">dispose</span>().<span class="hljs-title">catch</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-literal">undefined</span>); };
+    <span class="hljs-keyword">let</span> invalidReported = <span class="hljs-literal">false</span>;
+    <span class="hljs-keyword">const</span> reset = (): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+        <span class="hljs-title">invalidate</span>(); sessions.<span class="hljs-title">forEach</span>(<span class="hljs-params">session</span><span class="hljs-function"> =&gt;</span> { <span class="hljs-keyword">if</span> (!session.<span class="hljs-property">failed</span>) { <span class="hljs-title">close</span>(session.<span class="hljs-property">client</span>); } });
+        sessions.<span class="hljs-title">clear</span>(); invalidReported = <span class="hljs-literal">false</span>;
+    };
+    context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title">push</span>({ <span class="hljs-title">dispose</span>() { disposed = <span class="hljs-literal">true</span>; <span class="hljs-title">reset</span>(); } });
+</code></pre>
+
+</div>
+</div><p>Failure disables that session until configuration changes or the user invokes
+<code>literate.restartLanguageServers</code>. Cancellation is not failure. Restart invalidates
+old work without releasing the serialization gate until it settles. Diagnostics
+are fixed, actionable messages, once per failed session or invalid configuration
+revision, with at most 100 retained lines. No automatic restart loop is possible.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e006700750061006700650020006600650061007400750072006500200064006900610067006e006f00730074006900630073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e006700750061006700650020006600650061007400750072006500200064006900610067006e006f00730074006900630073"></span><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200064006900610067006e006f00730074006900630073" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200064006900610067006e006f00730074006900630073" aria-label="Definition of language feature diagnostics">&lt;&lt;language feature diagnostics&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">const</span> output = vscode.<span class="hljs-property">window</span>.<span class="hljs-title">createOutputChannel</span>(<span class="hljs-string">'Literate Language Servers'</span>);
+    <span class="hljs-keyword">let</span> lines = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">const</span> report = (<span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+        <span class="hljs-keyword">if</span> (disposed) { <span class="hljs-keyword">return</span>; }
+        <span class="hljs-keyword">if</span> (lines &gt;= <span class="hljs-number">100</span>) { output.<span class="hljs-title">clear</span>(); lines = <span class="hljs-number">0</span>; }
+        output.<span class="hljs-title">appendLine</span>(message); lines++;
+    };
+    <span class="hljs-keyword">const</span> invalid = (): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+        <span class="hljs-keyword">if</span> (invalidReported) { <span class="hljs-keyword">return</span>; }
+        invalidReported = <span class="hljs-literal">true</span>;
+        <span class="hljs-title">report</span>(<span class="hljs-string">'Invalid global literate.languageServers: use canonical language IDs, an absolute executable command, '</span>
+            + <span class="hljs-string">'optional string-array args and object initializationOptions/configuration. Workspace overrides are ignored.'</span>);
+    };
+    context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title">push</span>(output, vscode.<span class="hljs-property">commands</span>.<span class="hljs-title">registerCommand</span>(<span class="hljs-string">'literate.restartLanguageServers'</span>, <span class="hljs-function">() =&gt;</span> {
+        <span class="hljs-keyword">if</span> (!disposed) { <span class="hljs-title">reset</span>(); }
+    }));
+</code></pre>
+
+</div>
+</div><div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e00670075006100670065002000660065006100740075007200650020006500760065006e00740073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e00670075006100670065002000660065006100740075007200650020006500760065006e00740073"></span><a class="literate-tag-name" href="#f-006c0061006e00670075006100670065002000660065006100740075007200650020006500760065006e00740073" data-literate-target="f-006c0061006e00670075006100670065002000660065006100740075007200650020006500760065006e00740073" aria-label="Definition of language feature events">&lt;&lt;language feature events&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title">push</span>(vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">onDidChangeConfiguration</span>(<span class="hljs-params">event</span><span class="hljs-function"> =&gt;</span> {
+        <span class="hljs-keyword">if</span> (event.<span class="hljs-title">affectsConfiguration</span>(<span class="hljs-string">'literate.languageServers'</span>)) { <span class="hljs-title">reset</span>(); }
+    }), vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">onDidChangeWorkspaceFolders</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title">reset</span>()),
+    vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">onDidChangeTextDocument</span>(invalidate), vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">onDidOpenTextDocument</span>(invalidate),
+    vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">onDidCloseTextDocument</span>(invalidate));
+    <span class="hljs-keyword">const</span> watcher = vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">createFileSystemWatcher</span>(<span class="hljs-string">'**/*.literate'</span>);
+    context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title">push</span>(watcher, watcher.<span class="hljs-title">onDidChange</span>(invalidate), watcher.<span class="hljs-title">onDidCreate</span>(invalidate), watcher.<span class="hljs-title">onDidDelete</span>(invalidate));
+    <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">request</span>(<span class="hljs-variable">document</span><span class="hljs-params">: vscode.TextDocument, cursor: vscode.Position, token: vscode.CancellationToken,
+        method: </span><span class="hljs-string">'hover'</span><span class="hljs-params"> | </span><span class="hljs-string">'completion'</span>): <span class="hljs-title">Promise</span>&lt;vscode.<span class="hljs-property">Hover</span> | vscode.<span class="hljs-property">CompletionItem</span>[] | <span class="hljs-literal">undefined</span>&gt; {
+</code></pre>
+
+</div>
+</div><div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e00670075006100670065002000660065006100740075007200650020007200650071007500650073007400200067006100740065-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e00670075006100670065002000660065006100740075007200650020007200650071007500650073007400200067006100740065"></span><a class="literate-tag-name" href="#f-006c0061006e00670075006100670065002000660065006100740075007200650020007200650071007500650073007400200067006100740065" data-literate-target="f-006c0061006e00670075006100670065002000660065006100740075007200650020007200650071007500650073007400200067006100740065" aria-label="Definition of language feature request gate">&lt;&lt;language feature request gate&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>        <span class="hljs-keyword">const</span> folder = vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">getWorkspaceFolder</span>(<span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>);
+        <span class="hljs-keyword">if</span> (disposed || busy || token.<span class="hljs-property">isCancellationRequested</span> || !folder || !<span class="hljs-title">local</span>(folder, <span class="hljs-variable">document</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+        <span class="hljs-keyword">const</span> configured = <span class="hljs-title">servers</span>(invalid), fingerprint = <span class="hljs-title">JSON</span>.<span class="hljs-title">stringify</span>(configured);
+        <span class="hljs-keyword">if</span> (!<span class="hljs-title">Object</span>.<span class="hljs-title">keys</span>(configured).<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+        <span class="hljs-keyword">const</span> revision = epoch, version = <span class="hljs-variable">document</span>.<span class="hljs-property">version</span>;
+        <span class="hljs-keyword">const</span> controller = <span class="hljs-keyword">new</span> <span class="hljs-title">AbortController</span>();
+        <span class="hljs-keyword">const</span> cancellation = token.<span class="hljs-title">onCancellationRequested</span>(<span class="hljs-function">() =&gt;</span> controller.<span class="hljs-title">abort</span>());
+        active = controller; busy = <span class="hljs-literal">true</span>;
+        <span class="hljs-keyword">let</span> <span class="hljs-attr">session</span>: <span class="hljs-title">Session</span> | <span class="hljs-literal">undefined</span>, sessionKey = <span class="hljs-string">''</span>, phase = <span class="hljs-string">'snapshot'</span>;
+        <span class="hljs-keyword">const</span> fresh = (): <span class="hljs-params">boolean</span><span class="hljs-function"> =&gt;</span> !disposed &amp;&amp; !controller.<span class="hljs-property">signal</span>.<span class="hljs-property">aborted</span> &amp;&amp; !token.<span class="hljs-property">isCancellationRequested</span>
+            &amp;&amp; epoch === revision &amp;&amp; <span class="hljs-variable">document</span>.<span class="hljs-property">version</span> === version &amp;&amp; <span class="hljs-title">local</span>(folder, <span class="hljs-variable">document</span>)
+            &amp;&amp; <span class="hljs-title">JSON</span>.<span class="hljs-title">stringify</span>(<span class="hljs-title">servers</span>()) === fingerprint;
+        <span class="hljs-keyword">try</span> {
+            <span class="hljs-keyword">if</span> (!<span class="hljs-title">fresh</span>()) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+            <span class="hljs-keyword">const</span> documents = <span class="hljs-keyword">await</span> <span class="hljs-title">snapshot</span>(folder);
+            <span class="hljs-keyword">if</span> (!<span class="hljs-title">fresh</span>()) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+</code></pre>
+
+</div>
+</div><div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e006700750061006700650020006600650061007400750072006500200073006e0061007000730068006f0074-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e006700750061006700650020006600650061007400750072006500200073006e0061007000730068006f0074"></span><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200073006e0061007000730068006f0074" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200073006e0061007000730068006f0074" aria-label="Definition of language feature snapshot">&lt;&lt;language feature snapshot&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>            <span class="hljs-keyword">const</span> sourcePath = path.<span class="hljs-title">relative</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-property">fsPath</span>, <span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">fsPath</span>).<span class="hljs-title">split</span>(path.<span class="hljs-property">sep</span>).<span class="hljs-title">join</span>(<span class="hljs-string">'/'</span>);
+            <span class="hljs-keyword">if</span> (!documents.<span class="hljs-title">some</span>(<span class="hljs-params">source</span><span class="hljs-function"> =&gt;</span> source.<span class="hljs-property">path</span>.<span class="hljs-title">replace</span>(<span class="hljs-regexp">/^</span><span class="hljs-regexp">\.</span><span class="hljs-regexp">\/</span><span class="hljs-regexp">/</span>, <span class="hljs-string">''</span>) === sourcePath &amp;&amp; source.<span class="hljs-property">text</span> === <span class="hljs-variable">document</span>.<span class="hljs-title">getText</span>())) {
+                <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
+            }
+            <span class="hljs-keyword">const</span> projected = <span class="hljs-title">projectLanguageSources</span>(documents);
+            <span class="hljs-keyword">if</span> (projected.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+            <span class="hljs-keyword">const</span> hit = <span class="hljs-title">mapSourcePosition</span>(projected.<span class="hljs-property">files</span>, sourcePath, <span class="hljs-variable">document</span>.<span class="hljs-title">offsetAt</span>(cursor));
+            <span class="hljs-keyword">if</span> (!hit) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+            <span class="hljs-keyword">const</span> id = <span class="hljs-title">language</span>(hit.<span class="hljs-property">file</span>.<span class="hljs-property">language</span>), config = configured[id];
+            <span class="hljs-keyword">if</span> (!config) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+            sessionKey = <span class="hljs-title">JSON</span>.<span class="hljs-title">stringify</span>([folder.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>(), id]);
+            session = sessions.<span class="hljs-title">get</span>(sessionKey);
+            <span class="hljs-keyword">if</span> (session?.<span class="hljs-property">failed</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+            <span class="hljs-keyword">if</span> (!session) {
+                session = { <span class="hljs-attr">client</span>: <span class="hljs-keyword">new</span> <span class="hljs-title">LanguageClient</span>({ ...config, <span class="hljs-attr">cwd</span>: folder.<span class="hljs-property">uri</span>.<span class="hljs-property">fsPath</span>, <span class="hljs-attr">rootUri</span>: folder.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>() }), <span class="hljs-attr">failed</span>: <span class="hljs-literal">false</span> };
+                sessions.<span class="hljs-title">set</span>(sessionKey, session);
+            }
+            <span class="hljs-keyword">const</span> client = session.<span class="hljs-property">client</span>;
+            <span class="hljs-keyword">const</span> uri = (<span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>): <span class="hljs-params">string</span><span class="hljs-function"> =&gt;</span> vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title">file</span>(path.<span class="hljs-title">resolve</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-property">fsPath</span>, name)).<span class="hljs-title">toString</span>();
+</code></pre>
+
+</div>
+</div><div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e0067007500610067006500200066006500610074007500720065002000730079006e006300680072006f006e0069007a006100740069006f006e-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e0067007500610067006500200066006500610074007500720065002000730079006e006300680072006f006e0069007a006100740069006f006e"></span><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200066006500610074007500720065002000730079006e006300680072006f006e0069007a006100740069006f006e" data-literate-target="f-006c0061006e0067007500610067006500200066006500610074007500720065002000730079006e006300680072006f006e0069007a006100740069006f006e" aria-label="Definition of language feature synchronization">&lt;&lt;language feature synchronization&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>            phase = <span class="hljs-string">'initialization'</span>;
+            <span class="hljs-keyword">await</span> client.<span class="hljs-title">initialize</span>();
+            <span class="hljs-keyword">if</span> (!<span class="hljs-title">fresh</span>()) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+            <span class="hljs-keyword">const</span> capability = client.<span class="hljs-property">capabilities</span>[method === <span class="hljs-string">'hover'</span> ? <span class="hljs-string">'hoverProvider'</span> : <span class="hljs-string">'completionProvider'</span>];
+            <span class="hljs-keyword">if</span> (!(<span class="hljs-title">object</span>(capability) || (method === <span class="hljs-string">'hover'</span> &amp;&amp; capability === <span class="hljs-literal">true</span>))) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+            phase = <span class="hljs-string">'synchronization'</span>;
+            <span class="hljs-keyword">await</span> client.<span class="hljs-title">sync</span>(projected.<span class="hljs-property">files</span>.<span class="hljs-title">filter</span>(<span class="hljs-params">file</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">language</span>(file.<span class="hljs-property">language</span>) === id || (<span class="hljs-title">family</span>(id) &amp;&amp; <span class="hljs-title">family</span>(<span class="hljs-title">language</span>(file.<span class="hljs-property">language</span>))))
+                .<span class="hljs-title">map</span>(<span class="hljs-params">file</span><span class="hljs-function"> =&gt;</span> ({ <span class="hljs-attr">uri</span>: <span class="hljs-title">uri</span>(file.<span class="hljs-property">path</span>), <span class="hljs-attr">languageId</span>: <span class="hljs-title">language</span>(file.<span class="hljs-property">language</span>), <span class="hljs-attr">text</span>: file.<span class="hljs-property">content</span> })));
+            <span class="hljs-keyword">if</span> (!<span class="hljs-title">fresh</span>()) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+            phase = <span class="hljs-string">'request'</span>;
+            <span class="hljs-keyword">const</span> reply = <span class="hljs-keyword">await</span> client.<span class="hljs-title">request</span>(<span class="hljs-string">'textDocument/'</span> + method, {
+                <span class="hljs-attr">textDocument</span>: { <span class="hljs-attr">uri</span>: <span class="hljs-title">uri</span>(hit.<span class="hljs-property">file</span>.<span class="hljs-property">path</span>) }, <span class="hljs-attr">position</span>: <span class="hljs-title">position</span>(hit.<span class="hljs-property">file</span>.<span class="hljs-property">content</span>, hit.<span class="hljs-property">offset</span>),
+                ...(method === <span class="hljs-string">'completion'</span> ? { <span class="hljs-attr">context</span>: { <span class="hljs-attr">triggerKind</span>: <span class="hljs-number">1</span> } } : {})
+            }, controller.<span class="hljs-property">signal</span>);
+            <span class="hljs-keyword">if</span> (!<span class="hljs-title">fresh</span>()) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+            <span class="hljs-keyword">const</span> view = { <span class="hljs-variable">document</span>, <span class="hljs-attr">position</span>: cursor, hit };
+            <span class="hljs-keyword">return</span> method === <span class="hljs-string">'hover'</span> ? <span class="hljs-title">hover</span>(view, reply) : <span class="hljs-title">completions</span>(view, reply);
+</code></pre>
+
+</div>
+</div><div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e00670075006100670065002000660065006100740075007200650020006600610069006c007500720065-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e00670075006100670065002000660065006100740075007200650020006600610069006c007500720065"></span><a class="literate-tag-name" href="#f-006c0061006e00670075006100670065002000660065006100740075007200650020006600610069006c007500720065" data-literate-target="f-006c0061006e00670075006100670065002000660065006100740075007200650020006600610069006c007500720065" aria-label="Definition of language feature failure">&lt;&lt;language feature failure&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>        } <span class="hljs-keyword">catch</span> {
+            <span class="hljs-keyword">if</span> (session &amp;&amp; sessions.<span class="hljs-title">get</span>(sessionKey) === session &amp;&amp; !session.<span class="hljs-property">failed</span>
+                &amp;&amp; !(phase === <span class="hljs-string">'request'</span> &amp;&amp; controller.<span class="hljs-property">signal</span>.<span class="hljs-property">aborted</span>)) {
+                session.<span class="hljs-property">failed</span> = <span class="hljs-literal">true</span>; <span class="hljs-title">close</span>(session.<span class="hljs-property">client</span>);
+                <span class="hljs-title">report</span>(<span class="hljs-string">'Language server '</span> + phase + <span class="hljs-string">' failed. Check the executable and global literate.languageServers '</span>
+                    + <span class="hljs-string">'settings, then run literate.restartLanguageServers to retry. Server details are withheld.'</span>);
+            }
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
+        } <span class="hljs-keyword">finally</span> { cancellation.<span class="hljs-title">dispose</span>(); active = <span class="hljs-literal">undefined</span>; busy = <span class="hljs-literal">false</span>; }
+    }
+</code></pre>
+
+</div>
+</div><p>Registration advertises no trigger characters. The parent retains its separate
+fragment provider and restricts that provider to reference-marker contexts.
+Snapshot paths must be workspace-relative; active buffer text must match exactly.
+The parent also owns the machine/restricted manifest schema and activation wiring.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e0067007500610067006500200066006500610074007500720065002000700072006f007600690064006500720073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e0067007500610067006500200066006500610074007500720065002000700072006f007600690064006500720073"></span><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200066006500610074007500720065002000700072006f007600690064006500720073" data-literate-target="f-006c0061006e0067007500610067006500200066006500610074007500720065002000700072006f007600690064006500720073" aria-label="Definition of language feature providers">&lt;&lt;language feature providers&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">const</span> <span class="hljs-attr">selector</span>: vscode.<span class="hljs-property">DocumentSelector</span> = { <span class="hljs-attr">scheme</span>: <span class="hljs-string">'file'</span>, <span class="hljs-attr">language</span>: <span class="hljs-string">'markdown'</span>, <span class="hljs-attr">pattern</span>: <span class="hljs-string">'**/*.literate'</span> };
+    context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title">push</span>(vscode.<span class="hljs-property">languages</span>.<span class="hljs-title">registerHoverProvider</span>(selector, {
+        <span class="hljs-attr">provideHover</span>: <span class="hljs-function">(</span><span class="hljs-variable">document</span><span class="hljs-params">, cursor, token</span><span class="hljs-function">) =&gt;</span> <span class="hljs-title">request</span>(<span class="hljs-variable">document</span>, cursor, token, <span class="hljs-string">'hover'</span>) <span class="hljs-keyword">as</span> <span class="hljs-title">Promise</span>&lt;vscode.<span class="hljs-property">Hover</span> | <span class="hljs-literal">undefined</span>&gt;
+    }), vscode.<span class="hljs-property">languages</span>.<span class="hljs-title">registerCompletionItemProvider</span>(selector, {
+        <span class="hljs-attr">provideCompletionItems</span>: <span class="hljs-function">(</span><span class="hljs-variable">document</span><span class="hljs-params">, cursor, token, completionContext</span><span class="hljs-function">) =&gt;</span> {
+            <span class="hljs-keyword">if</span> (completionContext.<span class="hljs-property">triggerKind</span> !== vscode.<span class="hljs-property">CompletionTriggerKind</span>.<span class="hljs-property">Invoke</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+            <span class="hljs-keyword">return</span> <span class="hljs-title">request</span>(<span class="hljs-variable">document</span>, cursor, token, <span class="hljs-string">'completion'</span>) <span class="hljs-keyword">as</span> <span class="hljs-title">Promise</span>&lt;vscode.<span class="hljs-property">CompletionItem</span>[] | <span class="hljs-literal">undefined</span>&gt;;
+        }
+    }));
+}
+</code></pre>
+
+</div>
+</div><script type="application/json" class="literate-exploration-data">{"version":1,"parts":{},"families":{},"unavailable":"Exploration payload exceeds the one MiB limit."}</script><script>(
+// Closure-free: standalone HTML embeds this source without the module wrapper.
+function initializePublicationExploration(document) {
+    const view = document.defaultView;
+    if (!view || document.__literateExploration) { return; }
+    document.__literateExploration = true;
+    const limits = { payload: 1048576, layers: 8, bytes: 262144, panels: 200, parts: 200, segments: 4096 };
+    const roots = new Map();
+    const controls = new Map();
+    const panels = new Map();
+    const encoder = new view.TextEncoder();
+    const own = (object, key) => object && Object.prototype.hasOwnProperty.call(object, key) ? object[key] : undefined;
+    const record = value => value && typeof value === 'object' && !Array.isArray(value);
+    const identifier = value => typeof value === 'string' && value.length <= 4096 && /^[A-Za-z0-9_-]+$/.test(value);
+    const connected = node => !!node && document.documentElement.contains(node);
+    let usedBytes = 0, serial = 0, focused;
+    const element = (tag, text) => {
+        const node = document.createElement(tag);
+        if (text !== undefined) { node.textContent = text; }
+        return node;
+    };
+    function inPanel(node) {
+        for (let parent = node; parent; parent = parent.parentNode) { if (panels.has(parent)) { return true; } }
+        return false;
+    }
+    function safeHref(href, target, baseline = false) {
+        if (typeof href !== 'string' || href.length > 4096 || /[\s\u0000-\u001f\u007f\\]/.test(href)) { return undefined; }
+        if (identifier(target) && href === '#' + target) { return href; }
+        if (identifier(target) && href.endsWith('#' + target)) {
+            const path = href.slice(0, -target.length - 1);
+            if (path.startsWith('./') && path.endsWith('.html') && path.slice(2).split('/').every(
+                part => /^(?:[A-Za-z0-9_~.!'()*-]|%[0-9a-fA-F]{2})+$/.test(part))) { return href; }
+        }
+        if (/^vscode(?:-insiders)?:\/\/jesterking\.literate\/navigate\/[a-f0-9]{48}\/[a-f0-9]{48}(?:\?[^#]*)?$/.test(href)) { return href; }
+        // HTTPS transport shapes belong to the host. Never authorize one from JSON alone.
+        if (baseline && /^https:\/\//.test(href)) {
+            try {
+                const url = new view.URL(href);
+                if (url.protocol === 'https:' && url.hostname && !url.username && !url.password) { return href; }
+            } catch (_) { /* Invalid URLs remain plain text. */ }
+        }
+        return undefined;
+    }
+    function linkFor(context, model, target) {
+        if (context.links.has(target)) { return context.links.get(target); }
+        return safeHref(own(model.families, target)?.href, target);
+    }
+    function focusWithin(control) {
+        const active = document.activeElement;
+        if (control.button === active || control.panel?.contains(active)) { return true; }
+        return focused?.top === control && (!active || active === document.body || !connected(active));
+    }
+    function close(control) {
+        if (!control.panel) { return; }
+        for (const child of [...control.children]) { destroy(child); }
+        const cost = panels.get(control.panel)?.cost;
+        if (cost !== undefined) { usedBytes -= cost; panels.delete(control.panel); }
+        control.panel.remove(); control.panel = undefined;
+        control.button.setAttribute('aria-expanded', 'false');
+        control.button.removeAttribute('aria-controls');
+        control.note.textContent = '';
+    }
+    function destroy(control) {
+        close(control);
+        controls.delete(control.use);
+        control.parent?.children.delete(control);
+        control.context.controls.delete(control.use);
+        control.button.remove(); control.note.remove();
+    }
+    function restore(request) {
+        if (!request) { return; }
+        const replacement = controls.get(request.use) || [...controls.values()].find(control =>
+            !control.parent && control.target === request.target);
+        const anchor = [request.use.querySelector('a'), request.context.root.querySelector('a'),
+            ...document.querySelectorAll('a')].find(node => connected(node) && node.getAttribute('href'));
+        const destination = replacement?.button || anchor;
+        focused = undefined;
+        if (destination) { destination.focus(); }
+    }
+    // Account for serialized text/attributes without constructing candidate DOM or expanded strings.
+    function escapedCost(text) {
+        if (typeof text !== 'string' || text.length > limits.bytes) { return Infinity; }
+        let cost = encoder.encode(text).length;
+        for (const character of text) {
+            if (character === '&') { cost += 4; }
+            else if (character === '<' || character === '>') { cost += 3; }
+            else if (character === '"' || character === "'") { cost += 5; }
+        }
+        return cost;
+    }
+    function plan(control) {
+        const { model, target, path, context } = control;
+        const family = own(model.families, target);
+        if (model.unavailable) { return { reason: 'Exploration data is unavailable.' }; }
+        if (!identifier(target) || !record(family) || typeof family.name !== 'string' || family.name.length > 1024 || !Array.isArray(family.parts)) {
+            return { reason: 'Fragment is unavailable in this snapshot.' };
+        }
+        if (path.includes(target)) { return { reason: 'Cycle: this fragment is already open on this path.' }; }
+        if (path.length >= limits.layers) { return { reason: 'Exploration is limited to eight layers.' }; }
+        if (panels.size >= limits.panels) { return { reason: 'Exploration panel limit reached; collapse a panel first.' }; }
+        const failure = { reason: 'Exploration DOM budget or contribution limit reached. No code was truncated.' };
+        if (family.parts.length > limits.parts) { return failure; }
+        const parts = [], seen = new Set();
+        let cost = 512 + escapedCost(family.name), count = 0;
+        for (const id of family.parts) {
+            if (!identifier(id) || seen.has(id)) { return failure; }
+            seen.add(id);
+            const segments = own(model.parts, id);
+            if (!Array.isArray(segments) || (count += segments.length) > limits.segments) { return failure; }
+            cost += 96;
+            const entries = [];
+            for (const segment of segments) {
+                if (!record(segment) || typeof segment.text !== 'string') { return failure; }
+                const reference = segment.reference === true;
+                const destination = segment.target === undefined ? '' : segment.target;
+                if (reference && destination !== '' && !identifier(destination)) { return failure; }
+                const href = reference ? linkFor(context, model, destination) : undefined;
+                cost += 96 + escapedCost(segment.text);
+                if (reference) {
+                    cost += 1024 + escapedCost(segment.text.slice(0, 512)) + escapedCost(destination) * 2;
+                    if (href) { cost += escapedCost(href); }
+                }
+                if (cost + usedBytes > limits.bytes) { return failure; }
+                entries.push({ text: segment.text, reference, target: destination, href });
+            }
+            if (cost + usedBytes > limits.bytes) { return failure; }
+            parts.push(entries);
+        }
+        return cost + usedBytes <= limits.bytes ? { name: family.name, parts, cost } : failure;
+    }
+    function open(control) {
+        const accepted = plan(control);
+        if (accepted.reason) { control.note.textContent = accepted.reason + ' Definition links remain available.'; return; }
+        const candidate = element('span');
+        candidate.style.display = 'block';
+        candidate.setAttribute('role', 'group');
+        candidate.setAttribute('aria-label', 'Unexpanded fragment ' + accepted.name);
+        candidate.append(element('span', 'Unexpanded fragment — plain text; explore references separately.\n'));
+        for (const entries of accepted.parts) {
+            const code = element('span'); code.style.whiteSpace = 'pre-wrap';
+            for (const entry of entries) {
+                const text = element(entry.href ? 'a' : 'span', entry.text);
+                if (entry.href) { text.setAttribute('href', entry.href); text.setAttribute('data-literate-target', entry.target); }
+                code.append(text);
+                if (entry.reference) {
+                    text.setAttribute('data-literate-explore', entry.target);
+                    enhance(text, control.context, [...control.path, control.target], control);
+                }
+            }
+            candidate.append(code);
+        }
+        do { candidate.id = 'literate-exploration-' + (++serial); } while (document.getElementById(candidate.id));
+        // Diagnostic metadata is never read back for ownership or accounting.
+        candidate.setAttribute('data-literate-panel-bytes', String(accepted.cost));
+        usedBytes += accepted.cost;
+        panels.set(candidate, { cost: accepted.cost, owner: control });
+        control.panel = candidate;
+        control.note.textContent = ''; control.note.after(candidate);
+        control.button.setAttribute('aria-controls', candidate.id);
+        control.button.setAttribute('aria-expanded', 'true');
+    }
+    function signature(use) {
+        const anchor = use.matches('a') ? use : use.querySelector('a');
+        return [use.getAttribute('data-literate-explore'), use.textContent.slice(0, 512), anchor,
+            anchor?.getAttribute('href'), anchor?.getAttribute('data-literate-target')];
+    }
+    function enhance(use, context, path = [], parent) {
+        const identity = signature(use);
+        const button = element('button', 'Explore fragment'); button.type = 'button';
+        button.setAttribute('aria-label', 'Explore ' + identity[1]);
+        button.setAttribute('aria-expanded', 'false');
+        const note = element('span'); note.setAttribute('role', 'status');
+        use.after(button, note);
+        const control = { use, context, model: context.model, identity, target: identity[0], path,
+            button, note, parent, children: new Set(), panel: undefined };
+        controls.set(use, control);
+        if (parent) { parent.children.add(control); } else { context.controls.set(use, control); }
+        button.addEventListener('click', () => {
+            scan();
+            if (controls.get(use) !== control) { return; }
+            if (control.panel) {
+                if (focusWithin(control)) { button.focus(); }
+                close(control);
+            } else { open(control); }
+        });
+        return control;
+    }
+    function readModel(source) {
+        try {
+            if (source.length > limits.payload || encoder.encode(source).length > limits.payload) { throw new Error('payload limit'); }
+            const model = JSON.parse(source);
+            if (!record(model) || model.version !== 1 || !record(model.parts) || !record(model.families)) { throw new Error('invalid model'); }
+            return model;
+        } catch (_) { return { unavailable: true }; }
+    }
+    function baselineLinks(root) {
+        const links = new Map();
+        for (const anchor of root.querySelectorAll('a')) {
+            if (inPanel(anchor)) { continue; }
+            const target = anchor.getAttribute('data-literate-target');
+            if (!identifier(target)) { continue; }
+            const href = safeHref(anchor.getAttribute('href'), target, true);
+            links.set(target, links.has(target) && links.get(target) !== href ? undefined : href);
+        }
+        return links;
+    }
+    function scan() {
+        let request;
+        const retire = control => {
+            if (focusWithin(control)) { request = control; }
+            destroy(control);
+        };
+        const live = new Set(document.querySelectorAll('.literate-document'));
+        for (const [root, context] of roots) {
+            if (!live.has(root)) {
+                for (const control of [...context.controls.values()]) { retire(control); }
+                roots.delete(root);
+            }
+        }
+        for (const root of live) {
+            const payload = root.querySelector('script.literate-exploration-data[type="application/json"]');
+            let context = roots.get(root);
+            if (!payload) {
+                if (context) { for (const control of [...context.controls.values()]) { retire(control); } roots.delete(root); }
+                continue;
+            }
+            const source = payload.textContent;
+            const links = baselineLinks(root);
+            if (!context) {
+                context = { root, payload, source, links, model: readModel(source), controls: new Map() };
+                roots.set(root, context);
+            } else {
+                const changed = context.payload !== payload || context.source !== source;
+                const relink = links.size !== context.links.size || [...links].some(([key, value]) =>
+                                    !context.links.has(key) || context.links.get(key) !== value);
+                if (changed || relink) { for (const control of [...context.controls.values()]) { retire(control); } }
+                if (changed) { context.model = readModel(source); }
+                Object.assign(context, { payload, source, links });
+            }
+            const uses = new Set([...root.querySelectorAll('[data-literate-explore]')].filter(use => !inPanel(use)));
+            for (const [use, control] of [...context.controls]) {
+                const identity = signature(use);
+                if (!uses.has(use) || control.button.previousSibling !== use || control.note.previousSibling !== control.button
+                    || identity.some((value, index) => value !== control.identity[index])) { retire(control); }
+            }
+            for (const use of uses) { if (!controls.has(use)) { enhance(use, context); } }
+        }
+        for (const control of [...controls.values()]) {
+            if (!control.parent || controls.get(control.use) !== control) { continue; }
+            const identity = signature(control.use);
+            if (!connected(control.use) || control.button.previousSibling !== control.use
+                || identity.some((value, index) => value !== control.identity[index])) {
+                let top = control;
+                while (top.parent) { top = top.parent; }
+                if (focusWithin(top)) { request = top; }
+                close(top);
+            }
+        }
+        for (const [panel, { owner }] of [...panels]) {
+            if (!connected(panel)) {
+                let top = owner;
+                while (top.parent) { top = top.parent; }
+                if (focusWithin(top)) { request = top; }
+                close(owner);
+            }
+        }
+        restore(request);
+    }
+    document.addEventListener('focusin', event => {
+        focused = undefined;
+        for (const control of controls.values()) {
+            if (!control.parent && (control.button === event.target || control.panel?.contains(event.target))) {
+                focused = { top: control }; break;
+            }
+        }
+    });
+    scan();
+    document.addEventListener('DOMContentLoaded', scan);
+    view.addEventListener('vscode.markdown.updateContent', scan);
+    new view.MutationObserver(scan).observe(document.documentElement, {
+        childList: true, characterData: true, subtree: true, attributes: true,
+        attributeFilter: ['data-literate-explore', 'data-literate-target', 'href', 'type', 'class']
+    });
+}
+)(document);</script></div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

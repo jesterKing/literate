@@ -141,17 +141,19 @@ context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title
 
 </div>
 </div><h2>Providing completion items</h2>
-<p>The completion item provider will generate a <code>CompletionItem</code> for each fragment
-we currently know of. Although the provider gets passed in the <code>TextDocument</code>
-for which it was triggered we will present fragments from the entire project.</p>
+<p>Inside an unfinished fragment tag, the provider offers a <code>CompletionItem</code> for
+each known fragment in the project. Elsewhere it returns no fragment suggestions,
+leaving ordinary code completion to the configured language server.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0069006d0070006c0065006d0065006e0074002000700072006f007600690064006500200063006f006d0070006c006500740069006f006e0020006900740065006d0073-006c0069007400650072006100740065002f0063006f00640065005f0063006f006d0070006c006500740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0069006d0070006c0065006d0065006e0074002000700072006f007600690064006500200063006f006d0070006c006500740069006f006e0020006900740065006d0073"></span><a class="literate-tag-name" href="#f-0069006d0070006c0065006d0065006e0074002000700072006f007600690064006500200063006f006d0070006c006500740069006f006e0020006900740065006d0073" data-literate-target="f-0069006d0070006c0065006d0065006e0074002000700072006f007600690064006500200063006f006d0070006c006500740069006f006e0020006900740065006d0073" aria-label="Definition of implement provide completion items">&lt;&lt;implement provide completion items&gt;&gt;=</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">async</span> <span class="hljs-title">provideCompletionItems</span>(<span class="hljs-params">
   </span><span class="hljs-variable">document</span><span class="hljs-params"> : vscode.TextDocument,
-  ..._
+  position: vscode.Position
 </span>)
 {
+  <span class="hljs-keyword">const</span> prefix = <span class="hljs-variable">document</span>.<span class="hljs-title">lineAt</span>(position.<span class="hljs-property">line</span>).<span class="hljs-property">text</span>.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, position.<span class="hljs-property">character</span>);
+  <span class="hljs-keyword">if</span> (!<span class="hljs-regexp">/</span><span class="hljs-regexp">\x</span><span class="hljs-regexp">3c</span><span class="hljs-regexp">\x</span><span class="hljs-regexp">3c</span><span class="hljs-regexp">[^&gt;]</span><span class="hljs-regexp">*$/</span>.<span class="hljs-title">test</span>(prefix)) { <span class="hljs-keyword">return</span> []; }
 </code></pre>
 
 </div>
