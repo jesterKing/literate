@@ -533,6 +533,39 @@ sequenceDiagram
 ```
 
 ``` ts : <<fragment generation method>>=
+getPreviewProject(document: vscode.Uri | undefined, source: string | undefined) {
+  const folder = document && vscode.workspace.getWorkspaceFolder(document);
+  const currentPath = folder && document ? path.posix.relative(folder.uri.path, document.path) : 'index.literate';
+  const documents = new Map((folder ? this.sourceDocuments.get(folder.uri.toString()) || [] : [])
+    .map(value => [value.path, value]));
+  for (const open of vscode.workspace.textDocuments) {
+    if (folder && !open.isClosed && open.uri.path.endsWith('.literate')
+      && vscode.workspace.getWorkspaceFolder(open.uri)?.uri.toString() === folder.uri.toString()) {
+      const name = path.posix.relative(folder.uri.path, open.uri.path);
+      if (safeRelativePath(name) === name && open.uri.toString() === vscode.Uri.joinPath(folder.uri, name).toString()
+        && !name.split('/').slice(0, -1).some(value => discoveryExcludedDirectories.includes(value))) {
+        documents.set(name, { path: name, text: open.getText() });
+      }
+    }
+  }
+  if (source !== undefined) { documents.set(currentPath, { path: currentPath, text: source }); }
+  const inputs = [...documents.values()];
+  const parsed = parseProject(inputs);
+  return { path: currentPath, publication: parsed.publication,
+    tokens: parsed.documents.find(value => value.path === currentPath)?.tokens,
+    theme: folder ? previewThemeName(inputs) : defaultThemeName };
+}
+```
+
+Preview rendering is synchronous and read-only. Cached host tokens retain their
+original source in a weak map; rendering overlays that exact source and all other
+open buffers on the last discovered project snapshot. Capture source before
+Markdown-it normalizes NUL characters: invalid source must not acquire semantic
+targets merely by being displayed. The same overlay selects the root theme.
+Missing families stay unlinked. Filesystem discovery and save-time output
+transactions remain separate.
+
+```ts : <<fragment generation method>>=+
 getPreviewTheme(document?: vscode.Uri): string {
   const folder = document && vscode.workspace.getWorkspaceFolder(document);
   if (!folder) { return defaultThemeName; }
@@ -563,10 +596,12 @@ processLiterateFiles(
       <<snapshot workspace documents and theme>>
       <<load snapshot templates>>
       const result = generateProject(documents, templates);
+      const previousPublication = parseProject(this.sourceDocuments.get(themeKey) || []).publication;
       <<translate generation diagnostics>>
       <<replace workspace diagnostics>>
       <<prepare ordered navigation snapshot>>
       <<parse navigation snapshot>>
+      <<refresh semantic preview snapshot>>
       <<commit valid requested outputs>>
     }
   });
@@ -577,11 +612,22 @@ processLiterateFiles(
 }
 ```
 
+A semantic refresh is requested only after installing the new navigation/source
+snapshot, so a host that starts rendering immediately cannot see old destinations.
+It is not awaited and does not change whether output writes are requested.
+
+```ts : <<refresh semantic preview snapshot>>=
+if (theme !== previousTheme || JSON.stringify(previousPublication.contributions) !== JSON.stringify(result.publication.contributions)
+  || JSON.stringify(previousPublication.fragments) !== JSON.stringify(result.publication.fragments)) {
+  void vscode.commands.executeCommand('markdown.preview.refresh').then(undefined, () => undefined);
+}
+```
+
 ##### Snapshot inputs before generation
 
 Every downstream view uses the same document contents. Theme selection happens
-before template loading and generation, so preview refresh does not depend on
-successful output writes. The refresh is deliberately not awaited by the queue.
+before template loading and generation; refresh follows snapshot installation,
+not output writes. The refresh is deliberately not awaited by the queue.
 
 ``` ts : <<snapshot workspace documents and theme>>=
 const documents: SourceDocument[] = [];
@@ -595,9 +641,6 @@ const themeKey = workspaceFolder.uri.toString();
 const theme = previewThemeName(documents);
 const previousTheme = this.previewThemes.get(themeKey) ?? defaultThemeName;
 this.previewThemes.set(themeKey, theme);
-if (theme !== previousTheme) {
-  void vscode.commands.executeCommand('markdown.preview.refresh').then(undefined, () => undefined);
-}
 ```
 
 Template discovery can reject malformed declarations, but that must not suppress
@@ -1463,12 +1506,12 @@ The browser client supplies scoped CSS from the wrapper attribute.
 
 Repository processing caches the effective theme through `workspace.fs`, so
 remote workspaces need no synchronous filesystem fallback. A changed effective
-theme requests a preview refresh; unchanged processing does not. Activation
+theme or semantic contribution snapshot requests a preview refresh; unchanged
+processing does not. Activation
 awaits the initial repository snapshot before exposing the preview plugin.
 
 ```ts : <<renderCodeFence rule>>=
-<<fragment tag protector>>
-<<remove comments from HTML>>
+
 
 function previewThemeName(documents: SourceDocument[]): string {
   const theme = resolveProjectTheme(documents);
@@ -1482,11 +1525,18 @@ time. This lets a reused preview parser follow the document's workspace and its
 latest open index buffer.
 
 ```ts : <<renderCodeFence rule>>=+
-function installPreviewDocument(md: MarkdownIt, repository: FragmentRepository): void {
+function installPreviewDocument(md: MarkdownIt, repository: FragmentRepository, navigation: PreviewNavigation): void {
+  const sources = new WeakMap<Token[], string>();
+  md.core.ruler.before('normalize', 'literate_preview_source', state => { sources.set(state.tokens, state.src); });
   const originalRender = md.renderer.render;
   md.renderer.render = function (tokens, options, env) {
-    const body = originalRender.call(this, tokens, options, env);
-    const theme = repository.getPreviewTheme(env?.currentDocument);
+    env = env || {};
+    const snapshot = repository.getPreviewProject(env.currentDocument, sources.get(tokens));
+    const renderEnv = { ...env, literatePublication: snapshot.publication, literatePath: snapshot.path,
+          literateTokens: snapshot.tokens,
+                    literateDestination: (target: string) => navigation.destination(env.currentDocument, snapshot.publication, target) };
+    const body = originalRender.call(this, tokens, options, renderEnv);
+    const theme = snapshot.theme;
     return `<div class="literate-document" data-literate-theme="${md.utils.escapeHtml(theme)}">${body}</div>`;
   };
 }
@@ -1525,24 +1575,37 @@ if (!header) {
 }
 const previewToken = Object.assign(Object.create(Object.getPrototypeOf(token)), token);
 previewToken.content = token.content.replace(/\\\<</g, '\<<');
+previewToken.info = header.language;
+const model = env.literatePublication as ReturnType<typeof parseProject>['publication'] | undefined;
+const lookup = model && screenIndex(model);
+const candidate = lookup?.lines.get(env.literatePath)?.get(token.map?.[0] ?? -1);
+const part = candidate && candidate.content === token.content
+  && candidate.kind === (header.append ? 'append' : 'definition')
+  && lookup?.families.get(candidate.fragmentTarget)?.name === header.name && candidate.language === header.language
+  && env.literateTokens?.[candidate.tokenIndex]?.info === token.info ? candidate : undefined;
+const semantic = part && model ? renderScreenCode(part, model, 'preview', env.literateDestination) : undefined;
+const fenceOptions = semantic !== undefined ? { ...options, highlight: () => semantic } : options;
 const previewTokens = tokens.slice();
 previewTokens[idx] = previewToken;
-let rendered = header.language === 'mermaid'
-  ? `<pre><code class="language-mermaid">${md.utils.escapeHtml(previewToken.content)}</code></pre>\n`
-  : originalFence ? originalFence(previewTokens, idx, options, env, slf)
-    : `<pre><code>${md.utils.escapeHtml(previewToken.content)}</code></pre>\n`;
+const rendered = header.language === 'mermaid'
+  ? `<pre><code class="language-mermaid">${semantic ?? md.utils.escapeHtml(previewToken.content)}</code></pre>\n`
+  : originalFence ? originalFence(previewTokens, idx, fenceOptions, env, slf)
+    : `<pre><code>${semantic ?? md.utils.escapeHtml(previewToken.content)}</code></pre>\n`;
 <<decorate preview fragments>>
 ```
 
 Fragment labels and output filenames are text, not HTML. Escape them before
-wrapping the code; retain tag protection and comment cleanup for highlighted
-fragments, but leave the escaped Mermaid code fallback intact.
+wrapping the code. Accepted contributions use shared semantic links and syntax
+spans; stale or unaccepted tokens remain escaped code without invented targets.
+Matching includes the complete authored header, not just its name and language:
+a changed output path or invalid setting cannot borrow an older declaration.
 
 ```ts : <<decorate preview fragments>>=
 const name = md.utils.escapeHtml(header.name);
 const fileName = md.utils.escapeHtml(header.remainder.match(/^(.*?)\s+\$/)?.[1].trim() || '');
-if (header.language !== 'mermaid') {
-  rendered = removeCodeComments(protectFragmentTags(rendered));
+if (part && model) {
+  const label = `\<<${header.name}>>=${header.append ? '+' : ''} ${header.remainder.match(/^(.*?)\s+\$/)?.[1].trim() || ''}`.trimEnd();
+  return renderScreenContribution(part, model, 'preview', label, rendered, env.literateDestination);
 }
 return `<div class="codefragment">
 <div class="fragmentname">&lt;&lt;${name}&gt;&gt;=${header.append ? '+' : ''} ${fileName}</div>
@@ -1552,73 +1615,307 @@ ${rendered}
 </div>`;
 ```
 
-### Protecting fragment tags
+## Capability-only preview navigation
 
-With `protectFragmentTags` we can adjust the rendered HTML as received from the
-original fence rule. We'll search for `HTML` that is our fragment tag: `&lt;&lt`,
-followed by tag name, followed by `&gt;&gt;`. Such occurrances we wrap in a
-`span` tag that has the `CSS` class `clean-literate-tag-name`. The class can be
-set up to essentially override any styling applied through `hljs-keyword`.
+Cross-document links enter through one activation-owned URI handler. Random
+capabilities carry no filename, line or command. The bounded session map binds
+workspace object identity and a logical target; removed workspaces cannot regain
+old capabilities merely by reusing a URI. Untrusted workspaces mint nothing.
 
-For matching we use two regular expressions, `FRAGMENT_HTML_RE` and `FRAGMENT_HTML_KEYWORD_CLEANUP_RE`.
-
-With `FRAGMENT_HTML_KEYWORD_CLEANUP_RE` all `span` tags injected by `hljs` can be
-cleaned up, and with `FRAGMENT_HTML_RE` we can wrap our fragment tag names in a
-class of our own, `literate-name-tag` to handle special styling for tags in code
-fences.
-
-``` ts : <<fragment regular expressions>>=
-const FRAGMENT_HTML_CLEANUP_RE= /(<span.class="hljs-.+?">)(.*?)(<\/span>)/g;
-const FRAGMENT_HTML_RE= /(&lt;&lt;.+?&gt;&gt;)/g;
-```
-
-Since these regular expressions are used with `replaceAll` they need to be
-marked global with `g`.
-
-To make sure the highlights are properly cleaned we introduce an inline function
-`cleanHighlights` that takes care of all the highlights by using a `replaceAll`
-on the match passed on to `cleanHighlights`. The result is used to wrap inside
-the `span` with the `literate-name-tag` class.
-
-```ts : <<fragment tag protector>>=
-function protectFragmentTags(rendered : string) : string {
-  function cleanHighlights(match : string, _: number, __: string)
-  {
-    let internal = match.replaceAll(FRAGMENT_HTML_CLEANUP_RE, "$2");
-    return `<span class="literate-tag-name">${internal}</span>`;
-  }
-  return rendered
-    .replaceAll(
-      FRAGMENT_HTML_RE,
-      cleanHighlights
-    );
+```ts : <<renderCodeFence rule>>=+
+const previewUrlLifetime = 60_000;
+type PreviewCapability = {
+  folder: vscode.WorkspaceFolder; target: string; key: string;
+  href?: string; expiresAt?: number; retryAt: number; resolving: boolean;
+};
+class PreviewNavigation implements vscode.UriHandler, vscode.Disposable {
+  private readonly session = randomBytes(24).toString('hex');
+  private readonly entries = new Map<string, PreviewCapability>();
+  private readonly keys = new Map<string, string>();
+  private readonly pending: string[] = [];
+  private resolving = false;
+  private disposed = false;
+  private refresh: ReturnType<typeof setTimeout> | undefined;
+  private expiry: ReturnType<typeof setTimeout> | undefined;
+  private expiryAt = Infinity;
+  private readonly membership = vscode.workspace.onDidChangeWorkspaceFolders(() => this.invalidateMembership());
+  <<preview capability minting>>
+  <<preview capability lookup>>
+  <<preview capability resolution>>
+  <<preview capability external resolution>>
+  <<preview capability expiry scheduling>>
+  <<preview capability expiry>>
+  <<preview capability membership>>
+  <<preview capability handling>>
+  <<preview capability lifecycle>>
 }
 ```
 
-In our CSS file we can now specify `.literate-tag-name` to say an italic font to
-stand out in the code fences.
+Only the renderer's accepted cross-document destinations reach this adapter.
+Revalidate that target in its model before minting, and never substitute a native
+line link while URL resolution is pending. The retained-entry limit avoids both
+unbounded retention and eviction/remint/refresh loops on very large previews.
+Removed workspaces release capacity without making their old tokens valid.
 
-### Remove code comments
-
-In rendered `HTML` code comments are wrapped in `span` tags with the class
-`hljs-comment`. These can be on one line, or for comment blocks on multiple
-lines. Since the goal is to remove these completely from rendered `HTML` the
-regular expression for the match will be just to do that: match the span with
-the `hljs-comment` even if it is over several lines. To do that we use also the
-`s` modifier to the expression.
-
-``` ts : <<fragment regular expressions>>=+
-const CODECOMMENT_HTML_RE= /<span class="hljs-comment">.*?<\/span>/gs;
+```ts : <<preview capability minting>>=
+destination(document: vscode.Uri | undefined, model: ReturnType<typeof parseProject>['publication'], target: string) {
+  const folder = document && vscode.workspace.getWorkspaceFolder(document);
+  if (!folder || !this.allowed(folder) || !previewTarget(model, target)) { return undefined; }
+  const key = JSON.stringify([folder.uri.toString(), target]);
+  let token = this.keys.get(key);
+  if (!token) {
+    if (this.keys.size >= 4096) { return undefined; }
+    token = this.session + '/' + randomBytes(24).toString('hex');
+    this.keys.set(key, token);
+    this.entries.set(token, { folder, target, key, retryAt: 0, resolving: false });
+  }
+  return this.resolvedDestination(token);
+}
 ```
 
-The remove action becomes now a simple `replaceAll` on the rendered `HTML` using
-the regular expression `CODECOMMENT_HTML_RE` with the empty string as
-replacement.
+External URLs may become invalid without notification. Reuse a successful result
+for at most one minute, then resolve the COMPLETE capability URI again on demand.
+A pending request is shared by all renders; failures have a one-minute cooldown
+and do not schedule automatic retries. Renewal never remints the capability.
 
-```ts : <<remove comments from HTML>>=
-function removeCodeComments(rendered : string) : string {
-  rendered = rendered.replaceAll(CODECOMMENT_HTML_RE, "");
-  return rendered;
+```ts : <<preview capability lookup>>=
+private resolvedDestination(token: string): string | undefined {
+  const entry = this.entries.get(token);
+  if (!entry) { return undefined; }
+  const now = Date.now();
+  if (entry.href && entry.expiresAt! > now) { return entry.href; }
+  entry.href = undefined; entry.expiresAt = undefined;
+  if (!entry.resolving && entry.retryAt <= now) {
+    entry.resolving = true;
+    this.pending.push(token);
+    void this.resolve();
+  }
+  return undefined;
+}
+```
+
+The resolver queue retains bounded parallelism for initial resolution and renewal.
+Workspace removal prunes queued tokens; in-flight results still check their exact
+entry before publishing, so an old response cannot populate a re-added workspace.
+
+```ts : <<preview capability resolution>>=
+private async resolve(): Promise<void> {
+  if (this.resolving) { return; }
+  this.resolving = true;
+  try {
+    while (!this.disposed && this.pending.length) {
+      await Promise.all(this.pending.splice(0, 16).map(token => this.resolveExternal(token)));
+    }
+  } finally { this.resolving = false; }
+}
+```
+
+The returned URI is opaque, including its window-routing query. Both initial
+resolution and renewal store it verbatim. A failure clears the pending state but
+cannot trigger a refresh/retry loop; later rendering may retry after the cooldown.
+
+```ts : <<preview capability external resolution>>=
+private async resolveExternal(token: string): Promise<void> {
+  const entry = this.entries.get(token);
+  if (!entry) { return; }
+  try {
+    if (!this.allowed(entry.folder)) { return; }
+    const uri = vscode.Uri.parse(`${vscode.env.uriScheme}://jesterking.literate/navigate/${token}`);
+    const external = await vscode.env.asExternalUri(uri);
+    if (this.entries.get(token) === entry && this.allowed(entry.folder)) {
+      entry.href = external.toString();
+      entry.expiresAt = Date.now() + previewUrlLifetime;
+      this.scheduleExpiry(entry.expiresAt);
+      this.requestRefresh();
+    }
+  } catch (_) { /* Retry only on a later render after the cooldown. */ }
+  finally { entry.resolving = false; entry.retryAt = entry.href ? 0 : Date.now() + previewUrlLifetime; }
+}
+```
+
+One timer covers all successful URLs, regardless of the cache size. Publishing a
+later expiry does not rescan the map or restart the earlier timer. Expiry requests
+one coalesced refresh; only targets still rendered by the host are resolved again.
+
+```ts : <<preview capability expiry scheduling>>=
+private scheduleExpiry(at: number): void {
+  if (this.disposed || at >= this.expiryAt) { return; }
+  if (this.expiry !== undefined) { clearTimeout(this.expiry); }
+  this.expiryAt = at;
+  this.expiry = setTimeout(() => this.expireDestinations(), Math.max(0, at - Date.now()));
+}
+```
+
+Expired URLs stop authorizing navigation while renewal is pending. Entries not
+rendered again stay inert: they cannot start another timer or resolution. Failed
+resolutions likewise have no expiry timer, only an on-demand retry timestamp.
+
+```ts : <<preview capability expiry>>=
+private expireDestinations(): void {
+  this.expiry = undefined; this.expiryAt = Infinity;
+  if (this.disposed) { return; }
+  let changed = false;
+  for (const entry of this.entries.values()) {
+    if (entry.expiresAt === undefined) { continue; }
+    if (entry.expiresAt <= Date.now()) {
+      entry.href = undefined; entry.expiresAt = undefined; changed = true;
+    } else { this.scheduleExpiry(entry.expiresAt); }
+  }
+  if (changed) { this.requestRefresh(); }
+}
+```
+
+Removal invalidates both indexes and queued work. Re-adding the same URI can mint
+new capabilities immediately, but old tokens and late resolver completions remain
+invalid. Recompute the single expiry timer so removed workspaces leave no timer.
+
+```ts : <<preview capability membership>>=
+private invalidateMembership(): void {
+  for (const [token, entry] of this.entries) {
+    if (!this.allowed(entry.folder)) {
+      this.entries.delete(token);
+      this.keys.delete(entry.key);
+    }
+  }
+  for (let index = this.pending.length - 1; index >= 0; index--) {
+    if (!this.entries.has(this.pending[index])) { this.pending.splice(index, 1); }
+  }
+  if (this.expiry !== undefined) { clearTimeout(this.expiry); }
+  this.expireDestinations();
+}
+```
+
+Successful resolutions and expiry schedule refresh, coalesced outside rendering.
+Disposal cancels both timers and invalidates in-flight results. No parser operation
+or refresh command is awaited from a synchronous Markdown-it renderer.
+
+```ts : <<preview capability lifecycle>>=
+private allowed(folder: vscode.WorkspaceFolder): boolean {
+  return !this.disposed && vscode.workspace.isTrusted === true
+    && !!vscode.workspace.workspaceFolders?.includes(folder);
+}
+private requestRefresh(): void {
+  if (this.refresh !== undefined) { return; }
+  this.refresh = setTimeout(() => {
+    this.refresh = undefined;
+    if (!this.disposed) { void vscode.commands.executeCommand('markdown.preview.refresh').then(undefined, () => undefined); }
+  }, 0);
+}
+dispose(): void {
+  this.disposed = true;
+  if (this.refresh !== undefined) { clearTimeout(this.refresh); }
+  if (this.expiry !== undefined) { clearTimeout(this.expiry); }
+  this.membership.dispose();
+  this.entries.clear(); this.keys.clear(); this.pending.length = 0;
+}
+```
+
+The incoming query is host-owned routing data, never an action or target. Exact
+scheme, authority and path validation precedes map lookup; caller-supplied paths,
+fragments, malformed tokens and capabilities from earlier sessions do nothing.
+
+```ts : <<preview capability handling>>=
+async handleUri(uri: vscode.Uri): Promise<void> {
+  if (uri.scheme !== vscode.env.uriScheme || uri.authority !== 'jesterking.literate'
+    || uri.fragment || !/^\/navigate\/[a-f0-9]{48}\/[a-f0-9]{48}$/.test(uri.path)) { return; }
+  const token = uri.path.slice('/navigate/'.length);
+  const entry = this.entries.get(token);
+  const allowed = () => !!entry?.href && entry.expiresAt! > Date.now()
+    && this.entries.get(token) === entry && this.allowed(entry.folder);
+  if (!entry || !allowed()) { return; }
+  try {
+    await openPreviewTarget(entry, allowed);
+  } catch (_) { /* Missing, unsafe or expired destinations never fall back to host links. */ }
+}
+```
+
+Resolve logical identity against a fresh, read-only discovery, not the rendered
+model or the repository's last debounce result. Keep a clean disk-only base even
+for open files: otherwise discarding another buffer while opening the destination
+would leave its former unsaved text in the final model. Missing disk files enter
+only through current open buffers; other read failures abort navigation.
+
+```ts : <<renderCodeFence rule>>=+
+function previewTarget(model: ReturnType<typeof parseProject>['publication'], target: string) {
+  const index = screenIndex(model);
+  return index.parts.get(target) || index.parts.get(index.families.get(target)?.contributions[0] || '');
+}
+async function previewNavigationSources(folder: vscode.WorkspaceFolder): Promise<Map<string, SourceDocument>> {
+  const documents = new Map<string, SourceDocument>();
+  for (const uri of await getLiterateFileUris(folder)) {
+    const name = path.posix.relative(folder.uri.path, uri.path);
+    if (safeRelativePath(name) !== name || uri.toString() !== vscode.Uri.joinPath(folder.uri, name).toString()) { continue; }
+    try {
+      const text = new TextDecoder('utf-8').decode(await vscode.workspace.fs.readFile(uri));
+      documents.set(name, { path: name, text });
+    } catch (error) {
+      if (!(error instanceof vscode.FileSystemError) || error.code !== 'FileNotFound') { throw error; }
+    }
+  }
+  return documents;
+}
+```
+
+Canonical URI equality prevents a fragment-qualified host document from becoming
+an alternate source of truth. Each overlay copies the clean disk base and adds
+only currently open buffers, so closing/discarding a buffer restores disk contents
+(or removes an unsaved-only input). Excluded directories follow ordinary discovery.
+
+```ts : <<renderCodeFence rule>>=+
+function overlayNavigationSources(folder: vscode.WorkspaceFolder, disk: ReadonlyMap<string, SourceDocument>) {
+  const documents = new Map(disk);
+  for (const doc of vscode.workspace.textDocuments) {
+    const name = path.posix.relative(folder.uri.path, doc.uri.path);
+    if (!doc.isClosed && name.endsWith('.literate') && safeRelativePath(name) === name
+      && !name.split('/').slice(0, -1).some(value => discoveryExcludedDirectories.includes(value))
+      && doc.uri.toString() === vscode.Uri.joinPath(folder.uri, name).toString()
+      && vscode.workspace.getWorkspaceFolder(doc.uri) === folder) {
+      documents.set(name, { path: name, text: doc.getText() });
+    }
+  }
+  return [...documents.values()];
+}
+```
+
+Inspect every component beneath the workspace boundary before opening. Symlinks
+and non-files fail closed rather than escaping that boundary. A deleted file is
+not recreated even if its former buffer remains open.
+
+```ts : <<renderCodeFence rule>>=+
+async function safePreviewDocument(folder: vscode.WorkspaceFolder, name: string): Promise<vscode.Uri> {
+  if (safeRelativePath(name) !== name || !name.endsWith('.literate')) { throw new Error('Unsafe preview target'); }
+  const parts = name.split('/');
+  let uri = folder.uri;
+  for (let index = 0; index < parts.length; index++) {
+    uri = vscode.Uri.joinPath(uri, parts[index]);
+    const stat = await vscode.workspace.fs.stat(uri);
+    const wanted = index === parts.length - 1 ? vscode.FileType.File : vscode.FileType.Directory;
+    if (stat.type !== wanted) { throw new Error('Unsafe preview target component'); }
+  }
+  if (vscode.workspace.getWorkspaceFolder(uri) !== folder) { throw new Error('Preview workspace changed'); }
+  return uri;
+}
+```
+
+Opening may await a provider. Re-overlay buffers and resolve once more afterwards,
+then select only if logical identity still addresses that same canonical document.
+The final checks and selection calculation have no intervening asynchronous work.
+
+```ts : <<renderCodeFence rule>>=+
+async function openPreviewTarget(entry: PreviewCapability, allowed: () => boolean): Promise<void> {
+  const inputs = await previewNavigationSources(entry.folder);
+  const part = previewTarget(parseProject(overlayNavigationSources(entry.folder, inputs)).publication, entry.target);
+  if (!part || !allowed()) { return; }
+  const uri = await safePreviewDocument(entry.folder, part.definition.path);
+  if (!allowed()) { return; }
+  const document = await vscode.workspace.openTextDocument(uri);
+  await safePreviewDocument(entry.folder, part.definition.path);
+  const current = overlayNavigationSources(entry.folder, inputs);
+  const fresh = previewTarget(parseProject(current).publication, entry.target);
+  if (!allowed() || document.isClosed || document.uri.toString() !== uri.toString()
+    || !fresh || fresh.definition.path !== part.definition.path) { return; }
+  const position = new vscode.Position(fresh.definition.line, 0);
+  await vscode.window.showTextDocument(document, { selection: new vscode.Range(position, position) });
 }
 ```
 
@@ -1966,14 +2263,12 @@ Programming extension.
 
 ```
 
-Next we set up the fragment regular expressions and define everything needed to
-implement the fragment explorer. This explorer will show up in the Explorer bar
+Next we define everything needed to implement the fragment explorer. This explorer will show up in the Explorer bar
 when a literate project is open. We need a representation for a node in the tree
 view, a data provider for the tree view and then the actual tree view explorer
 itself.
 
 ```ts : <<literate.*>>=+
-<<fragment regular expressions>>
 
 <<fragment node>>
 
@@ -2048,9 +2343,11 @@ import { lstat, chmod } from 'fs/promises';
 import { commitOutputs, TransactionDirectoryError, TransactionFile, TransactionIO } from './output-transactions';
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { discoveryExcludedDirectories, generateProject, resolveProjectTheme, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection } from './engine';
+import { randomBytes } from 'crypto';
+import { parseProject, discoveryExcludedDirectories, generateProject, resolveProjectTheme, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection } from './engine';
 import { collectFragmentOccurrences, planFragmentRename, FragmentOccurrence } from './symbols';
 import { defaultThemeName } from './themes';
+import { renderScreenCode, renderScreenContribution, screenIndex } from './publication-screen';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');
 import Token = require('markdown-it/lib/token');
@@ -2100,6 +2397,8 @@ With that done we place our repository in the `context.subscriptions`.
   theOneRepository = new FragmentRepository(context);
   await theOneRepository.processLiterateFiles(undefined, true);
   context.subscriptions.push(theOneRepository);
+    const navigation = new PreviewNavigation();
+    context.subscriptions.push(navigation, vscode.window.registerUriHandler(navigation));
 ```
 
 Now that the repository is up and running we can register all our commands,
@@ -2141,7 +2440,7 @@ what our HTML rendering does.
     extendMarkdownIt(md: any) {
       md.use(grabberPlugin);
       installPreviewFences(md);
-      installPreviewDocument(md, theOneRepository);
+      installPreviewDocument(md, theOneRepository, navigation);
       return md;
     }
   };

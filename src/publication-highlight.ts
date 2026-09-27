@@ -9,7 +9,7 @@ export interface HighlightedContribution {
     spans: SyntaxSpan[];
     references: { start: number; end: number; name: string; target: string }[];
 }
-function displayContribution(part: PublicationContribution): HighlightedContribution {
+function displayContribution(part: PublicationContribution, screen: boolean): HighlightedContribution {
     const chunks: string[] = [];
     const references: HighlightedContribution['references'] = [];
     let rawOffset = 0, offset = 0;
@@ -18,17 +18,19 @@ function displayContribution(part: PublicationContribution): HighlightedContribu
         if (segment.kind === 'text') {
             text = text.replace(/\\\x3c\x3c/g, () => '<' + '<');
         } else {
-            if (segment.modifier !== undefined) {
+            if (!screen && segment.modifier !== undefined) {
                 throw new Error('Publication reference modifier is unsupported: ' + segment.name);
             }
-            if (segment.resolution.kind !== 'resolved' || !segment.resolution.target) {
+            if (!screen && (segment.resolution.kind !== 'resolved' || !segment.resolution.target)) {
                 throw new Error('Publication reference target is missing: ' + segment.name);
             }
-            if (segment.start !== rawOffset || segment.end !== rawOffset + text.length) {
+            if (segment.start !== rawOffset || segment.end + (segment.modifier?.length || 0) !== rawOffset + text.length) {
                 throw new Error('Publication reference offsets do not match segment text');
             }
-            references.push({ start: offset, end: offset + text.length,
-                name: segment.name, target: segment.resolution.target });
+            if (segment.resolution.kind === 'resolved') {
+                references.push({ start: offset, end: offset + text.length,
+                    name: segment.name, target: segment.resolution.target });
+            }
         }
         chunks.push(text);
         offset += text.length;
@@ -85,8 +87,8 @@ function syntaxSpans(text: string, root: unknown): SyntaxSpan[] {
     }
     return spans;
 }
-export function highlightContribution(part: PublicationContribution): HighlightedContribution {
-    const display = displayContribution(part);
+export function highlightContribution(part: PublicationContribution, screen = false): HighlightedContribution {
+    const display = displayContribution(part, screen);
     display.spans = part.language && hljs.getLanguage(part.language)
         ? syntaxSpans(display.text, emitterRoot(display.text, part.language))
         : display.text.length ? [{ start: 0, end: display.text.length, scope: '' }] : [];

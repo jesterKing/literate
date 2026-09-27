@@ -1,6 +1,7 @@
 import MarkdownIt = require('markdown-it');
 import Token = require('markdown-it/lib/token');
 import hljs from 'highlight.js';
+import { renderScreenCode, renderScreenContribution, screenIndex } from './publication-screen';
 import { defaultThemeName, getTheme, themeCss, mermaidTheme } from './themes';
 
 export interface SourceDocument { path: string; text: string; }
@@ -593,29 +594,27 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
         const code = expanded.get(fragment.header.name)!.replace(/\\<</g, () => '<<');
         files.push({ path: fragment.header.output, content: substitute(sourceTemplates.get(fragment.header.name) ?? '[CODE]', { code }) });
     }
-    md.renderer.rules.fence = (fenceTokens: Token[], index: number) => {
+    md.renderer.rules.fence = (fenceTokens: Token[], index: number, _options, env) => {
         const token = fenceTokens[index];
         if (token.info.trim() === 'SETTINGS') { return ''; }
         const header = headers.get(token);
         const language = header?.language || token.info.trim().split(/\s+/)[0];
         const code = token.content.replace(/\\<</g, () => '<<');
         if (!header && language === 'mermaid') { return `<pre class="mermaid">\n${escape(code)}</pre>\n`; }
-        let rendered = language && hljs.getLanguage(language)
-            ? hljs.highlight(code, { language }).value : escape(code);
-        if (header) {
-            rendered = rendered.replace(/<span class="hljs-comment">.*?<\/span>/gs, () => '');
-            rendered = rendered.replace(/&lt;&lt;.*?&gt;&gt;/g, (tag: string) =>
-                `<span class="literate-tag-name">${tag.replace(/<\/?span\b[^>]*>/g, () => '')}</span>`);
-        }
+        const part = screenIndex(publication).tokens.get(env.path)?.get(index);
+        const rendered = part ? renderScreenCode(part, publication, 'html')
+            : language && hljs.getLanguage(language) ? hljs.highlight(code, { language }).value : escape(code);
         const block = `<pre><code>${rendered}</code></pre>\n`;
         if (!header) { return block; }
         const label = escape(`<<${header.name}>>=${header.append ? '+' : ''} ${header.output ? header.output + ' $' : ''}`);
-        return `<div class="codefragment">\n<div class="fragmentname">${label}</div>\n<div class="code">\n${block}\n</div>\n</div>`;
+        return part ? renderScreenContribution(part, publication, 'html',
+            `<<${header.name}>>=${header.append ? '+' : ''} ${header.output ? header.output + ' $' : ''}`.trimEnd(), block)
+            : `<div class="codefragment">\n<div class="fragmentname">${label}</div>\n<div class="code">\n${block}\n</div>\n</div>`;
     };
     const metaAuthors = authors.split(';').map(author => `<meta name="author" content="${escape(author)}">`).join('');
     const theme = `<style>${themeCss(getTheme(projectTheme.name)!)}</style>`;
     for (const path of order) {
-        const rendered = md.renderer.render(tokens.get(path)!, md.options, {});
+        const rendered = md.renderer.render(tokens.get(path)!, md.options, { path });
         const wrapper = `<div class="literate-document" data-literate-theme="${escape(projectTheme.name)}">${rendered}</div>`;
         const content = htmlTemplate.includes('[THEME]') ? wrapper : theme + wrapper;
         files.push({ path: safeRelativePath(path.replace(/\.literate$/, '.html'))!, content: substitute(htmlTemplate, { content, authors: metaAuthors, theme }) });

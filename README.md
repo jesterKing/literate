@@ -366,25 +366,85 @@ renames, moves and insertions into the same family can change contribution IDs.
 These are logical identities, not user-editable slugs. LaTeX destination names
 encode the logical target again with a `lit-` prefix.
 
-**HTML and VS Code preview have no fragment destination IDs or fragment-use links
-yet.** The integration test maps each emitted fragment block through its document
-and source token to the shared contribution/family; it does not claim matching
-screen anchor strings. It exercises generated HTML and the actual activated
-`extendMarkdownIt` hook with a real Markdown-it/highlight.js host renderer.
-Full accessible links, common destinations and contribution navigation remain M2.
+### M2: semantic HTML and preview navigation
 
-Two legacy screen differences are explicitly tested, not hidden by that mapping:
+HTML and preview now render definitions and uses from the same publication model
+as LaTeX. Definition labels and genuine uses link to the family's base; **Previous,
+Base, and Next** controls navigate individual contributions when available.
+Links are native, keyboard-focusable anchors with descriptive accessible names.
+Generated HTML uses chapter-relative `.html#target` URLs and needs no navigation
+JavaScript. Escaped `\<<literal>>` examples remain literal, never links.
 
-- Escaped literal tags are still visually decorated like uses, but create no
-  publication references. Screen decoration is not semantic resolution.
-- Preview delegates the original fence info to the host. With highlight.js,
-  `js : <<name>>=` highlights as JavaScript, while compact `js: <<name>>=` supplies
-  the unrecognized language `js:` and leaves comments visible. Generated HTML
-  and LaTeX recognize both forms. Actual preview highlighting also depends on the
-  host renderer; the headless integration test is not a VS Code browser test.
+**Associate `*.literate` with Markdown.** Same-document links use native logical-ID
+anchors and stay in the preview. Cross-document fragment links open the source
+editor at the current declaration through Literate's registered URI handler,
+independently of `markdown.preview.openMarkdownLinks`. Ordinary Markdown links
+retain the host's behavior; Literate does not change editor preferences.
 
-These findings reinforce M2's planned semantic screen rendering and normalized
-host-language boundary; M1 does not silently migrate screen output.
+Cross-document URLs are opaque session capabilities, resolved as complete
+`vscode://jesterking.literate/navigate/<session>/<token>` URIs through
+`env.asExternalUri` (using the host's URI scheme). Returned routing data is kept
+unchanged. No command URLs, custom click script, socket or browser bridge is used.
+Only accepted semantic targets in a **trusted, currently open workspace** get a
+capability. The handler rediscovers current sources, overlays unsaved buffers,
+validates the target and safe existing path, and calls `showTextDocument` on the
+canonical document with an explicit selection. Navigation retains a clean disk
+snapshot and rebuilds the current-buffer overlay after opening, so discarding
+another input cannot leave its old unsaved text in the final model. It never falls
+back to `#L` links, which can produce divergent buffers in VS Code 1.138.0.
+
+Pending or failed URL resolution renders plain text; successful resolution requests
+a preview refresh. Capabilities expire on extension disposal or workspace removal;
+re-adding the same workspace can mint fresh links but never revives old tokens.
+Missing/renamed targets and unsafe paths fail closed. Restricted Mode disables
+cross-document fragment navigation, not local anchors. The cache retains at most
+4,096 workspace/target entries, with at most 16 URL resolutions in flight;
+additional targets remain text while that limit is reached.
+
+External URLs can become invalid without notification. Successful URLs are cached
+for **at most 60 seconds**; one expiry timer requests a refresh, and targets still
+rendered renew through `asExternalUri` without changing their capability tokens.
+Unused targets do not keep renewing. Failures remain text and may retry on a later
+render after a **60-second cooldown** (refresh the preview to request that retry).
+Removal/disposal cancels expiry work, and late results cannot revive removed entries.
+This bounds recovery but cannot guarantee a URL stays valid during its cache lifetime.
+`data-literate-target` preserves logical identity independently of the opaque URL.
+A third-party fence renderer that ignores Markdown-it's highlight option may
+suppress code-use links.
+
+Preview rendering is synchronous and read-only. It overlays the current rendered
+source and other open, unsaved buffers on the owning workspace's last discovered
+snapshot. Empty buffers remove definitions immediately. Missing references remain
+unlinked; unmatched stale tokens (including changed declaration settings) never
+borrow old semantic ranges. Raw invalid source is checked before host text
+normalization. Rendered root settings and semantics use the same source overlay,
+and snapshot refresh notifications follow installation of the new destinations. Closed-file
+changes become available after the existing filesystem refresh completes;
+**Literate: Process** explicitly refreshes the snapshot after a read failure.
+The save/output transaction workflow is unchanged.
+
+Whole-block syntax highlighting preserves context across references. Both
+`js: <<name>>=` and `js : <<name>>=` delegate normalized `js`. Preview also preserves
+host aliases such as `jsonc`/`json5`, `tsx`/`typescriptreact`, and `py3`. The syntax
+merge advances monotonically, and snapshot indexes avoid per-use model scans.
+All 70 palettes,
+ordinary fences, source-token maps and Mermaid handling remain in place.
+Screen comments retain the existing hiding policy, but genuine references inside
+comments remain visible and navigable. The fragment index and heading-ID parity
+are deferred; M2 does not redesign the website or add Mermaid export assets.
+
+Automated tests use the real engine and activated preview plugin, including
+independent destination/label assertions, cached tokens, unsaved buffers, remote
+snapshots, all palettes, linear merge work and real Pandoc target parity. A bounded
+VS Code 1.138.0 acceptance test dispatched real browser Tab/Enter input, checked
+native focus/outline and ARIA names, and verified local scrolling before and after
+an unsaved source shift. On the **unmodified installed host**, cross-file navigation,
+an unsaved destination edit and navigation again reused the **same canonical dirty
+TextDocument**, selected the actual moved declaration, and retained exactly one
+document identity. Real pointer input also passed. **Screen-reader behavior,
+physical-keyboard interaction, minimum-version host acceptance and complete editor
+scroll synchronization remain unverified.** See
+[the M2 acceptance and manual checklist](CONTRIBUTING.md#m2-screen-acceptance).
 
 Development validation: `LITERATE_TEST_PANDOC=1 yarn test` enables real Pandoc
 integration tests. Add `LITERATE_TEST_PANDOC_LIFECYCLE=1` to exercise both

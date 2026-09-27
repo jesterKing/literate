@@ -16,9 +16,11 @@ import { lstat, chmod } from 'fs/promises';
 import { commitOutputs, TransactionDirectoryError, TransactionFile, TransactionIO } from './output-transactions';
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { discoveryExcludedDirectories, generateProject, resolveProjectTheme, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection } from './engine';
+import { randomBytes } from 'crypto';
+import { parseProject, discoveryExcludedDirectories, generateProject, resolveProjectTheme, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection } from './engine';
 import { collectFragmentOccurrences, planFragmentRename, FragmentOccurrence } from './symbols';
 import { defaultThemeName } from './themes';
+import { renderScreenCode, renderScreenContribution, screenIndex } from './publication-screen';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');
 import Token = require('markdown-it/lib/token');
@@ -79,9 +81,6 @@ const emptyToken : TokenUsage =
   token : undefined,
 };
 
-const FRAGMENT_HTML_CLEANUP_RE= /(<span.class="hljs-.+?">)(.*?)(<\/span>)/g;
-const FRAGMENT_HTML_RE= /(&lt;&lt;.+?&gt;&gt;)/g;
-const CODECOMMENT_HTML_RE= /<span class="hljs-comment">.*?<\/span>/gs;
 
 class FragmentNode extends vscode.TreeItem
 {
@@ -302,33 +301,25 @@ export class FragmentHoverProvider implements vscode.HoverProvider {
     return null;
   }
 }
-function protectFragmentTags(rendered : string) : string {
-  function cleanHighlights(match : string, _: number, __: string)
-  {
-    let internal = match.replaceAll(FRAGMENT_HTML_CLEANUP_RE, "$2");
-    return `<span class="literate-tag-name">${internal}</span>`;
-  }
-  return rendered
-    .replaceAll(
-      FRAGMENT_HTML_RE,
-      cleanHighlights
-    );
-}
-function removeCodeComments(rendered : string) : string {
-  rendered = rendered.replaceAll(CODECOMMENT_HTML_RE, "");
-  return rendered;
-}
+
 
 function previewThemeName(documents: SourceDocument[]): string {
   const theme = resolveProjectTheme(documents);
   return theme.diagnostics.length ? defaultThemeName : theme.name;
 }
 
-function installPreviewDocument(md: MarkdownIt, repository: FragmentRepository): void {
+function installPreviewDocument(md: MarkdownIt, repository: FragmentRepository, navigation: PreviewNavigation): void {
+  const sources = new WeakMap<Token[], string>();
+  md.core.ruler.before('normalize', 'literate_preview_source', state => { sources.set(state.tokens, state.src); });
   const originalRender = md.renderer.render;
   md.renderer.render = function (tokens, options, env) {
-    const body = originalRender.call(this, tokens, options, env);
-    const theme = repository.getPreviewTheme(env?.currentDocument);
+    env = env || {};
+    const snapshot = repository.getPreviewProject(env.currentDocument, sources.get(tokens));
+    const renderEnv = { ...env, literatePublication: snapshot.publication, literatePath: snapshot.path,
+          literateTokens: snapshot.tokens,
+                    literateDestination: (target: string) => navigation.destination(env.currentDocument, snapshot.publication, target) };
+    const body = originalRender.call(this, tokens, options, renderEnv);
+    const theme = snapshot.theme;
     return `<div class="literate-document" data-literate-theme="${md.utils.escapeHtml(theme)}">${body}</div>`;
   };
 }
@@ -349,16 +340,27 @@ function installPreviewFences(md: MarkdownIt): void {
     }
     const previewToken = Object.assign(Object.create(Object.getPrototypeOf(token)), token);
     previewToken.content = token.content.replace(/\\<</g, '<<');
+    previewToken.info = header.language;
+    const model = env.literatePublication as ReturnType<typeof parseProject>['publication'] | undefined;
+    const lookup = model && screenIndex(model);
+    const candidate = lookup?.lines.get(env.literatePath)?.get(token.map?.[0] ?? -1);
+    const part = candidate && candidate.content === token.content
+      && candidate.kind === (header.append ? 'append' : 'definition')
+      && lookup?.families.get(candidate.fragmentTarget)?.name === header.name && candidate.language === header.language
+      && env.literateTokens?.[candidate.tokenIndex]?.info === token.info ? candidate : undefined;
+    const semantic = part && model ? renderScreenCode(part, model, 'preview', env.literateDestination) : undefined;
+    const fenceOptions = semantic !== undefined ? { ...options, highlight: () => semantic } : options;
     const previewTokens = tokens.slice();
     previewTokens[idx] = previewToken;
-    let rendered = header.language === 'mermaid'
-      ? `<pre><code class="language-mermaid">${md.utils.escapeHtml(previewToken.content)}</code></pre>\n`
-      : originalFence ? originalFence(previewTokens, idx, options, env, slf)
-        : `<pre><code>${md.utils.escapeHtml(previewToken.content)}</code></pre>\n`;
+    const rendered = header.language === 'mermaid'
+      ? `<pre><code class="language-mermaid">${semantic ?? md.utils.escapeHtml(previewToken.content)}</code></pre>\n`
+      : originalFence ? originalFence(previewTokens, idx, fenceOptions, env, slf)
+        : `<pre><code>${semantic ?? md.utils.escapeHtml(previewToken.content)}</code></pre>\n`;
     const name = md.utils.escapeHtml(header.name);
     const fileName = md.utils.escapeHtml(header.remainder.match(/^(.*?)\s+\$/)?.[1].trim() || '');
-    if (header.language !== 'mermaid') {
-      rendered = removeCodeComments(protectFragmentTags(rendered));
+    if (part && model) {
+      const label = `<<${header.name}>>=${header.append ? '+' : ''} ${header.remainder.match(/^(.*?)\s+\$/)?.[1].trim() || ''}`.trimEnd();
+      return renderScreenContribution(part, model, 'preview', label, rendered, env.literateDestination);
     }
     return `<div class="codefragment">
     <div class="fragmentname">&lt;&lt;${name}&gt;&gt;=${header.append ? '+' : ''} ${fileName}</div>
@@ -367,6 +369,194 @@ function installPreviewFences(md: MarkdownIt): void {
     </div>
     </div>`;
   };
+}
+const previewUrlLifetime = 60_000;
+type PreviewCapability = {
+  folder: vscode.WorkspaceFolder; target: string; key: string;
+  href?: string; expiresAt?: number; retryAt: number; resolving: boolean;
+};
+class PreviewNavigation implements vscode.UriHandler, vscode.Disposable {
+  private readonly session = randomBytes(24).toString('hex');
+  private readonly entries = new Map<string, PreviewCapability>();
+  private readonly keys = new Map<string, string>();
+  private readonly pending: string[] = [];
+  private resolving = false;
+  private disposed = false;
+  private refresh: ReturnType<typeof setTimeout> | undefined;
+  private expiry: ReturnType<typeof setTimeout> | undefined;
+  private expiryAt = Infinity;
+  private readonly membership = vscode.workspace.onDidChangeWorkspaceFolders(() => this.invalidateMembership());
+  destination(document: vscode.Uri | undefined, model: ReturnType<typeof parseProject>['publication'], target: string) {
+    const folder = document && vscode.workspace.getWorkspaceFolder(document);
+    if (!folder || !this.allowed(folder) || !previewTarget(model, target)) { return undefined; }
+    const key = JSON.stringify([folder.uri.toString(), target]);
+    let token = this.keys.get(key);
+    if (!token) {
+      if (this.keys.size >= 4096) { return undefined; }
+      token = this.session + '/' + randomBytes(24).toString('hex');
+      this.keys.set(key, token);
+      this.entries.set(token, { folder, target, key, retryAt: 0, resolving: false });
+    }
+    return this.resolvedDestination(token);
+  }
+  private resolvedDestination(token: string): string | undefined {
+    const entry = this.entries.get(token);
+    if (!entry) { return undefined; }
+    const now = Date.now();
+    if (entry.href && entry.expiresAt! > now) { return entry.href; }
+    entry.href = undefined; entry.expiresAt = undefined;
+    if (!entry.resolving && entry.retryAt <= now) {
+      entry.resolving = true;
+      this.pending.push(token);
+      void this.resolve();
+    }
+    return undefined;
+  }
+  private async resolve(): Promise<void> {
+    if (this.resolving) { return; }
+    this.resolving = true;
+    try {
+      while (!this.disposed && this.pending.length) {
+        await Promise.all(this.pending.splice(0, 16).map(token => this.resolveExternal(token)));
+      }
+    } finally { this.resolving = false; }
+  }
+  private async resolveExternal(token: string): Promise<void> {
+    const entry = this.entries.get(token);
+    if (!entry) { return; }
+    try {
+      if (!this.allowed(entry.folder)) { return; }
+      const uri = vscode.Uri.parse(`${vscode.env.uriScheme}://jesterking.literate/navigate/${token}`);
+      const external = await vscode.env.asExternalUri(uri);
+      if (this.entries.get(token) === entry && this.allowed(entry.folder)) {
+        entry.href = external.toString();
+        entry.expiresAt = Date.now() + previewUrlLifetime;
+        this.scheduleExpiry(entry.expiresAt);
+        this.requestRefresh();
+      }
+    } catch (_) { /* Retry only on a later render after the cooldown. */ }
+    finally { entry.resolving = false; entry.retryAt = entry.href ? 0 : Date.now() + previewUrlLifetime; }
+  }
+  private scheduleExpiry(at: number): void {
+    if (this.disposed || at >= this.expiryAt) { return; }
+    if (this.expiry !== undefined) { clearTimeout(this.expiry); }
+    this.expiryAt = at;
+    this.expiry = setTimeout(() => this.expireDestinations(), Math.max(0, at - Date.now()));
+  }
+  private expireDestinations(): void {
+    this.expiry = undefined; this.expiryAt = Infinity;
+    if (this.disposed) { return; }
+    let changed = false;
+    for (const entry of this.entries.values()) {
+      if (entry.expiresAt === undefined) { continue; }
+      if (entry.expiresAt <= Date.now()) {
+        entry.href = undefined; entry.expiresAt = undefined; changed = true;
+      } else { this.scheduleExpiry(entry.expiresAt); }
+    }
+    if (changed) { this.requestRefresh(); }
+  }
+  private invalidateMembership(): void {
+    for (const [token, entry] of this.entries) {
+      if (!this.allowed(entry.folder)) {
+        this.entries.delete(token);
+        this.keys.delete(entry.key);
+      }
+    }
+    for (let index = this.pending.length - 1; index >= 0; index--) {
+      if (!this.entries.has(this.pending[index])) { this.pending.splice(index, 1); }
+    }
+    if (this.expiry !== undefined) { clearTimeout(this.expiry); }
+    this.expireDestinations();
+  }
+  async handleUri(uri: vscode.Uri): Promise<void> {
+    if (uri.scheme !== vscode.env.uriScheme || uri.authority !== 'jesterking.literate'
+      || uri.fragment || !/^\/navigate\/[a-f0-9]{48}\/[a-f0-9]{48}$/.test(uri.path)) { return; }
+    const token = uri.path.slice('/navigate/'.length);
+    const entry = this.entries.get(token);
+    const allowed = () => !!entry?.href && entry.expiresAt! > Date.now()
+      && this.entries.get(token) === entry && this.allowed(entry.folder);
+    if (!entry || !allowed()) { return; }
+    try {
+      await openPreviewTarget(entry, allowed);
+    } catch (_) { /* Missing, unsafe or expired destinations never fall back to host links. */ }
+  }
+  private allowed(folder: vscode.WorkspaceFolder): boolean {
+    return !this.disposed && vscode.workspace.isTrusted === true
+      && !!vscode.workspace.workspaceFolders?.includes(folder);
+  }
+  private requestRefresh(): void {
+    if (this.refresh !== undefined) { return; }
+    this.refresh = setTimeout(() => {
+      this.refresh = undefined;
+      if (!this.disposed) { void vscode.commands.executeCommand('markdown.preview.refresh').then(undefined, () => undefined); }
+    }, 0);
+  }
+  dispose(): void {
+    this.disposed = true;
+    if (this.refresh !== undefined) { clearTimeout(this.refresh); }
+    if (this.expiry !== undefined) { clearTimeout(this.expiry); }
+    this.membership.dispose();
+    this.entries.clear(); this.keys.clear(); this.pending.length = 0;
+  }
+}
+function previewTarget(model: ReturnType<typeof parseProject>['publication'], target: string) {
+  const index = screenIndex(model);
+  return index.parts.get(target) || index.parts.get(index.families.get(target)?.contributions[0] || '');
+}
+async function previewNavigationSources(folder: vscode.WorkspaceFolder): Promise<Map<string, SourceDocument>> {
+  const documents = new Map<string, SourceDocument>();
+  for (const uri of await getLiterateFileUris(folder)) {
+    const name = path.posix.relative(folder.uri.path, uri.path);
+    if (safeRelativePath(name) !== name || uri.toString() !== vscode.Uri.joinPath(folder.uri, name).toString()) { continue; }
+    try {
+      const text = new TextDecoder('utf-8').decode(await vscode.workspace.fs.readFile(uri));
+      documents.set(name, { path: name, text });
+    } catch (error) {
+      if (!(error instanceof vscode.FileSystemError) || error.code !== 'FileNotFound') { throw error; }
+    }
+  }
+  return documents;
+}
+function overlayNavigationSources(folder: vscode.WorkspaceFolder, disk: ReadonlyMap<string, SourceDocument>) {
+  const documents = new Map(disk);
+  for (const doc of vscode.workspace.textDocuments) {
+    const name = path.posix.relative(folder.uri.path, doc.uri.path);
+    if (!doc.isClosed && name.endsWith('.literate') && safeRelativePath(name) === name
+      && !name.split('/').slice(0, -1).some(value => discoveryExcludedDirectories.includes(value))
+      && doc.uri.toString() === vscode.Uri.joinPath(folder.uri, name).toString()
+      && vscode.workspace.getWorkspaceFolder(doc.uri) === folder) {
+      documents.set(name, { path: name, text: doc.getText() });
+    }
+  }
+  return [...documents.values()];
+}
+async function safePreviewDocument(folder: vscode.WorkspaceFolder, name: string): Promise<vscode.Uri> {
+  if (safeRelativePath(name) !== name || !name.endsWith('.literate')) { throw new Error('Unsafe preview target'); }
+  const parts = name.split('/');
+  let uri = folder.uri;
+  for (let index = 0; index < parts.length; index++) {
+    uri = vscode.Uri.joinPath(uri, parts[index]);
+    const stat = await vscode.workspace.fs.stat(uri);
+    const wanted = index === parts.length - 1 ? vscode.FileType.File : vscode.FileType.Directory;
+    if (stat.type !== wanted) { throw new Error('Unsafe preview target component'); }
+  }
+  if (vscode.workspace.getWorkspaceFolder(uri) !== folder) { throw new Error('Preview workspace changed'); }
+  return uri;
+}
+async function openPreviewTarget(entry: PreviewCapability, allowed: () => boolean): Promise<void> {
+  const inputs = await previewNavigationSources(entry.folder);
+  const part = previewTarget(parseProject(overlayNavigationSources(entry.folder, inputs)).publication, entry.target);
+  if (!part || !allowed()) { return; }
+  const uri = await safePreviewDocument(entry.folder, part.definition.path);
+  if (!allowed()) { return; }
+  const document = await vscode.workspace.openTextDocument(uri);
+  await safePreviewDocument(entry.folder, part.definition.path);
+  const current = overlayNavigationSources(entry.folder, inputs);
+  const fresh = previewTarget(parseProject(current).publication, entry.target);
+  if (!allowed() || document.isClosed || document.uri.toString() !== uri.toString()
+    || !fresh || fresh.definition.path !== part.definition.path) { return; }
+  const position = new vscode.Position(fresh.definition.line, 0);
+  await vscode.window.showTextDocument(document, { selection: new vscode.Range(position, position) });
 }
 
 function createMarkdownItParserForLiterate() : MarkdownIt
@@ -588,6 +778,28 @@ export class FragmentRepository {
     );
     context.subscriptions.push(...this.inputSubscriptions);
   }
+  getPreviewProject(document: vscode.Uri | undefined, source: string | undefined) {
+    const folder = document && vscode.workspace.getWorkspaceFolder(document);
+    const currentPath = folder && document ? path.posix.relative(folder.uri.path, document.path) : 'index.literate';
+    const documents = new Map((folder ? this.sourceDocuments.get(folder.uri.toString()) || [] : [])
+      .map(value => [value.path, value]));
+    for (const open of vscode.workspace.textDocuments) {
+      if (folder && !open.isClosed && open.uri.path.endsWith('.literate')
+        && vscode.workspace.getWorkspaceFolder(open.uri)?.uri.toString() === folder.uri.toString()) {
+        const name = path.posix.relative(folder.uri.path, open.uri.path);
+        if (safeRelativePath(name) === name && open.uri.toString() === vscode.Uri.joinPath(folder.uri, name).toString()
+          && !name.split('/').slice(0, -1).some(value => discoveryExcludedDirectories.includes(value))) {
+          documents.set(name, { path: name, text: open.getText() });
+        }
+      }
+    }
+    if (source !== undefined) { documents.set(currentPath, { path: currentPath, text: source }); }
+    const inputs = [...documents.values()];
+    const parsed = parseProject(inputs);
+    return { path: currentPath, publication: parsed.publication,
+      tokens: parsed.documents.find(value => value.path === currentPath)?.tokens,
+      theme: folder ? previewThemeName(inputs) : defaultThemeName };
+  }
   getPreviewTheme(document?: vscode.Uri): string {
     const folder = document && vscode.workspace.getWorkspaceFolder(document);
     if (!folder) { return defaultThemeName; }
@@ -619,9 +831,6 @@ export class FragmentRepository {
         const theme = previewThemeName(documents);
         const previousTheme = this.previewThemes.get(themeKey) ?? defaultThemeName;
         this.previewThemes.set(themeKey, theme);
-        if (theme !== previousTheme) {
-          void vscode.commands.executeCommand('markdown.preview.refresh').then(undefined, () => undefined);
-        }
         const templates: Record<string, string> = Object.create(null);
         let references: string[] = [];
         try {
@@ -638,6 +847,7 @@ export class FragmentRepository {
           }
         }
         const result = generateProject(documents, templates);
+        const previousPublication = parseProject(this.sourceDocuments.get(themeKey) || []).publication;
         const diagnostics = new Map<string, vscode.Diagnostic[]>();
         for (const diagnostic of result.diagnostics) {
           const uri = vscode.Uri.joinPath(workspaceFolder.uri, diagnostic.path);
@@ -686,6 +896,10 @@ export class FragmentRepository {
           states.list.push(env);
         }
         fragments.map = handleFragments(states.list, result.inspection.fragments);
+        if (theme !== previousTheme || JSON.stringify(previousPublication.contributions) !== JSON.stringify(result.publication.contributions)
+          || JSON.stringify(previousPublication.fragments) !== JSON.stringify(result.publication.fragments)) {
+          void vscode.commands.executeCommand('markdown.preview.refresh').then(undefined, () => undefined);
+        }
         if (!writeFiles || result.diagnostics.length) { continue; }
         this.generatedOutputs.set(key, new Set(result.files.map(file =>
           vscode.Uri.joinPath(workspaceFolder.uri, file.path).toString())));
@@ -1137,6 +1351,8 @@ export async function activate(context: vscode.ExtensionContext) {
   theOneRepository = new FragmentRepository(context);
   await theOneRepository.processLiterateFiles(undefined, true);
   context.subscriptions.push(theOneRepository);
+    const navigation = new PreviewNavigation();
+    context.subscriptions.push(navigation, vscode.window.registerUriHandler(navigation));
   let literateProcessDisposable = vscode.commands.registerCommand(
     'literate.process',
     async function () {
@@ -1220,7 +1436,7 @@ export async function activate(context: vscode.ExtensionContext) {
     extendMarkdownIt(md: any) {
       md.use(grabberPlugin);
       installPreviewFences(md);
-      installPreviewDocument(md, theOneRepository);
+      installPreviewDocument(md, theOneRepository, navigation);
       return md;
     }
   };

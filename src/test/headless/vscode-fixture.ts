@@ -13,12 +13,14 @@ class Uri {
     }
     get fsPath(): string { return this.path; }
     get scheme(): string { return this.value.protocol.slice(0, -1); }
+        get authority(): string { return this.value.host; }
+        get fragment(): string { return this.value.hash.slice(1); }
     toString(): string { return this.value.toString(); }
     static file(value: string): Uri { return new Uri('file:///' + value.replace(/^\//, '')); }
     static parse(value: string): Uri { return new Uri(value); }
     static joinPath(uri: Uri, ...parts: string[]): Uri {
         const value = new URL(uri.toString());
-        value.pathname = path.posix.join(uri.path, ...parts);
+        value.pathname = path.posix.join(uri.path, ...parts).split('/').map(encodeURIComponent).join('/');
         return new Uri(value.toString());
     }
 }
@@ -146,6 +148,7 @@ export function fixture(workspaceUri = 'file:///project') {
     const deletions: string[] = [];
     let discoveries = 0;
     const changeListeners = new Set<(event: vscode.TextDocumentChangeEvent) => unknown>();
+        const workspaceEvents = new EventEmitter<{ added: typeof folder[]; removed: typeof folder[] }>();
     const fileEvents = { create: new EventEmitter<Uri>(), change: new EventEmitter<Uri>(), delete: new EventEmitter<Uri>() };
     const controls: {
         beforeWrite?: (uri: string) => Promise<void>;
@@ -154,7 +157,9 @@ export function fixture(workspaceUri = 'file:///project') {
         afterRename?: (from: string, to: string) => void | Promise<void>;
         afterCreateDirectory?: (uri: string) => void | Promise<void>;
         beforeDelete?: (uri: string) => void | Promise<void>;
-        readError?: string;
+        externalUri?: (uri: Uri) => Promise<Uri>;
+                beforeOpen?: () => void | Promise<void>;
+                readError?: string;
         chmodError?: string;
     } = {};
     const versions = new Map<string, number>();
@@ -192,8 +197,20 @@ export function fixture(workspaceUri = 'file:///project') {
         delete(uri: Uri) { diagnostics.delete(uri.toString()); },
         dispose() {}
     };
+    const opened: { document: vscode.TextDocument; selection: Range }[] = [];
+    const externalUris: Uri[] = [];
+    let uriHandler: { handleUri(uri: Uri): Promise<void> } | undefined;
     const workspace = {
+        isTrusted: true,
         workspaceFolders: [folder],
+        async openTextDocument(uri: Uri) {
+            await controls.beforeOpen?.();
+            const existing = workspace.textDocuments.find(doc => !doc.isClosed && doc.uri.toString() === uri.toString());
+            if (existing) { return existing; }
+            const content = disk.get(uri.toString());
+            if (!content) { throw new FileSystemError('FileNotFound'); }
+            return open(path.posix.relative(folder.uri.path, uri.path), content.toString());
+        },
         textDocuments: [] as vscode.TextDocument[],
         getWorkspaceFolder(uri: Uri) {
             return [folder, other].find(base => uri.toString().startsWith(base.uri.toString() + '/'));
@@ -202,7 +219,7 @@ export function fixture(workspaceUri = 'file:///project') {
             changeListeners.add(callback);
             return { dispose: () => changeListeners.delete(callback) };
         },
-        onDidChangeWorkspaceFolders() { return disposable(); },
+        onDidChangeWorkspaceFolders: workspaceEvents.event,
         createFileSystemWatcher(pattern: string) {
             assert.equal(pattern, '**/*');
             return { onDidCreate: fileEvents.create.event, onDidChange: fileEvents.change.event,
@@ -335,7 +352,19 @@ export function fixture(workspaceUri = 'file:///project') {
                 return commands.get(name)?.(...args);
             }
         },
+        env: { uriScheme: 'vscode', async asExternalUri(uri: Uri) {
+            externalUris.push(uri);
+            return controls.externalUri ? controls.externalUri(uri) : Uri.parse(uri.toString() + '?windowId%3D1');
+        } },
         window: {
+            registerUriHandler(handler: { handleUri(uri: Uri): Promise<void> }) {
+                assert.equal(uriHandler, undefined, 'one URI handler per activation');
+                uriHandler = handler;
+                return { dispose() { uriHandler = undefined; } };
+            },
+            async showTextDocument(document: vscode.TextDocument, options: { selection: Range }) {
+                opened.push({ document, selection: options.selection });
+            },
             showErrorMessage: (message: string) => { errors.push(message); },
             showInformationMessage: () => undefined, setStatusBarMessage: disposable,
             registerTreeDataProvider: register('tree'), createTreeView: disposable
@@ -406,6 +435,8 @@ export function fixture(workspaceUri = 'file:///project') {
         folder as unknown as vscode.WorkspaceFolder, writeFiles);
     return { folder, other, disk, modes, modeStats, modeChanges, types, statErrors, stats, listings, diagnostics, reads, writes, stagedWrites, renames, deletions, directories, errors, controls,
         workspace, repository, extension, mock, providers, commands, executedCommands, document, open, uri, put, change, process,
+                opened, externalUris, navigate: async (href: string) => uriHandler?.handleUri(Uri.parse(href)),
+                        workspaceChanged: () => workspaceEvents.fire({ added: [], removed: [folder] }),
         fileEvent(kind: keyof typeof fileEvents, name: string, base = folder) {
             fileEvents[kind].fire(Uri.joinPath(base.uri, name));
         },

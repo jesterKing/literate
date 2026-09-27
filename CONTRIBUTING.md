@@ -19,8 +19,8 @@ The authoritative implementations are in `literate/*.literate`.
 and `src/mermaid-preview.js` are generated;
 commit them together with their literate sources and rendered HTML.
 Many publication tests are also generated from their owning `.literate` chapters;
-`literate/publication-screen.literate` owns the HTML/preview/publication integration
-tests. Edit those chapters rather than their generated test files. Other tests and
+`literate/publication-screen.literate` owns `src/publication-screen.ts` and the
+HTML/preview/publication integration tests. Edit those chapters rather than their generated test files. Other tests and
 configuration remain ordinary files. Interleave prose with focused
 fragments: at most one function per fragment where practical, splitting larger
 functions into named steps. Aim for roughly 10–25 lines per code block; review
@@ -131,8 +131,8 @@ Acceptance criteria, with their evidence and bounds:
    highlighting; emitter shape/version/reconstruction checks prevent highlight
    output from inventing references. Literal/TeX-safety tests and real-Pandoc
    integration check that only genuine uses produce reference commands. This
-   criterion holds for publication, **not visual screen decoration**: the latter
-   still decorates escaped tags and is explicitly recorded as an M2 gap.
+   criterion now also holds for the shared semantic screen renderer introduced
+   in M2; escaped lookalikes receive no reference links.
 3. **Unicode, metacharacters, long names, inline positions, indentation and blank
    lines:** automated source/rendering tests plus PDF fixture checks cover these
    cases. Unicode remains font-dependent (Greek is tested in Lilex code, not
@@ -181,12 +181,10 @@ adapter and decode emitted LaTeX labels/reference destinations back to logical I
 Neither a fake renderer nor equality of two publication snapshots substitutes for
 rendered-output assertions.
 
-The mapping is canonical document + contribution token index → emitted fragment
-block → contribution target → family target. Screens currently have **no fragment
-IDs or links**, so this is a source/model correspondence, not clickable target
-parity. Tests also expose literal-tag decoration and the compact `js:` delegated
-language discrepancy. M2 must replace these explicit boundary assertions when
-adding semantic links and normalizing host language info. The plugin test does
+The mapping is canonical document + accepted contribution → emitted fragment
+block → contribution target → family target. M2 now asserts actual screen IDs and
+relative links, not only model correspondence. Literal examples stay unlinked;
+compact/spaced headers share normalized language delegation. The plugin test does
 not run a VS Code host, test browser clicks, or prove full editor synchronization.
 
 Reproduce the focused and full gates (the latter includes real Pandoc lifecycle
@@ -206,13 +204,338 @@ git diff --check
 Portable PDF acceptance is a separate, opt-in `yarn test:publication` run as
 specified above; do not describe a headless-suite pass as a fresh PDF build.
 
-The 2026-09-26 integration sign-off ran all seven new integration cases and the
+The historical M1 integration sign-off on 2026-09-26 ran all seven integration cases and the
 full real-Pandoc/lifecycle suite: **771 passed, zero failures or skips**. Self-host
 layout/typecheck/bundle/fixedpoint, extension/preview bundles, generated checks and
 whitespace checks passed. A fresh portable acceptance run also passed both A4/A5
 fixtures with the counts above and clean final logs, using the explicitly supplied
 local font manifest and disclosed `ulem` workaround. No new visual inspection or
 clean-machine/font-independent compilation is claimed by this run.
+
+## M2 screen acceptance
+
+The implementation covers the required fragment rendering/navigation scope:
+
+- One shared screen renderer consumes engine publication segments and the guarded
+  whole-block highlight.js emitter; it never discovers uses from rendered HTML.
+  LaTeX's strict missing-target/modifier policy remains unchanged; preview permits
+  incomplete inputs without inventing destinations.
+- Family and contribution IDs are emitted once at their accepted declarations.
+  Generated pages use percent-encoded, chapter-relative HTML links; preview uses
+  logical-ID local anchors and extension-owned capability links across chapters.
+  Cross-file navigation opens the canonical source document with an explicit
+  selection, independently of the host's Markdown link preference;
+  `data-literate-target` preserves the common identity. Previous/Base/Next controls are outside code,
+  with native anchors, descriptive accessible names and existing focus CSS.
+- Tests call actual `generateProject` and `activate().extendMarkdownIt` paths.
+  Independent literal anchors/hrefs cover punctuation collisions, repeated and
+  cross-document uses, nested paths with reserved URL characters, additions,
+  prose shifts, literal escaped nonlinks, whole-block syntax, normalized fence
+  languages, all palettes and source-map attributes. Existing tests cover normal
+  fences and Mermaid. Current source, cached host tokens, unsaved/empty buffers,
+  missing definitions and remote snapshot refresh are exercised without render
+  I/O or output writes. Real Pandoc tests check LaTeX's logical destinations.
+
+### Current extension-owned navigation acceptance
+
+The native-line-link blocker described in the historical investigation below is
+resolved by the authorized extension-owned route. One `registerUriHandler` per
+activation accepts only `vscode://jesterking.literate/navigate/<session>/<token>`
+(using `env.uriScheme`). Both opaque components contain 24 random bytes. Complete
+URIs are passed to `env.asExternalUri`; the returned URI, including its encoded
+window-routing query, is never reconstructed or modified.
+
+Capabilities bind workspace object identity and an accepted logical family or
+contribution, never a caller-supplied file, line, action or command. On use the
+handler checks scheme, authority, exact path shape, session/map membership,
+workspace membership and trust; it rediscovers sources and overlays canonical
+current buffers over a separate, disk-only snapshot. Every overlay is rebuilt
+without mutating that base, including after document opening: discarding another
+input restores its saved definition instead of retaining its old empty/dirty text.
+It rejects unsafe paths, symlink components, missing files and missing targets,
+then opens the canonical document and rechecks the current model and authorization
+before `showTextDocument(document, { selection })`. Filesystem
+providers do not supply atomic path/open transactions; this is not a sandbox for
+concurrent hostile filesystem mutation.
+
+Rendering remains synchronous and does no filesystem I/O. Pending/rejected URLs
+are text, never `#L` fallbacks. Successful resolution schedules a coalesced refresh.
+The cache retains at most 4,096 entries and resolves at most 16 URLs concurrently.
+Removal deletes both token entries and reverse keys, prunes queued resolutions and
+recomputes the expiry timer. Re-adding the same URI can mint new capabilities;
+old tokens and late responses remain invalid.
+
+`env.asExternalUri` does not promise indefinite URL validity. Successful results
+have a 60-second cache lifetime, managed by one earliest-expiry timer per activation.
+Expiry clears ready URLs and schedules one coalesced refresh; only targets rendered
+again resolve again, retaining their token and caching the new returned URI verbatim.
+Pending requests are shared. Failed resolutions have a 60-second on-demand retry
+cooldown, not an automatic retry timer. Saturation never evicts/remints on refresh.
+Removal and disposal cancel expiry work; late resolution cannot revive entries or
+timers. A URL invalidated before expiry can fail until renewal, and a failed renewal
+needs another render after cooldown. The API provides no invalidation notification,
+so this is bounded cache recovery, not a guarantee of continuous route validity.
+Untrusted workspaces mint/open none, while native local anchors still work.
+Generated HTML remains native and needs no navigation JavaScript. There is no
+command URI, shipped socket, custom webview bridge or injected click handler.
+
+The bounded acceptance harness passed on **unmodified installed VS Code 1.138.0**
+on 2026-09-27, using `/usr/share/code/code`, this worktree's extension bundle and
+a fresh disposable profile. It checked:
+
+- Native Tab/Enter, trusted click events, accessible names and a visible 2px focus
+  outline; local declaration scrolling before/after unsaved line shifts 123 → 125.
+- Cross-file capability navigation to the actual declaration at zero-based line 4.
+- An unsaved two-line destination edit, then the **same capability** selecting the
+  actual declaration at line 6 in the **same TextDocument object**. Disk bytes stayed
+  unchanged; the URI had no fragment and exactly one document identity existed.
+- Real Chromium pointer input to the same dirty destination, not synthetic
+  `element.click()` (which the host can treat differently). The harness switched
+  from `inEditor` to `inPreview` between cross-file keyboard activations.
+
+The host exited successfully with `M2_HOST_NAVIGATION_PASS 1.138.0`. Port 9333 was
+checked closed. Evidence is `out/m2-host/workspace/navigation-evidence.json`;
+reproduction command and remaining manual coverage appear below. Earlier patched
+host diagnostics are not this acceptance result. Their copy was preserved under
+ignored `.vscode-test/m2-patched-markdown-extension` so root compilation cannot
+accidentally include its TypeScript sources.
+
+After the independent-review fixes, final validation on 2026-09-27 passed the full
+real-Pandoc/lifecycle suite: **812 tests, zero failures or skips**, including
+**48 screen cases**. New regressions cover workspace removal/re-addition, discarding
+another input while opening a duplicate definition, opaque URL renewal, cooldowns,
+idle entries, late completions and cancellation of live expiry timers. Renewal
+uses a mocked resolver and Node 22's virtual clock; the fresh unmodified-host run
+above validates navigation but does not force actual platform URL invalidation.
+
+Self-host layout/typecheck/bundle/fixedpoint, extension/preview bundles, generated
+checks and whitespace checks passed. ESLint retains the pre-existing `#39` test
+helper naming warning (zero errors); Node emits its expected experimental MockTimers
+warning for virtual-clock tests. No new PDF compilation, physical-keyboard or
+screen-reader acceptance is claimed.
+
+### Historical native-link validation (superseded contract)
+
+The following recovery results and protocol investigation describe the earlier
+native-line implementation, **not the current navigation contract**. They explain
+why capability navigation was necessary; their `inEditor` requirements and dirty
+buffer limitations do not apply to current semantic fragment links.
+
+M2 recovery validation on 2026-09-27: the focused screen integration suite passed
+all **25 cases**, and `LITERATE_TEST_PANDOC=1 LITERATE_TEST_PANDOC_LIFECYCLE=1 yarn test`
+passed **789 tests, zero failures or skips**, including both converter deadlines.
+`check:self` passed layout/typecheck/bundle/fixedpoint; `esbuild`, generated-file
+checks and `git diff --check` passed. ESLint reports the pre-existing test-helper
+naming warning for the HTML entity key `#39` (no lint errors). The first full run
+caught a standalone-preview theme regression in the recovery changes; it was fixed
+before the passing run. Independent review then exposed resolver, scaling and
+preview-alias gaps; the figures above are the subsequent passing validation.
+The expanded real-webview keyboard/click acceptance below also passed on
+2026-09-27. That test/prose-only follow-up reran the **25 focused cases** with real
+Pandoc, compile, lint, extension bundles, self-hosting, generated-file and whitespace
+checks. The **789-test full run** above is the preceding runtime-fix validation,
+not a newly repeated full run for the harness changes. No fresh portable PDF
+compilation, physical-keyboard walkthrough or assistive-technology acceptance is claimed.
+
+Recovery regressions additionally cover raw NUL input before host normalization,
+rejected duplicate/orphan declarations, complete-header matching for unfamiliar
+cached tokens, rendered root settings/empty source, and workspace isolation.
+Semantic/theme refresh now follows installation of the new source snapshot.
+Review regressions additionally cover one-based cross-file source locations,
+unsaved declaration shifts, host language aliases and deterministic linear syntax
+leaf visits. A once-per-snapshot weak index supplies family, contribution, ordinal,
+source-line and token lookups to both screen adapters.
+
+A local warmed render-only benchmark (five samples, median, whole-block JavaScript
+highlighting plus semantic links, excluding parsing) measured 1,000/2,000/4,000/8,000
+references at **9.22/14.92/34.55/70.96 ms**. These are local observations, not CI
+performance thresholds. The regression counts actual syntax-leaf reads and rejects
+linear model searches during rendering, avoiding timing flakiness.
+
+### Preview protocol investigation and corrected navigation contract
+
+Earlier inspection of VS Code **1.96.0** source established the rendering and
+webview contracts at these pinned locations. It did **not** prove that generated
+IDs survive the language-service link resolver:
+
+- [`preview-src/index.ts`](https://github.com/microsoft/vscode/blob/1.96.0/extensions/markdown-language-features/preview-src/index.ts):
+  local `#` anchors pass through; relative link clicks post `openLink` to the host.
+- [`src/preview/preview.ts`](https://github.com/microsoft/vscode/blob/1.96.0/extensions/markdown-language-features/src/preview/preview.ts):
+  `inPreview` carries a resolver-supplied fragment into the destination preview;
+  the resolver may omit that fragment, so this alone proves no target jump.
+- [`preview-src/scroll-sync.ts`](https://github.com/microsoft/vscode/blob/1.96.0/extensions/markdown-language-features/preview-src/scroll-sync.ts):
+  destination IDs are found on `code-line` elements with `data-line`. Both family
+  and contribution targets satisfy that contract for local anchors. Source-map
+  markup alone cannot repair a fragment discarded before the destination opens.
+- [`src/markdownEngine.ts`](https://github.com/microsoft/vscode/blob/1.96.0/extensions/markdown-language-features/src/markdownEngine.ts):
+  parsing may be cached and rendering gets a fresh `env.currentDocument`.
+  The plugin's weak token/source association and synchronous render-time project
+  overlay respect that boundary; the host fence consumes `options.highlight`.
+
+No custom command URI, injected navigation script, asynchronous Markdown-it API,
+filesystem access during rendering or global editor setting is introduced.
+The host's built-in preview JavaScript still handles cross-document opening;
+“no JavaScript dependency” here means no **Literate/optional expansion** script,
+not a claim that VS Code's own preview can run without its host runtime.
+The installed **1.138.0** `dist/serverWorkerMain.js` was then inspected at
+`parseLocationInfoFromFragment` and `resolveLinkTarget`. It accepts `#L5` as
+zero-based line 4, column 0, but discards unknown generated fragment IDs absent
+from source headings/HTML IDs. Its `dist/extension.js` preview handler forwards
+only the resolver's fragment in `inPreview`, ignoring source positions. Therefore
+**exact cross-file navigation is supported in `inEditor`, not `inPreview`**.
+Native line links now select the source declaration, with no injected navigation
+script. Third-party fence rules must honor the supplied highlight option to retain
+semantic code-use links. No minimum-version host run is claimed.
+
+### Earlier installed-host rendering smoke test
+
+A bounded `@vscode/test-electron.runTests` run used the installed
+`/usr/share/code/code` (**VS Code 1.138.0**, Linux arm64), this worktree's bundled
+extension, and an isolated workspace/profile under ignored `out/m2-host/`.
+No VS Code download or user-setting changes were needed. The temporary harness
+called the real `markdown.api.render` with actual `TextDocument` objects after
+activating Literate and reloading Markdown plugins. It passed checks for:
+
+- Nested chapter-relative definition links and literal escaped nonlinks.
+- Family and contribution IDs with host `code-line`/`data-line` attributes.
+- Addition navigation's descriptive labels.
+- Rerendering a caller after emptying its destination in an unsaved editor buffer.
+
+The process exited successfully with `M2_HOST_RENDER_PASS 1.138.0`; the local
+harness and evidence are in `out/m2-host/run.cjs` and
+`out/m2-host/workspace/evidence.json`. These ignored files are disposable local
+evidence, not part of the committed test suite. This exercises the real host
+renderer, **not webview link clicks or assistive technology**. The pinned 1.96
+protocol investigation above remains source-level evidence, not a 1.96 host run.
+
+### Real webview navigation acceptance
+
+On **2026-09-27**, the generated `src/test/acceptance/screen-host.js` harness
+(authoritative chapter: `literate/publication-screen.literate`) passed against
+installed VS Code **1.138.0**, Linux arm64. It configured only an isolated fixture
+workspace for Markdown and `inEditor`, opened a real Markdown webview, and used
+test-only DevTools input with no mocked host APIs. The passing scope is:
+
+- Seed focus on the preceding native anchor, dispatch Chromium **Tab**, and assert
+  that the intended link receives focus, has `tabIndex=0`, matches `:focus-visible`,
+  has the expected descriptive `aria-label`, and displays a solid nonzero outline.
+- Dispatch **Enter**, assert it produces a trusted native click, and verify that a
+  distant same-document definition actually scrolls into the viewport. VS Code's
+  webview handles local anchors with `scrollIntoView`, not a URL-hash change.
+- Prepend two lines through `WorkspaceEdit` without saving. Assert the document is
+  dirty and disk bytes unchanged; wait for the real preview's source map to move
+  from zero-based line **123 to 125**. Repeat Tab/Enter and viewport assertions for
+  the same logical local target, and check the dirty source's declaration line.
+- Activate `./../base.literate#L5` with Tab/Enter and, separately, the retained native
+  click test. Assert the active editor's file, zero-based selection line **4**, and
+  actual declaration text on that line. The destination is saved in this scenario.
+- Check semantic highlighting of a `jsonc` fragment in the actual host.
+
+The run exited successfully with `M2_HOST_NAVIGATION_PASS 1.138.0` and structured
+check results. Evidence includes focus/outline values, local scroll geometry and
+source-map lines. This is browser keyboard-event and host-navigation acceptance,
+not physical-keyboard or screen-reader testing; ARIA names are asserted as DOM
+attributes, not as spoken output.
+
+Reproduce after `yarn generate && yarn compile && yarn esbuild` using an installed
+host (adjust the executable path for your machine). The harness requires a host
+with Node's `fetch`/`WebSocket` APIs, a graphical session and free loopback port 9333.
+The command is bounded at 90 seconds; no host download is requested. DevTools is
+local test infrastructure, not a shipped extension feature. Do not expose its port.
+
+```sh
+mkdir -p out/m2-host/workspace
+timeout 90s node -e 'const profile=require("node:fs").mkdtempSync(process.cwd()+"/out/m2-host/profile-");require("@vscode/test-electron").runTests({vscodeExecutablePath:"/usr/share/code/code",extensionDevelopmentPath:process.cwd(),extensionTestsPath:process.cwd()+"/src/test/acceptance/screen-host.js",launchArgs:[process.cwd()+"/out/m2-host/workspace","--user-data-dir="+profile,"--extensions-dir="+process.cwd()+"/out/m2-host/extensions","--disable-extensions","--disable-workspace-trust","--skip-welcome","--skip-release-notes","--no-sandbox","--remote-debugging-port=9333"]}).catch(e=>{console.error(e);process.exitCode=1})'
+```
+
+A fresh disposable profile per run prevents restored dirty editors from changing
+the fixture. The path guard prevents accidental use against another workspace. Use only
+this disposable profile with `--no-sandbox`; it is a test-launch flag, not a normal
+VS Code recommendation. Evidence is written to ignored
+`out/m2-host/workspace/navigation-evidence.json`. The earlier render-only smoke
+result is historical and was insufficient to detect the original navigation bug.
+
+### Dirty cross-file reopening limitation observed during acceptance
+
+Bounded diagnosis on **2026-09-27** identified a protocol-shape mismatch in the
+installed **1.138.0** build (`7debcd0e2acdea1c52de81bf9ee1620444407dda`):
+
+- The real `markdown/resolveLinkTarget` trace returns a fragment-free file URI and
+  `positionOrRange: { start: { line: 6, character: 0 }, end: ... }` for `#L7`.
+- The bundled Markdown extension's `openDocumentLink` reads **`position`**, not
+  `positionOrRange`. Its fallback reparses the raw numeric fragment, reattaches it
+  to the otherwise-canonical URI, and calls `vscode.open` with that URI and selection.
+- VS Code exposes separate `TextDocument` identities for the plain URI, `#L5`, and
+  `#L7`. A clean first navigation looks correct. A first navigation to an already
+  dirty canonical buffer can also copy its current contents into a new identity;
+  this is not reliable identity preservation or synchronization.
+- Opening `#L5`, typing two unsaved lines with the actual editor `type` command,
+  then following `#L7` reproduced the failure: selection line 6 contained the saved
+  closing fence (or `END` in the minimal fixture), not the moved declaration. The
+  original dirty document remained independently open and disk bytes were unchanged.
+
+The failure was reproduced with ordinary `.md` links in a fresh host where
+**Literate was not installed**. `.literate` association, workspace-root paths,
+relative paths and percent-encoded filenames do not explain the identity split.
+`#7`, `#l7`, `#L7,1`, `#%4C7` and `#%37` also retain fragment-qualified identities;
+encoding is not a reliable workaround. A no-fragment link reuses the canonical
+buffer but supplies no declaration position. Raw absolute `file:` links did not
+activate the expected editor in the bounded probe and are not a validated fix.
+
+Two supported API controls worked: `showTextDocument(existingDocument, { selection })`
+and `vscode.open(canonicalUri, { selection })` preserved the intended dirty buffer.
+However, the inspected native preview-link route calls its own resolver/opener;
+those controls alone do not give Literate a supported interception hook.
+
+A **diagnostic-only copy** of the built-in Markdown extension was then adapted to
+read the resolver's `positionOrRange` start as the opener's expected position. With
+no Literate runtime changes, both the minimal `.md` test and the actual Literate
+preview passed: Tab/Enter on `#L5`, an unsaved two-line edit, then Tab/Enter on the
+newly rendered `#L7` reused the **same canonical dirty document**, selected the
+actual declaration, and left exactly one document identity open for that file.
+This validates the root cause and a small host-side correction, not a production
+host patch or universal host-version guarantee. The installed host was not modified;
+range handling and broader upstream regression coverage remain part of a proper
+host fix. No command URI or custom Literate navigation runtime was introduced.
+
+Disposable scripts, trace logs and JSON evidence are under ignored `out/m2-host/`:
+`dirty-probe.cjs`, `dirty-lifecycle-probe.cjs`, `native-only-probe.cjs`, and
+`patched-literate-probe.cjs`; their evidence is in the `workspace/` subdirectory.
+All launches used fresh profiles, 90-second bounds and exited; the debug port was
+checked closed afterward. These diagnosis runs do **not** replace the earlier
+runtime test suite, and the patched-host result does **not** count as passing
+unsaved navigation on the unmodified installed host.
+
+The user subsequently authorized extension-owned navigation. The implementation
+and unmodified-host acceptance above resolve this blocker without a host patch
+or a narrower saved-target contract. A syntax-only native href change was not used.
+
+### Remaining manual host acceptance
+
+The automated browser checks above do not replace this remaining manual coverage:
+
+1. Associate `.literate` with Markdown. With preview/editor scrolling enabled,
+   open `literate/publication-screen.literate`. Repeat on the minimum
+   supported host version; the automated keyboard/click run used 1.138.0 only.
+2. Use Tab and Enter on a use, definition label and each available Previous/Base/
+   Next control. Check local and cross-chapter destinations, including a nested
+   chapter. Verify visible focus and the link's accessible name with a screen
+   reader; verify local preview scrolling and cross-file source selection at the
+   declaration. Semantic cross-file links always select the source editor; they do
+      not open a destination preview, regardless of the Markdown link setting.
+3. Insert prose above a declaration and edit a use without saving. Check editor
+   selection/scroll synchronization, links, blank lines and indentation. Change
+   a definition in another open buffer, empty it, then restore it. Check that the
+   preview refreshes without a save or output workflow change.
+4. Check a light and dark palette, an ordinary code fence, and an existing Mermaid
+   diagram. Disable optional third-party preview/expansion extensions and repeat.
+5. Open generated HTML with scripting disabled: fragment navigation must still
+   work. Mermaid rendering itself is outside this no-script navigation claim.
+
+Implementation, automated contract acceptance and the installed-host keyboard/click test
+are separate from this remaining manual UX validation. The optional fragment index, heading-ID parity and Mermaid
+asset work are deliberately deferred. No new portable PDF build is implied by
+M2's real-Pandoc tests; the earlier M1 PDF evidence above remains historical.
 
 ## Line endings across platforms
 
