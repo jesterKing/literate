@@ -114,7 +114,8 @@ test('parsing orders chapters and accepts empty documents and EOF fences without
     assert.deepEqual(parseProject([...documents].reverse()), parsed);
     assert.deepEqual(parseProject([]), {
         documents: [], diagnostics: [], inspection: { documents: [], templates: [], fragments: [] },
-        publication: { documents: [], fragments: [], contributions: [] }
+        publication: { documents: [], fragments: [], contributions: [] },
+        annotations: { terms: [], notes: [], uses: [], diagnostics: [] }
     });
 });
 

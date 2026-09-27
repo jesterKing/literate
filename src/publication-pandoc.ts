@@ -1,4 +1,5 @@
 import type Token = require('markdown-it/lib/token');
+import { parseAnnotationBody, resolveTermHref, PublicationAnnotations } from './publication-annotations';
 import type {
     GenerationDiagnostic, ParsedDocument, ParsedProject,
     PublicationContribution, PublicationLocation
@@ -15,6 +16,7 @@ export interface PandocPreparationResult {
     diagnostics: GenerationDiagnostic[];
 }
 export type PandocInline =
+    | { t: 'RawInline'; c: ['latex', string] }
     | { t: 'Str'; c: string }
     | { t: 'Space' | 'SoftBreak' | 'LineBreak' }
     | { t: 'Code'; c: [PandocAttr, string] }
@@ -223,6 +225,7 @@ function headingLinkDestination(destination: DocumentDestination, slug: string, 
     return '';
 }
 interface InlineReader {
+    annotations: PublicationAnnotations;
     document: ParsedDocument;
     tokens: readonly Token[];
     index: number;
@@ -262,12 +265,21 @@ function readInlines(reader: InlineReader, stop?: string, depth = 0): PandocInli
     return result;
 }
 function readLink(reader: InlineReader, token: Token, depth: number): PandocInline {
-    const href = linkDestination(token.attrGet('href') ?? '', reader.document,
+    const original = token.attrGet('href') ?? '';
+    const term = original.startsWith('term:');
+    const resolved = term ? resolveTermHref(reader.annotations, original) : undefined;
+    if (term && !resolved) {
+        report(reader.diagnostics, reader.at, 'annotation-missing', `Unresolved TERM link: ${original}`);
+    }
+    const href = term ? '#' + (resolved ?? '') : linkDestination(original, reader.document,
         reader.targets, reader.diagnostics, reader.at);
     const label = readInlines(reader, 'link_close', depth + 1);
-    return { t: 'Link', c: [emptyAttributes(), label, [href ?? '', token.attrGet('title') ?? '']] };
+    return { t: 'Link', c: [['', term ? ['lit-term-use'] : [], []], label,
+        [href ?? '', token.attrGet('title') ?? '']] };
 }
 interface BlockReader {
+    annotations: PublicationAnnotations;
+    annotationBody?: boolean;
     document: ParsedDocument;
     index: number;
     contributions: Map<number, PublicationContribution>;
@@ -351,7 +363,7 @@ function readTextBlock(reader: BlockReader, opening: Token): PandocInline[] {
     }
     reader.index++;
     const result = readInlines({ document: reader.document, tokens: token.children ?? [],
-        index: 0, at, targets: reader.targets, diagnostics: reader.diagnostics });
+        index: 0, at, targets: reader.targets, diagnostics: reader.diagnostics, annotations: reader.annotations });
     if (reader.document.tokens[reader.index]?.type === stop) { reader.index++; }
     else { report(reader.diagnostics, at, 'invalid-markdown-structure', `Expected ${stop}`); }
     return result;
@@ -360,6 +372,11 @@ function readHeading(reader: BlockReader, token: Token): PandocLeafBlock {
     const level = /^h[1-6]$/.test(token.tag) ? Number(token.tag.slice(1)) : 0;
     if (!level) {
         report(reader.diagnostics, tokenLocation(reader.document, token), 'invalid-markdown-structure', 'Invalid heading level');
+    }
+    if (reader.document.tokens[reader.index]?.children?.some(child =>
+        child.type === 'link_open' && child.attrGet('href')?.startsWith('term:'))) {
+        report(reader.diagnostics, tokenLocation(reader.document, token), 'annotation-heading',
+            'TERM links in headings are unsupported: use a prose link below the heading to avoid moving rail markers');
     }
     const id = reader.targets.get(reader.document.path)!.tokens.get(token)!;
     return { t: 'Header', c: [level, [id, [], []], readTextBlock(reader, token)] };
@@ -386,6 +403,9 @@ function readOrderedList(reader: BlockReader, token: Token, depth: number): Pend
 }
 function readFence(reader: BlockReader, token: Token, index: number): PendingBlock[] {
     if (token.info.trim() === 'SETTINGS') { return []; }
+    if (!reader.annotationBody && /^(TERM|NOTE)(?:\s|$)/.test(token.info.trim())) {
+        return readAnnotation(reader, index);
+    }
     const part = reader.contributions.get(index);
     const language = part?.language ?? token.info.trim().split(/\s+/)[0];
     if (language.toLowerCase() === 'mermaid') {
@@ -399,6 +419,25 @@ function readFence(reader: BlockReader, token: Token, index: number): PendingBlo
     }
     if (part) { return [{ t: 'Contribution', part }]; }
     return [{ t: 'CodeBlock', c: [['', language ? [language] : [], []], token.content] }];
+}
+function readAnnotation(reader: BlockReader, index: number): PendingBlock[] {
+    const matches = (item: { at: PublicationLocation; tokenIndex: number }): boolean =>
+        item.at.path === reader.document.path && item.tokenIndex === index;
+    const term = reader.annotations.terms.find(matches);
+    const note = reader.annotations.notes.find(matches);
+    const item = term ?? note;
+    if (!item) {
+        report(reader.diagnostics, tokenLocation(reader.document, reader.document.tokens[index]),
+            'annotation-binding', 'Annotation fence has no shared annotation binding');
+        return [];
+    }
+    const tokens = parseAnnotationBody(item.body);
+    for (const token of tokens) {
+        if (token.map) { token.map = [item.at.line + 1 + token.map[0], item.at.line + 1 + token.map[1]]; }
+    }
+    const body = readBlocks({ ...reader, annotationBody: true, assets: false,
+        document: { ...reader.document, tokens }, index: 0, contributions: new Map() });
+    return [{ t: 'Div', c: [[item.target, [term ? 'lit-term' : 'lit-note'], []], body] }];
 }
 function materialize(
     pending: PendingBlock[], render: ContributionRenderer, diagnostics: GenerationDiagnostic[], asset?: AssetRenderer
@@ -443,12 +482,15 @@ export function preparePandoc(
 ): PandocPreparationResult {
     const diagnostics = project.diagnostics.map(diagnostic => ({ ...diagnostic }));
     if (diagnostics.length) { return { diagnostics }; }
+    diagnostics.push(...project.annotations.diagnostics.map(diagnostic => ({ ...diagnostic })));
+    if (diagnostics.length) { return { diagnostics }; }
     validateReferences(project, diagnostics);
     const targets = new Map(project.documents.map(document => [document.path, headingDestinations(document)]));
     const parts = new Map(project.publication.contributions.map(part => [part.target, part]));
     const pending: PendingBlock[] = project.documents.map(document => {
         const contributions = contributionIndex(document, parts, diagnostics);
-        const body = readBlocks({ document, index: 0, contributions, targets, diagnostics, assets: !!renderAsset });
+        const body = readBlocks({ document, index: 0, contributions, targets, diagnostics,
+            annotations: project.annotations, assets: !!renderAsset });
         return { t: 'Div', c: [[targets.get(document.path)!.id, [], []], body] };
     });
     if (diagnostics.length) { return { diagnostics }; }

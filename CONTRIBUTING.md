@@ -14,6 +14,12 @@ yarn esbuild
 ## Edit the book, then generate
 
 The authoritative implementations are in `literate/*.literate`.
+Keep milestone status, acceptance history and run logs in README/CONTRIBUTING,
+not in the `.literate` knowledge book. Its prose should describe the current
+semantics and invariants through focused, named snippets, not implementation
+history. For annotations, `literate/publication-annotations.literate` owns the
+shared model/parser, and `literate/publication-rail.literate` owns placement;
+publication adapter chapters own their respective rendering/compilation paths.
 `src/extension.ts`, `src/grabber.ts`, `src/engine.ts`, `src/cli.ts`,
 `src/self-hosting.ts`, `src/symbols.ts`, `src/themes.ts`, `src/output-transactions.ts`,
 and `src/mermaid-preview.js` are generated;
@@ -181,12 +187,131 @@ This proves the packaged helper without checkout dependencies, not the extension
 host UI or cancellation phases. Keep the archive hash, inputs, metadata and
 limitations with the evidence; a later archive requires a fresh run.
 
-### Next milestone
+## M6 annotation acceptance
 
-**M6 is not implemented and requires the user's choice of author-facing syntax
-before implementation.** Source-chapter design prose is design-only, not evidence
-that proposed syntax or behavior is available. Keep milestone/progress reports in
-these docs, preserving the historical acceptance sections below.
+**M6 is complete; its TERM/NOTE syntax is approved.** This does not claim M7
+completion. The [README contract](README.md#m6-terms-explanatory-notes-and-indexes)
+describes author syntax, distinct definitions/indexes/lookups/notes, body limits,
+geometry and intentional failure cases. Historical M1–M5 evidence below/above
+retains its original scope rather than becoming evidence for M6.
+
+### Shared APIs and regression boundaries
+
+Inspect `literate/publication-annotations.literate` before changing the contract:
+
+- `collectAnnotations(documents)` accepts `{ path, text, tokens }` documents and
+  returns `PublicationAnnotations`: `terms`, `notes`, `uses`, `diagnostics`.
+  `ParsedProject.annotations` exposes that model; collection also merges its
+  diagnostics into project diagnostics. This is not a new CLI `inspect` field.
+- `PublicationTerm` carries `key`, `title`, `target`, `at`, `tokenIndex`, `body`;
+  `PublicationNote` carries `target`, `number`, `at`, `tokenIndex`, `body`.
+  `PublicationTermUse` carries `key`, optional `target`, `at`, `owner`,
+  `tokenIndex`, `childIndex`, and `resolution` (`resolved`, `missing`, `ambiguous`).
+- `parseAnnotationBody(body)` returns Markdown-it tokens; the collector checks
+  the controlled subset. Parsing alone is not validation or sanitization.
+  `resolveTermHref(annotations, href)` and `termByTarget(annotations, target)`
+  return the target/term or `undefined`, never a guessed fallback.
+- Locations use zero-based lines and UTF-16 columns. Prose uses locate their
+  enclosing inline block; body uses locate the annotation fence, not an exact
+  link character. Token/child indexes select the actual parsed link. Unique TERM
+  identities derive from exact keys; NOTE identities derive from source location,
+  separately from their encounter-order numbers.
+- `publicationRail(terms, notes)` accepts `RailTerm { target, title, label }` and
+  `RailNote { target, number, body }`. Titles/bodies must already be escaped,
+  controlled LaTeX, never raw author TeX. Empty arrays return an empty preamble.
+  The adapters enforce source-body and rendered-content limits before publication;
+  the rail independently bounds declarations, identifiers and controlled text.
+
+Regressions must cover exact explicit links (not heuristic word matching), duplicate,
+missing and ambiguous keys, rejected body tokens, and intentional export rejection
+of heading term links to prevent marker replay. Keep TERM prose definitions,
+page-local deduplicated title/page lookups, Term index entries and numbered NOTE
+bodies separate. Verify root-only screen indexes, both indexes only for annotated
+projects, safe unresolved preview links, dirty-buffer navigation and unchanged
+unannotated output. Rail tests must check actual page-position convergence,
+non-overlap and stable horizontal/vertical overflow rejection, never splitting,
+shrinking or moving entries to another page to hide failure.
+
+The recorded full suite in `out/m6-tests-final.log` reports **1,245 passed,
+2 skipped, 0 failed** (1,247 tests). That run predates the user-generated,
+untracked root `publication.pdf`; do not delete or overwrite that PDF to reproduce
+an earlier repository state. This is recorded evidence, not a claim of a later
+full-suite rerun.
+
+### Real PDF acceptance
+
+The opt-in package command is:
+
+```sh
+yarn test:annotations --font-manifest /absolute/path/to/font-project/fonts.json \
+  --ulem /absolute/path/to/existing/ulem.sty
+```
+
+Its direct build-and-harness equivalent is:
+
+```sh
+yarn build:cli && python3 src/test/acceptance/portable-annotations.py \
+  --font-manifest /absolute/path/to/font-project/fonts.json \
+  --ulem /absolute/path/to/existing/ulem.sty
+```
+
+`--font-manifest` is required and uses the existing portable fixture font/license
+contract (Latin Modern Roman, Monofur Nerd Font and four-face Lilex Nerd Font).
+`--ulem` is optional when the package is installed; otherwise it exposes an
+existing local `ulem.sty` directory through `TEXINPUTS`, without installing it.
+The harness requires Python 3, Node, Pandoc, latexmk/LuaLaTeX, the publication TeX
+packages and Poppler `pdftotext`. It downloads nothing, uses trusted fixtures and
+bounds each subprocess at 240 seconds. Do not use Python `-O`: checks use asserts.
+Evidence/failures remain in a fresh ignored `out/annotations-acceptance-*` directory.
+
+`out/annotations-acceptance-a373mfig/acceptance.json` records:
+
+- Real production PDFs: **A4, 9 pages** and asymmetric **A5, 14 pages**. Both
+  have six uses and five rail entries, proving same-page term deduplication and
+  reuse on another page, with separate keys sharing a display title.
+- Relocated, unmodified LaTeX/font companions compile with the source project
+  hidden. Both geometries converge in **three passes**, within the production
+  five-pass limit, and match the production placement certificates.
+- Certificate bounds and Poppler word boxes check the 25 mm rail, 5 mm gap,
+  body/rail separation, page bounds, non-overlap, definition-page references,
+  controlled note formatting, Term index and Fragment index. Repeat exports are
+  unchanged; final fixture logs have no unresolved references, missing characters
+  or overfull boxes.
+- Default A5/20 mm fails before compilation because the reduced body is 78 mm.
+  Top/right/bottom/left 18/16/22/20 mm gives 82 mm width and succeeds.
+- Stable vertical overflow and horizontal protrusion fail with error certificates;
+  these failures and the default-A5 rejection preserve the previous PDF hash.
+
+This is bounded fixture evidence, not universal typography, Unicode or geometry
+acceptance. Inspect the PDF as well as the certificate and logs for new content.
+
+### Native preview host acceptance
+
+Build the extension first with `yarn esbuild`, then run the installed-host harness:
+
+```sh
+timeout 240s node src/test/acceptance/annotation-host-run.js
+```
+
+It requires an installed VS Code, a display and checkout test dependencies; it
+neither builds nor downloads VS Code. `M6_CODE` overrides `/usr/share/code/code`;
+`M6_CDP_PORT` overrides port 9336. It uses isolated workspace/profile directories,
+checks bundle freshness, and records the tested bundle hash. The test host disables
+the trust prompt and uses `--no-sandbox`; this is not runtime trust-rejection proof
+or a publication-browser sandbox bypass.
+
+`out/m6-host-QqwEHJ/acceptance.json` records a passing native **VS Code 1.138.0**
+run: root-only indexes, distinct keys with identical titles, prose/body term links,
+escaped unsafe note content and inert unknown terms. A label alias navigated to
+the canonical TERM declaration at line **4**; after an unsaved title edit and
+three-line insertion, navigation selected line **7** in the canonical dirty
+`TextDocument` without saving. Root index text and chapter source maps refreshed.
+
+Navigation was real, not mocked: CDP Tab/Enter followed instrumented focus on the
+preceding anchor, and CDP pointer press/release followed instrumented
+`scrollIntoView`. Focus-visible styling was checked. This is real native-preview
+navigation evidence, not physical-keyboard, screen-reader or minimum-host-version
+acceptance.
 
 ## Opt-in portable publication acceptance
 
@@ -451,9 +576,9 @@ Acceptance criteria, with their evidence and bounds:
 No further M1 task is identified within those bounds. Universal Unicode/layout
 acceptance and clean-machine compilation without prerequisites remain unproven,
 not implicitly accepted. Portable local PNG/JPEG/PDF images are covered separately
-by the image acceptance harness above; Mermaid rendering is covered by M3. A complete
-term/index or note-column layout is not implemented; a separate note-font role
-reserves styling without claiming those features.
+by the image acceptance harness above; Mermaid rendering is covered by M3. M1 did
+not implement term/index or note-column layout; its separate note-font role did
+not claim those features. M6 annotation acceptance above now covers that later work.
 
 ### Screen integration regression
 

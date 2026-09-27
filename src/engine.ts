@@ -1,7 +1,9 @@
 import MarkdownIt = require('markdown-it');
 import Token = require('markdown-it/lib/token');
 import hljs from 'highlight.js';
-import { renderScreenCode, renderScreenContribution, screenIndex } from './publication-screen';
+import { collectAnnotations, PublicationAnnotations } from './publication-annotations';
+import { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAnnotation,
+    installScreenTermLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle } from './publication-screen';
 import { defaultThemeName, getTheme, themeCss, mermaidTheme } from './themes';
 
 export interface SourceDocument { path: string; text: string; }
@@ -54,6 +56,7 @@ interface Part { content: string; location: Location; definition: Location; colu
 interface Fragment { header: Header; parts: Part[]; location: Location; }
 
 export interface ParsedProject {
+    annotations: PublicationAnnotations;
     documents: readonly ParsedDocument[];
     diagnostics: GenerationDiagnostic[];
     inspection: ProjectInspection;
@@ -325,7 +328,8 @@ function collectProject(documents: SourceDocument[], policy?: CollectionPolicy) 
         const sourceLines = sources.get(path)!.text.split(/\r\n|\r|\n/);
         if (policy) { reserve(path.replace(/\.literate$/, '.html'), { path, line: 0, column: 0 }); }
         for (const [tokenIndex, token] of (tokens.get(path) || []).entries()) {
-            if (token.type !== 'fence' || token.info.trim() === 'SETTINGS' || !token.info.includes('<<')) { continue; }
+            if (token.type !== 'fence' || token.info.trim() === 'SETTINGS'
+                || /^(TERM|NOTE)(?:\s|$)/.test(token.info.trim()) || !token.info.includes('<<')) { continue; }
             const line = token.map?.[0] || 0;
             const location = { path, line, column: Math.max(0, sourceLines[line].indexOf(token.markup)) };
             const match = fragmentHeader.exec(token.info);
@@ -468,7 +472,11 @@ function collectProject(documents: SourceDocument[], policy?: CollectionPolicy) 
         }
         return { path, source: sources.get(path)!.text, tokens: documentTokens, blocks };
     });
-    const parsed: ParsedProject = { documents: parsedDocuments, diagnostics, inspection, publication };
+    const annotations = collectAnnotations(parsedDocuments.map(document => ({
+        path: document.path, text: document.source, tokens: document.tokens
+    })));
+    diagnostics.push(...annotations.diagnostics);
+    const parsed: ParsedProject = { documents: parsedDocuments, diagnostics, inspection, publication, annotations };
     return { parsed, md, tokens, order, fragments, headers, sourceTemplates, references };
 }
 
@@ -594,9 +602,13 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
         const code = expanded.get(fragment.header.name)!.replace(/\\<</g, () => '<<');
         files.push({ path: fragment.header.output, content: substitute(sourceTemplates.get(fragment.header.name) ?? '[CODE]', { code }) });
     }
+    const annotations = collected.parsed.annotations;
+    installScreenTermLinks(md);
     md.renderer.rules.fence = (fenceTokens: Token[], index: number, _options, env) => {
         const token = fenceTokens[index];
         if (token.info.trim() === 'SETTINGS') { return ''; }
+        const annotation = screenIndex(publication, annotations).annotationLines.get(env.path)?.get(token.map?.[0] ?? -1);
+        if (annotation?.tokenIndex === index) { return renderScreenAnnotation(annotation, env.literateScreen); }
         const header = headers.get(token);
         const language = header?.language || token.info.trim().split(/\s+/)[0];
         const code = token.content.replace(/\\<</g, () => '<<');
@@ -612,9 +624,12 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
             : `<div class="codefragment">\n<div class="fragmentname">${label}</div>\n<div class="code">\n${block}\n</div>\n</div>`;
     };
     const metaAuthors = authors.split(';').map(author => `<meta name="author" content="${escape(author)}">`).join('');
-    const theme = `<style>${themeCss(getTheme(projectTheme.name)!)}</style>`;
+    const theme = `<style>${themeCss(getTheme(projectTheme.name)!)}${annotations.terms.length || annotations.notes.length ? screenStyle : ''}</style>`;
     for (const path of order) {
-        const rendered = md.renderer.render(tokens.get(path)!, md.options, { path });
+        const literateScreen = { model: publication, annotations, path, format: 'html' as const };
+        const literateUseTargets = screenTermUseAnchors(tokens.get(path)!, annotations, path);
+            const rendered = md.renderer.render(tokens.get(path)!, md.options, { path, literateScreen, literateUseTargets })
+            + renderScreenIndexes(literateScreen, order);
         const wrapper = `<div class="literate-document" data-literate-theme="${escape(projectTheme.name)}">${rendered}</div>`;
         const content = htmlTemplate.includes('[THEME]') ? wrapper : theme + wrapper;
         files.push({ path: safeRelativePath(path.replace(/\.literate$/, '.html'))!, content: substitute(htmlTemplate, { content, authors: metaAuthors, theme }) });

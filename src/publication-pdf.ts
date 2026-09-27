@@ -255,6 +255,21 @@ function checkConvergence(log: string, transcript: string): void {
         throw new Error('PDF references did not converge; inspect book.log and fix unresolved references or rerun requirements');
     }
 }
+async function checkRailCertificate(cwd: string, check: () => void): Promise<void> {
+    const source = (await readBoundedFile(path.join(cwd, 'book.tex'), maximumPdfBytes, check)).toString('utf8');
+    const preamble = source.split('\\begin{document}', 1)[0];
+    const expected = /^% literate-publication-rail-v1$/m.test(preamble);
+    let certificate: string;
+    try {
+        certificate = (await readBoundedFile(path.join(cwd, 'book.litrail'), maximumLogBytes, check)).toString('utf8');
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT' && !expected) { return; }
+        throw new Error(`PDF rail certificate missing or unreadable: ${errorMessage(error)}`);
+    }
+    if (!/^stable [a-f0-9]{32}\r?\n/.test(certificate)) {
+        throw new Error('PDF rail did not converge: book.litrail must certify stable placement');
+    }
+}
 async function buildPdf(runner: PdfProcessRunner, cwd: string,
     env: NodeJS.ProcessEnv, check: () => void): Promise<PdfCompilation> {
     const result = await runner(requestFor('latexmk', [
@@ -264,6 +279,7 @@ async function buildPdf(runner: PdfProcessRunner, cwd: string,
     if (result.code !== 0) { throw new Error(`latexmk failed (exit ${result.code}).\n${result.output}`); }
     const log = (await readBoundedFile(path.join(cwd, 'book.log'), maximumLogBytes, check)).toString('utf8');
     checkConvergence(log, result.output);
+    await checkRailCertificate(cwd, check);
     const pdf = await readBoundedFile(path.join(cwd, 'book.pdf'), maximumPdfBytes, check);
     check();
     if (pdf.length < 8 || !/^%PDF-[12]\.[0-9]/.test(pdf.subarray(0, 8).toString('ascii'))) {

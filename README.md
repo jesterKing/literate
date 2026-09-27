@@ -240,8 +240,100 @@ with warnings is not a clean-typography guarantee; inspect the channel and PDF.
 See [M5 acceptance](CONTRIBUTING.md#m5-integrated-publication-acceptance) for the
 headless, real-host and isolated-package evidence and its limits.
 
-**Next: M6 requires a user choice of author-facing syntax before implementation.**
-It is not implemented; design prose is not a shipped syntax or feature contract.
+## M6: terms, explanatory notes and indexes
+
+M6 is complete with the approved explicit author syntax. It works through the
+existing `latex`/`pdf` CLI and VS Code publication commands, generated HTML and
+Markdown preview; there is no separate annotation export command. M7 is not
+claimed complete. See [M6 acceptance](CONTRIBUTING.md#m6-annotation-acceptance)
+for recorded tests, real PDFs and native-host evidence.
+
+### Author syntax and semantics
+
+````markdown
+```TERM transaction "Output transaction"
+A transaction publishes related outputs together, or preserves the previous set.
+```
+
+See the [transaction contract](term:transaction).
+
+```NOTE
+This explanation belongs to this point in the prose.
+
+- **Important:** publication is explicit.
+- Use `check` before generating; see the [contract](term:transaction).
+```
+````
+
+Fence headers are case-sensitive: `TERM key "Display title"` or `NOTE` without
+arguments. A key matches ASCII `[A-Za-z][A-Za-z0-9_.:-]{0,99}` (1–100 characters).
+The required title is a JSON-quoted string, at most **200 Unicode code points**;
+an empty title is accepted. Trailing header whitespace is ignored. Markdown-it
+controls fence boundaries. Both bodies allow paragraphs, ordered/unordered lists,
+emphasis, strong emphasis, inline code, links and line breaks. Raw HTML, images,
+headings, blockquotes, tables, strikethrough, indented/fenced code and nested
+TERM/NOTE/Mermaid fences are rejected. Inline code is allowed; code blocks are not.
+Raw author TeX is not an escape hatch into the rail.
+
+Only explicit `[label](term:key)` links are term uses. Keys are exact and
+case-sensitive; destinations are percent-decoded once. There is no heuristic
+matching of words, labels or display titles. Different keys may share a title.
+Malformed headers/bodies report `annotation-header` / `annotation-body`;
+duplicate definitions report `annotation-duplicate`, and unresolved uses report
+`annotation-missing` or `annotation-ambiguous`, with source locations. These
+errors block publication. Tolerant preview leaves unresolved links inert rather
+than guessing. **Term links in headings intentionally fail export** with
+`annotation-heading`: moving headings into contents/running matter would replay
+rail markers. Put the link in prose below the heading instead.
+
+These are four distinct things:
+
+- A **TERM definition** remains in the prose with its title and definition body.
+- The **Term index** links to definitions; it does not relocate their bodies.
+- A **page-local term lookup** in the PDF rail contains the title and final
+  definition page, not the definition body. Repeated uses of one key on the same
+  physical page share one entry; a use on another page gets another entry.
+  Prose link labels retain their explicit wording and linked definition-page suffix.
+- A **NOTE** is a numbered explanation in source encounter order, with a marker
+  in print prose and its controlled body in the rail. It is not a term definition
+  or a term lookup. Links inside annotation bodies still resolve, but do not
+  recursively create rail markers.
+
+Annotated projects get both **Term index** and **Fragment index**. Print indexes
+link to term definitions and fragment contribution pages. HTML/preview indexes
+also link to definitions, additions and reference sites, and appear only at the
+root (`index.literate`, or the first document if absent), not on every chapter.
+Screen TERM sections and numbered NOTE asides remain in document flow; screens
+have no physical-page rail. Preview uses the existing semantic navigation route,
+including current unsaved canonical documents. Projects without TERM/NOTE
+annotations retain their previous output and geometry: no new indexes or rail.
+
+### Print geometry and failure policy
+
+Annotated books reserve a **25 mm right-hand rail plus a 5 mm gap**, always on the
+right in one-sided layout. The requested outer page margins are preserved: the
+body's right edge moves left by **30 mm** (internally its right margin increases
+by 30 mm). The reduced body must still be at least **80 × 100 mm**.
+
+- A5 with default 20 mm margins leaves `148 - 20 - 20 - 30 = 78 mm`: rejected.
+- A5 with top/right/bottom/left **18/16/22/20 mm** leaves an **82 × 170 mm** body:
+  valid geometry. Use the asymmetric example under PDF/LaTeX export below.
+- Unannotated books do not reserve the extra 30 mm.
+
+Placement uses actual shipped page positions, not estimated source positions.
+PDF publication requires both reference convergence and a stable `book.litrail`
+placement certificate. Entries stay on their reference page without overlap;
+there is no split, shrink, spill-to-another-page or other fallback. Stable vertical
+or horizontal rail overflow fails publication, as does non-convergence, preserving
+the previous PDF. A valid page size alone does not guarantee that its notes fit.
+
+Export allows at most **1,000 terms and 1,000 notes**. Each source annotation body
+and each controlled rail text value is limited to **131,072 UTF-16 code units**;
+aggregate source/declaration and rendered declaration budgets are **2,097,152
+code units**. These are the implementation's nominal “128 KiB” / “2 MiB” limits,
+measured by JavaScript string length, **not UTF-8 byte limits**. Encoded identifiers
+also consume declaration budgets. The rail additionally bounds use markers at
+10,000; exceeding a limit fails rather than truncating content.
 
 ## M4: explicit PDF book compilation
 
@@ -672,8 +764,9 @@ merge advances monotonically, and snapshot indexes avoid per-use model scans.
 All 70 palettes,
 ordinary fences, source-token maps and Mermaid handling remain in place.
 Screen comments retain the existing hiding policy, but genuine references inside
-comments remain visible and navigable. The fragment index and heading-ID parity
-are deferred; M2 does not redesign the website or add Mermaid export assets.
+comments remain visible and navigable. M2 deferred the fragment index; M6 now
+adds it for annotated projects only. Heading-ID parity remains deferred; M2 did
+not redesign the website or add Mermaid export assets.
 
 Automated tests use the real engine and activated preview plugin, including
 independent destination/label assertions, cached tokens, unsaved buffers, remote

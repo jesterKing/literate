@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Shared publication annotations</h1>
+<p>Annotations are prose-local fenced blocks, not fragment contributions. A TERM
+header is exactly <code>TERM key &quot;Display title&quot;</code>; NOTE has no arguments. Headers are
+case-sensitive, with whitespace separating fields. Keys match ASCII
+<code>[A-Za-z][A-Za-z0-9_.:-]{0,99}</code>. The title is a required JSON string of at most
+200 Unicode code points (including an empty string). Trailing header whitespace
+is ignored. Markdown-it determines fence boundaries, including unclosed fences.
+TERM bodies stay in source prose; NOTE bodies belong in the publication rail.
+This module supplies data only, without choosing HTML or print presentation.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200061006e006e006f0074006100740069006f006e0073002e002a-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0061006e006e006f0074006100740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200061006e006e006f0074006100740069006f006e0073002e002a"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200061006e006e006f0074006100740069006f006e0073002e002a" data-literate-target="f-007000750062006c00690063006100740069006f006e00200061006e006e006f0074006100740069006f006e0073002e002a" aria-label="Definition of publication annotations.*">&lt;&lt;publication annotations.*&gt;&gt;= src/publication-annotations.ts $</a></div>
+<div class="code">
+<pre><code><a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e00200063006f006e007400720061006300740073" data-literate-target="f-0061006e006e006f0074006100740069006f006e00200063006f006e007400720061006300740073" aria-label="Definition of annotation contracts">&lt;&lt;annotation contracts&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e00200062006f00640079002000700061007200730069006e0067" data-literate-target="f-0061006e006e006f0074006100740069006f006e00200062006f00640079002000700061007200730069006e0067" aria-label="Definition of annotation body parsing">&lt;&lt;annotation body parsing&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e0020006900640065006e00740069007400690065007300200061006e0064002000680072006500660073" data-literate-target="f-0061006e006e006f0074006100740069006f006e0020006900640065006e00740069007400690065007300200061006e0064002000680072006500660073" aria-label="Definition of annotation identities and hrefs">&lt;&lt;annotation identities and hrefs&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e00200063006f006c006c0065006300740069006f006e" data-literate-target="f-0061006e006e006f0074006100740069006f006e00200063006f006c006c0065006300740069006f006e" aria-label="Definition of annotation collection">&lt;&lt;annotation collection&gt;&gt;</a>
+</code></pre>
+
+</div>
+</div><h2>Renderer-neutral contract</h2>
+<p>Locations use zero-based source lines and UTF-16 columns. Document uses point to
+the enclosing inline block; body uses point to the enclosing annotation fence.
+A use's tokenIndex selects an inline token in the document tokens or in
+<code>parseAnnotationBody(owner.body)</code>; childIndex selects that token's link_open child.
+This intentionally does not claim character-exact Markdown link locations.
+Definition tokenIndex selects the original fence. Owners are document paths for
+ordinary prose and annotation targets for body prose. Lists and headings in
+ordinary prose are included. Inline code, code blocks, and images are not uses.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0061006e006e006f0074006100740069006f006e00200063006f006e007400720061006300740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0061006e006e006f0074006100740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-0061006e006e006f0074006100740069006f006e00200063006f006e007400720061006300740073"></span><a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e00200063006f006e007400720061006300740073" data-literate-target="f-0061006e006e006f0074006100740069006f006e00200063006f006e007400720061006300740073" aria-label="Definition of annotation contracts">&lt;&lt;annotation contracts&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> <span class="hljs-title">MarkdownIt</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">'markdown-it'</span>);
+<span class="hljs-keyword">import</span> <span class="hljs-title">Token</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">'markdown-it/lib/token'</span>);
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">GenerationDiagnostic</span> <span class="hljs-keyword">as</span> <span class="hljs-title">Diagnostic</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
+
+<span class="hljs-keyword">type</span> <span class="hljs-title">Location</span> = { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">line</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">column</span>: <span class="hljs-built_in">number</span> };
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationTerm</span> {
+    <span class="hljs-attr">key</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">title</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">at</span>: <span class="hljs-title">Location</span>; <span class="hljs-attr">tokenIndex</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">body</span>: <span class="hljs-built_in">string</span>;
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationNote</span> {
+    <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">number</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">at</span>: <span class="hljs-title">Location</span>; <span class="hljs-attr">tokenIndex</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">body</span>: <span class="hljs-built_in">string</span>;
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationTermUse</span> {
+    <span class="hljs-attr">key</span>: <span class="hljs-built_in">string</span>; target?: <span class="hljs-built_in">string</span>; <span class="hljs-attr">at</span>: <span class="hljs-title">Location</span>; <span class="hljs-attr">owner</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">tokenIndex</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">childIndex</span>: <span class="hljs-built_in">number</span>;
+    <span class="hljs-attr">resolution</span>: <span class="hljs-string">'resolved'</span> | <span class="hljs-string">'missing'</span> | <span class="hljs-string">'ambiguous'</span>;
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationAnnotations</span> {
+    <span class="hljs-attr">terms</span>: <span class="hljs-title">PublicationTerm</span>[]; <span class="hljs-attr">notes</span>: <span class="hljs-title">PublicationNote</span>[];
+    <span class="hljs-attr">uses</span>: <span class="hljs-title">PublicationTermUse</span>[]; <span class="hljs-attr">diagnostics</span>: <span class="hljs-title">Diagnostic</span>[];
+}
+</code></pre>
+
+</div>
+</div><h2>One deterministic body parser</h2>
+<p>Bodies allow paragraphs, ordered and unordered lists, emphasis, strong emphasis,
+inline code, links, text and line breaks. All other token kinds are rejected,
+including headings, blockquotes, tables, strikethrough, images, indented code,
+code fences (including nested TERM/NOTE and Mermaid), and raw HTML. HTML parsing
+is enabled only to recognize and diagnose HTML, not to authorize rendering it.
+Escaped HTML and HTML inside inline code remain ordinary text/code. The parser
+returns tokens even for invalid bodies; the collector validates those same tokens.
+Adapters must honor diagnostics and never render rejected HTML unsanitized.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0061006e006e006f0074006100740069006f006e00200062006f00640079002000700061007200730069006e0067-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0061006e006e006f0074006100740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-0061006e006e006f0074006100740069006f006e00200062006f00640079002000700061007200730069006e0067"></span><a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e00200062006f00640079002000700061007200730069006e0067" data-literate-target="f-0061006e006e006f0074006100740069006f006e00200062006f00640079002000700061007200730069006e0067" aria-label="Definition of annotation body parsing">&lt;&lt;annotation body parsing&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">parseAnnotationBody</span>(<span class="hljs-params">body: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">Token</span>[] {
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> <span class="hljs-title">MarkdownIt</span>({ <span class="hljs-attr">html</span>: <span class="hljs-literal">true</span> }).<span class="hljs-title">parse</span>(body, {});
+}
+<span class="hljs-keyword">const</span> allowedBodyTokens = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>([
+    <span class="hljs-string">'paragraph_open'</span>, <span class="hljs-string">'paragraph_close'</span>, <span class="hljs-string">'inline'</span>, <span class="hljs-string">'text'</span>, <span class="hljs-string">'softbreak'</span>, <span class="hljs-string">'hardbreak'</span>,
+    <span class="hljs-string">'bullet_list_open'</span>, <span class="hljs-string">'bullet_list_close'</span>, <span class="hljs-string">'ordered_list_open'</span>, <span class="hljs-string">'ordered_list_close'</span>,
+    <span class="hljs-string">'list_item_open'</span>, <span class="hljs-string">'list_item_close'</span>, <span class="hljs-string">'em_open'</span>, <span class="hljs-string">'em_close'</span>, <span class="hljs-string">'strong_open'</span>,
+    <span class="hljs-string">'strong_close'</span>, <span class="hljs-string">'code_inline'</span>, <span class="hljs-string">'link_open'</span>, <span class="hljs-string">'link_close'</span>
+]);
+<span class="hljs-keyword">function</span> <span class="hljs-title">invalidBodyToken</span>(<span class="hljs-params">tokens: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> Token[]</span>): <span class="hljs-title">Token</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> tokens) {
+        <span class="hljs-keyword">if</span> (!allowedBodyTokens.<span class="hljs-title">has</span>(token.<span class="hljs-property">type</span>)) { <span class="hljs-keyword">return</span> token; }
+        <span class="hljs-keyword">const</span> invalid = <span class="hljs-title">invalidBodyToken</span>(token.<span class="hljs-property">children</span> || []);
+        <span class="hljs-keyword">if</span> (invalid) { <span class="hljs-keyword">return</span> invalid; }
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
+}
+</code></pre>
+
+</div>
+</div><h2>Stable identities and safe lookup</h2>
+<p>Targets have distinct generated namespaces and hex-encoded UTF-16 components,
+never author-controlled raw identifiers. TERM targets derive from the key;
+duplicate definitions receive location suffixes so preview targets remain unique.
+NOTE targets derive from path and fence line/column, not the encounter number.
+Numbers are one-based in caller document/fence order. Keys are case-sensitive.
+Percent-encoded term destinations are decoded exactly once; malformed encodings
+and invalid keys cannot resolve. Missing and ambiguous links return undefined,
+never the original href. termByTarget likewise returns undefined for unknown IDs.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0061006e006e006f0074006100740069006f006e0020006900640065006e00740069007400690065007300200061006e0064002000680072006500660073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0061006e006e006f0074006100740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-0061006e006e006f0074006100740069006f006e0020006900640065006e00740069007400690065007300200061006e0064002000680072006500660073"></span><a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e0020006900640065006e00740069007400690065007300200061006e0064002000680072006500660073" data-literate-target="f-0061006e006e006f0074006100740069006f006e0020006900640065006e00740069007400690065007300200061006e0064002000680072006500660073" aria-label="Definition of annotation identities and hrefs">&lt;&lt;annotation identities and hrefs&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> keyPattern = <span class="hljs-regexp">/^</span><span class="hljs-regexp">[A-Za-z]</span><span class="hljs-regexp">[A-Za-z0-9_.:-]</span><span class="hljs-regexp">{0,99}$/</span>;
+<span class="hljs-keyword">function</span> <span class="hljs-title">encode</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">return</span> value.<span class="hljs-title">split</span>(<span class="hljs-string">''</span>).<span class="hljs-title">map</span>(<span class="hljs-params">char</span><span class="hljs-function"> =&gt;</span> char.<span class="hljs-title">charCodeAt</span>(<span class="hljs-number">0</span>).<span class="hljs-title">toString</span>(<span class="hljs-number">16</span>).<span class="hljs-title">padStart</span>(<span class="hljs-number">4</span>, <span class="hljs-string">'0'</span>)).<span class="hljs-title">join</span>(<span class="hljs-string">''</span>);
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title">termKey</span>(<span class="hljs-params">href: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">if</span> (!href.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'term:'</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">try</span> { <span class="hljs-keyword">return</span> <span class="hljs-built_in">decodeURIComponent</span>(href.<span class="hljs-title">slice</span>(<span class="hljs-number">5</span>)); } <span class="hljs-keyword">catch</span> { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">resolveTermHref</span>(<span class="hljs-params">annotations: PublicationAnnotations, href: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">const</span> key = <span class="hljs-title">termKey</span>(href);
+    <span class="hljs-keyword">if</span> (key === <span class="hljs-literal">undefined</span> || !keyPattern.<span class="hljs-title">test</span>(key)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">const</span> terms = annotations.<span class="hljs-property">terms</span>.<span class="hljs-title">filter</span>(<span class="hljs-params">term</span><span class="hljs-function"> =&gt;</span> term.<span class="hljs-property">key</span> === key);
+    <span class="hljs-keyword">return</span> terms.<span class="hljs-property">length</span> === <span class="hljs-number">1</span> ? terms[<span class="hljs-number">0</span>].<span class="hljs-property">target</span> : <span class="hljs-literal">undefined</span>;
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">termByTarget</span>(<span class="hljs-params">annotations: PublicationAnnotations, target: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">PublicationTerm</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">return</span> annotations.<span class="hljs-property">terms</span>.<span class="hljs-title">find</span>(<span class="hljs-params">term</span><span class="hljs-function"> =&gt;</span> term.<span class="hljs-property">target</span> === target);
+}
+</code></pre>
+
+</div>
+</div><h2>Collection before resolution</h2>
+<p>Collection is pure with respect to caller tokens. Invalid headers produce no
+annotation; valid headers retain their bodies even when body validation fails.
+Every duplicate definition is diagnosed and all uses of that key are ambiguous.
+Forward and cross-document uses resolve after collection. Unknown or malformed
+term destinations are missing uses and diagnostic, so strict adapters can reject
+them while previews retain occurrence metadata. Diagnostics have stable codes.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0061006e006e006f0074006100740069006f006e00200063006f006c006c0065006300740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0061006e006e006f0074006100740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-0061006e006e006f0074006100740069006f006e00200063006f006c006c0065006300740069006f006e"></span><a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e00200063006f006c006c0065006300740069006f006e" data-literate-target="f-0061006e006e006f0074006100740069006f006e00200063006f006c006c0065006300740069006f006e" aria-label="Definition of annotation collection">&lt;&lt;annotation collection&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">collectAnnotations</span>(<span class="hljs-params">
+    documents: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> </span><span class="hljs-params">{ path: </span><span class="hljs-built_in">string</span><span class="hljs-params">; text: </span><span class="hljs-built_in">string</span><span class="hljs-params">; tokens: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> Token[] }</span><span class="hljs-params">[]
+</span>): <span class="hljs-title">PublicationAnnotations</span> {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">result</span>: <span class="hljs-title">PublicationAnnotations</span> = { <span class="hljs-attr">terms</span>: [], <span class="hljs-attr">notes</span>: [], <span class="hljs-attr">uses</span>: [], <span class="hljs-attr">diagnostics</span>: [] };
+    <span class="hljs-keyword">const</span> report = (<span class="hljs-attr">at</span>: <span class="hljs-title">Location</span>, <span class="hljs-attr">code</span>: <span class="hljs-built_in">string</span>, <span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+        result.<span class="hljs-property">diagnostics</span>.<span class="hljs-title">push</span>({ ...at, code, message });
+    };
+    <a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e00200069006e006c0069006e006500200063006f006c006c0065006300740069006f006e" data-literate-target="f-0061006e006e006f0074006100740069006f006e00200069006e006c0069006e006500200063006f006c006c0065006300740069006f006e" aria-label="Definition of annotation inline collection">&lt;&lt;annotation inline collection&gt;&gt;</a>
+    <a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e002000660065006e0063006500200063006f006c006c0065006300740069006f006e" data-literate-target="f-0061006e006e006f0074006100740069006f006e002000660065006e0063006500200063006f006c006c0065006300740069006f006e" aria-label="Definition of annotation fence collection">&lt;&lt;annotation fence collection&gt;&gt;</a>
+    <a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e002000660069006e0061006c0020007200650073006f006c007500740069006f006e" data-literate-target="f-0061006e006e006f0074006100740069006f006e002000660069006e0061006c0020007200650073006f006c007500740069006f006e" aria-label="Definition of annotation final resolution">&lt;&lt;annotation final resolution&gt;&gt;</a>
+    <span class="hljs-keyword">return</span> result;
+}
+</code></pre>
+
+</div>
+</div><p>Markdown-it emits list bodies as a flat block-token stream with inline children.
+Iterating every inline token handles arbitrary list nesting without inventing
+indexes or scanning raw Markdown. Image alt children are deliberately excluded.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0061006e006e006f0074006100740069006f006e00200069006e006c0069006e006500200063006f006c006c0065006300740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0061006e006e006f0074006100740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-0061006e006e006f0074006100740069006f006e00200069006e006c0069006e006500200063006f006c006c0065006300740069006f006e"></span><a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e00200069006e006c0069006e006500200063006f006c006c0065006300740069006f006e" data-literate-target="f-0061006e006e006f0074006100740069006f006e00200069006e006c0069006e006500200063006f006c006c0065006300740069006f006e" aria-label="Definition of annotation inline collection">&lt;&lt;annotation inline collection&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">const</span> collectUses = (<span class="hljs-attr">tokens</span>: <span class="hljs-keyword">readonly</span> <span class="hljs-title">Token</span>[], <span class="hljs-attr">owner</span>: <span class="hljs-built_in">string</span>,
+        <span class="hljs-attr">location</span>: <span class="hljs-function">(</span><span class="hljs-params">token: Token</span><span class="hljs-function">) =&gt;</span> <span class="hljs-title">Location</span>, tokenOffset = <span class="hljs-number">0</span>): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+        tokens.<span class="hljs-title">forEach</span>(<span class="hljs-function">(</span><span class="hljs-params">token, tokenIndex</span><span class="hljs-function">) =&gt;</span> {
+            <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> !== <span class="hljs-string">'inline'</span>) { <span class="hljs-keyword">return</span>; }
+            (token.<span class="hljs-property">children</span> || []).<span class="hljs-title">forEach</span>(<span class="hljs-function">(</span><span class="hljs-params">child, childIndex</span><span class="hljs-function">) =&gt;</span> {
+                <span class="hljs-keyword">const</span> href = child.<span class="hljs-property">type</span> === <span class="hljs-string">'link_open'</span> ? child.<span class="hljs-title">attrGet</span>(<span class="hljs-string">'href'</span>) : <span class="hljs-literal">null</span>;
+                <span class="hljs-keyword">if</span> (!href?.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'term:'</span>)) { <span class="hljs-keyword">return</span>; }
+                result.<span class="hljs-property">uses</span>.<span class="hljs-title">push</span>({ <span class="hljs-attr">key</span>: <span class="hljs-title">termKey</span>(href) ?? href.<span class="hljs-title">slice</span>(<span class="hljs-number">5</span>), <span class="hljs-attr">at</span>: <span class="hljs-title">location</span>(token),
+                    owner, <span class="hljs-attr">tokenIndex</span>: tokenIndex + tokenOffset, childIndex, <span class="hljs-attr">resolution</span>: <span class="hljs-string">'missing'</span> });
+            });
+        });
+    };
+</code></pre>
+
+</div>
+</div><p>Fence recognition reserves only the exact uppercase TERM and NOTE words followed
+by whitespace or end-of-header. Ordinary language fences are unchanged, including
+TERM-like language names. The original Markdown-normalized fence content is body.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0061006e006e006f0074006100740069006f006e002000660065006e0063006500200063006f006c006c0065006300740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0061006e006e006f0074006100740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-0061006e006e006f0074006100740069006f006e002000660065006e0063006500200063006f006c006c0065006300740069006f006e"></span><a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e002000660065006e0063006500200063006f006c006c0065006300740069006f006e" data-literate-target="f-0061006e006e006f0074006100740069006f006e002000660065006e0063006500200063006f006c006c0065006300740069006f006e" aria-label="Definition of annotation fence collection">&lt;&lt;annotation fence collection&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> <span class="hljs-variable">document</span> <span class="hljs-keyword">of</span> documents) {
+        <span class="hljs-keyword">const</span> lines = <span class="hljs-variable">document</span>.<span class="hljs-property">text</span>.<span class="hljs-title">split</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">|</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">|</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">/</span>);
+        <span class="hljs-keyword">const</span> location = (<span class="hljs-attr">token</span>: <span class="hljs-title">Token</span>): <span class="hljs-params">Location</span><span class="hljs-function"> =&gt;</span> ({ <span class="hljs-attr">path</span>: <span class="hljs-variable">document</span>.<span class="hljs-property">path</span>,
+            <span class="hljs-attr">line</span>: token.<span class="hljs-property">map</span>?.[<span class="hljs-number">0</span>] ?? <span class="hljs-number">0</span>, <span class="hljs-attr">column</span>: token.<span class="hljs-property">type</span> === <span class="hljs-string">'fence'</span>
+                ? <span class="hljs-title">Math</span>.<span class="hljs-title">max</span>(<span class="hljs-number">0</span>, (lines[token.<span class="hljs-property">map</span>?.[<span class="hljs-number">0</span>] ?? <span class="hljs-number">0</span>] || <span class="hljs-string">''</span>).<span class="hljs-title">indexOf</span>(token.<span class="hljs-property">markup</span>)) : <span class="hljs-number">0</span> });
+        <span class="hljs-variable">document</span>.<span class="hljs-property">tokens</span>.<span class="hljs-title">forEach</span>(<span class="hljs-function">(</span><span class="hljs-params">token, tokenIndex</span><span class="hljs-function">) =&gt;</span> {
+            <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> === <span class="hljs-string">'inline'</span>) {
+                
+                <span class="hljs-title">collectUses</span>([token], <span class="hljs-variable">document</span>.<span class="hljs-property">path</span>, location, tokenIndex);
+            }
+            <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> !== <span class="hljs-string">'fence'</span> || !<span class="hljs-regexp">/^(TERM|NOTE)(?:</span><span class="hljs-regexp">\s</span><span class="hljs-regexp">|$)/</span>.<span class="hljs-title">test</span>(token.<span class="hljs-property">info</span>.<span class="hljs-title">trim</span>())) { <span class="hljs-keyword">return</span>; }
+            <span class="hljs-keyword">const</span> header = token.<span class="hljs-property">info</span>.<span class="hljs-title">trim</span>();
+            <span class="hljs-keyword">const</span> at = <span class="hljs-title">location</span>(token);
+            <span class="hljs-keyword">const</span> body = token.<span class="hljs-property">content</span>;
+            <span class="hljs-keyword">let</span> <span class="hljs-attr">annotation</span>: <span class="hljs-title">PublicationTerm</span> | <span class="hljs-title">PublicationNote</span>;
+            <a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e002000680065006100640065007200200061006300630065007000740061006e00630065" data-literate-target="f-0061006e006e006f0074006100740069006f006e002000680065006100640065007200200061006300630065007000740061006e00630065" aria-label="Definition of annotation header acceptance">&lt;&lt;annotation header acceptance&gt;&gt;</a>
+            <span class="hljs-keyword">const</span> bodyTokens = <span class="hljs-title">parseAnnotationBody</span>(body);
+            <span class="hljs-keyword">const</span> invalid = <span class="hljs-title">invalidBodyToken</span>(bodyTokens);
+            <span class="hljs-keyword">if</span> (invalid) { <span class="hljs-title">report</span>(at, <span class="hljs-string">'annotation-body'</span>, <span class="hljs-string">`Unsupported annotation body token: </span><span class="hljs-subst">${invalid.</span><span class="hljs-keyword">type</span><span class="hljs-subst">}</span><span class="hljs-string">`</span>); }
+            <span class="hljs-title">collectUses</span>(bodyTokens, annotation.<span class="hljs-property">target</span>, <span class="hljs-function">() =&gt;</span> at);
+        });
+    }
+</code></pre>
+
+</div>
+</div><p>Required titles are parsed as JSON, rather than unescaping with a second grammar.
+Duplicate target suffixes are assigned after all definitions are known; body use
+owners are updated together with the corresponding target.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0061006e006e006f0074006100740069006f006e002000680065006100640065007200200061006300630065007000740061006e00630065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0061006e006e006f0074006100740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-0061006e006e006f0074006100740069006f006e002000680065006100640065007200200061006300630065007000740061006e00630065"></span><a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e002000680065006100640065007200200061006300630065007000740061006e00630065" data-literate-target="f-0061006e006e006f0074006100740069006f006e002000680065006100640065007200200061006300630065007000740061006e00630065" aria-label="Definition of annotation header acceptance">&lt;&lt;annotation header acceptance&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>            <span class="hljs-keyword">if</span> (header === <span class="hljs-string">'NOTE'</span>) {
+                annotation = { <span class="hljs-attr">target</span>: <span class="hljs-string">`annotation-note-</span><span class="hljs-subst">${encode(</span><span class="hljs-variable">document</span><span class="hljs-subst">.path)}</span><span class="hljs-string">-</span><span class="hljs-subst">${at.line}</span><span class="hljs-string">-</span><span class="hljs-subst">${at.column}</span><span class="hljs-string">`</span>,
+                    <span class="hljs-attr">number</span>: result.<span class="hljs-property">notes</span>.<span class="hljs-property">length</span> + <span class="hljs-number">1</span>, at, tokenIndex, body };
+                result.<span class="hljs-property">notes</span>.<span class="hljs-title">push</span>(annotation);
+            } <span class="hljs-keyword">else</span> {
+                <span class="hljs-keyword">const</span> match = <span class="hljs-regexp">/^TERM</span><span class="hljs-regexp">\s</span><span class="hljs-regexp">+(</span><span class="hljs-regexp">[A-Za-z]</span><span class="hljs-regexp">[A-Za-z0-9_.:-]</span><span class="hljs-regexp">{0,99})</span><span class="hljs-regexp">\s</span><span class="hljs-regexp">+(&quot;(?:</span><span class="hljs-regexp">[^&quot;</span><span class="hljs-regexp">\\</span><span class="hljs-regexp">]</span><span class="hljs-regexp">|</span><span class="hljs-regexp">\\</span><span class="hljs-regexp">.)*&quot;)$/</span>.<span class="hljs-title">exec</span>(header);
+                <span class="hljs-keyword">let</span> <span class="hljs-attr">title</span>: <span class="hljs-built_in">unknown</span>;
+                <span class="hljs-keyword">try</span> { title = match ? <span class="hljs-title">JSON</span>.<span class="hljs-title">parse</span>(match[<span class="hljs-number">2</span>]) : <span class="hljs-literal">undefined</span>; } <span class="hljs-keyword">catch</span> { title = <span class="hljs-literal">undefined</span>; }
+                <span class="hljs-keyword">if</span> (!match || <span class="hljs-keyword">typeof</span> title !== <span class="hljs-string">'string'</span> || [...title].<span class="hljs-property">length</span> &gt; <span class="hljs-number">200</span>) {
+                    <span class="hljs-title">report</span>(at, <span class="hljs-string">'annotation-header'</span>, <span class="hljs-string">'Expected TERM key &quot;title&quot; (JSON string, at most 200 code points) or NOTE'</span>);
+                    <span class="hljs-keyword">return</span>;
+                }
+                <span class="hljs-keyword">const</span> base = <span class="hljs-string">`annotation-term-</span><span class="hljs-subst">${encode(match[</span><span class="hljs-number">1</span><span class="hljs-subst">])}</span><span class="hljs-string">`</span>;
+                annotation = { <span class="hljs-attr">key</span>: match[<span class="hljs-number">1</span>], title, <span class="hljs-attr">target</span>: <span class="hljs-string">`</span><span class="hljs-subst">${base}</span><span class="hljs-string">-</span><span class="hljs-subst">${encode(</span><span class="hljs-variable">document</span><span class="hljs-subst">.path)}</span><span class="hljs-string">-</span><span class="hljs-subst">${at.line}</span><span class="hljs-string">-</span><span class="hljs-subst">${at.column}</span><span class="hljs-string">`</span>,
+                    at, tokenIndex, body };
+                result.<span class="hljs-property">terms</span>.<span class="hljs-title">push</span>(annotation);
+            }
+</code></pre>
+
+</div>
+</div><p>The temporary location-qualified term targets distinguish duplicate body owners.
+Unique terms shed that suffix, giving references an identity stable across prose
+edits and document moves. Duplicate definitions remain individually addressable,
+but never become a successful key resolution.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0061006e006e006f0074006100740069006f006e002000660069006e0061006c0020007200650073006f006c007500740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0061006e006e006f0074006100740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-0061006e006e006f0074006100740069006f006e002000660069006e0061006c0020007200650073006f006c007500740069006f006e"></span><a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e002000660069006e0061006c0020007200650073006f006c007500740069006f006e" data-literate-target="f-0061006e006e006f0074006100740069006f006e002000660069006e0061006c0020007200650073006f006c007500740069006f006e" aria-label="Definition of annotation final resolution">&lt;&lt;annotation final resolution&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">const</span> byKey = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">PublicationTerm</span>[]&gt;();
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> term <span class="hljs-keyword">of</span> result.<span class="hljs-property">terms</span>) { byKey.<span class="hljs-title">set</span>(term.<span class="hljs-property">key</span>, [...(byKey.<span class="hljs-title">get</span>(term.<span class="hljs-property">key</span>) || []), term]); }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> term <span class="hljs-keyword">of</span> result.<span class="hljs-property">terms</span>) {
+        <span class="hljs-keyword">if</span> (byKey.<span class="hljs-title">get</span>(term.<span class="hljs-property">key</span>)!.<span class="hljs-property">length</span> &gt; <span class="hljs-number">1</span>) {
+            <span class="hljs-title">report</span>(term.<span class="hljs-property">at</span>, <span class="hljs-string">'annotation-duplicate'</span>, <span class="hljs-string">`Duplicate TERM key: </span><span class="hljs-subst">${term.key}</span><span class="hljs-string">`</span>);
+        } <span class="hljs-keyword">else</span> {
+            <span class="hljs-keyword">const</span> target = <span class="hljs-string">`annotation-term-</span><span class="hljs-subst">${encode(term.key)}</span><span class="hljs-string">`</span>;
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> use <span class="hljs-keyword">of</span> result.<span class="hljs-property">uses</span>) { <span class="hljs-keyword">if</span> (use.<span class="hljs-property">owner</span> === term.<span class="hljs-property">target</span>) { use.<span class="hljs-property">owner</span> = target; } }
+            term.<span class="hljs-property">target</span> = target;
+        }
+    }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> use <span class="hljs-keyword">of</span> result.<span class="hljs-property">uses</span>) {
+        <span class="hljs-keyword">const</span> terms = keyPattern.<span class="hljs-title">test</span>(use.<span class="hljs-property">key</span>) ? byKey.<span class="hljs-title">get</span>(use.<span class="hljs-property">key</span>) || [] : [];
+        use.<span class="hljs-property">resolution</span> = terms.<span class="hljs-property">length</span> === <span class="hljs-number">1</span> ? <span class="hljs-string">'resolved'</span> : terms.<span class="hljs-property">length</span> &gt; <span class="hljs-number">1</span> ? <span class="hljs-string">'ambiguous'</span> : <span class="hljs-string">'missing'</span>;
+        <span class="hljs-keyword">if</span> (use.<span class="hljs-property">resolution</span> === <span class="hljs-string">'resolved'</span>) { use.<span class="hljs-property">target</span> = terms[<span class="hljs-number">0</span>].<span class="hljs-property">target</span>; }
+        <span class="hljs-keyword">else</span> { <span class="hljs-title">report</span>(use.<span class="hljs-property">at</span>, <span class="hljs-string">`annotation-</span><span class="hljs-subst">${use.resolution}</span><span class="hljs-string">`</span>, <span class="hljs-string">`</span><span class="hljs-subst">${use.resolution}</span><span class="hljs-string"> TERM use: </span><span class="hljs-subst">${use.key}</span><span class="hljs-string">`</span>); }
+    }
+</code></pre>
+
+</div>
+</div></div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

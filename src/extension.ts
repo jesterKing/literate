@@ -20,7 +20,8 @@ import { randomBytes } from 'crypto';
 import { parseProject, discoveryExcludedDirectories, generateProject, resolveProjectTheme, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection } from './engine';
 import { collectFragmentOccurrences, planFragmentRename, FragmentOccurrence } from './symbols';
 import { defaultThemeName } from './themes';
-import { renderScreenCode, renderScreenContribution, screenIndex } from './publication-screen';
+import { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAnnotation,
+  installScreenTermLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle } from './publication-screen';
 import { registerPublicationCommands } from './publication-extension';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');
@@ -310,16 +311,22 @@ function previewThemeName(documents: SourceDocument[]): string {
 }
 
 function installPreviewDocument(md: MarkdownIt, repository: FragmentRepository, navigation: PreviewNavigation): void {
+  installScreenTermLinks(md);
   const sources = new WeakMap<Token[], string>();
   md.core.ruler.before('normalize', 'literate_preview_source', state => { sources.set(state.tokens, state.src); });
   const originalRender = md.renderer.render;
   md.renderer.render = function (tokens, options, env) {
     env = env || {};
     const snapshot = repository.getPreviewProject(env.currentDocument, sources.get(tokens));
+    const destination = (target: string) => navigation.destination(env.currentDocument, snapshot, target);
+    const literateScreen = { model: snapshot.publication, annotations: snapshot.annotations,
+      path: snapshot.path, format: 'preview' as const, destination };
     const renderEnv = { ...env, literatePublication: snapshot.publication, literatePath: snapshot.path,
-          literateTokens: snapshot.tokens,
-                    literateDestination: (target: string) => navigation.destination(env.currentDocument, snapshot.publication, target) };
-    const body = originalRender.call(this, tokens, options, renderEnv);
+      literateTokens: snapshot.tokens, literateDestination: destination, literateScreen,
+            literateUseTargets: screenTermUseAnchors(tokens, snapshot.annotations, snapshot.path) };
+    const style = snapshot.annotations.terms.length || snapshot.annotations.notes.length ? `<style>${screenStyle}</style>` : '';
+    const body = style + originalRender.call(this, tokens, options, renderEnv)
+      + renderScreenIndexes(literateScreen, snapshot.paths);
     const theme = snapshot.theme;
     return `<div class="literate-document" data-literate-theme="${md.utils.escapeHtml(theme)}">${body}</div>`;
   };
@@ -329,6 +336,13 @@ function installPreviewFences(md: MarkdownIt): void {
   const originalFence = md.renderer.rules.fence;
   md.renderer.rules.fence = (tokens, idx, options, env, slf) => {
     const token = tokens[idx];
+    const context = env?.literateScreen;
+    const annotation = context && screenIndex(context.model, context.annotations).annotationLines
+      .get(context.path)?.get(token.map?.[0] ?? -1);
+    if (annotation && annotation.body === token.content
+      && env.literateTokens?.[annotation.tokenIndex]?.info === token.info) {
+      return renderScreenAnnotation(annotation, context);
+    }
     if (token.info.includes('SETTINGS')) { return ''; }
     if (token.info.trim() === 'mermaid') {
       const line = token.map ? ` data-line="${token.map[0]}"` : '';
@@ -387,7 +401,7 @@ class PreviewNavigation implements vscode.UriHandler, vscode.Disposable {
   private expiry: ReturnType<typeof setTimeout> | undefined;
   private expiryAt = Infinity;
   private readonly membership = vscode.workspace.onDidChangeWorkspaceFolders(() => this.invalidateMembership());
-  destination(document: vscode.Uri | undefined, model: ReturnType<typeof parseProject>['publication'], target: string) {
+  destination(document: vscode.Uri | undefined, model: Pick<ReturnType<typeof parseProject>, 'publication' | 'annotations'>, target: string) {
     const folder = document && vscode.workspace.getWorkspaceFolder(document);
     if (!folder || !this.allowed(folder) || !previewTarget(model, target)) { return undefined; }
     const key = JSON.stringify([folder.uri.toString(), target]);
@@ -500,9 +514,8 @@ class PreviewNavigation implements vscode.UriHandler, vscode.Disposable {
     this.entries.clear(); this.keys.clear(); this.pending.length = 0;
   }
 }
-function previewTarget(model: ReturnType<typeof parseProject>['publication'], target: string) {
-  const index = screenIndex(model);
-  return index.parts.get(target) || index.parts.get(index.families.get(target)?.contributions[0] || '');
+function previewTarget(model: Pick<ReturnType<typeof parseProject>, 'publication' | 'annotations'>, target: string) {
+  return screenIndex(model.publication, model.annotations).targets.get(target);
 }
 async function previewNavigationSources(folder: vscode.WorkspaceFolder): Promise<Map<string, SourceDocument>> {
   const documents = new Map<string, SourceDocument>();
@@ -546,14 +559,14 @@ async function safePreviewDocument(folder: vscode.WorkspaceFolder, name: string)
 }
 async function openPreviewTarget(entry: PreviewCapability, allowed: () => boolean): Promise<void> {
   const inputs = await previewNavigationSources(entry.folder);
-  const part = previewTarget(parseProject(overlayNavigationSources(entry.folder, inputs)).publication, entry.target);
+  const part = previewTarget(parseProject(overlayNavigationSources(entry.folder, inputs)), entry.target);
   if (!part || !allowed()) { return; }
   const uri = await safePreviewDocument(entry.folder, part.definition.path);
   if (!allowed()) { return; }
   const document = await vscode.workspace.openTextDocument(uri);
   await safePreviewDocument(entry.folder, part.definition.path);
   const current = overlayNavigationSources(entry.folder, inputs);
-  const fresh = previewTarget(parseProject(current).publication, entry.target);
+  const fresh = previewTarget(parseProject(current), entry.target);
   if (!allowed() || document.isClosed || document.uri.toString() !== uri.toString()
     || !fresh || fresh.definition.path !== part.definition.path) { return; }
   const position = new vscode.Position(fresh.definition.line, 0);
@@ -797,7 +810,8 @@ export class FragmentRepository {
     if (source !== undefined) { documents.set(currentPath, { path: currentPath, text: source }); }
     const inputs = [...documents.values()];
     const parsed = parseProject(inputs);
-    return { path: currentPath, publication: parsed.publication,
+    return { path: currentPath, publication: parsed.publication, annotations: parsed.annotations,
+        paths: parsed.documents.map(value => value.path),
       tokens: parsed.documents.find(value => value.path === currentPath)?.tokens,
       theme: folder ? previewThemeName(inputs) : defaultThemeName };
   }
@@ -848,7 +862,8 @@ export class FragmentRepository {
           }
         }
         const result = generateProject(documents, templates);
-        const previousPublication = parseProject(this.sourceDocuments.get(themeKey) || []).publication;
+        const previousPreview = parseProject(this.sourceDocuments.get(themeKey) || []);
+              const previousPublication = previousPreview.publication;
         const diagnostics = new Map<string, vscode.Diagnostic[]>();
         for (const diagnostic of result.diagnostics) {
           const uri = vscode.Uri.joinPath(workspaceFolder.uri, diagnostic.path);
@@ -898,7 +913,8 @@ export class FragmentRepository {
         }
         fragments.map = handleFragments(states.list, result.inspection.fragments);
         if (theme !== previousTheme || JSON.stringify(previousPublication.contributions) !== JSON.stringify(result.publication.contributions)
-          || JSON.stringify(previousPublication.fragments) !== JSON.stringify(result.publication.fragments)) {
+          || JSON.stringify(previousPublication.fragments) !== JSON.stringify(result.publication.fragments)
+            || JSON.stringify(previousPreview.annotations) !== JSON.stringify(parseProject(documents).annotations)) {
           void vscode.commands.executeCommand('markdown.preview.refresh').then(undefined, () => undefined);
         }
         if (!writeFiles || result.diagnostics.length) { continue; }

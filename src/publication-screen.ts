@@ -1,5 +1,8 @@
 import MarkdownIt = require('markdown-it');
+import Token = require('markdown-it/lib/token');
 import type { PublicationModel, PublicationContribution } from './engine';
+import type { PublicationAnnotations, PublicationTerm, PublicationNote, PublicationTermUse } from './publication-annotations';
+import { parseAnnotationBody, resolveTermHref } from './publication-annotations';
 import { highlightContribution } from './publication-highlight';
 const escapeHtml = new MarkdownIt().utils.escapeHtml;
 export type ScreenFormat = 'html' | 'preview';
@@ -20,12 +23,18 @@ function screenLink(href: string | undefined, label: string, text: string, targe
     return `<a class="literate-tag-name" href="${escapeHtml(href)}" data-literate-target="${target}" aria-label="${escapeHtml(label)}">${escapeHtml(text)}</a>`;
 }
 const screenIndexes = new WeakMap<PublicationModel, ReturnType<typeof buildScreenIndex>>();
-export function screenIndex(model: PublicationModel) {
-    let index = screenIndexes.get(model);
-    if (!index) { index = buildScreenIndex(model); screenIndexes.set(model, index); }
+const annotationIndexes = new WeakMap<PublicationAnnotations, WeakMap<PublicationModel, ReturnType<typeof buildScreenIndex>>>();
+export function screenIndex(model: PublicationModel, annotations?: PublicationAnnotations) {
+    let cache = screenIndexes;
+    if (annotations) {
+        if (!annotationIndexes.has(annotations)) { annotationIndexes.set(annotations, new WeakMap()); }
+        cache = annotationIndexes.get(annotations)!;
+    }
+    let index = cache.get(model);
+    if (!index) { index = buildScreenIndex(model, annotations); cache.set(model, index); }
     return index;
 }
-function buildScreenIndex(model: PublicationModel) {
+function buildScreenIndex(model: PublicationModel, annotations?: PublicationAnnotations) {
     const families = new Map(model.fragments.map(family => [family.target, family]));
     const parts = new Map(model.contributions.map(part => [part.target, part]));
     const ordinals = new Map<string, number>();
@@ -40,7 +49,40 @@ function buildScreenIndex(model: PublicationModel) {
             map.get(part.definition.path)!.set(key, part);
         }
     }
-    return { families, parts, ordinals, tokens, lines };
+        const targets = new Map<string, { definition: PublicationContribution['definition'] }>(parts);
+        for (const family of model.fragments) {
+            const base = parts.get(family.contributions[0]);
+            if (base) { targets.set(family.target, base); }
+        }
+        const annotationLines = new Map<string, Map<number, PublicationTerm | PublicationNote>>();
+        const annotationTargets = new Map<string, PublicationTerm | PublicationNote>();
+        for (const annotation of [...annotations?.terms || [], ...annotations?.notes || []]) {
+            targets.set(annotation.target, { definition: annotation.at });
+            annotationTargets.set(annotation.target, annotation);
+            if (!annotationLines.has(annotation.at.path)) { annotationLines.set(annotation.at.path, new Map()); }
+            annotationLines.get(annotation.at.path)!.set(annotation.at.line, annotation);
+        }
+        for (const use of annotations?.uses || []) { targets.set(screenTermUseTarget(use), { definition: use.at }); }
+        const termReferences = new Map<string, PublicationTermUse[]>();
+        for (const use of annotations?.uses || []) {
+            if (!use.target) { continue; }
+            if (!termReferences.has(use.target)) { termReferences.set(use.target, []); }
+            termReferences.get(use.target)!.push(use);
+        }
+        const fragmentReferences = new Map<string, PublicationContribution[]>();
+        for (const part of model.contributions) {
+            const seen = new Set<string>();
+            for (const segment of part.segments) {
+                if (segment.kind !== 'reference' || segment.resolution.kind !== 'resolved') { continue; }
+                const target = segment.resolution.target;
+                if (seen.has(target)) { continue; }
+                seen.add(target);
+                if (!fragmentReferences.has(target)) { fragmentReferences.set(target, []); }
+                fragmentReferences.get(target)!.push(part);
+            }
+        }
+    return { families, parts, ordinals, tokens, lines, targets, annotationLines, annotationTargets,
+        termReferences, fragmentReferences };
 }
 export function previewLanguage(language: string): string {
     switch (language.toLowerCase()) {
@@ -120,3 +162,102 @@ function screenNavigation(part: PublicationContribution, model: PublicationModel
     });
     return links.length ? `<nav class="fragment-navigation" aria-label="${escapeHtml('Contributions of ' + family.name)}">${links.join(' · ')}</nav>\n` : '';
 }
+export interface ScreenAnnotationContext {
+    model: PublicationModel; annotations: PublicationAnnotations; path: string;
+    format: ScreenFormat; destination?: PreviewDestination;
+}
+const annotationMarkdown = new MarkdownIt({ html: false });
+installScreenTermLinks(annotationMarkdown);
+export function renderScreenAnnotation(annotation: PublicationTerm | PublicationNote,
+    context: ScreenAnnotationContext): string {
+    const term = 'title' in annotation;
+    const tag = term ? 'section' : 'aside';
+    const title = term ? annotation.title : `Note ${annotation.number}`;
+    const source = context.format === 'preview' ? ` code-line" data-line="${annotation.at.line}` : '';
+    const tokens = sanitizeAnnotationTokens(parseAnnotationBody(annotation.body));
+    const literateUseTargets = screenTermUseAnchors(tokens, context.annotations, annotation.target);
+    return `<${tag} class="literate-annotation literate-${term ? 'term' : 'note'}${source}" id="${annotation.target}">`
+        + `<div class="literate-annotation-title">${escapeHtml(title)}</div>`
+        + annotationMarkdown.renderer.render(tokens, annotationMarkdown.options,
+                    { literateScreen: context, literateUseTargets }) + `</${tag}>\n`;
+}
+const screenBodyTokens = new Set([
+    'paragraph_open', 'paragraph_close', 'inline', 'text', 'softbreak', 'hardbreak',
+    'bullet_list_open', 'bullet_list_close', 'ordered_list_open', 'ordered_list_close',
+    'list_item_open', 'list_item_close', 'em_open', 'em_close', 'strong_open',
+    'strong_close', 'code_inline', 'link_open', 'link_close'
+]);
+function sanitizeAnnotationTokens(tokens: Token[]): Token[] {
+    for (const token of tokens) {
+        if (!screenBodyTokens.has(token.type)) {
+            token.type = 'text'; token.tag = ''; token.nesting = 0;
+            token.children = null; token.hidden = false;
+        } else if (token.children) { sanitizeAnnotationTokens(token.children); }
+        token.attrs = token.attrs?.filter(([name]) =>
+            (token.type === 'link_open' && (name === 'href' || name === 'title'))
+            || (token.type === 'ordered_list_open' && name === 'start')) || null;
+    }
+    return tokens;
+}
+export function installScreenTermLinks(md: MarkdownIt): void {
+    const open = md.renderer.rules.link_open, close = md.renderer.rules.link_close;
+    const destination = (href: string, context?: ScreenAnnotationContext) => {
+        if (!context) { return undefined; }
+        const target = resolveTermHref(context.annotations, href);
+        const at = target && screenIndex(context.model, context.annotations).targets.get(target)?.definition;
+        return target && at ? { target, href: screenHref(context.path, at.path, target,
+            context.format, context.destination) } : undefined;
+    };
+    md.renderer.rules.link_open = (tokens, index, options, env, renderer) => {
+        const href = tokens[index].attrGet('href') || '';
+        if (!href.startsWith('term:')) { return open ? open(tokens, index, options, env, renderer) : renderer.renderToken(tokens, index, options); }
+        const link = destination(href, env?.literateScreen);
+        const use = env?.literateUseTargets?.get(tokens[index]) as PublicationTermUse | undefined;
+        const anchor = use ? `<span id="${screenTermUseTarget(use)}"${env.literateScreen?.format === 'preview' ? ` class="code-line" data-line="${use.at.line}"` : ''}></span>` : '';
+        return anchor + (link?.href ? `<a href="${escapeHtml(link.href)}" data-literate-target="${link.target}">` : '<span class="literate-term-unresolved">');
+    };
+    md.renderer.rules.link_close = (tokens, index, options, env, renderer) => {
+        let start = index - 1;
+        while (start >= 0 && tokens[start].type !== 'link_open') { start--; }
+        const href = start >= 0 ? tokens[start].attrGet('href') || '' : '';
+        if (href.startsWith('term:')) { return destination(href, env?.literateScreen)?.href ? '</a>' : '</span>'; }
+        return close ? close(tokens, index, options, env, renderer) : renderer.renderToken(tokens, index, options);
+    };
+}
+function screenTermUseTarget(use: PublicationTermUse): string {
+    const owner = use.owner.split('').map(char => char.charCodeAt(0).toString(16).padStart(4, '0')).join('');
+    return `annotation-use-${owner}-${use.tokenIndex}-${use.childIndex}`;
+}
+export function screenTermUseAnchors(tokens: Token[], annotations: PublicationAnnotations, owner: string) {
+    const anchors = new Map<Token, PublicationTermUse>();
+    for (const use of annotations.uses) {
+        if (use.owner !== owner) { continue; }
+        const token = tokens[use.tokenIndex]?.children?.[use.childIndex];
+        if (token?.type === 'link_open' && token.attrGet('href')?.startsWith('term:')) { anchors.set(token, use); }
+    }
+    return anchors;
+}
+export function renderScreenIndexes(context: ScreenAnnotationContext, paths: readonly string[]): string {
+    const { model, annotations, path, format, destination } = context;
+    if (!annotations.terms.length && !annotations.notes.length) { return ''; }
+    if (path !== (paths.includes('index.literate') ? 'index.literate' : paths[0])) { return ''; }
+    const lookup = screenIndex(model, annotations);
+    const link = (target: string, title: string) => {
+        const at = lookup.targets.get(target)?.definition;
+        return screenLink(at && screenHref(path, at.path, target, format, destination), title, title, target);
+    };
+    const terms = annotations.terms.map(term => `<li>${link(term.target, term.title)} — Definition`
+        + (lookup.termReferences.get(term.target) || []).map((use, index) =>
+            ` · ${link(screenTermUseTarget(use), `Reference ${index + 1}`)}`).join('') + '</li>').join('');
+    const fragments = model.fragments.map(family => `<li>${link(family.target, family.name)}: `
+        + family.contributions.map((target, index) => link(target, index ? `Addition ${index}` : 'Definition')).join(' · ')
+        + (lookup.fragmentReferences.get(family.target) || [])
+            .map((part, index) => ` · ${link(part.target, `Reference ${index + 1}`)}`).join('') + '</li>').join('');
+    return `<nav class="literate-screen-index" aria-label="Term index"><h2>Term index</h2><ul>${terms}</ul></nav>`
+        + `<nav class="literate-screen-index" aria-label="Fragment index"><h2>Fragment index</h2><ul>${fragments}</ul></nav>`;
+}
+export const screenStyle = `.literate-document .literate-annotation { margin-block: 1em; padding: .6em 1em; border-inline-start: .2em solid currentColor; }
+.literate-document .literate-annotation-title { font-weight: bold; }
+.literate-document .literate-note { border-inline-start-style: dotted; }
+.literate-document .literate-term-unresolved { text-decoration: underline dotted; }
+.literate-document .literate-screen-index { margin-block-start: 2em; }`;

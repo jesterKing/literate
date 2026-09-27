@@ -137,6 +137,12 @@ rescanned for tags. This module has no filesystem or VS Code dependency.</p>
 
 <a class="literate-tag-name" href="#f-00730063007200650065006e00200063006f006e0074007200690062007500740069006f006e002000720065006e0064006500720069006e0067" data-literate-target="f-00730063007200650065006e00200063006f006e0074007200690062007500740069006f006e002000720065006e0064006500720069006e0067" aria-label="Definition of screen contribution rendering">&lt;&lt;screen contribution rendering&gt;&gt;</a>
 <a class="literate-tag-name" href="#f-00730063007200650065006e00200063006f006e0074007200690062007500740069006f006e0020006e0061007600690067006100740069006f006e" data-literate-target="f-00730063007200650065006e00200063006f006e0074007200690062007500740069006f006e0020006e0061007600690067006100740069006f006e" aria-label="Definition of screen contribution navigation">&lt;&lt;screen contribution navigation&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e002000720065006e0064006500720069006e0067" data-literate-target="f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e002000720065006e0064006500720069006e0067" aria-label="Definition of screen annotation rendering">&lt;&lt;screen annotation rendering&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e00200062006f00640079002000730061006e006900740069007a006100740069006f006e" data-literate-target="f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e00200062006f00640079002000730061006e006900740069007a006100740069006f006e" aria-label="Definition of screen annotation body sanitization">&lt;&lt;screen annotation body sanitization&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-00730063007200650065006e0020007400650072006d0020006c0069006e006b0073" data-literate-target="f-00730063007200650065006e0020007400650072006d0020006c0069006e006b0073" aria-label="Definition of screen term links">&lt;&lt;screen term links&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-00730063007200650065006e0020007400650072006d002000750073006500200061006e00630068006f00720073" data-literate-target="f-00730063007200650065006e0020007400650072006d002000750073006500200061006e00630068006f00720073" aria-label="Definition of screen term use anchors">&lt;&lt;screen term use anchors&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-00730063007200650065006e00200062006f006f006b00200069006e00640065007800650073" data-literate-target="f-00730063007200650065006e00200062006f006f006b00200069006e00640065007800650073" aria-label="Definition of screen book indexes">&lt;&lt;screen book indexes&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e0020007300740079006c00650073" data-literate-target="f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e0020007300740079006c00650073" aria-label="Definition of screen annotation styles">&lt;&lt;screen annotation styles&gt;&gt;</a>
 </code></pre>
 
 </div>
@@ -147,7 +153,10 @@ separately. Preview supplies a synchronous lookup of asynchronously resolved URL
 <div class="fragmentname" id="c-00730063007200650065006e002000720065006e0064006500720065007200200069006d0070006f007200740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1"><span id="f-00730063007200650065006e002000720065006e0064006500720065007200200069006d0070006f007200740073"></span><a class="literate-tag-name" href="#f-00730063007200650065006e002000720065006e0064006500720065007200200069006d0070006f007200740073" data-literate-target="f-00730063007200650065006e002000720065006e0064006500720065007200200069006d0070006f007200740073" aria-label="Definition of screen renderer imports">&lt;&lt;screen renderer imports&gt;&gt;=</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">import</span> <span class="hljs-title">MarkdownIt</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">'markdown-it'</span>);
+<span class="hljs-keyword">import</span> <span class="hljs-title">Token</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">'markdown-it/lib/token'</span>);
 <span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">PublicationModel</span>, <span class="hljs-title">PublicationContribution</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">PublicationAnnotations</span>, <span class="hljs-title">PublicationTerm</span>, <span class="hljs-title">PublicationNote</span>, <span class="hljs-title">PublicationTermUse</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-annotations'</span>;
+<span class="hljs-keyword">import</span> { parseAnnotationBody, resolveTermHref } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-annotations'</span>;
 <span class="hljs-keyword">import</span> { highlightContribution } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-highlight'</span>;
 <span class="hljs-keyword">const</span> escapeHtml = <span class="hljs-keyword">new</span> <span class="hljs-title">MarkdownIt</span>().<span class="hljs-property">utils</span>.<span class="hljs-property">escapeHtml</span>;
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title">ScreenFormat</span> = <span class="hljs-string">'html'</span> | <span class="hljs-string">'preview'</span>;
@@ -280,9 +289,15 @@ Nested document maps avoid path/key delimiter collisions.</p>
 <div class="fragmentname" id="c-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1"><span id="f-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078"></span><a class="literate-tag-name" href="#f-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078" data-literate-target="f-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078" aria-label="Definition of screen model index">&lt;&lt;screen model index&gt;&gt;=</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">const</span> screenIndexes = <span class="hljs-keyword">new</span> <span class="hljs-title">WeakMap</span>&lt;<span class="hljs-title">PublicationModel</span>, <span class="hljs-title">ReturnType</span>&lt;<span class="hljs-keyword">typeof</span> buildScreenIndex&gt;&gt;();
-<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">screenIndex</span>(<span class="hljs-params">model: PublicationModel</span>) {
-    <span class="hljs-keyword">let</span> index = screenIndexes.<span class="hljs-title">get</span>(model);
-    <span class="hljs-keyword">if</span> (!index) { index = <span class="hljs-title">buildScreenIndex</span>(model); screenIndexes.<span class="hljs-title">set</span>(model, index); }
+<span class="hljs-keyword">const</span> annotationIndexes = <span class="hljs-keyword">new</span> <span class="hljs-title">WeakMap</span>&lt;<span class="hljs-title">PublicationAnnotations</span>, <span class="hljs-title">WeakMap</span>&lt;<span class="hljs-title">PublicationModel</span>, <span class="hljs-title">ReturnType</span>&lt;<span class="hljs-keyword">typeof</span> buildScreenIndex&gt;&gt;&gt;();
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">screenIndex</span>(<span class="hljs-params">model: PublicationModel, annotations?: PublicationAnnotations</span>) {
+    <span class="hljs-keyword">let</span> cache = screenIndexes;
+    <span class="hljs-keyword">if</span> (annotations) {
+        <span class="hljs-keyword">if</span> (!annotationIndexes.<span class="hljs-title">has</span>(annotations)) { annotationIndexes.<span class="hljs-title">set</span>(annotations, <span class="hljs-keyword">new</span> <span class="hljs-title">WeakMap</span>()); }
+        cache = annotationIndexes.<span class="hljs-title">get</span>(annotations)!;
+    }
+    <span class="hljs-keyword">let</span> index = cache.<span class="hljs-title">get</span>(model);
+    <span class="hljs-keyword">if</span> (!index) { index = <span class="hljs-title">buildScreenIndex</span>(model, annotations); cache.<span class="hljs-title">set</span>(model, index); }
     <span class="hljs-keyword">return</span> index;
 }
 </code></pre>
@@ -294,7 +309,7 @@ Nested document maps avoid path/key delimiter collisions.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078" data-literate-target="f-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078" aria-label="Definition of screen model index">&lt;&lt;screen model index&gt;&gt;=+</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">buildScreenIndex</span>(<span class="hljs-params">model: PublicationModel</span>) {
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">buildScreenIndex</span>(<span class="hljs-params">model: PublicationModel, annotations?: PublicationAnnotations</span>) {
     <span class="hljs-keyword">const</span> families = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>(model.<span class="hljs-property">fragments</span>.<span class="hljs-title">map</span>(<span class="hljs-params">family</span><span class="hljs-function"> =&gt;</span> [family.<span class="hljs-property">target</span>, family]));
     <span class="hljs-keyword">const</span> parts = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>(model.<span class="hljs-property">contributions</span>.<span class="hljs-title">map</span>(<span class="hljs-params">part</span><span class="hljs-function"> =&gt;</span> [part.<span class="hljs-property">target</span>, part]));
     <span class="hljs-keyword">const</span> ordinals = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">number</span>&gt;();
@@ -309,12 +324,64 @@ Nested document maps avoid path/key delimiter collisions.</p>
             map.<span class="hljs-title">get</span>(part.<span class="hljs-property">definition</span>.<span class="hljs-property">path</span>)!.<span class="hljs-title">set</span>(key, part);
         }
     }
-    <span class="hljs-keyword">return</span> { families, parts, ordinals, tokens, lines };
+    <a class="literate-tag-name" href="#f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e00200069006e006400650078" data-literate-target="f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e00200069006e006400650078" aria-label="Definition of screen annotation index">&lt;&lt;screen annotation index&gt;&gt;</a>
+    <a class="literate-tag-name" href="#f-00730063007200650065006e002000720065007600650072007300650020007200650066006500720065006e006300650073" data-literate-target="f-00730063007200650065006e002000720065007600650072007300650020007200650066006500720065006e006300650073" aria-label="Definition of screen reverse references">&lt;&lt;screen reverse references&gt;&gt;</a>
+    <span class="hljs-keyword">return</span> { families, parts, ordinals, tokens, lines, targets, annotationLines, annotationTargets,
+        termReferences, fragmentReferences };
 }
 </code></pre>
 
 </div>
 <nav class="fragment-navigation" aria-label="Contributions of screen model index"><a class="literate-tag-name" href="#c-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1" data-literate-target="c-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1" aria-label="Previous contribution of screen model index">Previous</a> · <a class="literate-tag-name" href="#c-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1" data-literate-target="c-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1" aria-label="Base contribution of screen model index">Base</a></nav>
+</div><p>Annotations extend the common destination map without changing publication parts.
+Use locations remain explicit model data, including links inside annotation bodies.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00730063007200650065006e00200061006e006e006f0074006100740069006f006e00200069006e006400650078-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1"><span id="f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e00200069006e006400650078"></span><a class="literate-tag-name" href="#f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e00200069006e006400650078" data-literate-target="f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e00200069006e006400650078" aria-label="Definition of screen annotation index">&lt;&lt;screen annotation index&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">const</span> targets = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, { <span class="hljs-attr">definition</span>: <span class="hljs-title">PublicationContribution</span>[<span class="hljs-string">'definition'</span>] }&gt;(parts);
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> family <span class="hljs-keyword">of</span> model.<span class="hljs-property">fragments</span>) {
+        <span class="hljs-keyword">const</span> base = parts.<span class="hljs-title">get</span>(family.<span class="hljs-property">contributions</span>[<span class="hljs-number">0</span>]);
+        <span class="hljs-keyword">if</span> (base) { targets.<span class="hljs-title">set</span>(family.<span class="hljs-property">target</span>, base); }
+    }
+    <span class="hljs-keyword">const</span> annotationLines = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">number</span>, <span class="hljs-title">PublicationTerm</span> | <span class="hljs-title">PublicationNote</span>&gt;&gt;();
+    <span class="hljs-keyword">const</span> annotationTargets = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">PublicationTerm</span> | <span class="hljs-title">PublicationNote</span>&gt;();
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> annotation <span class="hljs-keyword">of</span> [...annotations?.<span class="hljs-property">terms</span> || [], ...annotations?.<span class="hljs-property">notes</span> || []]) {
+        targets.<span class="hljs-title">set</span>(annotation.<span class="hljs-property">target</span>, { <span class="hljs-attr">definition</span>: annotation.<span class="hljs-property">at</span> });
+        annotationTargets.<span class="hljs-title">set</span>(annotation.<span class="hljs-property">target</span>, annotation);
+        <span class="hljs-keyword">if</span> (!annotationLines.<span class="hljs-title">has</span>(annotation.<span class="hljs-property">at</span>.<span class="hljs-property">path</span>)) { annotationLines.<span class="hljs-title">set</span>(annotation.<span class="hljs-property">at</span>.<span class="hljs-property">path</span>, <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>()); }
+        annotationLines.<span class="hljs-title">get</span>(annotation.<span class="hljs-property">at</span>.<span class="hljs-property">path</span>)!.<span class="hljs-title">set</span>(annotation.<span class="hljs-property">at</span>.<span class="hljs-property">line</span>, annotation);
+    }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> use <span class="hljs-keyword">of</span> annotations?.<span class="hljs-property">uses</span> || []) { targets.<span class="hljs-title">set</span>(<span class="hljs-title">screenTermUseTarget</span>(use), { <span class="hljs-attr">definition</span>: use.<span class="hljs-property">at</span> }); }
+</code></pre>
+
+</div>
+</div><p>Reverse references preserve encounter order and are built once per snapshot.
+Repeated uses of one family in a contribution produce one index entry, without
+rescanning every contribution for each family or every use for each term.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00730063007200650065006e002000720065007600650072007300650020007200650066006500720065006e006300650073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1"><span id="f-00730063007200650065006e002000720065007600650072007300650020007200650066006500720065006e006300650073"></span><a class="literate-tag-name" href="#f-00730063007200650065006e002000720065007600650072007300650020007200650066006500720065006e006300650073" data-literate-target="f-00730063007200650065006e002000720065007600650072007300650020007200650066006500720065006e006300650073" aria-label="Definition of screen reverse references">&lt;&lt;screen reverse references&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">const</span> termReferences = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">PublicationTermUse</span>[]&gt;();
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> use <span class="hljs-keyword">of</span> annotations?.<span class="hljs-property">uses</span> || []) {
+        <span class="hljs-keyword">if</span> (!use.<span class="hljs-property">target</span>) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">if</span> (!termReferences.<span class="hljs-title">has</span>(use.<span class="hljs-property">target</span>)) { termReferences.<span class="hljs-title">set</span>(use.<span class="hljs-property">target</span>, []); }
+        termReferences.<span class="hljs-title">get</span>(use.<span class="hljs-property">target</span>)!.<span class="hljs-title">push</span>(use);
+    }
+    <span class="hljs-keyword">const</span> fragmentReferences = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">PublicationContribution</span>[]&gt;();
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> part <span class="hljs-keyword">of</span> model.<span class="hljs-property">contributions</span>) {
+        <span class="hljs-keyword">const</span> seen = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> segment <span class="hljs-keyword">of</span> part.<span class="hljs-property">segments</span>) {
+            <span class="hljs-keyword">if</span> (segment.<span class="hljs-property">kind</span> !== <span class="hljs-string">'reference'</span> || segment.<span class="hljs-property">resolution</span>.<span class="hljs-property">kind</span> !== <span class="hljs-string">'resolved'</span>) { <span class="hljs-keyword">continue</span>; }
+            <span class="hljs-keyword">const</span> target = segment.<span class="hljs-property">resolution</span>.<span class="hljs-property">target</span>;
+            <span class="hljs-keyword">if</span> (seen.<span class="hljs-title">has</span>(target)) { <span class="hljs-keyword">continue</span>; }
+            seen.<span class="hljs-title">add</span>(target);
+            <span class="hljs-keyword">if</span> (!fragmentReferences.<span class="hljs-title">has</span>(target)) { fragmentReferences.<span class="hljs-title">set</span>(target, []); }
+            fragmentReferences.<span class="hljs-title">get</span>(target)!.<span class="hljs-title">push</span>(part);
+        }
+    }
+</code></pre>
+
+</div>
 </div><p>The preview host applies aliases before highlight.js. Our semantic overlay replaces
 its highlighter, so apply the same compatibility mapping explicitly, without
 changing the authored language or LaTeX policy. Unknown languages stay plain.</p>
@@ -360,6 +427,161 @@ leaf per reference. A leaf straddling a reference remains available for its suff
         <span class="hljs-keyword">return</span> output.<span class="hljs-title">join</span>(<span class="hljs-string">''</span>);
     };
 }
+</code></pre>
+
+</div>
+</div><h2>Annotation prose</h2>
+<p>Annotation bodies use the collector's parser, preserving reference aliases,
+autolinks and occurrence offsets. A closed token vocabulary keeps raw HTML,
+images, headings and code fences from introducing active elements or attributes.
+The title is plain text; NOTE has its own numbered aside, never a term identity.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00730063007200650065006e00200061006e006e006f0074006100740069006f006e002000720065006e0064006500720069006e0067-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1"><span id="f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e002000720065006e0064006500720069006e0067"></span><a class="literate-tag-name" href="#f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e002000720065006e0064006500720069006e0067" data-literate-target="f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e002000720065006e0064006500720069006e0067" aria-label="Definition of screen annotation rendering">&lt;&lt;screen annotation rendering&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">ScreenAnnotationContext</span> {
+    <span class="hljs-attr">model</span>: <span class="hljs-title">PublicationModel</span>; <span class="hljs-attr">annotations</span>: <span class="hljs-title">PublicationAnnotations</span>; <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">format</span>: <span class="hljs-title">ScreenFormat</span>; destination?: <span class="hljs-title">PreviewDestination</span>;
+}
+<span class="hljs-keyword">const</span> annotationMarkdown = <span class="hljs-keyword">new</span> <span class="hljs-title">MarkdownIt</span>({ <span class="hljs-attr">html</span>: <span class="hljs-literal">false</span> });
+<span class="hljs-title">installScreenTermLinks</span>(annotationMarkdown);
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">renderScreenAnnotation</span>(<span class="hljs-params">annotation: PublicationTerm | PublicationNote,
+    context: ScreenAnnotationContext</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">const</span> term = <span class="hljs-string">'title'</span> <span class="hljs-keyword">in</span> annotation;
+    <span class="hljs-keyword">const</span> tag = term ? <span class="hljs-string">'section'</span> : <span class="hljs-string">'aside'</span>;
+    <span class="hljs-keyword">const</span> title = term ? annotation.<span class="hljs-property">title</span> : <span class="hljs-string">`Note </span><span class="hljs-subst">${annotation.</span><span class="hljs-built_in">number</span><span class="hljs-subst">}</span><span class="hljs-string">`</span>;
+    <span class="hljs-keyword">const</span> source = context.<span class="hljs-property">format</span> === <span class="hljs-string">'preview'</span> ? <span class="hljs-string">` code-line&quot; data-line=&quot;</span><span class="hljs-subst">${annotation.at.line}</span><span class="hljs-string">`</span> : <span class="hljs-string">''</span>;
+    <span class="hljs-keyword">const</span> tokens = <span class="hljs-title">sanitizeAnnotationTokens</span>(<span class="hljs-title">parseAnnotationBody</span>(annotation.<span class="hljs-property">body</span>));
+    <span class="hljs-keyword">const</span> literateUseTargets = <span class="hljs-title">screenTermUseAnchors</span>(tokens, context.<span class="hljs-property">annotations</span>, annotation.<span class="hljs-property">target</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-string">`&lt;</span><span class="hljs-subst">${tag}</span><span class="hljs-string"> class=&quot;literate-annotation literate-</span><span class="hljs-subst">${term ? </span><span class="hljs-string">'term'</span><span class="hljs-subst"> : </span><span class="hljs-string">'note'</span><span class="hljs-subst">}</span><span class="hljs-subst">${source}</span><span class="hljs-string">&quot; id=&quot;</span><span class="hljs-subst">${annotation.target}</span><span class="hljs-string">&quot;&gt;`</span>
+        + <span class="hljs-string">`&lt;div class=&quot;literate-annotation-title&quot;&gt;</span><span class="hljs-subst">${escapeHtml(title)}</span><span class="hljs-string">&lt;/div&gt;`</span>
+        + annotationMarkdown.<span class="hljs-property">renderer</span>.<span class="hljs-title">render</span>(tokens, annotationMarkdown.<span class="hljs-property">options</span>,
+                    { <span class="hljs-attr">literateScreen</span>: context, literateUseTargets }) + <span class="hljs-string">`&lt;/</span><span class="hljs-subst">${tag}</span><span class="hljs-string">&gt;</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>;
+}
+</code></pre>
+
+</div>
+</div><p>Sanitization preserves every token slot, so the collector's token and child
+indexes still identify the rendered links. Rejected leaf content becomes escaped
+text; rejected containers lose their tags, not their accepted inline children.
+Only parser-owned link and ordered-list attributes survive.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00730063007200650065006e00200061006e006e006f0074006100740069006f006e00200062006f00640079002000730061006e006900740069007a006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1"><span id="f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e00200062006f00640079002000730061006e006900740069007a006100740069006f006e"></span><a class="literate-tag-name" href="#f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e00200062006f00640079002000730061006e006900740069007a006100740069006f006e" data-literate-target="f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e00200062006f00640079002000730061006e006900740069007a006100740069006f006e" aria-label="Definition of screen annotation body sanitization">&lt;&lt;screen annotation body sanitization&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> screenBodyTokens = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>([
+    <span class="hljs-string">'paragraph_open'</span>, <span class="hljs-string">'paragraph_close'</span>, <span class="hljs-string">'inline'</span>, <span class="hljs-string">'text'</span>, <span class="hljs-string">'softbreak'</span>, <span class="hljs-string">'hardbreak'</span>,
+    <span class="hljs-string">'bullet_list_open'</span>, <span class="hljs-string">'bullet_list_close'</span>, <span class="hljs-string">'ordered_list_open'</span>, <span class="hljs-string">'ordered_list_close'</span>,
+    <span class="hljs-string">'list_item_open'</span>, <span class="hljs-string">'list_item_close'</span>, <span class="hljs-string">'em_open'</span>, <span class="hljs-string">'em_close'</span>, <span class="hljs-string">'strong_open'</span>,
+    <span class="hljs-string">'strong_close'</span>, <span class="hljs-string">'code_inline'</span>, <span class="hljs-string">'link_open'</span>, <span class="hljs-string">'link_close'</span>
+]);
+<span class="hljs-keyword">function</span> <span class="hljs-title">sanitizeAnnotationTokens</span>(<span class="hljs-params">tokens: Token[]</span>): <span class="hljs-title">Token</span>[] {
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> tokens) {
+        <span class="hljs-keyword">if</span> (!screenBodyTokens.<span class="hljs-title">has</span>(token.<span class="hljs-property">type</span>)) {
+            token.<span class="hljs-property">type</span> = <span class="hljs-string">'text'</span>; token.<span class="hljs-property">tag</span> = <span class="hljs-string">''</span>; token.<span class="hljs-property">nesting</span> = <span class="hljs-number">0</span>;
+            token.<span class="hljs-property">children</span> = <span class="hljs-literal">null</span>; token.<span class="hljs-property">hidden</span> = <span class="hljs-literal">false</span>;
+        } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (token.<span class="hljs-property">children</span>) { <span class="hljs-title">sanitizeAnnotationTokens</span>(token.<span class="hljs-property">children</span>); }
+        token.<span class="hljs-property">attrs</span> = token.<span class="hljs-property">attrs</span>?.<span class="hljs-title">filter</span>(<span class="hljs-function">(</span><span class="hljs-params">[name]</span><span class="hljs-function">) =&gt;</span>
+            (token.<span class="hljs-property">type</span> === <span class="hljs-string">'link_open'</span> &amp;&amp; (name === <span class="hljs-string">'href'</span> || name === <span class="hljs-string">'title'</span>))
+            || (token.<span class="hljs-property">type</span> === <span class="hljs-string">'ordered_list_open'</span> &amp;&amp; name === <span class="hljs-string">'start'</span>)) || <span class="hljs-literal">null</span>;
+    }
+    <span class="hljs-keyword">return</span> tokens;
+}
+</code></pre>
+
+</div>
+</div><p>Term links share resolution in prose, headings and annotation bodies. A missing,
+ambiguous or pending destination becomes a span, including its closing tag.
+Other links retain the host renderer's behavior and Markdown URL validation.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00730063007200650065006e0020007400650072006d0020006c0069006e006b0073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1"><span id="f-00730063007200650065006e0020007400650072006d0020006c0069006e006b0073"></span><a class="literate-tag-name" href="#f-00730063007200650065006e0020007400650072006d0020006c0069006e006b0073" data-literate-target="f-00730063007200650065006e0020007400650072006d0020006c0069006e006b0073" aria-label="Definition of screen term links">&lt;&lt;screen term links&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">installScreenTermLinks</span>(<span class="hljs-params">md: MarkdownIt</span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">const</span> open = md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">link_open</span>, close = md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">link_close</span>;
+    <span class="hljs-keyword">const</span> <span class="hljs-title">destination</span> = (<span class="hljs-params">href: </span><span class="hljs-built_in">string</span><span class="hljs-params">, context?: ScreenAnnotationContext</span>) =&gt; {
+        <span class="hljs-keyword">if</span> (!context) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+        <span class="hljs-keyword">const</span> target = <span class="hljs-title">resolveTermHref</span>(context.<span class="hljs-property">annotations</span>, href);
+        <span class="hljs-keyword">const</span> at = target &amp;&amp; <span class="hljs-title">screenIndex</span>(context.<span class="hljs-property">model</span>, context.<span class="hljs-property">annotations</span>).<span class="hljs-property">targets</span>.<span class="hljs-title">get</span>(target)?.<span class="hljs-property">definition</span>;
+        <span class="hljs-keyword">return</span> target &amp;&amp; at ? { target, <span class="hljs-attr">href</span>: <span class="hljs-title">screenHref</span>(context.<span class="hljs-property">path</span>, at.<span class="hljs-property">path</span>, target,
+            context.<span class="hljs-property">format</span>, context.<span class="hljs-property">destination</span>) } : <span class="hljs-literal">undefined</span>;
+    };
+    md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">link_open</span> = <span class="hljs-function">(</span><span class="hljs-params">tokens, index, options, env, renderer</span><span class="hljs-function">) =&gt;</span> {
+        <span class="hljs-keyword">const</span> href = tokens[index].<span class="hljs-title">attrGet</span>(<span class="hljs-string">'href'</span>) || <span class="hljs-string">''</span>;
+        <span class="hljs-keyword">if</span> (!href.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'term:'</span>)) { <span class="hljs-keyword">return</span> open ? <span class="hljs-title">open</span>(tokens, index, options, env, renderer) : renderer.<span class="hljs-title">renderToken</span>(tokens, index, options); }
+        <span class="hljs-keyword">const</span> link = <span class="hljs-title">destination</span>(href, env?.<span class="hljs-property">literateScreen</span>);
+        <span class="hljs-keyword">const</span> use = env?.<span class="hljs-property">literateUseTargets</span>?.<span class="hljs-title">get</span>(tokens[index]) <span class="hljs-keyword">as</span> <span class="hljs-title">PublicationTermUse</span> | <span class="hljs-literal">undefined</span>;
+        <span class="hljs-keyword">const</span> anchor = use ? <span class="hljs-string">`&lt;span id=&quot;</span><span class="hljs-subst">${screenTermUseTarget(use)}</span><span class="hljs-string">&quot;</span><span class="hljs-subst">${env.literateScreen?.format === </span><span class="hljs-string">'preview'</span><span class="hljs-subst"> ? </span><span class="hljs-string">` class=&quot;code-line&quot; data-line=&quot;</span><span class="hljs-subst">${use.at.line}</span><span class="hljs-string">&quot;`</span><span class="hljs-subst"> : </span><span class="hljs-string">''</span><span class="hljs-subst">}</span><span class="hljs-string">&gt;&lt;/span&gt;`</span> : <span class="hljs-string">''</span>;
+        <span class="hljs-keyword">return</span> anchor + (link?.<span class="hljs-property">href</span> ? <span class="hljs-string">`&lt;a href=&quot;</span><span class="hljs-subst">${escapeHtml(link.href)}</span><span class="hljs-string">&quot; data-literate-target=&quot;</span><span class="hljs-subst">${link.target}</span><span class="hljs-string">&quot;&gt;`</span> : <span class="hljs-string">'&lt;span class=&quot;literate-term-unresolved&quot;&gt;'</span>);
+    };
+    md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">link_close</span> = <span class="hljs-function">(</span><span class="hljs-params">tokens, index, options, env, renderer</span><span class="hljs-function">) =&gt;</span> {
+        <span class="hljs-keyword">let</span> start = index - <span class="hljs-number">1</span>;
+        <span class="hljs-keyword">while</span> (start &gt;= <span class="hljs-number">0</span> &amp;&amp; tokens[start].<span class="hljs-property">type</span> !== <span class="hljs-string">'link_open'</span>) { start--; }
+        <span class="hljs-keyword">const</span> href = start &gt;= <span class="hljs-number">0</span> ? tokens[start].<span class="hljs-title">attrGet</span>(<span class="hljs-string">'href'</span>) || <span class="hljs-string">''</span> : <span class="hljs-string">''</span>;
+        <span class="hljs-keyword">if</span> (href.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'term:'</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-title">destination</span>(href, env?.<span class="hljs-property">literateScreen</span>)?.<span class="hljs-property">href</span> ? <span class="hljs-string">'&lt;/a&gt;'</span> : <span class="hljs-string">'&lt;/span&gt;'</span>; }
+        <span class="hljs-keyword">return</span> close ? <span class="hljs-title">close</span>(tokens, index, options, env, renderer) : renderer.<span class="hljs-title">renderToken</span>(tokens, index, options);
+    };
+}
+</code></pre>
+
+</div>
+</div><p>Use anchors address model occurrences rather than matching label text. They are
+separate from definition identities and share the capability location map.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00730063007200650065006e0020007400650072006d002000750073006500200061006e00630068006f00720073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1"><span id="f-00730063007200650065006e0020007400650072006d002000750073006500200061006e00630068006f00720073"></span><a class="literate-tag-name" href="#f-00730063007200650065006e0020007400650072006d002000750073006500200061006e00630068006f00720073" data-literate-target="f-00730063007200650065006e0020007400650072006d002000750073006500200061006e00630068006f00720073" aria-label="Definition of screen term use anchors">&lt;&lt;screen term use anchors&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">screenTermUseTarget</span>(<span class="hljs-params">use: PublicationTermUse</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">const</span> owner = use.<span class="hljs-property">owner</span>.<span class="hljs-title">split</span>(<span class="hljs-string">''</span>).<span class="hljs-title">map</span>(<span class="hljs-params">char</span><span class="hljs-function"> =&gt;</span> char.<span class="hljs-title">charCodeAt</span>(<span class="hljs-number">0</span>).<span class="hljs-title">toString</span>(<span class="hljs-number">16</span>).<span class="hljs-title">padStart</span>(<span class="hljs-number">4</span>, <span class="hljs-string">'0'</span>)).<span class="hljs-title">join</span>(<span class="hljs-string">''</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-string">`annotation-use-</span><span class="hljs-subst">${owner}</span><span class="hljs-string">-</span><span class="hljs-subst">${use.tokenIndex}</span><span class="hljs-string">-</span><span class="hljs-subst">${use.childIndex}</span><span class="hljs-string">`</span>;
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">screenTermUseAnchors</span>(<span class="hljs-params">tokens: Token[], annotations: PublicationAnnotations, owner: </span><span class="hljs-built_in">string</span>) {
+    <span class="hljs-keyword">const</span> anchors = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-title">Token</span>, <span class="hljs-title">PublicationTermUse</span>&gt;();
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> use <span class="hljs-keyword">of</span> annotations.<span class="hljs-property">uses</span>) {
+        <span class="hljs-keyword">if</span> (use.<span class="hljs-property">owner</span> !== owner) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">const</span> token = tokens[use.<span class="hljs-property">tokenIndex</span>]?.<span class="hljs-property">children</span>?.[use.<span class="hljs-property">childIndex</span>];
+        <span class="hljs-keyword">if</span> (token?.<span class="hljs-property">type</span> === <span class="hljs-string">'link_open'</span> &amp;&amp; token.<span class="hljs-title">attrGet</span>(<span class="hljs-string">'href'</span>)?.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'term:'</span>)) { anchors.<span class="hljs-title">set</span>(token, use); }
+    }
+    <span class="hljs-keyword">return</span> anchors;
+}
+</code></pre>
+
+</div>
+</div><h2>Screen indexes</h2>
+<p>Only annotated books gain indexes. One root page owns both lists, with global
+navigation to definitions and accepted fragment contributions. Entries use titles
+and explicit semantic identities, not guessed identifiers or print page numbers.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00730063007200650065006e00200062006f006f006b00200069006e00640065007800650073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1"><span id="f-00730063007200650065006e00200062006f006f006b00200069006e00640065007800650073"></span><a class="literate-tag-name" href="#f-00730063007200650065006e00200062006f006f006b00200069006e00640065007800650073" data-literate-target="f-00730063007200650065006e00200062006f006f006b00200069006e00640065007800650073" aria-label="Definition of screen book indexes">&lt;&lt;screen book indexes&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">renderScreenIndexes</span>(<span class="hljs-params">context: ScreenAnnotationContext, paths: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> </span><span class="hljs-built_in">string</span><span class="hljs-params">[]</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">const</span> { model, annotations, path, format, destination } = context;
+    <span class="hljs-keyword">if</span> (!annotations.<span class="hljs-property">terms</span>.<span class="hljs-property">length</span> &amp;&amp; !annotations.<span class="hljs-property">notes</span>.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">''</span>; }
+    <span class="hljs-keyword">if</span> (path !== (paths.<span class="hljs-title">includes</span>(<span class="hljs-string">'index.literate'</span>) ? <span class="hljs-string">'index.literate'</span> : paths[<span class="hljs-number">0</span>])) { <span class="hljs-keyword">return</span> <span class="hljs-string">''</span>; }
+    <span class="hljs-keyword">const</span> lookup = <span class="hljs-title">screenIndex</span>(model, annotations);
+    <span class="hljs-keyword">const</span> <span class="hljs-title">link</span> = (<span class="hljs-params">target: </span><span class="hljs-built_in">string</span><span class="hljs-params">, title: </span><span class="hljs-built_in">string</span>) =&gt; {
+        <span class="hljs-keyword">const</span> at = lookup.<span class="hljs-property">targets</span>.<span class="hljs-title">get</span>(target)?.<span class="hljs-property">definition</span>;
+        <span class="hljs-keyword">return</span> <span class="hljs-title">screenLink</span>(at &amp;&amp; <span class="hljs-title">screenHref</span>(path, at.<span class="hljs-property">path</span>, target, format, destination), title, title, target);
+    };
+    <span class="hljs-keyword">const</span> terms = annotations.<span class="hljs-property">terms</span>.<span class="hljs-title">map</span>(<span class="hljs-params">term</span><span class="hljs-function"> =&gt;</span> <span class="hljs-string">`&lt;li&gt;</span><span class="hljs-subst">${link(term.target, term.title)}</span><span class="hljs-string"> — Definition`</span>
+        + (lookup.<span class="hljs-property">termReferences</span>.<span class="hljs-title">get</span>(term.<span class="hljs-property">target</span>) || []).<span class="hljs-title">map</span>(<span class="hljs-function">(</span><span class="hljs-params">use, index</span><span class="hljs-function">) =&gt;</span>
+            <span class="hljs-string">` · </span><span class="hljs-subst">${link(screenTermUseTarget(use), </span><span class="hljs-string">`Reference </span><span class="hljs-subst">${index + </span><span class="hljs-number">1</span><span class="hljs-subst">}</span><span class="hljs-string">`</span><span class="hljs-subst">)}</span><span class="hljs-string">`</span>).<span class="hljs-title">join</span>(<span class="hljs-string">''</span>) + <span class="hljs-string">'&lt;/li&gt;'</span>).<span class="hljs-title">join</span>(<span class="hljs-string">''</span>);
+    <span class="hljs-keyword">const</span> fragments = model.<span class="hljs-property">fragments</span>.<span class="hljs-title">map</span>(<span class="hljs-params">family</span><span class="hljs-function"> =&gt;</span> <span class="hljs-string">`&lt;li&gt;</span><span class="hljs-subst">${link(family.target, family.name)}</span><span class="hljs-string">: `</span>
+        + family.<span class="hljs-property">contributions</span>.<span class="hljs-title">map</span>(<span class="hljs-function">(</span><span class="hljs-params">target, index</span><span class="hljs-function">) =&gt;</span> <span class="hljs-title">link</span>(target, index ? <span class="hljs-string">`Addition </span><span class="hljs-subst">${index}</span><span class="hljs-string">`</span> : <span class="hljs-string">'Definition'</span>)).<span class="hljs-title">join</span>(<span class="hljs-string">' · '</span>)
+        + (lookup.<span class="hljs-property">fragmentReferences</span>.<span class="hljs-title">get</span>(family.<span class="hljs-property">target</span>) || [])
+            .<span class="hljs-title">map</span>(<span class="hljs-function">(</span><span class="hljs-params">part, index</span><span class="hljs-function">) =&gt;</span> <span class="hljs-string">` · </span><span class="hljs-subst">${link(part.target, </span><span class="hljs-string">`Reference </span><span class="hljs-subst">${index + </span><span class="hljs-number">1</span><span class="hljs-subst">}</span><span class="hljs-string">`</span><span class="hljs-subst">)}</span><span class="hljs-string">`</span>).<span class="hljs-title">join</span>(<span class="hljs-string">''</span>) + <span class="hljs-string">'&lt;/li&gt;'</span>).<span class="hljs-title">join</span>(<span class="hljs-string">''</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-string">`&lt;nav class=&quot;literate-screen-index&quot; aria-label=&quot;Term index&quot;&gt;&lt;h2&gt;Term index&lt;/h2&gt;&lt;ul&gt;</span><span class="hljs-subst">${terms}</span><span class="hljs-string">&lt;/ul&gt;&lt;/nav&gt;`</span>
+        + <span class="hljs-string">`&lt;nav class=&quot;literate-screen-index&quot; aria-label=&quot;Fragment index&quot;&gt;&lt;h2&gt;Fragment index&lt;/h2&gt;&lt;ul&gt;</span><span class="hljs-subst">${fragments}</span><span class="hljs-string">&lt;/ul&gt;&lt;/nav&gt;`</span>;
+}
+</code></pre>
+
+</div>
+</div><p>Annotation presentation is scoped to document wrappers and inherits the active
+palette. It does not add generated theme data or change legacy book styling.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00730063007200650065006e00200061006e006e006f0074006100740069006f006e0020007300740079006c00650073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1"><span id="f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e0020007300740079006c00650073"></span><a class="literate-tag-name" href="#f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e0020007300740079006c00650073" data-literate-target="f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e0020007300740079006c00650073" aria-label="Definition of screen annotation styles">&lt;&lt;screen annotation styles&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">const</span> screenStyle = <span class="hljs-string">`.literate-document .literate-annotation { margin-block: 1em; padding: .6em 1em; border-inline-start: .2em solid currentColor; }
+.literate-document .literate-annotation-title { font-weight: bold; }
+.literate-document .literate-note { border-inline-start-style: dotted; }
+.literate-document .literate-term-unresolved { text-decoration: underline dotted; }
+.literate-document .literate-screen-index { margin-block-start: 2em; }`</span>;
 </code></pre>
 
 </div>

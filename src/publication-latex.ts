@@ -1,5 +1,6 @@
 import type { ParsedProject, PublicationContribution, GenerationDiagnostic } from './engine';
-import { preparePandoc } from './publication-pandoc';
+import { preparePandoc, PandocInline } from './publication-pandoc';
+import { publicationRail, RailNote, RailTerm } from './publication-rail';
 import { resolvePublicationSettings } from './publication-settings';
 import { checkFontFace, fontFaces, fontFile, PortableFont } from './publication-fonts';
 import type { PublicationSettingsResult } from './publication-settings';
@@ -44,7 +45,7 @@ function fontName(value: string): string {
     }
     return value;
 }
-function checkOptions(options: LatexOptions, settings: PublicationSettingsResult): CheckedOptions {
+function checkOptions(options: LatexOptions, settings: PublicationSettingsResult, rail = false): CheckedOptions {
     const theme = getTheme(options.theme ?? defaultThemeName);
     if (!theme) { throw new Error('Unknown publication theme'); }
     const papers = new Map<string, [string, number, number]>([
@@ -58,11 +59,11 @@ function checkOptions(options: LatexOptions, settings: PublicationSettingsResult
     const [top, right, bottom, left] = overrides.map(value => value ?? margin);
     if (!paper || [margin, top, right, bottom, left].some(value =>
         !Number.isFinite(value) || value < 5 || value > 50) ||
-        paper[1] - left - right < 80 || paper[2] - top - bottom < 100) {
+        paper[1] - left - right - (rail ? 30 : 0) < 80 || paper[2] - top - bottom < 100) {
         throw new Error('Invalid paper or margin; require 5–50 mm and an 80 × 100 mm body');
     }
-    const geometry = overrides.some(value => value !== undefined)
-        ? `top=${top}mm,right=${right}mm,bottom=${bottom}mm,left=${left}mm`
+    const geometry = rail || overrides.some(value => value !== undefined)
+        ? `top=${top}mm,right=${right + (rail ? 30 : 0)}mm,bottom=${bottom}mm,left=${left}mm`
         : `margin=${margin}mm`;
     const codeLigatures = options.codeLigatures ?? settings.codeLigatures;
     if (typeof codeLigatures !== 'boolean') { throw new Error('Code ligatures must be boolean'); }
@@ -153,7 +154,7 @@ function slantFeatures(font: PortableFont): string {
     }
     return features;
 }
-function template(body: string, options: CheckedOptions, definitions: string[]): string {
+function template(body: string, options: CheckedOptions, definitions: string[], rail: string): string {
     const c = options.theme.colors;
     return themeNotice() + String.raw`\newcommand{\DoNotLoadEpstopdf}{}
     \documentclass[11pt,oneside,openany]{scrbook}
@@ -177,7 +178,7 @@ ${'\\usepackage'}[hidelinks]{hyperref}
 \providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 \providecommand{\passthrough}[1]{#1}
 \providecommand{\pandocbounded}[1]{#1}
-` + templateCodeSettings() + '\n' + templateImageSettings() + '\n' + definitions.join('\n') +
+` + templateCodeSettings() + '\n' + templateImageSettings() + '\n' + definitions.join('\n') + (rail ? '\n' + rail : '') +
         '\n\\begin{document}\n\\tableofcontents\n' + body + '\n\\end{document}\n';
 }
 function templateCodeSettings(): string {
@@ -378,6 +379,129 @@ function referencePrefixEnd(text: string, cursor: number, start: number): number
     const lineStart = text.lastIndexOf('\n', start - 1) + 1;
     return /^[ \t]*$/.test(text.slice(lineStart, start)) ? Math.max(cursor, lineStart) : start;
 }
+const conversionOptions: LatexConversionOptions = {
+    standalone: false, syntaxHighlighting: 'none', topLevelDivision: 'chapter'
+};
+function rawInline(value: string): PandocInline { return { t: 'RawInline', c: ['latex', value] }; }
+function annotationInlines(inlines: PandocInline[], markers: boolean, next: () => string): PandocInline[] {
+    return inlines.flatMap((inline): PandocInline[] => {
+        if (inline.t === 'Link') {
+            const label = annotationInlines(inline.c[1], markers, next);
+            if (!inline.c[0][1].includes('lit-term-use')) { return [{ ...inline, c: [inline.c[0], label, inline.c[2]] }]; }
+            const id = target(inline.c[2][0].slice(1));
+            const opening = (markers ? `\\LitTermUse{${next()}}{${id}}{` : '') + `\\hyperref[${id}]{`;
+            const closing = `\\textsuperscript{\\notefont\\pageref*{${id}}}}` + (markers ? '}' : '');
+            return [rawInline(opening), ...label, rawInline(closing)];
+        }
+        if (inline.t === 'Emph' || inline.t === 'Strong' || inline.t === 'Strikeout') {
+            return [{ ...inline, c: annotationInlines(inline.c, markers, next) }];
+        }
+        return [inline];
+    });
+}
+const maximumAnnotationBody = 131072;
+const maximumAnnotationContent = 2 * 1024 * 1024;
+interface AnnotationBudget { terms: RailTerm[]; size: number; }
+function annotationText(value: string): void {
+    if (typeof value !== 'string' || value.length > maximumAnnotationBody ||
+        /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)) {
+        throw new Error('Invalid or oversized controlled rail LaTeX (maximum 131072 characters)');
+    }
+}
+function annotationSize(size: number): void {
+    if (size > maximumAnnotationContent) { throw new Error('Annotation content exceeds 2 MiB'); }
+}
+function annotationTarget(value: string): string {
+    if (4 + value.length * 4 > 8192) { throw new Error('Encoded rail target exceeds 8192 characters'); }
+    return target(value);
+}
+function annotationBudget(project: ParsedProject): AnnotationBudget {
+    const { terms, notes } = project.annotations;
+    if (terms.length > 1000 || notes.length > 1000) {
+        throw new Error('Rail supports at most 1000 terms and 1000 notes');
+    }
+    let sourceSize = 0, size = 0;
+    for (const item of [...terms, ...notes]) {
+        if (item.body.length > maximumAnnotationBody) {
+            throw new Error('Annotation source body exceeds 131072 characters');
+        }
+        sourceSize += item.body.length;
+        annotationSize(sourceSize);
+    }
+    const declarations = terms.map(term => {
+        const id = annotationTarget(term.target), title = tex(term.title);
+        annotationText(title);
+        size += 2 * id.length + title.length;
+        annotationSize(size + sourceSize);
+        return { target: id, title, label: id };
+    });
+    for (const note of notes) {
+        size += annotationTarget(note.target).length;
+        annotationSize(size + sourceSize);
+    }
+    return { terms: declarations, size };
+}
+async function annotationLatex(document: PandocDocument, project: ParsedProject,
+    convert: LatexConverter, budget: AnnotationBudget): Promise<string> {
+    const notes: RailNote[] = [];
+    let occurrence = 0;
+    const next = (): string => `lit-use-${++occurrence}`;
+    const raw = (value: string): PandocBlock => ({ t: 'RawBlock', c: ['latex', value] });
+    const walk = async (blocks: PandocBlock[], markers: boolean): Promise<PandocBlock[]> => {
+        const result: PandocBlock[] = [];
+        for (const block of blocks) {
+            if (block.t === 'Div') {
+                const term = project.annotations.terms.find(item => item.target === block.c[0][0]);
+                const note = project.annotations.notes.find(item => item.target === block.c[0][0]);
+                const children = await walk(block.c[1], markers && !term && !note);
+                if (note) {
+                    const body = children.length ? await convert({ ...document, blocks: children }, conversionOptions) : '';
+                    annotationText(body);
+                    budget.size += body.length;
+                    annotationSize(budget.size);
+                    notes.push({ target: target(note.target), number: note.number, body });
+                    result.push(raw(`\\LitNoteUse{${target(note.target)}}`));
+                } else if (term) {
+                    result.push(raw(`\\par${anchor(term.target)}\\textbf{${tex(term.title)}}\\par`), ...children);
+                } else { result.push({ ...block, c: [block.c[0], children] }); }
+            } else { result.push(await ordinary(block, markers)); }
+        }
+        return result;
+    };
+    const items = async (list: PandocBlock[][], markers: boolean): Promise<PandocBlock[][]> => {
+        const result: PandocBlock[][] = [];
+        for (const item of list) { result.push(await walk(item, markers)); }
+        return result;
+    };
+    const ordinary = async (block: PandocBlock, markers: boolean): Promise<PandocBlock> => {
+        switch (block.t) {
+            case 'Para': case 'Plain': return { ...block, c: annotationInlines(block.c, markers, next) };
+            case 'BlockQuote': return { ...block, c: await walk(block.c, markers) };
+            case 'BulletList': return { ...block, c: await items(block.c, markers) };
+            case 'OrderedList': return { ...block,
+                c: [block.c[0], await items(block.c[1], markers)] };
+            default: return block;
+        }
+    };
+    document.blocks = await walk(document.blocks, true);
+    const terms = budget.terms;
+    if (!terms.length && !notes.length) { return ''; }
+    return '% literate-publication-rail-v1\n' +
+        '\\setlength{\\marginparwidth}{25mm}\n\\setlength{\\marginparsep}{5mm}\n' +
+        '\\microtypesetup{protrusion=false}\n' + publicationRail(terms, notes);
+}
+function annotationIndexes(project: ParsedProject): string {
+    let output = '\n\\chapter*{Term index}\n';
+    for (const term of project.annotations.terms) {
+        output += pageLink(term.target, tex(term.title)) + '\\par\n';
+    }
+    output += '\n\\chapter*{Fragment index}\n';
+    for (const family of project.publication.fragments) {
+        output += `{\\fragmentfont ${nameText(family.name)}}\\quad ` +
+            family.contributions.map(id => pageLink(id, '')).join(', ') + '\\par\n';
+    }
+    return output;
+}
 export async function renderLatex(parsed: ParsedProject, options: LatexOptions,
     convert: LatexConverter): Promise<LatexResult> {
     let stage = 'latex-options';
@@ -386,21 +510,23 @@ export async function renderLatex(parsed: ParsedProject, options: LatexOptions,
         if (settings.diagnostics.length) {
             return { diagnostics: [...parsed.diagnostics, ...settings.diagnostics] };
         }
-        const checked = checkOptions(options, settings);
+        const hasAnnotations = !!(parsed.annotations.terms.length || parsed.annotations.notes.length);
+        const checked = checkOptions(options, settings, hasAnnotations);
         const definitions: string[] = [];
         stage = 'latex-preparation';
+        const budget = annotationBudget(parsed);
         const prepared = preparePandoc(parsed, part =>
             contribution(part, parsed, checked.theme, definitions), options.assetPath
                 ? asset => imageBlock(asset, options.assetPath!) : undefined);
         if (!prepared.document) { return { diagnostics: prepared.diagnostics }; }
         prepared.document.blocks = ordinaryCode(prepared.document.blocks, checked.theme);
         stage = 'latex-conversion';
-        const body = await convert(prepared.document, {
-            standalone: false, syntaxHighlighting: 'none', topLevelDivision: 'chapter'
-        });
+        const annotations = await annotationLatex(prepared.document, parsed, convert, budget);
+        const body = await convert(prepared.document, conversionOptions);
         if (typeof body !== 'string') { throw new Error('Converter must return a LaTeX body string'); }
         stage = 'latex-template';
-        return { latex: template(body, checked, definitions), diagnostics: [] };
+        return { latex: template(body + (hasAnnotations ? annotationIndexes(parsed) : ''),
+            checked, definitions, annotations), diagnostics: [] };
     } catch (error) {
         return { diagnostics: [{ path: parsed.documents[0]?.path ?? '', line: 0, column: 0,
             code: stage, message: error instanceof Error ? error.message : String(error) }] };

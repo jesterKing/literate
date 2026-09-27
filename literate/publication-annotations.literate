@@ -1,0 +1,234 @@
+# Shared publication annotations
+
+Annotations are prose-local fenced blocks, not fragment contributions. A TERM
+header is exactly `TERM key "Display title"`; NOTE has no arguments. Headers are
+case-sensitive, with whitespace separating fields. Keys match ASCII
+`[A-Za-z][A-Za-z0-9_.:-]{0,99}`. The title is a required JSON string of at most
+200 Unicode code points (including an empty string). Trailing header whitespace
+is ignored. Markdown-it determines fence boundaries, including unclosed fences.
+TERM bodies stay in source prose; NOTE bodies belong in the publication rail.
+This module supplies data only, without choosing HTML or print presentation.
+
+```ts : <<publication annotations.*>>= ./src/publication-annotations.ts $
+<<annotation contracts>>
+<<annotation body parsing>>
+<<annotation identities and hrefs>>
+<<annotation collection>>
+```
+
+## Renderer-neutral contract
+
+Locations use zero-based source lines and UTF-16 columns. Document uses point to
+the enclosing inline block; body uses point to the enclosing annotation fence.
+A use's tokenIndex selects an inline token in the document tokens or in
+`parseAnnotationBody(owner.body)`; childIndex selects that token's link_open child.
+This intentionally does not claim character-exact Markdown link locations.
+Definition tokenIndex selects the original fence. Owners are document paths for
+ordinary prose and annotation targets for body prose. Lists and headings in
+ordinary prose are included. Inline code, code blocks, and images are not uses.
+
+```ts : <<annotation contracts>>=
+import MarkdownIt = require('markdown-it');
+import Token = require('markdown-it/lib/token');
+import type { GenerationDiagnostic as Diagnostic } from './engine';
+
+type Location = { path: string; line: number; column: number };
+export interface PublicationTerm {
+    key: string; title: string; target: string; at: Location; tokenIndex: number; body: string;
+}
+export interface PublicationNote {
+    target: string; number: number; at: Location; tokenIndex: number; body: string;
+}
+export interface PublicationTermUse {
+    key: string; target?: string; at: Location; owner: string;
+    tokenIndex: number; childIndex: number;
+    resolution: 'resolved' | 'missing' | 'ambiguous';
+}
+export interface PublicationAnnotations {
+    terms: PublicationTerm[]; notes: PublicationNote[];
+    uses: PublicationTermUse[]; diagnostics: Diagnostic[];
+}
+```
+
+## One deterministic body parser
+
+Bodies allow paragraphs, ordered and unordered lists, emphasis, strong emphasis,
+inline code, links, text and line breaks. All other token kinds are rejected,
+including headings, blockquotes, tables, strikethrough, images, indented code,
+code fences (including nested TERM/NOTE and Mermaid), and raw HTML. HTML parsing
+is enabled only to recognize and diagnose HTML, not to authorize rendering it.
+Escaped HTML and HTML inside inline code remain ordinary text/code. The parser
+returns tokens even for invalid bodies; the collector validates those same tokens.
+Adapters must honor diagnostics and never render rejected HTML unsanitized.
+
+```ts : <<annotation body parsing>>=
+export function parseAnnotationBody(body: string): Token[] {
+    return new MarkdownIt({ html: true }).parse(body, {});
+}
+const allowedBodyTokens = new Set([
+    'paragraph_open', 'paragraph_close', 'inline', 'text', 'softbreak', 'hardbreak',
+    'bullet_list_open', 'bullet_list_close', 'ordered_list_open', 'ordered_list_close',
+    'list_item_open', 'list_item_close', 'em_open', 'em_close', 'strong_open',
+    'strong_close', 'code_inline', 'link_open', 'link_close'
+]);
+function invalidBodyToken(tokens: readonly Token[]): Token | undefined {
+    for (const token of tokens) {
+        if (!allowedBodyTokens.has(token.type)) { return token; }
+        const invalid = invalidBodyToken(token.children || []);
+        if (invalid) { return invalid; }
+    }
+    return undefined;
+}
+```
+
+## Stable identities and safe lookup
+
+Targets have distinct generated namespaces and hex-encoded UTF-16 components,
+never author-controlled raw identifiers. TERM targets derive from the key;
+duplicate definitions receive location suffixes so preview targets remain unique.
+NOTE targets derive from path and fence line/column, not the encounter number.
+Numbers are one-based in caller document/fence order. Keys are case-sensitive.
+Percent-encoded term destinations are decoded exactly once; malformed encodings
+and invalid keys cannot resolve. Missing and ambiguous links return undefined,
+never the original href. termByTarget likewise returns undefined for unknown IDs.
+
+```ts : <<annotation identities and hrefs>>=
+const keyPattern = /^[A-Za-z][A-Za-z0-9_.:-]{0,99}$/;
+function encode(value: string): string {
+    return value.split('').map(char => char.charCodeAt(0).toString(16).padStart(4, '0')).join('');
+}
+function termKey(href: string): string | undefined {
+    if (!href.startsWith('term:')) { return undefined; }
+    try { return decodeURIComponent(href.slice(5)); } catch { return undefined; }
+}
+export function resolveTermHref(annotations: PublicationAnnotations, href: string): string | undefined {
+    const key = termKey(href);
+    if (key === undefined || !keyPattern.test(key)) { return undefined; }
+    const terms = annotations.terms.filter(term => term.key === key);
+    return terms.length === 1 ? terms[0].target : undefined;
+}
+export function termByTarget(annotations: PublicationAnnotations, target: string): PublicationTerm | undefined {
+    return annotations.terms.find(term => term.target === target);
+}
+```
+
+## Collection before resolution
+
+Collection is pure with respect to caller tokens. Invalid headers produce no
+annotation; valid headers retain their bodies even when body validation fails.
+Every duplicate definition is diagnosed and all uses of that key are ambiguous.
+Forward and cross-document uses resolve after collection. Unknown or malformed
+term destinations are missing uses and diagnostic, so strict adapters can reject
+them while previews retain occurrence metadata. Diagnostics have stable codes.
+
+```ts : <<annotation collection>>=
+export function collectAnnotations(
+    documents: readonly { path: string; text: string; tokens: readonly Token[] }[]
+): PublicationAnnotations {
+    const result: PublicationAnnotations = { terms: [], notes: [], uses: [], diagnostics: [] };
+    const report = (at: Location, code: string, message: string): void => {
+        result.diagnostics.push({ ...at, code, message });
+    };
+    <<annotation inline collection>>
+    <<annotation fence collection>>
+    <<annotation final resolution>>
+    return result;
+}
+```
+
+Markdown-it emits list bodies as a flat block-token stream with inline children.
+Iterating every inline token handles arbitrary list nesting without inventing
+indexes or scanning raw Markdown. Image alt children are deliberately excluded.
+
+```ts : <<annotation inline collection>>=
+    const collectUses = (tokens: readonly Token[], owner: string,
+        location: (token: Token) => Location, tokenOffset = 0): void => {
+        tokens.forEach((token, tokenIndex) => {
+            if (token.type !== 'inline') { return; }
+            (token.children || []).forEach((child, childIndex) => {
+                const href = child.type === 'link_open' ? child.attrGet('href') : null;
+                if (!href?.startsWith('term:')) { return; }
+                result.uses.push({ key: termKey(href) ?? href.slice(5), at: location(token),
+                    owner, tokenIndex: tokenIndex + tokenOffset, childIndex, resolution: 'missing' });
+            });
+        });
+    };
+```
+
+Fence recognition reserves only the exact uppercase TERM and NOTE words followed
+by whitespace or end-of-header. Ordinary language fences are unchanged, including
+TERM-like language names. The original Markdown-normalized fence content is body.
+
+```ts : <<annotation fence collection>>=
+    for (const document of documents) {
+        const lines = document.text.split(/\r\n|\r|\n/);
+        const location = (token: Token): Location => ({ path: document.path,
+            line: token.map?.[0] ?? 0, column: token.type === 'fence'
+                ? Math.max(0, (lines[token.map?.[0] ?? 0] || '').indexOf(token.markup)) : 0 });
+        document.tokens.forEach((token, tokenIndex) => {
+            if (token.type === 'inline') {
+                // Preserve source encounter order with body uses between prose uses.
+                collectUses([token], document.path, location, tokenIndex);
+            }
+            if (token.type !== 'fence' || !/^(TERM|NOTE)(?:\s|$)/.test(token.info.trim())) { return; }
+            const header = token.info.trim();
+            const at = location(token);
+            const body = token.content;
+            let annotation: PublicationTerm | PublicationNote;
+            <<annotation header acceptance>>
+            const bodyTokens = parseAnnotationBody(body);
+            const invalid = invalidBodyToken(bodyTokens);
+            if (invalid) { report(at, 'annotation-body', `Unsupported annotation body token: ${invalid.type}`); }
+            collectUses(bodyTokens, annotation.target, () => at);
+        });
+    }
+```
+
+Required titles are parsed as JSON, rather than unescaping with a second grammar.
+Duplicate target suffixes are assigned after all definitions are known; body use
+owners are updated together with the corresponding target.
+
+```ts : <<annotation header acceptance>>=
+            if (header === 'NOTE') {
+                annotation = { target: `annotation-note-${encode(document.path)}-${at.line}-${at.column}`,
+                    number: result.notes.length + 1, at, tokenIndex, body };
+                result.notes.push(annotation);
+            } else {
+                const match = /^TERM\s+([A-Za-z][A-Za-z0-9_.:-]{0,99})\s+("(?:[^"\\]|\\.)*")$/.exec(header);
+                let title: unknown;
+                try { title = match ? JSON.parse(match[2]) : undefined; } catch { title = undefined; }
+                if (!match || typeof title !== 'string' || [...title].length > 200) {
+                    report(at, 'annotation-header', 'Expected TERM key "title" (JSON string, at most 200 code points) or NOTE');
+                    return;
+                }
+                const base = `annotation-term-${encode(match[1])}`;
+                annotation = { key: match[1], title, target: `${base}-${encode(document.path)}-${at.line}-${at.column}`,
+                    at, tokenIndex, body };
+                result.terms.push(annotation);
+            }
+```
+
+The temporary location-qualified term targets distinguish duplicate body owners.
+Unique terms shed that suffix, giving references an identity stable across prose
+edits and document moves. Duplicate definitions remain individually addressable,
+but never become a successful key resolution.
+
+```ts : <<annotation final resolution>>=
+    const byKey = new Map<string, PublicationTerm[]>();
+    for (const term of result.terms) { byKey.set(term.key, [...(byKey.get(term.key) || []), term]); }
+    for (const term of result.terms) {
+        if (byKey.get(term.key)!.length > 1) {
+            report(term.at, 'annotation-duplicate', `Duplicate TERM key: ${term.key}`);
+        } else {
+            const target = `annotation-term-${encode(term.key)}`;
+            for (const use of result.uses) { if (use.owner === term.target) { use.owner = target; } }
+            term.target = target;
+        }
+    }
+    for (const use of result.uses) {
+        const terms = keyPattern.test(use.key) ? byKey.get(use.key) || [] : [];
+        use.resolution = terms.length === 1 ? 'resolved' : terms.length > 1 ? 'ambiguous' : 'missing';
+        if (use.resolution === 'resolved') { use.target = terms[0].target; }
+        else { report(use.at, `annotation-${use.resolution}`, `${use.resolution} TERM use: ${use.key}`); }
+    }
+```

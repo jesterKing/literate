@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Page-local publication annotations</h1>
+<p>A publication rail is one ordered stream of term lookups and numbered explanations.
+It occupies a reserved 25 mm column, separated from the body by 5 mm. Entries remain
+on their reference page: collision resolution moves them vertically, never splits,
+shrinks, or spills them. Impossible stable layouts are errors.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020007200610069006c002e002a-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020007200610069006c002e002a"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c002e002a" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c002e002a" aria-label="Definition of publication rail.*">&lt;&lt;publication rail.*&gt;&gt;= src/publication-rail.ts $</a></div>
+<div class="code">
+<pre><code><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c00200063006f006e007400720061006300740073" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200063006f006e007400720061006300740073" aria-label="Definition of publication rail contracts">&lt;&lt;publication rail contracts&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c00200061007300730065006d0062006c0079" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200061007300730065006d0062006c0079" aria-label="Definition of publication rail assembly">&lt;&lt;publication rail assembly&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c0020005400650058" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c0020005400650058" aria-label="Definition of publication rail TeX">&lt;&lt;publication rail TeX&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c0020004c00750061002000730074006100740065" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c0020004c00750061002000730074006100740065" aria-label="Definition of publication rail Lua state">&lt;&lt;publication rail Lua state&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c00200062006f0078002000610075006400690074" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200062006f0078002000610075006400690074" aria-label="Definition of publication rail box audit">&lt;&lt;publication rail box audit&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c0020006d00610072006b006500720073" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c0020006d00610072006b006500720073" aria-label="Definition of publication rail markers">&lt;&lt;publication rail markers&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c0020007000610067006500200065006e00740072006900650073" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c0020007000610067006500200065006e00740072006900650073" aria-label="Definition of publication rail page entries">&lt;&lt;publication rail page entries&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c00200070006c006100630065006d0065006e0074" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200070006c006100630065006d0065006e0074" aria-label="Definition of publication rail placement">&lt;&lt;publication rail placement&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c00200063006f006e00760065007200670065006e00630065" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200063006f006e00760065007200670065006e00630065" aria-label="Definition of publication rail convergence">&lt;&lt;publication rail convergence&gt;&gt;</a>
+</code></pre>
+
+</div>
+</div><h2>Controlled inputs</h2>
+<p>The caller supplies escaped, controlled LaTeX, not raw author TeX. A term's model
+<code>target</code> and its pre-encoded definition <code>label</code> are distinct identifiers. Titles
+and note bodies never enter executable Lua. Declarations, text, markers, pages and
+node traversal have explicit limits. No annotations returns an empty preamble.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020007200610069006c00200063006f006e007400720061006300740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200063006f006e007400720061006300740073"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c00200063006f006e007400720061006300740073" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200063006f006e007400720061006300740073" aria-label="Definition of publication rail contracts">&lt;&lt;publication rail contracts&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">RailTerm</span> { <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">title</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">label</span>: <span class="hljs-built_in">string</span>; }
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">RailNote</span> { <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">number</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">body</span>: <span class="hljs-built_in">string</span>; }
+
+<span class="hljs-keyword">const</span> maximumDeclarations = <span class="hljs-number">1000</span>;
+<span class="hljs-keyword">const</span> maximumContent = <span class="hljs-number">2</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>;
+<span class="hljs-keyword">function</span> <span class="hljs-title">identifier</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> value !== <span class="hljs-string">'string'</span> || !<span class="hljs-regexp">/^</span><span class="hljs-regexp">[A-Za-z0-9]</span><span class="hljs-regexp">[A-Za-z0-9:._-]</span><span class="hljs-regexp">{0,8191}$/</span>.<span class="hljs-title">test</span>(value)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Rail targets and labels must be safe ASCII identifiers (1–8192 characters)'</span>);
+    }
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title">controlledText</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> value !== <span class="hljs-string">'string'</span> || <span class="hljs-regexp">/</span><span class="hljs-regexp">[</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">0000-</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">0008</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">000b</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">000c</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">000e-</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">001f</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">007f]</span><span class="hljs-regexp">/</span>.<span class="hljs-title">test</span>(value) ||
+        value.<span class="hljs-property">length</span> &gt; <span class="hljs-number">131072</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Invalid or oversized controlled rail LaTeX'</span>); }
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title">suffix</span>(<span class="hljs-params">index: </span><span class="hljs-built_in">number</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">let</span> result = <span class="hljs-string">''</span>;
+    <span class="hljs-keyword">do</span> {
+        result = <span class="hljs-title">String</span>.<span class="hljs-title">fromCharCode</span>(<span class="hljs-number">65</span> + index % <span class="hljs-number">26</span>) + result;
+        index = <span class="hljs-title">Math</span>.<span class="hljs-title">floor</span>(index / <span class="hljs-number">26</span>) - <span class="hljs-number">1</span>;
+    } <span class="hljs-keyword">while</span> (index &gt;= <span class="hljs-number">0</span>);
+    <span class="hljs-keyword">return</span> result;
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title">luaLoader</span>(<span class="hljs-params">source: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">chunks</span>: <span class="hljs-built_in">string</span>[] = [];
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> offset = <span class="hljs-number">0</span>; offset &lt; source.<span class="hljs-property">length</span>; offset += <span class="hljs-number">128</span>) {
+        chunks.<span class="hljs-title">push</span>(<span class="hljs-string">'string.char('</span> + <span class="hljs-title">Array</span>.<span class="hljs-title">from</span>(source.<span class="hljs-title">slice</span>(offset, offset + <span class="hljs-number">128</span>),
+            <span class="hljs-params">character</span><span class="hljs-function"> =&gt;</span> character.<span class="hljs-title">charCodeAt</span>(<span class="hljs-number">0</span>)).<span class="hljs-title">join</span>(<span class="hljs-string">','</span>) + <span class="hljs-string">')'</span>);
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">directlua{assert(load(table.concat({'</span> + chunks.<span class="hljs-title">join</span>(<span class="hljs-string">',</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>) + <span class="hljs-string">'}),&quot;literate-rail&quot;))()}'</span>;
+}
+
+</code></pre>
+
+</div>
+</div><p>Fixed trusted Lua is embedded as ASCII character codes, avoiding TeX catcode
+interpretation and a separate asset contract. Each declaration gets a reusable
+box whose contents are typeset after the document auxiliary labels have loaded.
+A term row links its title and final definition page; every note has its own row.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020007200610069006c00200061007300730065006d0062006c0079-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200061007300730065006d0062006c0079"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c00200061007300730065006d0062006c0079" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200061007300730065006d0062006c0079" aria-label="Definition of publication rail assembly">&lt;&lt;publication rail assembly&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">publicationRail</span>(<span class="hljs-params">terms: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> RailTerm[], notes: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> RailNote[]</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">if</span> (terms.<span class="hljs-property">length</span> &gt; maximumDeclarations || notes.<span class="hljs-property">length</span> &gt; maximumDeclarations) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Rail supports at most 1000 terms and 1000 notes'</span>);
+    }
+    <span class="hljs-keyword">const</span> targets = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;(), labels = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;(), numbers = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">number</span>&gt;();
+    <span class="hljs-keyword">let</span> size = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> item <span class="hljs-keyword">of</span> [...terms, ...notes]) {
+        <span class="hljs-title">identifier</span>(item.<span class="hljs-property">target</span>);
+        <span class="hljs-keyword">if</span> (targets.<span class="hljs-title">has</span>(item.<span class="hljs-property">target</span>)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Duplicate rail target: </span><span class="hljs-subst">${item.target}</span><span class="hljs-string">`</span>); }
+        targets.<span class="hljs-title">add</span>(item.<span class="hljs-property">target</span>); size += item.<span class="hljs-property">target</span>.<span class="hljs-property">length</span>;
+    }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> term <span class="hljs-keyword">of</span> terms) {
+        <span class="hljs-title">identifier</span>(term.<span class="hljs-property">label</span>); <span class="hljs-title">controlledText</span>(term.<span class="hljs-property">title</span>);
+        <span class="hljs-keyword">if</span> (labels.<span class="hljs-title">has</span>(term.<span class="hljs-property">label</span>)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Duplicate rail definition label: </span><span class="hljs-subst">${term.label}</span><span class="hljs-string">`</span>); }
+        labels.<span class="hljs-title">add</span>(term.<span class="hljs-property">label</span>); size += term.<span class="hljs-property">label</span>.<span class="hljs-property">length</span> + term.<span class="hljs-property">title</span>.<span class="hljs-property">length</span>;
+    }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> note <span class="hljs-keyword">of</span> notes) {
+        <span class="hljs-title">controlledText</span>(note.<span class="hljs-property">body</span>);
+        <span class="hljs-keyword">if</span> (!<span class="hljs-title">Number</span>.<span class="hljs-title">isSafeInteger</span>(note.<span class="hljs-property">number</span>) || note.<span class="hljs-property">number</span> &lt; <span class="hljs-number">1</span> || note.<span class="hljs-property">number</span> &gt; <span class="hljs-number">10000</span> || numbers.<span class="hljs-title">has</span>(note.<span class="hljs-property">number</span>)) {
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Rail note numbers must be unique integers in 1–10000'</span>);
+        }
+        numbers.<span class="hljs-title">add</span>(note.<span class="hljs-property">number</span>); size += note.<span class="hljs-property">body</span>.<span class="hljs-property">length</span>;
+    }
+    <span class="hljs-keyword">if</span> (size &gt; maximumContent) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Rail declarations exceed 2 MiB'</span>); }
+    <span class="hljs-keyword">if</span> (!terms.<span class="hljs-property">length</span> &amp;&amp; !notes.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">''</span>; }
+    <span class="hljs-keyword">const</span> declarations = [
+        ...terms.<span class="hljs-title">map</span>(<span class="hljs-params">term</span><span class="hljs-function"> =&gt;</span> ({ <span class="hljs-attr">target</span>: term.<span class="hljs-property">target</span>, <span class="hljs-attr">kind</span>: <span class="hljs-string">'term'</span>, <span class="hljs-attr">number</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">label</span>: term.<span class="hljs-property">label</span>,
+            <span class="hljs-attr">body</span>: <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">hyperref[</span><span class="hljs-subst">${term.label}</span><span class="hljs-string">]{</span><span class="hljs-string">\\</span><span class="hljs-string">textbf{</span><span class="hljs-subst">${term.title}</span><span class="hljs-string">}</span><span class="hljs-string">\\</span><span class="hljs-string">space</span><span class="hljs-string">\\</span><span class="hljs-string">pageref*{</span><span class="hljs-subst">${term.label}</span><span class="hljs-string">}}`</span> })),
+        ...notes.<span class="hljs-title">map</span>(<span class="hljs-params">note</span><span class="hljs-function"> =&gt;</span> ({ ...note, <span class="hljs-attr">kind</span>: <span class="hljs-string">'note'</span>, <span class="hljs-attr">label</span>: <span class="hljs-string">''</span>,
+            <span class="hljs-attr">body</span>: <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">textbf{</span><span class="hljs-subst">${note.</span><span class="hljs-built_in">number</span><span class="hljs-subst">}</span><span class="hljs-string">.}</span><span class="hljs-string">\\</span><span class="hljs-string">space </span><span class="hljs-subst">${note.body}</span><span class="hljs-string">`</span> }))
+    ];
+    <span class="hljs-keyword">const</span> registration = declarations.<span class="hljs-title">map</span>(<span class="hljs-function">(</span><span class="hljs-params">item, index</span><span class="hljs-function">) =&gt;</span>
+        <span class="hljs-string">`litrail.declare(</span><span class="hljs-subst">${index + </span><span class="hljs-number">1</span><span class="hljs-subst">}</span><span class="hljs-string">,&quot;</span><span class="hljs-subst">${item.target}</span><span class="hljs-string">&quot;,&quot;</span><span class="hljs-subst">${item.kind}</span><span class="hljs-string">&quot;,</span><span class="hljs-subst">${item.</span><span class="hljs-built_in">number</span><span class="hljs-subst">}</span><span class="hljs-string">)`</span>).<span class="hljs-title">join</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>);
+    <span class="hljs-keyword">const</span> boxes = declarations.<span class="hljs-title">map</span>(<span class="hljs-function">(</span><span class="hljs-params">item, index</span><span class="hljs-function">) =&gt;</span> {
+        <span class="hljs-keyword">const</span> name = <span class="hljs-title">suffix</span>(index);
+        <span class="hljs-keyword">return</span> <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">expandafter</span><span class="hljs-string">\\</span><span class="hljs-string">newbox</span><span class="hljs-string">\\</span><span class="hljs-string">csname LitRailBox</span><span class="hljs-subst">${name}</span><span class="hljs-string">\\</span><span class="hljs-string">endcsname</span><span class="hljs-string">\n</span><span class="hljs-string">`</span> +
+            <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">long</span><span class="hljs-string">\\</span><span class="hljs-string">def</span><span class="hljs-string">\\</span><span class="hljs-string">LitRailBody</span><span class="hljs-subst">${name}</span><span class="hljs-string">{</span><span class="hljs-subst">${item.body}</span><span class="hljs-string">}</span><span class="hljs-string">\n</span><span class="hljs-string">`</span> +
+            <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">AddToHook{begindocument/end}{</span><span class="hljs-string">\\</span><span class="hljs-string">LitRailBuild{</span><span class="hljs-subst">${index + </span><span class="hljs-number">1</span><span class="hljs-subst">}</span><span class="hljs-string">}{</span><span class="hljs-subst">${name}</span><span class="hljs-string">}{</span><span class="hljs-subst">${item.label}</span><span class="hljs-string">}}`</span>;
+    }).<span class="hljs-title">join</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-title">luaLoader</span>(<span class="hljs-title">railLua</span>() + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + registration) + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + <span class="hljs-title">railTex</span>() + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + boxes + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>;
+}
+
+</code></pre>
+
+</div>
+</div><h2>Renderer integration</h2>
+<p>Load this preamble once, after <code>fontspec</code>, the <code>notefont</code> family, <code>hyperref</code>, and
+any <code>microtype</code> setup. Use one-sided, single-column <code>scrbook</code>. When annotations
+exist, the renderer must reserve <code>right = originalRight + 30 mm</code>, set
+<code>marginparwidth=25mm</code> and <code>marginparsep=5mm</code>, and reject a reduced body below
+80 by 100 mm. Do not also use geometry's <code>includemp</code>. A5 default margins leave
+78 mm and must fail; left 16/right 20 mm leave a valid 82 mm. Without annotations,
+leave today's margins unchanged. Disable body microtype protrusion if the full
+5 mm clear gap is required; body overfull diagnostics remain the renderer's concern.</p>
+<p>Emit <code>\phantomsection\label{label}</code> at the definition. A use is
+<code>\LitTermUse{uniqueOccurrenceId}{termTarget}{renderedLabel}</code>: the supplied label,
+including any caller-owned hyperlink/page suffix, appears exactly once. Its
+zero-width marker precedes its first glyph. <code>\LitNoteUse{noteTarget}</code> emits the
+number and a marker at the source location. Call each NOTE once. Suppress markers
+in TOC copies, running heads and bookmarks; do not put them in discarded boxes,
+floats, or inside rail bodies. Paragraphs and ordinary lists are supported in notes;
+raw TeX, graphics, nested annotations and arbitrary layout commands are not.</p>
+<p>Pandoc's normal <code>tightlist</code> helper must be available for converted lists. The fixed
+9/11 pt note style has 2 mm vertical padding and controlled list indentation.
+Microtype protrusion and expansion are disabled inside rail boxes. No new package,
+external Lua companion, shell escape, or margin insertion is required.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020007200610069006c0020005400650058-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020007200610069006c0020005400650058"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c0020005400650058" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c0020005400650058" aria-label="Definition of publication rail TeX">&lt;&lt;publication rail TeX&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">railTex</span>(): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-title">String</span>.<span class="hljs-property">raw</span><span class="hljs-string">`</span><span class="hljs-string">\m</span><span class="hljs-string">akeatletter
+</span><span class="hljs-string">\n</span><span class="hljs-string">ewif</span><span class="hljs-string">\i</span><span class="hljs-string">fLitRailBuilding
+</span><span class="hljs-string">\n</span><span class="hljs-string">ewcommand{</span><span class="hljs-string">\L</span><span class="hljs-string">itRailPrevious}[5]{</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.previous(#1,#2,#3,#4,#5)}}
+</span><span class="hljs-string">\n</span><span class="hljs-string">ewcommand{</span><span class="hljs-string">\L</span><span class="hljs-string">itRailState}[1]{</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.oldhash=&quot;</span><span class="hljs-string">\l</span><span class="hljs-string">uaescapestring{#1}&quot;}}
+</span><span class="hljs-string">\n</span><span class="hljs-string">ewcommand{</span><span class="hljs-string">\L</span><span class="hljs-string">itRailWrite}[5]{</span><span class="hljs-string">\i</span><span class="hljs-string">mmediate</span><span class="hljs-string">\w</span><span class="hljs-string">rite</span><span class="hljs-string">\@</span><span class="hljs-string">auxout{</span><span class="hljs-string">\s</span><span class="hljs-string">tring</span><span class="hljs-string">\L</span><span class="hljs-string">itRailPrevious{#1}{#2}{#3}{#4}{#5}}}
+</span><span class="hljs-string">\n</span><span class="hljs-string">ewcommand{</span><span class="hljs-string">\L</span><span class="hljs-string">itRailWriteState}[1]{</span><span class="hljs-string">\i</span><span class="hljs-string">mmediate</span><span class="hljs-string">\w</span><span class="hljs-string">rite</span><span class="hljs-string">\@</span><span class="hljs-string">auxout{</span><span class="hljs-string">\s</span><span class="hljs-string">tring</span><span class="hljs-string">\L</span><span class="hljs-string">itRailState{#1}}}
+</span><span class="hljs-string">\n</span><span class="hljs-string">ewcommand{</span><span class="hljs-string">\L</span><span class="hljs-string">itRailBuild}[3]{%
+  </span><span class="hljs-string">\b</span><span class="hljs-string">egingroup</span><span class="hljs-string">\L</span><span class="hljs-string">itRailBuildingtrue
+  </span><span class="hljs-string">\h</span><span class="hljs-string">size=</span><span class="hljs-string">\m</span><span class="hljs-string">arginparwidth</span><span class="hljs-string">\l</span><span class="hljs-string">inewidth=</span><span class="hljs-string">\h</span><span class="hljs-string">size</span><span class="hljs-string">\c</span><span class="hljs-string">olumnwidth=</span><span class="hljs-string">\h</span><span class="hljs-string">size</span><span class="hljs-string">\t</span><span class="hljs-string">extwidth=</span><span class="hljs-string">\h</span><span class="hljs-string">size
+  </span><span class="hljs-string">\@</span><span class="hljs-string">totalleftmargin=0pt</span><span class="hljs-string">\l</span><span class="hljs-string">eftmargini=14pt</span><span class="hljs-string">\l</span><span class="hljs-string">eftmarginii=12pt</span><span class="hljs-string">\l</span><span class="hljs-string">abelsep=3pt
+  </span><span class="hljs-string">\n</span><span class="hljs-string">otefont</span><span class="hljs-string">\f</span><span class="hljs-string">ontsize{9}{11}</span><span class="hljs-string">\s</span><span class="hljs-string">electfont
+  </span><span class="hljs-string">\i</span><span class="hljs-string">fdefined</span><span class="hljs-string">\m</span><span class="hljs-string">icrotypesetup</span><span class="hljs-string">\m</span><span class="hljs-string">icrotypesetup{protrusion=false,expansion=false}</span><span class="hljs-string">\f</span><span class="hljs-string">i
+  </span><span class="hljs-string">\p</span><span class="hljs-string">arindent=0pt</span><span class="hljs-string">\p</span><span class="hljs-string">arskip=2pt</span><span class="hljs-string">\r</span><span class="hljs-string">aggedright
+  </span><span class="hljs-string">\e</span><span class="hljs-string">xpandafter</span><span class="hljs-string">\g</span><span class="hljs-string">lobal</span><span class="hljs-string">\e</span><span class="hljs-string">xpandafter</span><span class="hljs-string">\s</span><span class="hljs-string">etbox</span><span class="hljs-string">\c</span><span class="hljs-string">sname LitRailBox#2</span><span class="hljs-string">\e</span><span class="hljs-string">ndcsname=</span><span class="hljs-string">\v</span><span class="hljs-string">box{%
+    </span><span class="hljs-string">\k</span><span class="hljs-string">ern2mm</span><span class="hljs-string">\c</span><span class="hljs-string">sname LitRailBody#2</span><span class="hljs-string">\e</span><span class="hljs-string">ndcsname</span><span class="hljs-string">\p</span><span class="hljs-string">ar</span><span class="hljs-string">\k</span><span class="hljs-string">ern2mm}%
+  </span><span class="hljs-string">\d</span><span class="hljs-string">ef</span><span class="hljs-string">\L</span><span class="hljs-string">itRailResolved{1}</span><span class="hljs-string">\d</span><span class="hljs-string">ef</span><span class="hljs-string">\L</span><span class="hljs-string">itRailPage{}%
+  </span><span class="hljs-string">\i</span><span class="hljs-string">f</span><span class="hljs-string">\r</span><span class="hljs-string">elax</span><span class="hljs-string">\d</span><span class="hljs-string">etokenize{#3}</span><span class="hljs-string">\r</span><span class="hljs-string">elax</span><span class="hljs-string">\e</span><span class="hljs-string">lse
+    </span><span class="hljs-string">\i</span><span class="hljs-string">fcsname r@#3</span><span class="hljs-string">\e</span><span class="hljs-string">ndcsname</span><span class="hljs-string">\e</span><span class="hljs-string">def</span><span class="hljs-string">\L</span><span class="hljs-string">itRailPage{</span><span class="hljs-string">\g</span><span class="hljs-string">etpagerefnumber{#3}}%
+    </span><span class="hljs-string">\e</span><span class="hljs-string">lse</span><span class="hljs-string">\d</span><span class="hljs-string">ef</span><span class="hljs-string">\L</span><span class="hljs-string">itRailResolved{0}</span><span class="hljs-string">\f</span><span class="hljs-string">i
+  </span><span class="hljs-string">\f</span><span class="hljs-string">i
+  </span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.box(#1,</span><span class="hljs-string">\e</span><span class="hljs-string">xpandafter</span><span class="hljs-string">\n</span><span class="hljs-string">umber</span><span class="hljs-string">\c</span><span class="hljs-string">sname LitRailBox#2</span><span class="hljs-string">\e</span><span class="hljs-string">ndcsname,
+    &quot;LitRailBody#2&quot;,</span><span class="hljs-string">\L</span><span class="hljs-string">itRailResolved,&quot;</span><span class="hljs-string">\l</span><span class="hljs-string">uaescapestring{</span><span class="hljs-string">\L</span><span class="hljs-string">itRailPage}&quot;)}%
+  </span><span class="hljs-string">\e</span><span class="hljs-string">ndgroup}
+</span><span class="hljs-string">\D</span><span class="hljs-string">eclareRobustCommand{</span><span class="hljs-string">\L</span><span class="hljs-string">itTermUse}[3]{%
+  </span><span class="hljs-string">\i</span><span class="hljs-string">fLitRailBuilding</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.reject(&quot;nested rail marker&quot;)}%
+  </span><span class="hljs-string">\e</span><span class="hljs-string">lse</span><span class="hljs-string">\l</span><span class="hljs-string">eavevmode</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.use(&quot;</span><span class="hljs-string">\l</span><span class="hljs-string">uaescapestring{#1}&quot;,&quot;</span><span class="hljs-string">\l</span><span class="hljs-string">uaescapestring{#2}&quot;,&quot;term&quot;)}#3</span><span class="hljs-string">\f</span><span class="hljs-string">i}
+</span><span class="hljs-string">\D</span><span class="hljs-string">eclareRobustCommand{</span><span class="hljs-string">\L</span><span class="hljs-string">itNoteUse}[1]{%
+  </span><span class="hljs-string">\i</span><span class="hljs-string">fLitRailBuilding</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.reject(&quot;nested rail marker&quot;)}%
+  </span><span class="hljs-string">\e</span><span class="hljs-string">lse</span><span class="hljs-string">\l</span><span class="hljs-string">eavevmode</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.use(&quot;</span><span class="hljs-string">\l</span><span class="hljs-string">uaescapestring{#1}&quot;,&quot;</span><span class="hljs-string">\l</span><span class="hljs-string">uaescapestring{#1}&quot;,&quot;note&quot;)}</span><span class="hljs-string">\f</span><span class="hljs-string">i}
+</span><span class="hljs-string">\A</span><span class="hljs-string">ddToHook{begindocument/end}{%
+  </span><span class="hljs-string">\i</span><span class="hljs-string">f@twoside</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.reject(&quot;two-sided rail unsupported; use oneside&quot;)}</span><span class="hljs-string">\f</span><span class="hljs-string">i
+  </span><span class="hljs-string">\i</span><span class="hljs-string">f@twocolumn</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.reject(&quot;two-column rail unsupported&quot;)}</span><span class="hljs-string">\f</span><span class="hljs-string">i}
+</span><span class="hljs-string">\A</span><span class="hljs-string">ddToHook{shipout/foreground}{%
+  </span><span class="hljs-string">\s</span><span class="hljs-string">etlength</span><span class="hljs-subst">${</span><span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">unitlength'</span><span class="hljs-subst">}</span><span class="hljs-string">{1pt}%
+  </span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.ship(
+    </span><span class="hljs-string">\n</span><span class="hljs-string">umber</span><span class="hljs-string">\d</span><span class="hljs-string">imexpr1in+</span><span class="hljs-string">\h</span><span class="hljs-string">offset+</span><span class="hljs-string">\o</span><span class="hljs-string">ddsidemargin+</span><span class="hljs-string">\t</span><span class="hljs-string">extwidth+</span><span class="hljs-string">\m</span><span class="hljs-string">arginparsep</span><span class="hljs-string">\r</span><span class="hljs-string">elax,
+    </span><span class="hljs-string">\n</span><span class="hljs-string">umber</span><span class="hljs-string">\d</span><span class="hljs-string">imexpr1in+</span><span class="hljs-string">\v</span><span class="hljs-string">offset+</span><span class="hljs-string">\t</span><span class="hljs-string">opmargin+</span><span class="hljs-string">\h</span><span class="hljs-string">eadheight+</span><span class="hljs-string">\h</span><span class="hljs-string">eadsep</span><span class="hljs-string">\r</span><span class="hljs-string">elax,
+    </span><span class="hljs-string">\n</span><span class="hljs-string">umber</span><span class="hljs-string">\t</span><span class="hljs-string">extwidth,</span><span class="hljs-string">\n</span><span class="hljs-string">umber</span><span class="hljs-string">\t</span><span class="hljs-string">extheight,</span><span class="hljs-string">\n</span><span class="hljs-string">umber</span><span class="hljs-string">\m</span><span class="hljs-string">arginparwidth,</span><span class="hljs-string">\n</span><span class="hljs-string">umber</span><span class="hljs-string">\m</span><span class="hljs-string">arginparsep)}}
+</span><span class="hljs-string">\A</span><span class="hljs-string">ddToHook{enddocument/afterlastpage}{</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.finish()}}
+</span><span class="hljs-string">\m</span><span class="hljs-string">akeatother`</span>;
+}
+
+</code></pre>
+
+</div>
+</div><h2>Shipout state</h2>
+<p>Physical page membership comes from late Lua nodes, never the logical page counter
+while a paragraph is being built. Prior records live in the normal job auxiliary
+file. Bucket them by absolute page to bound lookup work; ignore LaTeX's final aux
+reread. The separate job-owned <code>.litrail</code> certificate starts pending on every run.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020007200610069006c0020004c00750061002000730074006100740065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020007200610069006c0020004c00750061002000730074006100740065"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c0020004c00750061002000730074006100740065" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c0020004c00750061002000730074006100740065" aria-label="Definition of publication rail Lua state">&lt;&lt;publication rail Lua state&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">railLua</span>(): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-title">String</span>.<span class="hljs-property">raw</span><span class="hljs-string">`litrail = { defs={}, targets={}, old={}, oldpages={}, current={}, issued={}, seen={}, pages={},
+  oldhash=&quot;&quot;, page=0, count=0, nodes=0, bounds={}, problems={}, fingerprints={} }
+local R = litrail
+local mm = 65536*72.27/25.4
+local gap = tex.sp(&quot;2mm&quot;)
+local function fatal(message)
+  R.failed=true
+  local f = assert(io.open(tex.jobname..&quot;.litrail&quot;, &quot;w&quot;))
+  f:write(&quot;error</span><span class="hljs-string">\n</span><span class="hljs-string">&quot;,message,&quot;</span><span class="hljs-string">\n</span><span class="hljs-string">&quot;); f:close()
+  tex.error(&quot;Literate rail: &quot;..message, {&quot;No shrinking, splitting, overlap, or page spill is permitted.&quot;})
+end
+R.reject=fatal
+local function pending(message) R.problems[#R.problems+1]=message end
+local function digest(text) return md5.sumhexa(text) end
+local function validid(id)
+  return #id&gt;0 and #id&lt;=8192 and id:match(&quot;^[%w][%w:._%-]*$&quot;)
+end
+local start = assert(io.open(tex.jobname..&quot;.litrail&quot;, &quot;w&quot;))
+start:write(&quot;pending</span><span class="hljs-string">\n</span><span class="hljs-string">&quot;); start:close()
+function R.declare(index,target,kind,number)
+  R.defs[index]={target=target,kind=kind,number=number}
+  R.targets[target]=index
+end
+function R.previous(use,definition,page,x,y)
+  if R.finished then return end
+  if #R.old&gt;=10000 or use&lt;1 or use&gt;10000 or definition&lt;1 or definition&gt;2000 or
+     page&lt;1 or page&gt;100000 then fatal(&quot;invalid or excessive auxiliary records&quot;); return end
+  local record={use,definition,page,x,y}
+  R.old[#R.old+1]=record
+  R.oldpages[page]=R.oldpages[page] or {}
+  table.insert(R.oldpages[page],record)
+end
+</span></code></pre>
+
+</div>
+</div><p>A fixed outer box width alone does not prove that a line fits. Traverse its nested
+lists with actual glue settings, shifts and glyph offsets. Reject horizontal glyph
+or rule protrusion, including overlong words and list labels. Link whatsits have
+no advancing width. Fingerprint shaped content, font identity and resolved pages
+as well as dimensions; equal heights alone are not convergence.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020007200610069006c00200062006f0078002000610075006400690074-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200062006f0078002000610075006400690074"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c00200062006f0078002000610075006400690074" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200062006f0078002000610075006400690074" aria-label="Definition of publication rail box audit">&lt;&lt;publication rail box audit&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>local <span class="hljs-keyword">function</span> <span class="hljs-title">audit</span>(<span class="hljs-params">box</span>)
+  local trace, fonts, failure = {}, {}, nil
+  local <span class="hljs-keyword">function</span> <span class="hljs-title">visit</span>(<span class="hljs-params">parent,x,depth</span>)
+    <span class="hljs-keyword">if</span> depth&gt;<span class="hljs-number">64</span> then <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;rail box nesting exceeds 64&quot;</span>); <span class="hljs-keyword">return</span> end
+    local horizontal=parent.<span class="hljs-property">id</span>==node.<span class="hljs-title">id</span>(<span class="hljs-string">&quot;hlist&quot;</span>)
+    local cursor=x
+    <span class="hljs-keyword">for</span> n <span class="hljs-keyword">in</span> node.<span class="hljs-title">traverse</span>(parent.<span class="hljs-property">list</span>) <span class="hljs-keyword">do</span>
+      R.<span class="hljs-property">nodes</span>=R.<span class="hljs-property">nodes</span>+<span class="hljs-number">1</span>
+      <span class="hljs-keyword">if</span> R.<span class="hljs-property">nodes</span>&gt;<span class="hljs-number">500000</span> then <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;rail box node budget exceeds 500000&quot;</span>); <span class="hljs-keyword">return</span> end
+      local kind=node.<span class="hljs-title">type</span>(n.<span class="hljs-property">id</span>)
+      trace[#trace+<span class="hljs-number">1</span>]=table.<span class="hljs-title">concat</span>({kind,n.<span class="hljs-property">subtype</span> or <span class="hljs-number">0</span>,n.<span class="hljs-property">width</span> or <span class="hljs-number">0</span>,n.<span class="hljs-property">height</span> or <span class="hljs-number">0</span>,
+        n.<span class="hljs-property">depth</span> or <span class="hljs-number">0</span>,n.<span class="hljs-property">shift</span> or <span class="hljs-number">0</span>,n.<span class="hljs-property">kern</span> or <span class="hljs-number">0</span>,n.<span class="hljs-property">glue_set</span> or <span class="hljs-number">0</span>,n.<span class="hljs-property">glue_sign</span> or <span class="hljs-number">0</span>,n.<span class="hljs-property">glue_order</span> or <span class="hljs-number">0</span>},<span class="hljs-string">&quot;:&quot;</span>)
+      local at=horizontal and cursor or x+(n.<span class="hljs-property">shift</span> or <span class="hljs-number">0</span>)
+      <span class="hljs-keyword">if</span> kind==<span class="hljs-string">&quot;glyph&quot;</span> then
+        trace[#trace+<span class="hljs-number">1</span>]=table.<span class="hljs-title">concat</span>({n.<span class="hljs-property">char</span>,n.<span class="hljs-property">font</span>,n.<span class="hljs-property">xoffset</span>,n.<span class="hljs-property">yoffset</span>},<span class="hljs-string">&quot;:&quot;</span>)
+        <span class="hljs-keyword">if</span> not fonts[n.<span class="hljs-property">font</span>] then
+          local fontdata=font.<span class="hljs-title">getfont</span>(n.<span class="hljs-property">font</span>)
+          trace[#trace+<span class="hljs-number">1</span>]=table.<span class="hljs-title">concat</span>({fontdata.<span class="hljs-property">name</span> or <span class="hljs-string">&quot;&quot;</span>,fontdata.<span class="hljs-property">filename</span> or <span class="hljs-string">&quot;&quot;</span>,fontdata.<span class="hljs-property">size</span> or <span class="hljs-number">0</span>},<span class="hljs-string">&quot;:&quot;</span>)
+          fonts[n.<span class="hljs-property">font</span>]=<span class="hljs-literal">true</span>
+        end
+        local left=at+n.<span class="hljs-property">xoffset</span>
+        <span class="hljs-keyword">if</span> left &lt; -<span class="hljs-number">1</span> or left+n.<span class="hljs-property">width</span> &gt; box.<span class="hljs-property">width</span>+<span class="hljs-number">1</span> then
+          failure=<span class="hljs-built_in">string</span>.<span class="hljs-title">format</span>(<span class="hljs-string">&quot;horizontal protrusion (glyph U+%04X at %.3f..%.3f mm; width %.3f mm)&quot;</span>,
+            n.<span class="hljs-property">char</span>,left/mm,(left+n.<span class="hljs-property">width</span>)/mm,box.<span class="hljs-property">width</span>/mm)
+        end
+      elseif kind==<span class="hljs-string">&quot;hlist&quot;</span> or kind==<span class="hljs-string">&quot;vlist&quot;</span> then
+        <span class="hljs-title">visit</span>(n,at,depth+<span class="hljs-number">1</span>)
+      elseif kind==<span class="hljs-string">&quot;rule&quot;</span> and n.<span class="hljs-property">width</span>&gt;<span class="hljs-number">0</span> then
+        <span class="hljs-keyword">if</span> at &lt; -<span class="hljs-number">1</span> or at+n.<span class="hljs-property">width</span> &gt; box.<span class="hljs-property">width</span>+<span class="hljs-number">1</span> then failure=<span class="hljs-string">&quot;horizontal rule protrusion&quot;</span> end
+      elseif kind==<span class="hljs-string">&quot;dir&quot;</span> and n.<span class="hljs-property">dir</span>~=<span class="hljs-string">&quot;TLT&quot;</span> and n.<span class="hljs-property">dir</span>~=<span class="hljs-string">&quot;+TLT&quot;</span> and n.<span class="hljs-property">dir</span>~=<span class="hljs-string">&quot;-TLT&quot;</span> then
+        failure=<span class="hljs-string">&quot;unsupported rail text direction&quot;</span>
+      end
+      <span class="hljs-keyword">if</span> horizontal then
+        local width=<span class="hljs-number">0</span>
+        <span class="hljs-keyword">if</span> kind==<span class="hljs-string">&quot;glyph&quot;</span> or kind==<span class="hljs-string">&quot;hlist&quot;</span> or kind==<span class="hljs-string">&quot;vlist&quot;</span> or kind==<span class="hljs-string">&quot;rule&quot;</span> or kind==<span class="hljs-string">&quot;glue&quot;</span> then width=n.<span class="hljs-property">width</span> end
+        <span class="hljs-keyword">if</span> kind==<span class="hljs-string">&quot;glue&quot;</span> then
+          <span class="hljs-keyword">if</span> parent.<span class="hljs-property">glue_sign</span>==<span class="hljs-number">1</span> and n.<span class="hljs-property">stretch_order</span>==parent.<span class="hljs-property">glue_order</span> then width=width+parent.<span class="hljs-property">glue_set</span>*n.<span class="hljs-property">stretch</span> end
+          <span class="hljs-keyword">if</span> parent.<span class="hljs-property">glue_sign</span>==<span class="hljs-number">2</span> and n.<span class="hljs-property">shrink_order</span>==parent.<span class="hljs-property">glue_order</span> then width=width-parent.<span class="hljs-property">glue_set</span>*n.<span class="hljs-property">shrink</span> end
+        elseif kind==<span class="hljs-string">&quot;kern&quot;</span> then width=n.<span class="hljs-property">kern</span>
+        elseif kind==<span class="hljs-string">&quot;disc&quot;</span> then
+          -- A surviving discretionary contributes its replacement list.
+          local replacement=n.<span class="hljs-property">replace</span>
+          <span class="hljs-keyword">if</span> replacement then
+            local wrapper=node.<span class="hljs-title">new</span>(<span class="hljs-string">&quot;hlist&quot;</span>); wrapper.<span class="hljs-property">list</span>=node.<span class="hljs-title">copy_list</span>(replacement)
+            <span class="hljs-title">visit</span>(wrapper,cursor,depth+<span class="hljs-number">1</span>)
+            width=node.<span class="hljs-title">dimensions</span>(replacement); node.<span class="hljs-title">flush_node</span>(wrapper)
+          end
+        end
+        cursor=cursor+width
+      end
+    end
+  end
+  <span class="hljs-title">visit</span>(box,<span class="hljs-number">0</span>,<span class="hljs-number">0</span>)
+  <span class="hljs-keyword">return</span> <span class="hljs-title">digest</span>(table.<span class="hljs-title">concat</span>(trace,<span class="hljs-string">&quot;|&quot;</span>)),failure
+end
+<span class="hljs-keyword">function</span> R.<span class="hljs-title">box</span>(index,<span class="hljs-built_in">number</span>,macro,resolved,page)
+  local d=R.<span class="hljs-property">defs</span>[index]
+  local b=tex.<span class="hljs-property">box</span>[<span class="hljs-built_in">number</span>]
+  local shape,problem=<span class="hljs-title">audit</span>(b)
+  d.<span class="hljs-property">box</span>=<span class="hljs-built_in">number</span>; d.<span class="hljs-property">height</span>=b.<span class="hljs-property">height</span>+b.<span class="hljs-property">depth</span>; d.<span class="hljs-property">width</span>=b.<span class="hljs-property">width</span>; d.<span class="hljs-property">resolved</span>=resolved==<span class="hljs-number">1</span>
+  d.<span class="hljs-property">problem</span>=problem
+  d.<span class="hljs-property">fingerprint</span>=<span class="hljs-title">digest</span>(table.<span class="hljs-title">concat</span>({d.<span class="hljs-property">target</span>,d.<span class="hljs-property">kind</span>,d.<span class="hljs-property">number</span>,token.<span class="hljs-title">get_macro</span>(macro),
+    b.<span class="hljs-property">width</span>,b.<span class="hljs-property">height</span>,b.<span class="hljs-property">depth</span>,page,resolved,shape},<span class="hljs-string">&quot;|&quot;</span>))
+end
+</code></pre>
+
+</div>
+</div><p>Markers are allocated once and must ship exactly once. Duplicate occurrence IDs
+catch moving-argument replay; missing markers catch discarded content. Notes have
+visible source-order numbers and stable destinations outside their reusable boxes.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020007200610069006c0020006d00610072006b006500720073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020007200610069006c0020006d00610072006b006500720073"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c0020006d00610072006b006500720073" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c0020006d00610072006b006500720073" aria-label="Definition of publication rail markers">&lt;&lt;publication rail markers&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> R.<span class="hljs-title">use</span>(id,target,kind)
+  local index=R.<span class="hljs-property">targets</span>[target]
+  <span class="hljs-keyword">if</span> not <span class="hljs-title">validid</span>(id) or not index or R.<span class="hljs-property">defs</span>[index].<span class="hljs-property">kind</span>~=kind then <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;invalid annotation marker&quot;</span>); <span class="hljs-keyword">return</span> end
+  local identity=kind..<span class="hljs-string">&quot;:&quot;</span>..<span class="hljs-property">id</span>
+  <span class="hljs-keyword">if</span> R.<span class="hljs-property">seen</span>[identity] then <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;duplicate occurrence &quot;</span>..<span class="hljs-property">id</span>..<span class="hljs-string">&quot; (moving arguments must be marker-free)&quot;</span>); <span class="hljs-keyword">return</span> end
+  <span class="hljs-keyword">if</span> R.<span class="hljs-property">count</span>&gt;=<span class="hljs-number">10000</span> then <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;annotation use budget exceeds 10000&quot;</span>); <span class="hljs-keyword">return</span> end
+  R.<span class="hljs-property">seen</span>[identity]=<span class="hljs-literal">true</span>; R.<span class="hljs-property">count</span>=R.<span class="hljs-property">count</span>+<span class="hljs-number">1</span>
+  R.<span class="hljs-property">issued</span>[R.<span class="hljs-property">count</span>]={index=index,id=id,kind=kind}
+  tex.<span class="hljs-title">sprint</span>(<span class="hljs-string">&quot;</span><span class="hljs-string">\\</span><span class="hljs-string">latelua{litrail.mark(&quot;</span>..<span class="hljs-property">R</span>.<span class="hljs-property">count</span>..<span class="hljs-string">&quot;)}&quot;</span>)
+  <span class="hljs-keyword">if</span> kind==<span class="hljs-string">&quot;note&quot;</span> then
+    tex.<span class="hljs-title">sprint</span>(<span class="hljs-string">&quot;</span><span class="hljs-string">\\</span><span class="hljs-string">hyperlink{lit-rail-note-&quot;</span>..<span class="hljs-property">index</span>..<span class="hljs-string">&quot;}{</span><span class="hljs-string">\\</span><span class="hljs-string">textsuperscript{</span><span class="hljs-string">\\</span><span class="hljs-string">notefont &quot;</span>..<span class="hljs-property">R</span>.<span class="hljs-property">defs</span>[index].<span class="hljs-property">number</span>..<span class="hljs-string">&quot;}}&quot;</span>)
+  end
+end
+<span class="hljs-keyword">function</span> R.<span class="hljs-title">mark</span>(use)
+  local entry=R.<span class="hljs-property">issued</span>[use]
+  <span class="hljs-keyword">if</span> not entry or entry.<span class="hljs-property">shipped</span> then <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;missing or replayed annotation marker&quot;</span>); <span class="hljs-keyword">return</span> end
+  entry.<span class="hljs-property">shipped</span>=<span class="hljs-literal">true</span>
+  local x,y=pdf.<span class="hljs-title">getpos</span>()
+  R.<span class="hljs-property">current</span>[#R.<span class="hljs-property">current</span>+<span class="hljs-number">1</span>]={use,entry.<span class="hljs-property">index</span>,R.<span class="hljs-property">page</span>,math.<span class="hljs-title">floor</span>(x),math.<span class="hljs-title">floor</span>(tex.<span class="hljs-property">pageheight</span>-y)}
+end
+</code></pre>
+
+</div>
+</div><p>Sort by shipped reading position, with source encounter order breaking ties. A
+term's first use supplies its preferred position; further uses on that page do
+not create rows. Notes stay distinct and share the same ordering and cursor.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020007200610069006c0020007000610067006500200065006e00740072006900650073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020007200610069006c0020007000610067006500200065006e00740072006900650073"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c0020007000610067006500200065006e00740072006900650073" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c0020007000610067006500200065006e00740072006900650073" aria-label="Definition of publication rail page entries">&lt;&lt;publication rail page entries&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>local <span class="hljs-keyword">function</span> <span class="hljs-title">itemsFor</span>(<span class="hljs-params">page</span>)
+  local records=R.<span class="hljs-property">oldpages</span>[page] or {}
+  table.<span class="hljs-title">sort</span>(records,<span class="hljs-keyword">function</span>(<span class="hljs-params">a,b</span>)
+    <span class="hljs-keyword">if</span> a[<span class="hljs-number">5</span>]~=b[<span class="hljs-number">5</span>] then <span class="hljs-keyword">return</span> a[<span class="hljs-number">5</span>]&lt;b[<span class="hljs-number">5</span>] end
+    <span class="hljs-keyword">if</span> a[<span class="hljs-number">4</span>]~=b[<span class="hljs-number">4</span>] then <span class="hljs-keyword">return</span> a[<span class="hljs-number">4</span>]&lt;b[<span class="hljs-number">4</span>] end
+    <span class="hljs-keyword">return</span> a[<span class="hljs-number">1</span>]&lt;b[<span class="hljs-number">1</span>]
+  end)
+  local items,seen={},{}
+  <span class="hljs-keyword">for</span> _,r <span class="hljs-keyword">in</span> <span class="hljs-title">ipairs</span>(records) <span class="hljs-keyword">do</span>
+    local d=R.<span class="hljs-property">defs</span>[r[<span class="hljs-number">2</span>]]
+    <span class="hljs-keyword">if</span> d and d.<span class="hljs-property">box</span> then
+      <span class="hljs-keyword">if</span> d.<span class="hljs-property">kind</span>==<span class="hljs-string">&quot;note&quot;</span> and seen[r[<span class="hljs-number">2</span>]] then <span class="hljs-title">pending</span>(<span class="hljs-string">&quot;replayed note &quot;</span>..<span class="hljs-property">d</span>.<span class="hljs-property">target</span>) end
+      <span class="hljs-keyword">if</span> not seen[r[<span class="hljs-number">2</span>]] then
+        seen[r[<span class="hljs-number">2</span>]]=<span class="hljs-literal">true</span>
+        items[#items+<span class="hljs-number">1</span>]={index=r[<span class="hljs-number">2</span>],d=d,desired=r[<span class="hljs-number">5</span>]-tex.<span class="hljs-title">sp</span>(<span class="hljs-string">&quot;3mm&quot;</span>)}
+      end
+    <span class="hljs-keyword">else</span> <span class="hljs-title">pending</span>(<span class="hljs-string">&quot;stale annotation declaration&quot;</span>) end
+  end
+  <span class="hljs-keyword">return</span> items
+end
+</code></pre>
+
+</div>
+</div><p>The main text origin determines the rail, so asymmetric margins and different top
+margins need no hardcoded offsets. Measure all entries before emitting any overlay.
+A forward sweep respects preferred positions; a backward sweep resolves bottom
+collisions. Each final rectangle is checked against its predecessor and the rail.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020007200610069006c00200070006c006100630065006d0065006e0074-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200070006c006100630065006d0065006e0074"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c00200070006c006100630065006d0065006e0074" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200070006c006100630065006d0065006e0074" aria-label="Definition of publication rail placement">&lt;&lt;publication rail placement&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> R.<span class="hljs-title">ship</span>(x,top,body,height,width,separation)
+  <span class="hljs-keyword">if</span> R.<span class="hljs-property">failed</span> then <span class="hljs-keyword">return</span> end
+  R.<span class="hljs-property">page</span>=R.<span class="hljs-property">page</span>+<span class="hljs-number">1</span>
+  <span class="hljs-keyword">if</span> R.<span class="hljs-property">page</span>&gt;<span class="hljs-number">100000</span> then <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;page budget exceeds 100000&quot;</span>); <span class="hljs-keyword">return</span> end
+  <span class="hljs-keyword">if</span> math.<span class="hljs-title">abs</span>(width-tex.<span class="hljs-title">sp</span>(<span class="hljs-string">&quot;25mm&quot;</span>))&gt;<span class="hljs-number">1</span> or math.<span class="hljs-title">abs</span>(separation-tex.<span class="hljs-title">sp</span>(<span class="hljs-string">&quot;5mm&quot;</span>))&gt;<span class="hljs-number">1</span> or
+     body&lt;tex.<span class="hljs-title">sp</span>(<span class="hljs-string">&quot;80mm&quot;</span>) or height&lt;tex.<span class="hljs-title">sp</span>(<span class="hljs-string">&quot;100mm&quot;</span>) or x&lt;<span class="hljs-number">0</span> or top&lt;<span class="hljs-number">0</span> or
+     x+width&gt;tex.<span class="hljs-property">pagewidth</span> or top+height&gt;tex.<span class="hljs-property">pageheight</span> then
+    <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;invalid geometry: require 25 mm rail, 5 mm gap, 80 x 100 mm body inside the page&quot;</span>); <span class="hljs-keyword">return</span>
+  end
+  R.<span class="hljs-property">pages</span>[#R.<span class="hljs-property">pages</span>+<span class="hljs-number">1</span>]=table.<span class="hljs-title">concat</span>({R.<span class="hljs-property">page</span>,x,top,body,height,width,separation,tex.<span class="hljs-property">pagewidth</span>,tex.<span class="hljs-property">pageheight</span>},<span class="hljs-string">&quot;,&quot;</span>)
+  local items=<span class="hljs-title">itemsFor</span>(R.<span class="hljs-property">page</span>)
+  local needed=math.<span class="hljs-title">max</span>(<span class="hljs-number">0</span>,#items-<span class="hljs-number">1</span>)*gap
+  local failed=<span class="hljs-literal">false</span>
+  <span class="hljs-keyword">for</span> _,item <span class="hljs-keyword">in</span> <span class="hljs-title">ipairs</span>(items) <span class="hljs-keyword">do</span>
+    local d=item.<span class="hljs-property">d</span>
+    needed=needed+d.<span class="hljs-property">height</span>
+    <span class="hljs-keyword">if</span> d.<span class="hljs-property">problem</span> or not d.<span class="hljs-property">resolved</span> or d.<span class="hljs-property">width</span>~=width then
+      <span class="hljs-title">pending</span>(<span class="hljs-string">&quot;page &quot;</span>..<span class="hljs-property">R</span>.<span class="hljs-property">page</span>..<span class="hljs-string">&quot;, &quot;</span>..<span class="hljs-property">d</span>.<span class="hljs-property">target</span>..<span class="hljs-string">&quot;: &quot;</span>..(d.<span class="hljs-property">problem</span> or (not d.<span class="hljs-property">resolved</span> and <span class="hljs-string">&quot;unresolved definition page&quot;</span> or <span class="hljs-string">&quot;rail width changed&quot;</span>)))
+      failed=<span class="hljs-literal">true</span>
+    end
+  end
+  <span class="hljs-keyword">if</span> needed&gt;height then
+    <span class="hljs-title">pending</span>(<span class="hljs-built_in">string</span>.<span class="hljs-title">format</span>(<span class="hljs-string">&quot;overflow on absolute page %d: required %.3f mm, available %.3f mm&quot;</span>,R.<span class="hljs-property">page</span>,needed/mm,height/mm))
+    failed=<span class="hljs-literal">true</span>
+  end
+  <span class="hljs-keyword">if</span> failed then <span class="hljs-keyword">return</span> end
+  local cursor=top
+  <span class="hljs-keyword">for</span> _,item <span class="hljs-keyword">in</span> <span class="hljs-title">ipairs</span>(items) <span class="hljs-keyword">do</span> item.<span class="hljs-property">y</span>=math.<span class="hljs-title">max</span>(cursor,item.<span class="hljs-property">desired</span>); cursor=item.<span class="hljs-property">y</span>+item.<span class="hljs-property">d</span>.<span class="hljs-property">height</span>+gap end
+  cursor=top+height
+  <span class="hljs-keyword">for</span> i=#items,<span class="hljs-number">1</span>,-<span class="hljs-number">1</span> <span class="hljs-keyword">do</span> local item=items[i]; item.<span class="hljs-property">y</span>=math.<span class="hljs-title">min</span>(item.<span class="hljs-property">y</span>,cursor-item.<span class="hljs-property">d</span>.<span class="hljs-property">height</span>); cursor=item.<span class="hljs-property">y</span>-gap end
+  cursor=top-gap
+  <span class="hljs-keyword">for</span> _,item <span class="hljs-keyword">in</span> <span class="hljs-title">ipairs</span>(items) <span class="hljs-keyword">do</span>
+    <span class="hljs-keyword">if</span> item.<span class="hljs-property">y</span>&lt;cursor+gap or item.<span class="hljs-property">y</span>+item.<span class="hljs-property">d</span>.<span class="hljs-property">height</span>&gt;top+height then <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;internal placement bounds violation&quot;</span>); <span class="hljs-keyword">return</span> end
+    cursor=item.<span class="hljs-property">y</span>+item.<span class="hljs-property">d</span>.<span class="hljs-property">height</span>
+    R.<span class="hljs-property">bounds</span>[#R.<span class="hljs-property">bounds</span>+<span class="hljs-number">1</span>]=table.<span class="hljs-title">concat</span>({R.<span class="hljs-property">page</span>,item.<span class="hljs-property">index</span>,x,item.<span class="hljs-property">y</span>,width,item.<span class="hljs-property">d</span>.<span class="hljs-property">height</span>},<span class="hljs-string">&quot;,&quot;</span>)
+    local destination=item.<span class="hljs-property">d</span>.<span class="hljs-property">kind</span>==<span class="hljs-string">&quot;note&quot;</span> and (<span class="hljs-string">&quot;lit-rail-note-&quot;</span>..<span class="hljs-property">item</span>.<span class="hljs-property">index</span>) or (<span class="hljs-string">&quot;lit-rail-term-&quot;</span>..<span class="hljs-property">R</span>.<span class="hljs-property">page</span>..<span class="hljs-string">&quot;-&quot;</span>..<span class="hljs-property">item</span>.<span class="hljs-property">index</span>)
+    tex.<span class="hljs-title">sprint</span>(<span class="hljs-built_in">string</span>.<span class="hljs-title">format</span>(<span class="hljs-string">&quot;</span><span class="hljs-string">\\</span><span class="hljs-string">put(%.8f,%.8f){</span><span class="hljs-string">\\</span><span class="hljs-string">vtop{</span><span class="hljs-string">\\</span><span class="hljs-string">kern0pt</span><span class="hljs-string">\\</span><span class="hljs-string">hbox{</span><span class="hljs-string">\\</span><span class="hljs-string">hypertarget{%s}{</span><span class="hljs-string">\\</span><span class="hljs-string">copy%d}}}}&quot;</span>,x/<span class="hljs-number">65536</span>,-item.<span class="hljs-property">y</span>/<span class="hljs-number">65536</span>,destination,item.<span class="hljs-property">d</span>.<span class="hljs-property">box</span>))
+  end
+end
+</code></pre>
+
+</div>
+</div><h2>Stable release</h2>
+<p>A digest includes current membership and positions, declaration content, resolved
+page values, shaped box dimensions/fonts, geometry, placements and pending errors.
+An impossible layout derived from stale records suppresses that provisional rail
+and requests another pass. Only an unchanged impossible state becomes a fatal
+error. No certificate can become stable after a rail error.</p>
+<p>Use the existing bounded <code>latexmk -lualatex -halt-on-error -no-shell-escape</code> build
+and its final unresolved-reference/rerun check. The job-owned <code>.litrail</code> file must
+start with <code>stable &lt;digest&gt;</code> before release; it then reports counts and rectangles
+as <code>bounds page,definitionIndex,x,y,width,height</code> in integer scaled points. Indices
+follow terms then notes. A compiler integrating this module should require this
+certificate in addition to its normal log checks, never publish provisional PDFs,
+and retain the five-repeat limit. Exported TeX must also be built to convergence.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020007200610069006c00200063006f006e00760065007200670065006e00630065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200063006f006e00760065007200670065006e00630065"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c00200063006f006e00760065007200670065006e00630065" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200063006f006e00760065007200670065006e00630065" aria-label="Definition of publication rail convergence">&lt;&lt;publication rail convergence&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> R.<span class="hljs-title">finish</span>()
+  R.<span class="hljs-property">finished</span>=<span class="hljs-literal">true</span>
+  <span class="hljs-keyword">if</span> R.<span class="hljs-property">failed</span> then <span class="hljs-keyword">return</span> end
+  <span class="hljs-keyword">for</span> _,entry <span class="hljs-keyword">in</span> <span class="hljs-title">ipairs</span>(R.<span class="hljs-property">issued</span>) <span class="hljs-keyword">do</span>
+    <span class="hljs-keyword">if</span> not entry.<span class="hljs-property">shipped</span> then <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;unshipped annotation occurrence &quot;</span>..<span class="hljs-property">entry</span>.<span class="hljs-property">id</span>); <span class="hljs-keyword">return</span> end
+    R.<span class="hljs-property">fingerprints</span>[#R.<span class="hljs-property">fingerprints</span>+<span class="hljs-number">1</span>]=entry.<span class="hljs-property">kind</span>..<span class="hljs-string">&quot;:&quot;</span>..<span class="hljs-property">entry</span>.<span class="hljs-property">id</span>..<span class="hljs-string">&quot;:&quot;</span>..<span class="hljs-property">entry</span>.<span class="hljs-property">index</span>
+  end
+  <span class="hljs-keyword">for</span> _,d <span class="hljs-keyword">in</span> <span class="hljs-title">ipairs</span>(R.<span class="hljs-property">defs</span>) <span class="hljs-keyword">do</span>
+    <span class="hljs-keyword">if</span> d.<span class="hljs-property">kind</span>==<span class="hljs-string">&quot;note&quot;</span> and not R.<span class="hljs-property">seen</span>[<span class="hljs-string">&quot;note:&quot;</span>..<span class="hljs-property">d</span>.<span class="hljs-property">target</span>] then <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;note has no source marker: &quot;</span>..<span class="hljs-property">d</span>.<span class="hljs-property">target</span>); <span class="hljs-keyword">return</span> end
+    R.<span class="hljs-property">fingerprints</span>[#R.<span class="hljs-property">fingerprints</span>+<span class="hljs-number">1</span>]=d.<span class="hljs-property">fingerprint</span> or <span class="hljs-string">&quot;unbuilt&quot;</span>
+  end
+  local records={}
+  <span class="hljs-keyword">for</span> _,r <span class="hljs-keyword">in</span> <span class="hljs-title">ipairs</span>(R.<span class="hljs-property">current</span>) <span class="hljs-keyword">do</span>
+    records[#records+<span class="hljs-number">1</span>]=table.<span class="hljs-title">concat</span>(r,<span class="hljs-string">&quot;,&quot;</span>)
+    tex.<span class="hljs-title">sprint</span>(<span class="hljs-built_in">string</span>.<span class="hljs-title">format</span>(<span class="hljs-string">&quot;</span><span class="hljs-string">\\</span><span class="hljs-string">LitRailWrite{%d}{%d}{%d}{%d}{%d}&quot;</span>,table.<span class="hljs-title">unpack</span>(r)))
+  end
+  local hash=<span class="hljs-title">digest</span>(table.<span class="hljs-title">concat</span>(R.<span class="hljs-property">fingerprints</span>,<span class="hljs-string">&quot;|&quot;</span>)..<span class="hljs-string">&quot;;&quot;</span>..<span class="hljs-property">table</span>.<span class="hljs-title">concat</span>(records,<span class="hljs-string">&quot;|&quot;</span>)..<span class="hljs-string">&quot;;&quot;</span>..
+    table.<span class="hljs-title">concat</span>(R.<span class="hljs-property">pages</span>,<span class="hljs-string">&quot;|&quot;</span>)..<span class="hljs-string">&quot;;&quot;</span>..<span class="hljs-property">table</span>.<span class="hljs-title">concat</span>(R.<span class="hljs-property">bounds</span>,<span class="hljs-string">&quot;|&quot;</span>)..<span class="hljs-string">&quot;;&quot;</span>..<span class="hljs-property">table</span>.<span class="hljs-title">concat</span>(R.<span class="hljs-property">problems</span>,<span class="hljs-string">&quot;|&quot;</span>))
+  tex.<span class="hljs-title">sprint</span>(<span class="hljs-string">&quot;</span><span class="hljs-string">\\</span><span class="hljs-string">LitRailWriteState{&quot;</span>..<span class="hljs-property">hash</span>..<span class="hljs-string">&quot;}&quot;</span>)
+  <span class="hljs-keyword">if</span> hash==R.<span class="hljs-property">oldhash</span> and #R.<span class="hljs-property">problems</span>&gt;<span class="hljs-number">0</span> then <span class="hljs-title">fatal</span>(R.<span class="hljs-property">problems</span>[<span class="hljs-number">1</span>]); <span class="hljs-keyword">return</span> end
+  local stable=hash==R.<span class="hljs-property">oldhash</span>
+  local f=<span class="hljs-title">assert</span>(io.<span class="hljs-title">open</span>(tex.<span class="hljs-property">jobname</span>..<span class="hljs-string">&quot;.litrail&quot;</span>,<span class="hljs-string">&quot;w&quot;</span>))
+  <span class="hljs-attr">f</span>:<span class="hljs-title">write</span>(stable and <span class="hljs-string">&quot;stable &quot;</span> or <span class="hljs-string">&quot;pending &quot;</span>,hash,<span class="hljs-string">&quot;</span><span class="hljs-string">\n</span><span class="hljs-string">&quot;</span>)
+  <span class="hljs-attr">f</span>:<span class="hljs-title">write</span>(<span class="hljs-built_in">string</span>.<span class="hljs-title">format</span>(<span class="hljs-string">&quot;pages %d uses %d entries %d</span><span class="hljs-string">\n</span><span class="hljs-string">&quot;</span>,R.<span class="hljs-property">page</span>,#R.<span class="hljs-property">current</span>,#R.<span class="hljs-property">bounds</span>))
+  <span class="hljs-keyword">for</span> _,b <span class="hljs-keyword">in</span> <span class="hljs-title">ipairs</span>(R.<span class="hljs-property">bounds</span>) <span class="hljs-keyword">do</span> <span class="hljs-attr">f</span>:<span class="hljs-title">write</span>(<span class="hljs-string">&quot;bounds &quot;</span>,b,<span class="hljs-string">&quot;</span><span class="hljs-string">\n</span><span class="hljs-string">&quot;</span>) end
+  <span class="hljs-attr">f</span>:<span class="hljs-title">close</span>()
+  <span class="hljs-keyword">if</span> not stable then tex.<span class="hljs-title">sprint</span>(<span class="hljs-string">&quot;</span><span class="hljs-string">\\</span><span class="hljs-string">PackageWarningNoLine{literate-rail}{Rerun to get rail membership, dimensions and references right}&quot;</span>) end
+end<span class="hljs-string">`;
+}
+</span></code></pre>
+
+</div>
+</div></div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>
