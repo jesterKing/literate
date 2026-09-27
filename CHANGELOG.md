@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.15.0
+
+* LSP-based editor capabilities: hover, completion, signature, rename ( #5 )
+* Add exporting to PDF
+* Mermaid diagrams now also render into HTML and PDF
+* Fully self-hosted, should be able to debug extension again ( #7 )
+* Theme support, CSS cleanup
+
+
 ## 0.14.4
 
 * Hide code comments from generated HTML ( #38 )
