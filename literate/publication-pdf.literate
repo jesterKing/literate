@@ -1,0 +1,506 @@
+# Compiling a publication PDF
+
+This chapter owns `src/publication-pdf.ts`. Pandoc conversion and destination
+protection belong to the caller. Here a trusted publication plan becomes a PDF
+in a private temporary directory. TeX and Lua can read files and execute code:
+turning off shell escape is defense in depth, **not a sandbox for untrusted TeX**.
+No tools are downloaded, no user destination is opened, and no shell is spawned
+by this adapter. latexmk itself invokes its configured TeX engine.
+
+```ts : <<publication PDF.*>>= ./src/publication-pdf.ts $
+<<publication PDF imports>>
+<<publication PDF API>>
+<<publication PDF process types>>
+<<publication PDF process termination>>
+<<publication PDF process execution>>
+<<publication PDF process capture>>
+<<publication PDF process lifecycle>>
+<<publication PDF compiler lifetime>>
+<<publication PDF plan validation>>
+<<publication PDF staging>>
+<<publication PDF environment>>
+<<publication PDF dependencies>>
+<<publication PDF bounded files>>
+<<publication PDF diagnostics>>
+<<publication PDF build>>
+<<publication PDF orchestration>>
+```
+
+The public compiler has no process-specific options. A factory supplies the test
+seam without changing the CLI-facing signature; injected runners are trusted and
+must honor their request's timeout, output bound, and completion contract.
+
+```ts : <<publication PDF imports>>=
+import { spawn, ChildProcess } from 'node:child_process';
+import { constants } from 'node:fs';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import { tmpdir } from 'node:os';
+```
+
+Failures retain the same diagnostic information as success. A retained directory
+is caller-owned, including after failure; otherwise cleanup runs in `finally`.
+Validation failures occurring before staging have no build directory to retain.
+
+```ts : <<publication PDF API>>=
+export interface PdfCompileOptions { keepBuild?: boolean; }
+export interface PdfCompilation {
+    pdf: Uint8Array;
+    warnings: string[];
+    buildDirectory?: string;
+}
+export type PdfCompiler = (files: readonly { path: string; content: string | Uint8Array }[],
+    entry: string, options?: PdfCompileOptions) => Promise<PdfCompilation>;
+export class PdfCompilationError extends Error {
+    constructor(message: string, public readonly buildDirectory?: string,
+        public readonly warnings: string[] = []) {
+        super(message);
+        this.name = 'PdfCompilationError';
+    }
+}
+```
+
+The normal runner bounds aggregate stdout and stderr, not each stream separately.
+Its promise settles only after draining the pipes, or explicitly closing pipes
+which a stray descendant kept open. Each invocation has its own process group
+on POSIX. The default runner explicitly rejects Windows before spawning anything:
+without process-tree-safe termination, direct-child termination is insufficient.
+Injected runners can still exercise the compiler independently on Windows.
+
+```ts : <<publication PDF process types>>=
+export interface PdfProcessRequest {
+    command: string;
+    args: readonly string[];
+    cwd: string;
+    env: NodeJS.ProcessEnv;
+    timeoutMs: number;
+    maximumOutputBytes: number;
+}
+export interface PdfProcessResult { code: number | null; output: string; }
+export type PdfProcessRunner = (request: PdfProcessRequest) => Promise<PdfProcessResult>;
+const maximumLogBytes = 4 * 1024 * 1024;
+const maximumPdfBytes = 64 * 1024 * 1024;
+const buildTimeoutMs = 180_000;
+```
+
+Group termination also happens on a normal leader exit: a successful latexmk
+must not leave descendants behind. An exit hook handles synchronous parent exit;
+SIGINT, SIGTERM and SIGHUP cancel the invocation with an actionable error. The
+host can handle that rejected promise using its normal command failure policy.
+
+```ts : <<publication PDF process termination>>=
+function killProcessTree(child: ChildProcess): void {
+    if (!child.pid) { return; }
+    try {
+        process.kill(-child.pid, 'SIGKILL');
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ESRCH') {
+            try { child.kill('SIGKILL'); } catch { /* The process may already be gone. */ }
+        }
+    }
+}
+interface ProcessCapture {
+    chunks: Buffer[]; bytes: number; failure?: Error;
+    drainTimer?: NodeJS.Timeout;
+}
+```
+
+Spawn always uses an argument vector and ignored stdin. Timeouts cover the entire
+invocation, including pipe closure. The short drain grace period is only a
+fallback for inherited descriptors; ordinary output is read until `close`.
+
+```ts : <<publication PDF process execution>>=
+export const runPdfProcess: PdfProcessRunner = request => new Promise((resolve, reject) => {
+    if (process.platform === 'win32') {
+        reject(new Error('PDF compilation is unsupported on Windows: process-tree-safe termination is unavailable'));
+        return;
+    }
+    const child = spawn(request.command, [...request.args], {
+        cwd: request.cwd, env: request.env, shell: false,
+        detached: true, stdio: ['ignore', 'pipe', 'pipe']
+    });
+    const capture: ProcessCapture = { chunks: [], bytes: 0 };
+    const stop = (error?: Error) => {
+        capture.failure ??= error;
+        killProcessTree(child);
+        capture.drainTimer ??= setTimeout(() => {
+            child.stdout?.destroy(); child.stderr?.destroy();
+        }, 1000);
+    };
+    const timer = setTimeout(() => stop(new Error(
+        `${request.command} timed out after ${request.timeoutMs} ms`)), request.timeoutMs);
+    const cleanup = processHooks(child, stop);
+    captureProcess(child, request, capture, stop);
+    finishProcess(child, capture, timer, cleanup, resolve, reject);
+});
+```
+
+Once the bound is exceeded, subsequent data is discarded while both streams
+continue draining. We never concatenate an unbounded transcript. Stream errors
+are failures too, rather than unhandled events or silent partial diagnostics.
+
+```ts : <<publication PDF process capture>>=
+function captureProcess(child: ChildProcess, request: PdfProcessRequest,
+    capture: ProcessCapture, stop: (error?: Error) => void): void {
+    const data = (chunk: Buffer) => {
+        const remaining = Math.max(0, request.maximumOutputBytes - capture.bytes);
+        if (remaining) { capture.chunks.push(chunk.subarray(0, remaining)); }
+        capture.bytes += chunk.length;
+        if (capture.bytes > request.maximumOutputBytes) {
+            stop(new Error(`${request.command} exceeded its output limit`));
+        }
+    };
+    for (const stream of [child.stdout, child.stderr]) {
+        stream?.on('data', data);
+        stream?.on('error', stop);
+    }
+    child.once('error', error => stop(error));
+    child.once('exit', () => stop());
+}
+```
+
+Hooks are removed on every completion, including spawn failure. The runner does
+not retain global build state, so independent compiler invocations can overlap.
+
+```ts : <<publication PDF process lifecycle>>=
+function processHooks(child: ChildProcess, stop: (error?: Error) => void): () => void {
+    const exit = () => killProcessTree(child);
+    const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
+    const handlers = signals.map(signal => () => stop(new Error(`PDF compilation interrupted by ${signal}`)));
+    process.on('exit', exit);
+    signals.forEach((signal, index) => process.on(signal, handlers[index]));
+    return () => {
+        process.removeListener('exit', exit);
+        signals.forEach((signal, index) => process.removeListener(signal, handlers[index]));
+    };
+}
+function finishProcess(child: ChildProcess, capture: ProcessCapture, timer: NodeJS.Timeout,
+    cleanup: () => void, resolve: (result: PdfProcessResult) => void, reject: (error: Error) => void): void {
+    child.once('close', (code, signal) => {
+        clearTimeout(timer); clearTimeout(capture.drainTimer); cleanup();
+        const output = Buffer.concat(capture.chunks).toString('utf8');
+        const failure = capture.failure ?? (signal ? new Error(`Process terminated by ${signal}`) : undefined);
+        if (failure) { reject(new Error(`${failure.message}\n${output}`.trim())); }
+        else { resolve({ code, output }); }
+    });
+}
+```
+
+Compiler signal handlers span staging, preflight, log/PDF reads, and cleanup,
+not just subprocess execution. The first signal records cancellation; subsequent
+signals leave cleanup running. Filesystem operations already in flight finish
+before their next checkpoint throws. Runner hooks independently kill live process
+groups. Diagnostic reads and cleanup deliberately remain available after cancellation.
+
+```ts : <<publication PDF compiler lifetime>>=
+function compilerLifetime(): { check: () => void; dispose: () => void } {
+    let cancellation: Error | undefined;
+    const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
+    const handlers = signals.map(signal => () => {
+        cancellation ??= new Error(`PDF compilation interrupted by ${signal}`);
+    });
+    signals.forEach((signal, index) => process.on(signal, handlers[index]));
+    return {
+        check: () => { if (cancellation) { throw cancellation; } },
+        dispose: () => signals.forEach((signal, index) => process.removeListener(signal, handlers[index]))
+    };
+}
+function checkedRunner(runner: PdfProcessRunner, check: () => void): PdfProcessRunner {
+    return async request => {
+        check();
+        const result = await runner(request);
+        check();
+        return result;
+    };
+}
+```
+
+Plan names are portable, normalized relative paths, never traversal instructions.
+The staged entry has the fixed name `book.tex` in its original relative directory.
+Companions remain in their planned locations, so relative TeX paths still work.
+Case-folded collisions are rejected even on case-sensitive hosts. The working
+directory's `book.*` namespace is reserved for compiler output, not supplied data.
+
+```ts : <<publication PDF plan validation>>=
+function safePlanPath(value: string): string {
+    if (!value || /[\\:\u0000-\u001f\u007f]/u.test(value) || value.startsWith('/') ||
+        value.split('/').some(part => !part || part === '.' || part === '..' || /[. ]$/.test(part) ||
+            /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part))) {
+        throw new Error(`Unsafe publication path: ${JSON.stringify(value)}`);
+    }
+    return value;
+}
+function prepareFiles(files: Parameters<PdfCompiler>[0], entry: string): Parameters<PdfCompiler>[0] {
+    safePlanPath(entry);
+    if (!entry.endsWith('.tex')) { throw new Error('PDF entry must be a .tex path'); }
+    const fixed = path.posix.join(path.posix.dirname(entry), 'book.tex');
+    const seen = new Set<string>();
+    const prepared = files.map(file => {
+        const name = safePlanPath(file.path);
+        const staged = name === entry ? fixed : name;
+        if (seen.has(staged.toLowerCase()) || (name !== entry &&
+            path.posix.dirname(name).toLowerCase() === path.posix.dirname(entry).toLowerCase() &&
+            /^book\./i.test(path.posix.basename(name)))) { throw new Error(`Conflicting publication path: ${name}`); }
+        seen.add(staged.toLowerCase());
+        return { path: staged, content: file.content };
+    });
+    if (!files.some(file => file.path === entry)) { throw new Error(`Missing PDF entry: ${entry}`); }
+    return prepared;
+}
+```
+
+Only fresh regular files are written, with exclusive creation and restrictive
+permissions. Parent/file conflicts fail during staging and follow normal cleanup.
+The input buffers are not modified. mkdtemp provides an unpredictable private root.
+
+```ts : <<publication PDF staging>>=
+async function stageFiles(directory: string, files: Parameters<PdfCompiler>[0], check: () => void): Promise<void> {
+    check();
+    await fs.chmod(directory, 0o700);
+    for (const file of files) {
+        check();
+        const destination = path.join(directory, ...file.path.split('/'));
+        await fs.mkdir(path.dirname(destination), { recursive: true, mode: 0o700 });
+        check();
+        await fs.writeFile(destination, file.content, { flag: 'wx', mode: 0o600 });
+    }
+    check();
+}
+async function buildEnvironment(directory: string): Promise<NodeJS.ProcessEnv> {
+    const cache = await fs.mkdtemp(path.join(directory, '.tex-cache-'));
+    return { ...process.env, TEXMFOUTPUT: directory, TEXMFVAR: cache, TEXMFCACHE: cache,
+        openout_any: 'p', shell_escape: 'f' };
+}
+```
+
+User TeX installations and search configuration, including TEXMFHOME, TEXMFCONFIG
+and TEXINPUTS, remain available. TEXMFOUTPUT cannot redirect output into a caller's
+directory; writable TeX/font caches are private. SOURCE_DATE_EPOCH is preserved
+when supplied, not invented: byte-identical PDF output is not promised.
+
+```ts : <<publication PDF environment>>=
+function requestFor(command: string, args: readonly string[], cwd: string,
+    env: NodeJS.ProcessEnv, timeoutMs = 15_000): PdfProcessRequest {
+    return { command, args, cwd, env, timeoutMs, maximumOutputBytes: maximumLogBytes };
+}
+const requiredTexFiles = [
+    'scrbook.cls', 'fontspec.sty', 'geometry.sty', 'fvextra.sty', 'needspace.sty',
+    'xcolor.sty', 'microtype.sty', 'amssymb.sty', 'amsmath.sty', 'graphicx.sty',
+    'ulem.sty', 'hyperref.sty'
+];
+```
+
+Preflight reflects the publication LaTeX template, including its KOMA book class.
+kpsewhich uses the LuaLaTeX program name to honor engine-specific configuration.
+Missing executables and packages give installation guidance without invoking a
+package manager. Even the latexmk version probe uses `-norc`: version queries can
+otherwise execute rc files. Font availability remains LuaLaTeX/fontspec's responsibility.
+
+```ts : <<publication PDF dependencies>>=
+async function preflight(runner: PdfProcessRunner, cwd: string, env: NodeJS.ProcessEnv): Promise<void> {
+    for (const command of ['latexmk', 'lualatex', 'kpsewhich']) {
+        try {
+            const args = command === 'latexmk' ? ['-norc', '--version'] : ['--version'];
+            const result = await runner(requestFor(command, args, cwd, env));
+            if (result.code !== 0) { throw new Error(result.output || `exit ${result.code}`); }
+        } catch (error) {
+            throw new Error(`Cannot run ${command}. Install a TeX distribution with latexmk and LuaLaTeX, ` +
+                `and ensure ${command} is on PATH. ${errorMessage(error)}`);
+        }
+    }
+    const missing: string[] = [];
+    for (const file of requiredTexFiles) {
+        const result = await runner(requestFor('kpsewhich', ['-progname=lualatex', file], cwd, env));
+        if (result.code !== 0 || !result.output.trim()) { missing.push(file); }
+    }
+    if (missing.length) { throw new Error(`Missing TeX packages: ${missing.join(', ')}. ` +
+        'Install these using your TeX distribution package manager, then retry.'); }
+}
+```
+
+Read descriptors, not unchecked paths. The nonblocking open prevents a FIFO from
+hanging before the regular-file check; no-follow plus lstat protects against links
+on supported platforms. A size-plus-one read detects growth beyond the measured
+size. PDF acceptance requires a header and a bounded, nonempty regular file, not
+merely a successful process exit; this is not a full PDF parser.
+
+```ts : <<publication PDF bounded files>>=
+async function readBoundedFile(filename: string, limit: number, check: () => void = () => {}): Promise<Buffer> {
+    check(); const before = await fs.lstat(filename);
+    check();
+    if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1) {
+        throw new Error(`Expected a regular nonlink file: ${path.basename(filename)}`);
+    }
+    const handle = await fs.open(filename, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) |
+        (constants.O_NONBLOCK ?? 0));
+    try {
+        check(); const stat = await handle.stat();
+        check();
+        if (!stat.isFile() || stat.nlink !== 1 || stat.ino !== before.ino || stat.dev !== before.dev ||
+            stat.size > limit) { throw new Error(`Invalid or oversized compiler file: ${path.basename(filename)}`); }
+        const buffer = Buffer.alloc(stat.size + 1);
+        let length = 0;
+        while (length < buffer.length) {
+            check(); const read = await handle.read(buffer, length, buffer.length - length, length);
+            if (!read.bytesRead) { break; }
+            length += read.bytesRead;
+        }
+        if (length !== stat.size) { throw new Error(`Compiler file changed while reading: ${path.basename(filename)}`); }
+        check(); return buffer.subarray(0, length);
+    } finally { await handle.close(); }
+}
+```
+
+Only the final TeX log decides reference convergence: earlier passes normally have
+undefined references. Missing glyphs and overfull boxes remain warnings. A bounded
+log is mandatory on success; a failed build may not have produced one at all.
+
+```ts : <<publication PDF diagnostics>>=
+function errorMessage(error: unknown): string { return error instanceof Error ? error.message : String(error); }
+function logWarnings(log: string): string[] {
+    return [...new Set(log.split(/\r?\n/).filter(line =>
+        /Missing character:|Overfull \\[hv]box|(?:LaTeX|Package .*?) Warning:/i.test(line)))];
+}
+
+async function failureWarnings(cwd: string): Promise<string[]> {
+    try { return logWarnings((await readBoundedFile(path.join(cwd, 'book.log'), maximumLogBytes)).toString('utf8')); }
+    catch { return []; }
+}
+```
+
+Warning headers delimit semantic records. TeX can wrap an unindented line at its
+print width; packages also prefix continuation lines with their package name.
+Join those lines only inside a warning record, stopping at blank lines or another
+recognizable log record. Convergence phrases must begin the warning message, so
+ordinary box contents or prose mentioning undefined references cannot fail a build.
+
+```ts : <<publication PDF diagnostics>>=+
+function texWarnings(log: string): { source: string; message: string }[] {
+    const records: { source: string; message: string }[] = [];
+    let current: { source: string; message: string } | undefined;
+    for (const line of log.split(/\r?\n/)) {
+        const header = /^(LaTeX(?: Font)?|Package [\w.-]+|Class [\w.-]+) Warning(?: \([^)]*\))?:\s*(.*)$/.exec(line);
+        if (header) {
+            current = { source: header[1], message: header[2] };
+            records.push(current);
+        } else if (!line.trim() || /^(?:Overfull|Underfull|Missing character:|Latexmk:|!|\[|Output written|Transcript written)/.test(line)) {
+            current = undefined;
+        } else if (current) {
+            current.message += ' ' + line.replace(/^\([\w.-]+\)\s*/, '').trim();
+        }
+    }
+    return records.map(record => ({ ...record, message: record.message.replace(/\s+/g, ' ').trim() }));
+}
+```
+
+Only final-log warnings determine unresolved references. latexmk exhaustion has
+its own anchored diagnostic forms, including its multi-line processing-failure
+report. Earlier TeX passes in the console transcript may legitimately request a
+rerun and are not inspected as final warnings.
+
+```ts : <<publication PDF diagnostics>>=+
+function checkConvergence(log: string, transcript: string): void {
+    const unresolved = /^(?:There (?:were|are) undefined (?:references|citations)\b|(?:Reference|Citation)\s+.*\bundefined\b|Label\(s\) may have changed\b|Rerun to get\b|Please (?:\(re\))?run (?:LaTeX|Biber|BibTeX)\b)/i;
+    const pending = texWarnings(log).some(record => unresolved.test(record.message) ||
+        (record.source === 'Package rerunfilecheck' && /^File\s+.*\bhas changed\b/i.test(record.message)));
+    const exhausted = /^Latexmk:[ \t]*(?:Maximum (?:number of )?(?:runs|repeats)\b[^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)?|Failure in processing file[^\r\n]*\r?\n[ \t]+[^\r\n]*\bneeded too many passes\b)/im;
+    if (pending || exhausted.test(transcript)) {
+        throw new Error('PDF references did not converge; inspect book.log and fix unresolved references or rerun requirements');
+    }
+}
+```
+
+latexmk receives only literal arguments. `-norc` disables system, user and project
+rc discovery; the literal repeat limit cannot be influenced by an entry basename.
+A 180-second build deadline and five repeats bound runaway reruns. No `-f` option
+can turn a failed pass into apparent success, and shell escape stays disabled.
+
+```ts : <<publication PDF build>>=
+async function buildPdf(runner: PdfProcessRunner, cwd: string,
+    env: NodeJS.ProcessEnv, check: () => void): Promise<PdfCompilation> {
+    const result = await runner(requestFor('latexmk', [
+        '-norc', '-lualatex', '-interaction=nonstopmode', '-halt-on-error',
+        '-file-line-error', '-no-shell-escape', '-e', '$max_repeat = 5;', 'book.tex'
+    ], cwd, env, buildTimeoutMs));
+    if (result.code !== 0) { throw new Error(`latexmk failed (exit ${result.code}).\n${result.output}`); }
+    const log = (await readBoundedFile(path.join(cwd, 'book.log'), maximumLogBytes, check)).toString('utf8');
+    checkConvergence(log, result.output);
+    const pdf = await readBoundedFile(path.join(cwd, 'book.pdf'), maximumPdfBytes, check);
+    check();
+    if (pdf.length < 8 || !/^%PDF-[12]\.[0-9]/.test(pdf.subarray(0, 8).toString('ascii'))) {
+        throw new Error('LuaLaTeX did not produce a valid PDF header in book.pdf');
+    }
+    return { pdf, warnings: logWarnings(log) };
+}
+```
+
+The factory stages before preflight so retained failures are inspectable. Every
+error becomes the exported error type. The success value owns its PDF bytes and
+is independent of the deleted stage. Only explicit keepBuild transfers ownership
+of that stage to the caller. A final cancellation check occurs after cleanup, so
+a signal during deletion cannot turn into a successful compilation.
+
+```ts : <<publication PDF orchestration>>=
+async function compileStaged(directory: string, cwd: string, files: Parameters<PdfCompiler>[0],
+    runner: PdfProcessRunner, check: () => void): Promise<PdfCompilation> {
+    await stageFiles(directory, files, check);
+    check();
+    const env = await buildEnvironment(directory);
+    check();
+    const guarded = checkedRunner(runner, check);
+    await preflight(guarded, cwd, env);
+    check();
+    return buildPdf(guarded, cwd, env, check);
+}
+```
+
+A directory acquired during cancellation is still owned and removed. Failure
+warnings are read before deletion, while the lifetime handlers remain installed.
+Cancellation takes precedence over a secondary filesystem or tool error.
+
+```ts : <<publication PDF orchestration>>=+
+async function compileInStage(files: Parameters<PdfCompiler>[0], entry: string, options: PdfCompileOptions,
+    runner: PdfProcessRunner, check: () => void): Promise<PdfCompilation> {
+    const directory = await fs.mkdtemp(path.join(tmpdir(), 'literate-pdf-'));
+    const cwd = path.join(directory, path.posix.dirname(entry));
+    let warnings: string[] = [];
+    try {
+        let result: PdfCompilation;
+        try {
+            result = await compileStaged(directory, cwd, files, runner, check);
+            warnings = result.warnings;
+        } catch (error) {
+            warnings = await failureWarnings(cwd);
+            throw error;
+        } finally {
+            if (!options.keepBuild) { await fs.rm(directory, { recursive: true, force: true }); }
+        }
+        check();
+        return options.keepBuild ? { ...result, buildDirectory: directory } : result;
+    } catch (error) {
+        try { check(); } catch (cancellation) { error = cancellation; }
+        throw new PdfCompilationError(errorMessage(error), options.keepBuild ? directory : undefined, warnings);
+    }
+}
+```
+
+Lifetime hooks are acquired before any asynchronous work and disposed only after
+the stage has been handled. Synchronous validation errors retain the same public
+error type without allocating a build directory.
+
+```ts : <<publication PDF orchestration>>=+
+export function createPdfCompiler(runner: PdfProcessRunner = runPdfProcess): PdfCompiler {
+    return async (files, entry, options = {}) => {
+        const lifetime = compilerLifetime();
+        try {
+            const prepared = prepareFiles(files, entry);
+            lifetime.check();
+            return await compileInStage(prepared, entry, options, runner, lifetime.check);
+        } catch (error) {
+            if (error instanceof PdfCompilationError) { throw error; }
+            throw new PdfCompilationError(errorMessage(error));
+        } finally { lifetime.dispose(); }
+    };
+}
+export const compilePdf: PdfCompiler = createPdfCompiler();
+```

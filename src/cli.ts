@@ -5,6 +5,7 @@ import { spawn } from 'child_process';
 import { renderLatex, LatexConverter, LatexOptions } from './publication-latex';
 import { planFonts } from './publication-fonts';
 import { collectAssets, planAssets, assetKey, maximumAssetBytes } from './publication-assets';
+import type { PdfCompiler, PdfCompilationError } from './publication-pdf';
 import type { DiagramRenderer } from './publication-mermaid';
 import { resolvePublicationSettings } from './publication-settings';
 import { commitOutputs, OutputTransactionError, TransactionIO } from './output-transactions';
@@ -27,10 +28,11 @@ interface CliResponse {
     outputs: { path: string; status: OutputStatus }[];
     inspection?: Generation['inspection'];
     selfHosting?: { ok: boolean; checks: { name: string; ok: boolean; message?: string }[] };
+    publication?: { warnings: string[]; buildDirectory?: string };
     usage?: string;
 }
 
-const commands = ['generate', 'check', 'inspect', 'self-check', 'latex'];
+const commands = ['generate', 'check', 'inspect', 'self-check', 'latex', 'pdf'];
 const latexMarginOptions = [
     ['--margin', 'marginMm'], ['--margin-top', 'marginTopMm'], ['--margin-right', 'marginRightMm'],
     ['--margin-bottom', 'marginBottomMm'], ['--margin-left', 'marginLeftMm']
@@ -38,12 +40,15 @@ const latexMarginOptions = [
 const latexValueFlags = ['--output', '--paper', '--font-manifest', '--browser', ...latexMarginOptions.map(([flag]) => flag)];
 const latexUsage = 'latex [root] --output path.tex [--paper a4|a5|letter|legal] [--margin 20mm]'
     + ' [--margin-top Nmm] [--margin-right Nmm] [--margin-bottom Nmm] [--margin-left Nmm] [--font-manifest path.json] [--browser /absolute/path] [--json]';
+const pdfUsage = latexUsage.replace('latex [root] --output path.tex', 'pdf [root] --output path.pdf') + ' [--keep-build]';
 const usage = 'Usage: node out/cli.js generate|check|inspect|self-check [root] [--json]\n'
     + `       node out/cli.js ${latexUsage}\n`
+    + `       node out/cli.js ${pdfUsage}\n`
     + '       node out/cli.js <command> --help [--json]\n       node out/cli.js --help [--json]\n';
 const descriptions: Record<string, string> = Object.fromEntries([
     ['generate', 'Write missing or changed generated files.'],
     ['latex', 'Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving at least an 80 × 100 mm body. Each side overrides --margin; unspecified sides use --margin or 20mm. Fonts resolve from root index.literate SETTINGS. No TeX/book PDF execution. --font-manifest opts into explicit font/license companions. --browser explicitly selects a sandbox-capable system Chromium for Mermaid PDF/SVG assets; no browser download.'],
+    ['pdf', 'Compile a .pdf book using Pandoc and latexmk/LuaLaTeX on PATH. Shares latex paper, margin, font-manifest and browser options; output is relative to root. Only the PDF is published. --keep-build retains the private build directory on success or compilation failure. TeX/Lua execution is for trusted inputs, not a sandbox. No source/HTML generation or tool downloads.'],
     ['check', 'Report missing or stale generated files without writing.'],
     ['inspect', 'Report documents, templates, and fragment definitions and dependencies without reading outputs or writing.'],
     ['self-check', 'Verify this repository’s trusted self-hosting code without generating files; all outputs must already be current.']
@@ -228,7 +233,8 @@ export const runPandoc: LatexConverter = async document => {
 };
 async function planLatex(root: string, documents: SourceDocument[], output: string,
     options: LatexOptions, convert: LatexConverter, manifest: string | undefined,
-        browser: string | undefined, diagrams: DiagramRenderer): Promise<{
+        browser: string | undefined, diagrams: DiagramRenderer,
+        virtualOutput?: { destinations: string[] }): Promise<{
         files: { path: string; content: string | Uint8Array }[]; diagnostics: Generation['diagnostics'];
         inspection?: Generation['inspection'];
     }> {
@@ -265,7 +271,7 @@ async function planLatex(root: string, documents: SourceDocument[], output: stri
     }) : undefined;
     const inputs = [...documents.map(document => document.path), ...templateReferences(documents),
         ...(companions?.inputs ?? []), ...assets.inputs];
-    const destinations = [output, ...(companions?.files.map(file => file.path) ?? []),
+    const destinations = virtualOutput?.destinations ?? [output, ...(companions?.files.map(file => file.path) ?? []),
         ...assets.files.map(file => file.path)];
     for (const destination of destinations) {
         const target = destination.toLowerCase();
@@ -326,7 +332,8 @@ async function protectLatexAliases(root: string, inputs: string[], outputs: stri
 export async function run(args: string[], io: CliIO = defaultIO,
     transactionIO: (root: string) => TransactionIO = createTransactionIO,
     convert: LatexConverter = runPandoc,
-    diagrams: DiagramRenderer = async (...args) => (await import('./publication-mermaid')).renderDiagrams(...args)
+    diagrams: DiagramRenderer = async (...args) => (await import('./publication-mermaid')).renderDiagrams(...args),
+    compile: PdfCompiler = async (...args) => (await import('./publication-pdf')).compilePdf(...args)
 ): Promise<number> {
     const json = args.includes('--json');
     const positional: string[] = [];
@@ -352,7 +359,7 @@ export async function run(args: string[], io: CliIO = defaultIO,
             else { values.set(arg, value); index++; }
         } else if (arg.startsWith('-')) {
             const flag = arg === '-h' ? '--help' : arg;
-            if (!['--help', '--json'].includes(flag)) { response.errors.push(`Unknown flag: ${arg}`); }
+            if (!['--help', '--json', '--keep-build'].includes(flag)) { response.errors.push(`Unknown flag: ${arg}`); }
             else if (flags.has(flag)) { response.errors.push(`Duplicate flag: ${arg}`); }
             flags.add(flag);
         } else { positional.push(arg); }
@@ -369,10 +376,13 @@ export async function run(args: string[], io: CliIO = defaultIO,
         (helpCommand && flags.has('--help')) || (helpCommand && topic && !commands.includes(topic))) {
         response.errors.push('Invalid arguments');
     }
-    if (topic !== 'latex' && latexValueFlags.some(flag => flags.has(flag))) {
-        response.errors.push(`${latexValueFlags.join(', ')} are only valid for latex`);
+    if (topic !== 'pdf' && flags.has('--keep-build')) {
+        response.errors.push('--keep-build is only valid for pdf');
     }
-    if (topic === 'latex') {
+    if (topic !== 'latex' && topic !== 'pdf' && latexValueFlags.some(flag => flags.has(flag))) {
+        response.errors.push(`${latexValueFlags.join(', ')} are only valid for latex or pdf`);
+    }
+    if (topic === 'latex' || topic === 'pdf') {
         const browser = values.get('--browser');
         if (browser !== undefined && (!path.isAbsolute(browser) || /[\u0000-\u001f]/.test(browser))) {
             response.errors.push('--browser requires an absolute system Chromium executable path');
@@ -383,8 +393,9 @@ export async function run(args: string[], io: CliIO = defaultIO,
         }
         const output = values.get('--output');
         latexOutput = output ? safeRelativePath(output) || '' : '';
-        if ((!help || output !== undefined) && (!latexOutput || !latexOutput.endsWith('.tex'))) {
-            response.errors.push('latex requires --output with a safe root-relative .tex path');
+        const extension = topic === 'pdf' ? '.pdf' : '.tex';
+        if ((!help || output !== undefined) && (!latexOutput || !latexOutput.endsWith(extension))) {
+            response.errors.push(`${topic} requires --output with a safe root-relative ${extension} path`);
         }
         const paper = values.get('--paper') ?? 'a4';
         if (!['a4', 'a5', 'letter', 'legal'].includes(paper)) {
@@ -420,10 +431,22 @@ export async function run(args: string[], io: CliIO = defaultIO,
     if (help) {
         response.command = 'help';
         response.usage = topic
-            ? `Usage: node out/cli.js ${topic === 'latex' ? latexUsage : topic + ' [root] [--json]'}\n${descriptions[topic]}\n`
+            ? `Usage: node out/cli.js ${topic === 'latex' ? latexUsage : topic === 'pdf' ? pdfUsage : topic + ' [root] [--json]'}\n${descriptions[topic]}\n`
             : usage;
         if (!json) { io.stdout(response.usage); }
         return finish(0);
+    }
+    let cancellation: Error | undefined;
+    const cancellationHandlers = new Map<NodeJS.Signals, () => void>();
+    const checkCancelled = command === 'pdf' ? (): void => {
+        if (cancellation) { throw cancellation; }
+    } : undefined;
+    if (command === 'pdf') {
+        for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
+            const handler = (): void => { cancellation ??= new Error(`PDF publication cancelled by ${signal}`); };
+            cancellationHandlers.set(signal, handler);
+            process.on(signal, handler);
+        }
     }
     try {
         const root = await fs.realpath(path.resolve(positional[1] || process.cwd()));
@@ -437,10 +460,12 @@ export async function run(args: string[], io: CliIO = defaultIO,
                 templates[reference] = await fs.readFile(path.join(root, reference), 'utf8');
             }
         }
-        const result = command === 'latex'
-            ? await planLatex(root, documents, latexOutput, latexOptions, convert,
+        checkCancelled?.();
+        const entry = command === 'pdf' ? path.posix.join(path.posix.dirname(latexOutput), 'book.tex') : latexOutput;
+        const result = command === 'latex' || command === 'pdf'
+            ? await planLatex(root, documents, entry, latexOptions, convert,
                 values.has('--font-manifest') ? relative(values.get('--font-manifest')!) : undefined,
-                        values.get('--browser'), diagrams)
+                        values.get('--browser'), diagrams, command === 'pdf' ? { destinations: [latexOutput] } : undefined)
             : generateProject(documents, templates);
         response.diagnostics = result.diagnostics;
         if (command === 'inspect') {
@@ -456,6 +481,26 @@ export async function run(args: string[], io: CliIO = defaultIO,
             return finish(1);
         }
         if (command === 'inspect') { return finish(0); }
+        if (command === 'pdf') {
+            const publication = (details: { warnings?: string[]; buildDirectory?: string }): void => {
+                response.publication = { warnings: details.warnings ?? [],
+                    ...(details.buildDirectory === undefined ? {} : { buildDirectory: details.buildDirectory }) };
+                if (!json) {
+                    for (const warning of response.publication.warnings) { io.stderr(`literate: warning: ${warning}\n`); }
+                    if (details.buildDirectory !== undefined) { io.stderr(`literate: build directory: ${details.buildDirectory}\n`); }
+                }
+            };
+            checkCancelled?.();
+            try {
+                const compiled = await compile(result.files, entry, { keepBuild: flags.has('--keep-build') });
+                publication(compiled);
+                result.files = [{ path: latexOutput, content: compiled.pdf }];
+            } catch (error) {
+                if (error instanceof Error) { publication(error as Partial<PdfCompilationError>); }
+                throw error;
+            }
+            checkCancelled?.();
+        }
         const files = result.files.map(file => ({ path: relative(file.path), content: file.content }));
         const targets = new Set<string>();
         for (const file of files) {
@@ -507,10 +552,11 @@ export async function run(args: string[], io: CliIO = defaultIO,
                 if (!json) { io.stdout(`generated: ${output.path}\n`); }
             }
         };
+        checkCancelled?.();
         try {
             const written = await commitOutputs(files.map(file => ({
                 path: file.path, content: typeof file.content === 'string' ? Buffer.from(file.content, 'utf8') : file.content
-            })), transactionIO(root));
+            })), transactionIO(root), checkCancelled);
             markWritten(written);
         } catch (error) {
             if (error instanceof OutputTransactionError && error.committed) {
@@ -524,6 +570,8 @@ export async function run(args: string[], io: CliIO = defaultIO,
         response.errors.push(message);
         if (!json) { io.stderr(`literate: ${message}\n`); }
         return finish(1);
+    } finally {
+        for (const [signal, handler] of cancellationHandlers) { process.removeListener(signal, handler); }
     }
 }
 

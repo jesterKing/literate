@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Compiling a publication PDF</h1>
+<p>This chapter owns <code>src/publication-pdf.ts</code>. Pandoc conversion and destination
+protection belong to the caller. Here a trusted publication plan becomes a PDF
+in a private temporary directory. TeX and Lua can read files and execute code:
+turning off shell escape is defense in depth, <strong>not a sandbox for untrusted TeX</strong>.
+No tools are downloaded, no user destination is opened, and no shell is spawned
+by this adapter. latexmk itself invokes its configured TeX engine.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020005000440046002e002a-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020005000440046002e002a"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020005000440046002e002a" data-literate-target="f-007000750062006c00690063006100740069006f006e0020005000440046002e002a" aria-label="Definition of publication PDF.*">&lt;&lt;publication PDF.*&gt;&gt;= src/publication-pdf.ts $</a></div>
+<div class="code">
+<pre><code><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500044004600200069006d0070006f007200740073" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500044004600200069006d0070006f007200740073" aria-label="Definition of publication PDF imports">&lt;&lt;publication PDF imports&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200050004400460020004100500049" data-literate-target="f-007000750062006c00690063006100740069006f006e00200050004400460020004100500049" aria-label="Definition of publication PDF API">&lt;&lt;publication PDF API&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f0063006500730073002000740079007000650073" data-literate-target="f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f0063006500730073002000740079007000650073" aria-label="Definition of publication PDF process types">&lt;&lt;publication PDF process types&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f00630065007300730020007400650072006d0069006e006100740069006f006e" data-literate-target="f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f00630065007300730020007400650072006d0069006e006100740069006f006e" aria-label="Definition of publication PDF process termination">&lt;&lt;publication PDF process termination&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f006300650073007300200065007800650063007500740069006f006e" data-literate-target="f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f006300650073007300200065007800650063007500740069006f006e" aria-label="Definition of publication PDF process execution">&lt;&lt;publication PDF process execution&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f006300650073007300200063006100700074007500720065" data-literate-target="f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f006300650073007300200063006100700074007500720065" aria-label="Definition of publication PDF process capture">&lt;&lt;publication PDF process capture&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f00630065007300730020006c006900660065006300790063006c0065" data-literate-target="f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f00630065007300730020006c006900660065006300790063006c0065" aria-label="Definition of publication PDF process lifecycle">&lt;&lt;publication PDF process lifecycle&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500044004600200063006f006d00700069006c006500720020006c00690066006500740069006d0065" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500044004600200063006f006d00700069006c006500720020006c00690066006500740069006d0065" aria-label="Definition of publication PDF compiler lifetime">&lt;&lt;publication PDF compiler lifetime&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500044004600200070006c0061006e002000760061006c00690064006100740069006f006e" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500044004600200070006c0061006e002000760061006c00690064006100740069006f006e" aria-label="Definition of publication PDF plan validation">&lt;&lt;publication PDF plan validation&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020005000440046002000730074006100670069006e0067" data-literate-target="f-007000750062006c00690063006100740069006f006e0020005000440046002000730074006100670069006e0067" aria-label="Definition of publication PDF staging">&lt;&lt;publication PDF staging&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500044004600200065006e007600690072006f006e006d0065006e0074" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500044004600200065006e007600690072006f006e006d0065006e0074" aria-label="Definition of publication PDF environment">&lt;&lt;publication PDF environment&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500044004600200064006500700065006e00640065006e0063006900650073" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500044004600200064006500700065006e00640065006e0063006900650073" aria-label="Definition of publication PDF dependencies">&lt;&lt;publication PDF dependencies&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500044004600200062006f0075006e006400650064002000660069006c00650073" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500044004600200062006f0075006e006400650064002000660069006c00650073" aria-label="Definition of publication PDF bounded files">&lt;&lt;publication PDF bounded files&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073" aria-label="Definition of publication PDF diagnostics">&lt;&lt;publication PDF diagnostics&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200050004400460020006200750069006c0064" data-literate-target="f-007000750062006c00690063006100740069006f006e00200050004400460020006200750069006c0064" aria-label="Definition of publication PDF build">&lt;&lt;publication PDF build&gt;&gt;</a>
+<a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e" data-literate-target="f-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e" aria-label="Definition of publication PDF orchestration">&lt;&lt;publication PDF orchestration&gt;&gt;</a>
+</code></pre>
+
+</div>
+</div><p>The public compiler has no process-specific options. A factory supplies the test
+seam without changing the CLI-facing signature; injected runners are trusted and
+must honor their request's timeout, output bound, and completion contract.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500044004600200069006d0070006f007200740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e002000500044004600200069006d0070006f007200740073"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500044004600200069006d0070006f007200740073" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500044004600200069006d0070006f007200740073" aria-label="Definition of publication PDF imports">&lt;&lt;publication PDF imports&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> { spawn, <span class="hljs-title">ChildProcess</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'node:child_process'</span>;
+<span class="hljs-keyword">import</span> { constants } <span class="hljs-keyword">from</span> <span class="hljs-string">'node:fs'</span>;
+<span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> fs <span class="hljs-keyword">from</span> <span class="hljs-string">'node:fs/promises'</span>;
+<span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> path <span class="hljs-keyword">from</span> <span class="hljs-string">'node:path'</span>;
+<span class="hljs-keyword">import</span> { tmpdir } <span class="hljs-keyword">from</span> <span class="hljs-string">'node:os'</span>;
+</code></pre>
+
+</div>
+</div><p>Failures retain the same diagnostic information as success. A retained directory
+is caller-owned, including after failure; otherwise cleanup runs in <code>finally</code>.
+Validation failures occurring before staging have no build directory to retain.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200050004400460020004100500049-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200050004400460020004100500049"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200050004400460020004100500049" data-literate-target="f-007000750062006c00690063006100740069006f006e00200050004400460020004100500049" aria-label="Definition of publication PDF API">&lt;&lt;publication PDF API&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PdfCompileOptions</span> { keepBuild?: <span class="hljs-built_in">boolean</span>; }
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PdfCompilation</span> {
+    <span class="hljs-attr">pdf</span>: <span class="hljs-title">Uint8Array</span>;
+    <span class="hljs-attr">warnings</span>: <span class="hljs-built_in">string</span>[];
+    buildDirectory?: <span class="hljs-built_in">string</span>;
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title">PdfCompiler</span> = <span class="hljs-function">(</span><span class="hljs-params">files: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> </span><span class="hljs-params">{ path: </span><span class="hljs-built_in">string</span><span class="hljs-params">; content: </span><span class="hljs-built_in">string</span><span class="hljs-params"> | </span><span class="hljs-built_in">Uint8Array</span><span class="hljs-params"> }</span><span class="hljs-params">[],
+    entry: </span><span class="hljs-built_in">string</span><span class="hljs-params">, options?: PdfCompileOptions</span><span class="hljs-function">) =&gt;</span> <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">PdfCompilation</span>&gt;;
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">class</span> <span class="hljs-title">PdfCompilationError</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Error</span> {
+    <span class="hljs-title">constructor</span>(<span class="hljs-params">message: </span><span class="hljs-built_in">string</span><span class="hljs-params">, </span><span class="hljs-keyword">public</span><span class="hljs-params"> </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> buildDirectory?: </span><span class="hljs-built_in">string</span><span class="hljs-params">,
+        </span><span class="hljs-keyword">public</span><span class="hljs-params"> </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> warnings: </span><span class="hljs-built_in">string</span><span class="hljs-params">[] = []</span>) {
+        <span class="hljs-variable">super</span>(message);
+        <span class="hljs-variable">this</span>.<span class="hljs-property">name</span> = <span class="hljs-string">'PdfCompilationError'</span>;
+    }
+}
+</code></pre>
+
+</div>
+</div><p>The normal runner bounds aggregate stdout and stderr, not each stream separately.
+Its promise settles only after draining the pipes, or explicitly closing pipes
+which a stray descendant kept open. Each invocation has its own process group
+on POSIX. The default runner explicitly rejects Windows before spawning anything:
+without process-tree-safe termination, direct-child termination is insufficient.
+Injected runners can still exercise the compiler independently on Windows.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f0063006500730073002000740079007000650073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f0063006500730073002000740079007000650073"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f0063006500730073002000740079007000650073" data-literate-target="f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f0063006500730073002000740079007000650073" aria-label="Definition of publication PDF process types">&lt;&lt;publication PDF process types&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PdfProcessRequest</span> {
+    <span class="hljs-attr">command</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">args</span>: <span class="hljs-keyword">readonly</span> <span class="hljs-built_in">string</span>[];
+    <span class="hljs-attr">cwd</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">env</span>: <span class="hljs-title">NodeJS</span>.<span class="hljs-property">ProcessEnv</span>;
+    <span class="hljs-attr">timeoutMs</span>: <span class="hljs-built_in">number</span>;
+    <span class="hljs-attr">maximumOutputBytes</span>: <span class="hljs-built_in">number</span>;
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PdfProcessResult</span> { <span class="hljs-attr">code</span>: <span class="hljs-built_in">number</span> | <span class="hljs-literal">null</span>; <span class="hljs-attr">output</span>: <span class="hljs-built_in">string</span>; }
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title">PdfProcessRunner</span> = <span class="hljs-function">(</span><span class="hljs-params">request: PdfProcessRequest</span><span class="hljs-function">) =&gt;</span> <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">PdfProcessResult</span>&gt;;
+<span class="hljs-keyword">const</span> maximumLogBytes = <span class="hljs-number">4</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>;
+<span class="hljs-keyword">const</span> maximumPdfBytes = <span class="hljs-number">64</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>;
+<span class="hljs-keyword">const</span> buildTimeoutMs = <span class="hljs-number">180_000</span>;
+</code></pre>
+
+</div>
+</div><p>Group termination also happens on a normal leader exit: a successful latexmk
+must not leave descendants behind. An exit hook handles synchronous parent exit;
+SIGINT, SIGTERM and SIGHUP cancel the invocation with an actionable error. The
+host can handle that rejected promise using its normal command failure policy.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f00630065007300730020007400650072006d0069006e006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f00630065007300730020007400650072006d0069006e006100740069006f006e"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f00630065007300730020007400650072006d0069006e006100740069006f006e" data-literate-target="f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f00630065007300730020007400650072006d0069006e006100740069006f006e" aria-label="Definition of publication PDF process termination">&lt;&lt;publication PDF process termination&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">killProcessTree</span>(<span class="hljs-params">child: ChildProcess</span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">if</span> (!child.<span class="hljs-property">pid</span>) { <span class="hljs-keyword">return</span>; }
+    <span class="hljs-keyword">try</span> {
+        process.<span class="hljs-title">kill</span>(-child.<span class="hljs-property">pid</span>, <span class="hljs-string">'SIGKILL'</span>);
+    } <span class="hljs-keyword">catch</span> (error) {
+        <span class="hljs-keyword">if</span> ((error <span class="hljs-keyword">as</span> <span class="hljs-title">NodeJS</span>.<span class="hljs-property">ErrnoException</span>).<span class="hljs-property">code</span> !== <span class="hljs-string">'ESRCH'</span>) {
+            <span class="hljs-keyword">try</span> { child.<span class="hljs-title">kill</span>(<span class="hljs-string">'SIGKILL'</span>); } <span class="hljs-keyword">catch</span> {  }
+        }
+    }
+}
+<span class="hljs-keyword">interface</span> <span class="hljs-title">ProcessCapture</span> {
+    <span class="hljs-attr">chunks</span>: <span class="hljs-title">Buffer</span>[]; <span class="hljs-attr">bytes</span>: <span class="hljs-built_in">number</span>; failure?: <span class="hljs-title">Error</span>;
+    drainTimer?: <span class="hljs-title">NodeJS</span>.<span class="hljs-property">Timeout</span>;
+}
+</code></pre>
+
+</div>
+</div><p>Spawn always uses an argument vector and ignored stdin. Timeouts cover the entire
+invocation, including pipe closure. The short drain grace period is only a
+fallback for inherited descriptors; ordinary output is read until <code>close</code>.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f006300650073007300200065007800650063007500740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f006300650073007300200065007800650063007500740069006f006e"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f006300650073007300200065007800650063007500740069006f006e" data-literate-target="f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f006300650073007300200065007800650063007500740069006f006e" aria-label="Definition of publication PDF process execution">&lt;&lt;publication PDF process execution&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">const</span> <span class="hljs-attr">runPdfProcess</span>: <span class="hljs-title">PdfProcessRunner</span> = <span class="hljs-params">request</span><span class="hljs-function"> =&gt;</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Promise</span>(<span class="hljs-function">(</span><span class="hljs-params">resolve, reject</span><span class="hljs-function">) =&gt;</span> {
+    <span class="hljs-keyword">if</span> (process.<span class="hljs-property">platform</span> === <span class="hljs-string">'win32'</span>) {
+        <span class="hljs-title">reject</span>(<span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'PDF compilation is unsupported on Windows: process-tree-safe termination is unavailable'</span>));
+        <span class="hljs-keyword">return</span>;
+    }
+    <span class="hljs-keyword">const</span> child = <span class="hljs-title">spawn</span>(request.<span class="hljs-property">command</span>, [...request.<span class="hljs-property">args</span>], {
+        <span class="hljs-attr">cwd</span>: request.<span class="hljs-property">cwd</span>, <span class="hljs-attr">env</span>: request.<span class="hljs-property">env</span>, <span class="hljs-attr">shell</span>: <span class="hljs-literal">false</span>,
+        <span class="hljs-attr">detached</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">stdio</span>: [<span class="hljs-string">'ignore'</span>, <span class="hljs-string">'pipe'</span>, <span class="hljs-string">'pipe'</span>]
+    });
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">capture</span>: <span class="hljs-title">ProcessCapture</span> = { <span class="hljs-attr">chunks</span>: [], <span class="hljs-attr">bytes</span>: <span class="hljs-number">0</span> };
+    <span class="hljs-keyword">const</span> <span class="hljs-title">stop</span> = (<span class="hljs-params">error?: </span><span class="hljs-built_in">Error</span>) =&gt; {
+        capture.<span class="hljs-property">failure</span> ??= error;
+        <span class="hljs-title">killProcessTree</span>(child);
+        capture.<span class="hljs-property">drainTimer</span> ??= <span class="hljs-built_in">setTimeout</span>(<span class="hljs-function">() =&gt;</span> {
+            child.<span class="hljs-property">stdout</span>?.<span class="hljs-title">destroy</span>(); child.<span class="hljs-property">stderr</span>?.<span class="hljs-title">destroy</span>();
+        }, <span class="hljs-number">1000</span>);
+    };
+    <span class="hljs-keyword">const</span> timer = <span class="hljs-built_in">setTimeout</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title">stop</span>(<span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(
+        <span class="hljs-string">`</span><span class="hljs-subst">${request.command}</span><span class="hljs-string"> timed out after </span><span class="hljs-subst">${request.timeoutMs}</span><span class="hljs-string"> ms`</span>)), request.<span class="hljs-property">timeoutMs</span>);
+    <span class="hljs-keyword">const</span> cleanup = <span class="hljs-title">processHooks</span>(child, stop);
+    <span class="hljs-title">captureProcess</span>(child, request, capture, stop);
+    <span class="hljs-title">finishProcess</span>(child, capture, timer, cleanup, resolve, reject);
+});
+</code></pre>
+
+</div>
+</div><p>Once the bound is exceeded, subsequent data is discarded while both streams
+continue draining. We never concatenate an unbounded transcript. Stream errors
+are failures too, rather than unhandled events or silent partial diagnostics.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f006300650073007300200063006100700074007500720065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f006300650073007300200063006100700074007500720065"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f006300650073007300200063006100700074007500720065" data-literate-target="f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f006300650073007300200063006100700074007500720065" aria-label="Definition of publication PDF process capture">&lt;&lt;publication PDF process capture&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">captureProcess</span>(<span class="hljs-params">child: ChildProcess, request: PdfProcessRequest,
+    capture: ProcessCapture, stop: </span><span class="hljs-params">(error?: </span><span class="hljs-built_in">Error</span><span class="hljs-params">)</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">const</span> <span class="hljs-title">data</span> = (<span class="hljs-params">chunk: Buffer</span>) =&gt; {
+        <span class="hljs-keyword">const</span> remaining = <span class="hljs-title">Math</span>.<span class="hljs-title">max</span>(<span class="hljs-number">0</span>, request.<span class="hljs-property">maximumOutputBytes</span> - capture.<span class="hljs-property">bytes</span>);
+        <span class="hljs-keyword">if</span> (remaining) { capture.<span class="hljs-property">chunks</span>.<span class="hljs-title">push</span>(chunk.<span class="hljs-title">subarray</span>(<span class="hljs-number">0</span>, remaining)); }
+        capture.<span class="hljs-property">bytes</span> += chunk.<span class="hljs-property">length</span>;
+        <span class="hljs-keyword">if</span> (capture.<span class="hljs-property">bytes</span> &gt; request.<span class="hljs-property">maximumOutputBytes</span>) {
+            <span class="hljs-title">stop</span>(<span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${request.command}</span><span class="hljs-string"> exceeded its output limit`</span>));
+        }
+    };
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> stream <span class="hljs-keyword">of</span> [child.<span class="hljs-property">stdout</span>, child.<span class="hljs-property">stderr</span>]) {
+        stream?.<span class="hljs-title">on</span>(<span class="hljs-string">'data'</span>, data);
+        stream?.<span class="hljs-title">on</span>(<span class="hljs-string">'error'</span>, stop);
+    }
+    child.<span class="hljs-title">once</span>(<span class="hljs-string">'error'</span>, <span class="hljs-params">error</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">stop</span>(error));
+    child.<span class="hljs-title">once</span>(<span class="hljs-string">'exit'</span>, <span class="hljs-function">() =&gt;</span> <span class="hljs-title">stop</span>());
+}
+</code></pre>
+
+</div>
+</div><p>Hooks are removed on every completion, including spawn failure. The runner does
+not retain global build state, so independent compiler invocations can overlap.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f00630065007300730020006c006900660065006300790063006c0065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f00630065007300730020006c006900660065006300790063006c0065"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f00630065007300730020006c006900660065006300790063006c0065" data-literate-target="f-007000750062006c00690063006100740069006f006e0020005000440046002000700072006f00630065007300730020006c006900660065006300790063006c0065" aria-label="Definition of publication PDF process lifecycle">&lt;&lt;publication PDF process lifecycle&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">processHooks</span>(<span class="hljs-params">child: ChildProcess, stop: </span><span class="hljs-params">(error?: </span><span class="hljs-built_in">Error</span><span class="hljs-params">)</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span>): <span class="hljs-function">() =&gt;</span> <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">const</span> <span class="hljs-title">exit</span> = () =&gt; <span class="hljs-title">killProcessTree</span>(child);
+    <span class="hljs-keyword">const</span> signals = [<span class="hljs-string">'SIGINT'</span>, <span class="hljs-string">'SIGTERM'</span>, <span class="hljs-string">'SIGHUP'</span>] <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span>;
+    <span class="hljs-keyword">const</span> handlers = signals.<span class="hljs-title">map</span>(<span class="hljs-params">signal</span><span class="hljs-function"> =&gt;</span> <span class="hljs-function">() =&gt;</span> <span class="hljs-title">stop</span>(<span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`PDF compilation interrupted by </span><span class="hljs-subst">${signal}</span><span class="hljs-string">`</span>)));
+    process.<span class="hljs-title">on</span>(<span class="hljs-string">'exit'</span>, exit);
+    signals.<span class="hljs-title">forEach</span>(<span class="hljs-function">(</span><span class="hljs-params">signal, index</span><span class="hljs-function">) =&gt;</span> process.<span class="hljs-title">on</span>(signal, handlers[index]));
+    <span class="hljs-keyword">return</span> <span class="hljs-function">() =&gt;</span> {
+        process.<span class="hljs-title">removeListener</span>(<span class="hljs-string">'exit'</span>, exit);
+        signals.<span class="hljs-title">forEach</span>(<span class="hljs-function">(</span><span class="hljs-params">signal, index</span><span class="hljs-function">) =&gt;</span> process.<span class="hljs-title">removeListener</span>(signal, handlers[index]));
+    };
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title">finishProcess</span>(<span class="hljs-params">child: ChildProcess, capture: ProcessCapture, timer: NodeJS.Timeout,
+    cleanup: </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span><span class="hljs-params">, resolve: </span><span class="hljs-params">(result: PdfProcessResult)</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span><span class="hljs-params">, reject: </span><span class="hljs-params">(error: </span><span class="hljs-built_in">Error</span><span class="hljs-params">)</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span>): <span class="hljs-built_in">void</span> {
+    child.<span class="hljs-title">once</span>(<span class="hljs-string">'close'</span>, <span class="hljs-function">(</span><span class="hljs-params">code, signal</span><span class="hljs-function">) =&gt;</span> {
+        <span class="hljs-built_in">clearTimeout</span>(timer); <span class="hljs-built_in">clearTimeout</span>(capture.<span class="hljs-property">drainTimer</span>); <span class="hljs-title">cleanup</span>();
+        <span class="hljs-keyword">const</span> output = <span class="hljs-title">Buffer</span>.<span class="hljs-title">concat</span>(capture.<span class="hljs-property">chunks</span>).<span class="hljs-title">toString</span>(<span class="hljs-string">'utf8'</span>);
+        <span class="hljs-keyword">const</span> failure = capture.<span class="hljs-property">failure</span> ?? (signal ? <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Process terminated by </span><span class="hljs-subst">${signal}</span><span class="hljs-string">`</span>) : <span class="hljs-literal">undefined</span>);
+        <span class="hljs-keyword">if</span> (failure) { <span class="hljs-title">reject</span>(<span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${failure.message}</span><span class="hljs-string">\n</span><span class="hljs-subst">${output}</span><span class="hljs-string">`</span>.<span class="hljs-title">trim</span>())); }
+        <span class="hljs-keyword">else</span> { <span class="hljs-title">resolve</span>({ code, output }); }
+    });
+}
+</code></pre>
+
+</div>
+</div><p>Compiler signal handlers span staging, preflight, log/PDF reads, and cleanup,
+not just subprocess execution. The first signal records cancellation; subsequent
+signals leave cleanup running. Filesystem operations already in flight finish
+before their next checkpoint throws. Runner hooks independently kill live process
+groups. Diagnostic reads and cleanup deliberately remain available after cancellation.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500044004600200063006f006d00700069006c006500720020006c00690066006500740069006d0065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e002000500044004600200063006f006d00700069006c006500720020006c00690066006500740069006d0065"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500044004600200063006f006d00700069006c006500720020006c00690066006500740069006d0065" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500044004600200063006f006d00700069006c006500720020006c00690066006500740069006d0065" aria-label="Definition of publication PDF compiler lifetime">&lt;&lt;publication PDF compiler lifetime&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">compilerLifetime</span>(): { <span class="hljs-attr">check</span>: <span class="hljs-function">() =&gt;</span> <span class="hljs-built_in">void</span>; <span class="hljs-attr">dispose</span>: <span class="hljs-function">() =&gt;</span> <span class="hljs-built_in">void</span> } {
+    <span class="hljs-keyword">let</span> <span class="hljs-attr">cancellation</span>: <span class="hljs-title">Error</span> | <span class="hljs-literal">undefined</span>;
+    <span class="hljs-keyword">const</span> signals = [<span class="hljs-string">'SIGINT'</span>, <span class="hljs-string">'SIGTERM'</span>, <span class="hljs-string">'SIGHUP'</span>] <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span>;
+    <span class="hljs-keyword">const</span> handlers = signals.<span class="hljs-title">map</span>(<span class="hljs-params">signal</span><span class="hljs-function"> =&gt;</span> <span class="hljs-function">() =&gt;</span> {
+        cancellation ??= <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`PDF compilation interrupted by </span><span class="hljs-subst">${signal}</span><span class="hljs-string">`</span>);
+    });
+    signals.<span class="hljs-title">forEach</span>(<span class="hljs-function">(</span><span class="hljs-params">signal, index</span><span class="hljs-function">) =&gt;</span> process.<span class="hljs-title">on</span>(signal, handlers[index]));
+    <span class="hljs-keyword">return</span> {
+        <span class="hljs-attr">check</span>: <span class="hljs-function">() =&gt;</span> { <span class="hljs-keyword">if</span> (cancellation) { <span class="hljs-keyword">throw</span> cancellation; } },
+        <span class="hljs-attr">dispose</span>: <span class="hljs-function">() =&gt;</span> signals.<span class="hljs-title">forEach</span>(<span class="hljs-function">(</span><span class="hljs-params">signal, index</span><span class="hljs-function">) =&gt;</span> process.<span class="hljs-title">removeListener</span>(signal, handlers[index]))
+    };
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title">checkedRunner</span>(<span class="hljs-params">runner: PdfProcessRunner, check: </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span>): <span class="hljs-title">PdfProcessRunner</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">async</span> request =&gt; {
+        <span class="hljs-title">check</span>();
+        <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">await</span> <span class="hljs-title">runner</span>(request);
+        <span class="hljs-title">check</span>();
+        <span class="hljs-keyword">return</span> result;
+    };
+}
+</code></pre>
+
+</div>
+</div><p>Plan names are portable, normalized relative paths, never traversal instructions.
+The staged entry has the fixed name <code>book.tex</code> in its original relative directory.
+Companions remain in their planned locations, so relative TeX paths still work.
+Case-folded collisions are rejected even on case-sensitive hosts. The working
+directory's <code>book.*</code> namespace is reserved for compiler output, not supplied data.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500044004600200070006c0061006e002000760061006c00690064006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e002000500044004600200070006c0061006e002000760061006c00690064006100740069006f006e"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500044004600200070006c0061006e002000760061006c00690064006100740069006f006e" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500044004600200070006c0061006e002000760061006c00690064006100740069006f006e" aria-label="Definition of publication PDF plan validation">&lt;&lt;publication PDF plan validation&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">safePlanPath</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">if</span> (!value || <span class="hljs-regexp">/</span><span class="hljs-regexp">[</span><span class="hljs-regexp">\\</span><span class="hljs-regexp">:</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">0000-</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">001f</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">007f]</span><span class="hljs-regexp">/u</span>.<span class="hljs-title">test</span>(value) || value.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'/'</span>) ||
+        value.<span class="hljs-title">split</span>(<span class="hljs-string">'/'</span>).<span class="hljs-title">some</span>(<span class="hljs-params">part</span><span class="hljs-function"> =&gt;</span> !part || part === <span class="hljs-string">'.'</span> || part === <span class="hljs-string">'..'</span> || <span class="hljs-regexp">/</span><span class="hljs-regexp">[. ]</span><span class="hljs-regexp">$/</span>.<span class="hljs-title">test</span>(part) ||
+            <span class="hljs-regexp">/^(con|prn|aux|nul|com</span><span class="hljs-regexp">[1-9]</span><span class="hljs-regexp">|lpt</span><span class="hljs-regexp">[1-9]</span><span class="hljs-regexp">)(?:</span><span class="hljs-regexp">\.</span><span class="hljs-regexp">|$)/i</span>.<span class="hljs-title">test</span>(part))) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Unsafe publication path: </span><span class="hljs-subst">${</span><span class="hljs-built_in">JSON</span><span class="hljs-subst">.stringify(value)}</span><span class="hljs-string">`</span>);
+    }
+    <span class="hljs-keyword">return</span> value;
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title">prepareFiles</span>(<span class="hljs-params">files: Parameters&lt;PdfCompiler&gt;[</span><span class="hljs-number">0</span><span class="hljs-params">], entry: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">Parameters</span>&lt;<span class="hljs-title">PdfCompiler</span>&gt;[<span class="hljs-number">0</span>] {
+    <span class="hljs-title">safePlanPath</span>(entry);
+    <span class="hljs-keyword">if</span> (!entry.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'.tex'</span>)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'PDF entry must be a .tex path'</span>); }
+    <span class="hljs-keyword">const</span> fixed = path.<span class="hljs-property">posix</span>.<span class="hljs-title">join</span>(path.<span class="hljs-property">posix</span>.<span class="hljs-title">dirname</span>(entry), <span class="hljs-string">'book.tex'</span>);
+    <span class="hljs-keyword">const</span> seen = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
+    <span class="hljs-keyword">const</span> prepared = files.<span class="hljs-title">map</span>(<span class="hljs-params">file</span><span class="hljs-function"> =&gt;</span> {
+        <span class="hljs-keyword">const</span> name = <span class="hljs-title">safePlanPath</span>(file.<span class="hljs-property">path</span>);
+        <span class="hljs-keyword">const</span> staged = name === entry ? fixed : name;
+        <span class="hljs-keyword">if</span> (seen.<span class="hljs-title">has</span>(staged.<span class="hljs-title">toLowerCase</span>()) || (name !== entry &amp;&amp;
+            path.<span class="hljs-property">posix</span>.<span class="hljs-title">dirname</span>(name).<span class="hljs-title">toLowerCase</span>() === path.<span class="hljs-property">posix</span>.<span class="hljs-title">dirname</span>(entry).<span class="hljs-title">toLowerCase</span>() &amp;&amp;
+            <span class="hljs-regexp">/^book</span><span class="hljs-regexp">\.</span><span class="hljs-regexp">/i</span>.<span class="hljs-title">test</span>(path.<span class="hljs-property">posix</span>.<span class="hljs-title">basename</span>(name)))) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Conflicting publication path: </span><span class="hljs-subst">${name}</span><span class="hljs-string">`</span>); }
+        seen.<span class="hljs-title">add</span>(staged.<span class="hljs-title">toLowerCase</span>());
+        <span class="hljs-keyword">return</span> { <span class="hljs-attr">path</span>: staged, <span class="hljs-attr">content</span>: file.<span class="hljs-property">content</span> };
+    });
+    <span class="hljs-keyword">if</span> (!files.<span class="hljs-title">some</span>(<span class="hljs-params">file</span><span class="hljs-function"> =&gt;</span> file.<span class="hljs-property">path</span> === entry)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Missing PDF entry: </span><span class="hljs-subst">${entry}</span><span class="hljs-string">`</span>); }
+    <span class="hljs-keyword">return</span> prepared;
+}
+</code></pre>
+
+</div>
+</div><p>Only fresh regular files are written, with exclusive creation and restrictive
+permissions. Parent/file conflicts fail during staging and follow normal cleanup.
+The input buffers are not modified. mkdtemp provides an unpredictable private root.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020005000440046002000730074006100670069006e0067-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020005000440046002000730074006100670069006e0067"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020005000440046002000730074006100670069006e0067" data-literate-target="f-007000750062006c00690063006100740069006f006e0020005000440046002000730074006100670069006e0067" aria-label="Definition of publication PDF staging">&lt;&lt;publication PDF staging&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">stageFiles</span>(<span class="hljs-params">directory: </span><span class="hljs-built_in">string</span><span class="hljs-params">, files: Parameters&lt;PdfCompiler&gt;[</span><span class="hljs-number">0</span><span class="hljs-params">], check: </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; {
+    <span class="hljs-title">check</span>();
+    <span class="hljs-keyword">await</span> fs.<span class="hljs-title">chmod</span>(directory, <span class="hljs-number">0o700</span>);
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> files) {
+        <span class="hljs-title">check</span>();
+        <span class="hljs-keyword">const</span> destination = path.<span class="hljs-title">join</span>(directory, ...file.<span class="hljs-property">path</span>.<span class="hljs-title">split</span>(<span class="hljs-string">'/'</span>));
+        <span class="hljs-keyword">await</span> fs.<span class="hljs-title">mkdir</span>(path.<span class="hljs-title">dirname</span>(destination), { <span class="hljs-attr">recursive</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">mode</span>: <span class="hljs-number">0o700</span> });
+        <span class="hljs-title">check</span>();
+        <span class="hljs-keyword">await</span> fs.<span class="hljs-title">writeFile</span>(destination, file.<span class="hljs-property">content</span>, { <span class="hljs-attr">flag</span>: <span class="hljs-string">'wx'</span>, <span class="hljs-attr">mode</span>: <span class="hljs-number">0o600</span> });
+    }
+    <span class="hljs-title">check</span>();
+}
+<span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">buildEnvironment</span>(<span class="hljs-params">directory: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">NodeJS</span>.<span class="hljs-property">ProcessEnv</span>&gt; {
+    <span class="hljs-keyword">const</span> cache = <span class="hljs-keyword">await</span> fs.<span class="hljs-title">mkdtemp</span>(path.<span class="hljs-title">join</span>(directory, <span class="hljs-string">'.tex-cache-'</span>));
+    <span class="hljs-keyword">return</span> { ...process.<span class="hljs-property">env</span>, <span class="hljs-attr">TEXMFOUTPUT</span>: directory, <span class="hljs-attr">TEXMFVAR</span>: cache, <span class="hljs-attr">TEXMFCACHE</span>: cache,
+        <span class="hljs-attr">openout_any</span>: <span class="hljs-string">'p'</span>, <span class="hljs-attr">shell_escape</span>: <span class="hljs-string">'f'</span> };
+}
+</code></pre>
+
+</div>
+</div><p>User TeX installations and search configuration, including TEXMFHOME, TEXMFCONFIG
+and TEXINPUTS, remain available. TEXMFOUTPUT cannot redirect output into a caller's
+directory; writable TeX/font caches are private. SOURCE_DATE_EPOCH is preserved
+when supplied, not invented: byte-identical PDF output is not promised.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500044004600200065006e007600690072006f006e006d0065006e0074-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e002000500044004600200065006e007600690072006f006e006d0065006e0074"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500044004600200065006e007600690072006f006e006d0065006e0074" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500044004600200065006e007600690072006f006e006d0065006e0074" aria-label="Definition of publication PDF environment">&lt;&lt;publication PDF environment&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">requestFor</span>(<span class="hljs-params">command: </span><span class="hljs-built_in">string</span><span class="hljs-params">, args: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> </span><span class="hljs-built_in">string</span><span class="hljs-params">[], cwd: </span><span class="hljs-built_in">string</span><span class="hljs-params">,
+    env: NodeJS.ProcessEnv, timeoutMs = </span><span class="hljs-number">15_000</span>): <span class="hljs-title">PdfProcessRequest</span> {
+    <span class="hljs-keyword">return</span> { command, args, cwd, env, timeoutMs, <span class="hljs-attr">maximumOutputBytes</span>: maximumLogBytes };
+}
+<span class="hljs-keyword">const</span> requiredTexFiles = [
+    <span class="hljs-string">'scrbook.cls'</span>, <span class="hljs-string">'fontspec.sty'</span>, <span class="hljs-string">'geometry.sty'</span>, <span class="hljs-string">'fvextra.sty'</span>, <span class="hljs-string">'needspace.sty'</span>,
+    <span class="hljs-string">'xcolor.sty'</span>, <span class="hljs-string">'microtype.sty'</span>, <span class="hljs-string">'amssymb.sty'</span>, <span class="hljs-string">'amsmath.sty'</span>, <span class="hljs-string">'graphicx.sty'</span>,
+    <span class="hljs-string">'ulem.sty'</span>, <span class="hljs-string">'hyperref.sty'</span>
+];
+</code></pre>
+
+</div>
+</div><p>Preflight reflects the publication LaTeX template, including its KOMA book class.
+kpsewhich uses the LuaLaTeX program name to honor engine-specific configuration.
+Missing executables and packages give installation guidance without invoking a
+package manager. Even the latexmk version probe uses <code>-norc</code>: version queries can
+otherwise execute rc files. Font availability remains LuaLaTeX/fontspec's responsibility.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500044004600200064006500700065006e00640065006e0063006900650073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e002000500044004600200064006500700065006e00640065006e0063006900650073"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500044004600200064006500700065006e00640065006e0063006900650073" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500044004600200064006500700065006e00640065006e0063006900650073" aria-label="Definition of publication PDF dependencies">&lt;&lt;publication PDF dependencies&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">preflight</span>(<span class="hljs-params">runner: PdfProcessRunner, cwd: </span><span class="hljs-built_in">string</span><span class="hljs-params">, env: NodeJS.ProcessEnv</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; {
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> command <span class="hljs-keyword">of</span> [<span class="hljs-string">'latexmk'</span>, <span class="hljs-string">'lualatex'</span>, <span class="hljs-string">'kpsewhich'</span>]) {
+        <span class="hljs-keyword">try</span> {
+            <span class="hljs-keyword">const</span> args = command === <span class="hljs-string">'latexmk'</span> ? [<span class="hljs-string">'-norc'</span>, <span class="hljs-string">'--version'</span>] : [<span class="hljs-string">'--version'</span>];
+            <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">await</span> <span class="hljs-title">runner</span>(<span class="hljs-title">requestFor</span>(command, args, cwd, env));
+            <span class="hljs-keyword">if</span> (result.<span class="hljs-property">code</span> !== <span class="hljs-number">0</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(result.<span class="hljs-property">output</span> || <span class="hljs-string">`exit </span><span class="hljs-subst">${result.code}</span><span class="hljs-string">`</span>); }
+        } <span class="hljs-keyword">catch</span> (error) {
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Cannot run </span><span class="hljs-subst">${command}</span><span class="hljs-string">. Install a TeX distribution with latexmk and LuaLaTeX, `</span> +
+                <span class="hljs-string">`and ensure </span><span class="hljs-subst">${command}</span><span class="hljs-string"> is on PATH. </span><span class="hljs-subst">${errorMessage(error)}</span><span class="hljs-string">`</span>);
+        }
+    }
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">missing</span>: <span class="hljs-built_in">string</span>[] = [];
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> requiredTexFiles) {
+        <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">await</span> <span class="hljs-title">runner</span>(<span class="hljs-title">requestFor</span>(<span class="hljs-string">'kpsewhich'</span>, [<span class="hljs-string">'-progname=lualatex'</span>, file], cwd, env));
+        <span class="hljs-keyword">if</span> (result.<span class="hljs-property">code</span> !== <span class="hljs-number">0</span> || !result.<span class="hljs-property">output</span>.<span class="hljs-title">trim</span>()) { missing.<span class="hljs-title">push</span>(file); }
+    }
+    <span class="hljs-keyword">if</span> (missing.<span class="hljs-property">length</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Missing TeX packages: </span><span class="hljs-subst">${missing.join(</span><span class="hljs-string">', '</span><span class="hljs-subst">)}</span><span class="hljs-string">. `</span> +
+        <span class="hljs-string">'Install these using your TeX distribution package manager, then retry.'</span>); }
+}
+</code></pre>
+
+</div>
+</div><p>Read descriptors, not unchecked paths. The nonblocking open prevents a FIFO from
+hanging before the regular-file check; no-follow plus lstat protects against links
+on supported platforms. A size-plus-one read detects growth beyond the measured
+size. PDF acceptance requires a header and a bounded, nonempty regular file, not
+merely a successful process exit; this is not a full PDF parser.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500044004600200062006f0075006e006400650064002000660069006c00650073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e002000500044004600200062006f0075006e006400650064002000660069006c00650073"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500044004600200062006f0075006e006400650064002000660069006c00650073" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500044004600200062006f0075006e006400650064002000660069006c00650073" aria-label="Definition of publication PDF bounded files">&lt;&lt;publication PDF bounded files&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">readBoundedFile</span>(<span class="hljs-params">filename: </span><span class="hljs-built_in">string</span><span class="hljs-params">, limit: </span><span class="hljs-built_in">number</span><span class="hljs-params">, check: </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span><span class="hljs-params"> = </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-params">{}</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">Buffer</span>&gt; {
+    <span class="hljs-title">check</span>(); <span class="hljs-keyword">const</span> before = <span class="hljs-keyword">await</span> fs.<span class="hljs-title">lstat</span>(filename);
+    <span class="hljs-title">check</span>();
+    <span class="hljs-keyword">if</span> (!before.<span class="hljs-title">isFile</span>() || before.<span class="hljs-title">isSymbolicLink</span>() || before.<span class="hljs-property">nlink</span> !== <span class="hljs-number">1</span>) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Expected a regular nonlink file: </span><span class="hljs-subst">${path.basename(filename)}</span><span class="hljs-string">`</span>);
+    }
+    <span class="hljs-keyword">const</span> handle = <span class="hljs-keyword">await</span> fs.<span class="hljs-title">open</span>(filename, constants.<span class="hljs-property">O_RDONLY</span> | (constants.<span class="hljs-property">O_NOFOLLOW</span> ?? <span class="hljs-number">0</span>) |
+        (constants.<span class="hljs-property">O_NONBLOCK</span> ?? <span class="hljs-number">0</span>));
+    <span class="hljs-keyword">try</span> {
+        <span class="hljs-title">check</span>(); <span class="hljs-keyword">const</span> stat = <span class="hljs-keyword">await</span> handle.<span class="hljs-title">stat</span>();
+        <span class="hljs-title">check</span>();
+        <span class="hljs-keyword">if</span> (!stat.<span class="hljs-title">isFile</span>() || stat.<span class="hljs-property">nlink</span> !== <span class="hljs-number">1</span> || stat.<span class="hljs-property">ino</span> !== before.<span class="hljs-property">ino</span> || stat.<span class="hljs-property">dev</span> !== before.<span class="hljs-property">dev</span> ||
+            stat.<span class="hljs-property">size</span> &gt; limit) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Invalid or oversized compiler file: </span><span class="hljs-subst">${path.basename(filename)}</span><span class="hljs-string">`</span>); }
+        <span class="hljs-keyword">const</span> buffer = <span class="hljs-title">Buffer</span>.<span class="hljs-title">alloc</span>(stat.<span class="hljs-property">size</span> + <span class="hljs-number">1</span>);
+        <span class="hljs-keyword">let</span> length = <span class="hljs-number">0</span>;
+        <span class="hljs-keyword">while</span> (length &lt; buffer.<span class="hljs-property">length</span>) {
+            <span class="hljs-title">check</span>(); <span class="hljs-keyword">const</span> read = <span class="hljs-keyword">await</span> handle.<span class="hljs-title">read</span>(buffer, length, buffer.<span class="hljs-property">length</span> - length, length);
+            <span class="hljs-keyword">if</span> (!read.<span class="hljs-property">bytesRead</span>) { <span class="hljs-keyword">break</span>; }
+            length += read.<span class="hljs-property">bytesRead</span>;
+        }
+        <span class="hljs-keyword">if</span> (length !== stat.<span class="hljs-property">size</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Compiler file changed while reading: </span><span class="hljs-subst">${path.basename(filename)}</span><span class="hljs-string">`</span>); }
+        <span class="hljs-title">check</span>(); <span class="hljs-keyword">return</span> buffer.<span class="hljs-title">subarray</span>(<span class="hljs-number">0</span>, length);
+    } <span class="hljs-keyword">finally</span> { <span class="hljs-keyword">await</span> handle.<span class="hljs-title">close</span>(); }
+}
+</code></pre>
+
+</div>
+</div><p>Only the final TeX log decides reference convergence: earlier passes normally have
+undefined references. Missing glyphs and overfull boxes remain warnings. A bounded
+log is mandatory on success; a failed build may not have produced one at all.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073" aria-label="Definition of publication PDF diagnostics">&lt;&lt;publication PDF diagnostics&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">errorMessage</span>(<span class="hljs-params">error: </span><span class="hljs-built_in">unknown</span>): <span class="hljs-built_in">string</span> { <span class="hljs-keyword">return</span> error <span class="hljs-keyword">instanceof</span> <span class="hljs-title">Error</span> ? error.<span class="hljs-property">message</span> : <span class="hljs-title">String</span>(error); }
+<span class="hljs-keyword">function</span> <span class="hljs-title">logWarnings</span>(<span class="hljs-params">log: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span>[] {
+    <span class="hljs-keyword">return</span> [...<span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>(log.<span class="hljs-title">split</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">?</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">/</span>).<span class="hljs-title">filter</span>(<span class="hljs-params">line</span><span class="hljs-function"> =&gt;</span>
+        <span class="hljs-regexp">/Missing character:|Overfull </span><span class="hljs-regexp">\\</span><span class="hljs-regexp">[hv]</span><span class="hljs-regexp">box|(?:LaTeX|Package .*?) Warning:/i</span>.<span class="hljs-title">test</span>(line)))];
+}
+
+<span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">failureWarnings</span>(<span class="hljs-params">cwd: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">string</span>[]&gt; {
+    <span class="hljs-keyword">try</span> { <span class="hljs-keyword">return</span> <span class="hljs-title">logWarnings</span>((<span class="hljs-keyword">await</span> <span class="hljs-title">readBoundedFile</span>(path.<span class="hljs-title">join</span>(cwd, <span class="hljs-string">'book.log'</span>), maximumLogBytes)).<span class="hljs-title">toString</span>(<span class="hljs-string">'utf8'</span>)); }
+    <span class="hljs-keyword">catch</span> { <span class="hljs-keyword">return</span> []; }
+}
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of publication PDF diagnostics"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-2" data-literate-target="c-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-2" aria-label="Next contribution of publication PDF diagnostics">Next</a></nav>
+</div><p>Warning headers delimit semantic records. TeX can wrap an unindented line at its
+print width; packages also prefix continuation lines with their package name.
+Join those lines only inside a warning record, stopping at blank lines or another
+recognizable log record. Convergence phrases must begin the warning message, so
+ordinary box contents or prose mentioning undefined references cannot fail a build.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073" aria-label="Definition of publication PDF diagnostics">&lt;&lt;publication PDF diagnostics&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">texWarnings</span>(<span class="hljs-params">log: </span><span class="hljs-built_in">string</span>): { <span class="hljs-attr">source</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span> }[] {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">records</span>: { <span class="hljs-attr">source</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span> }[] = [];
+    <span class="hljs-keyword">let</span> <span class="hljs-attr">current</span>: { <span class="hljs-attr">source</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span> } | <span class="hljs-literal">undefined</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> line <span class="hljs-keyword">of</span> log.<span class="hljs-title">split</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">?</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">/</span>)) {
+        <span class="hljs-keyword">const</span> header = <span class="hljs-regexp">/^(LaTeX(?: Font)?|Package </span><span class="hljs-regexp">[</span><span class="hljs-regexp">\w</span><span class="hljs-regexp">.-]</span><span class="hljs-regexp">+|Class </span><span class="hljs-regexp">[</span><span class="hljs-regexp">\w</span><span class="hljs-regexp">.-]</span><span class="hljs-regexp">+) Warning(?: </span><span class="hljs-regexp">\(</span><span class="hljs-regexp">[^)]</span><span class="hljs-regexp">*</span><span class="hljs-regexp">\)</span><span class="hljs-regexp">)?:</span><span class="hljs-regexp">\s</span><span class="hljs-regexp">*(.*)$/</span>.<span class="hljs-title">exec</span>(line);
+        <span class="hljs-keyword">if</span> (header) {
+            current = { <span class="hljs-attr">source</span>: header[<span class="hljs-number">1</span>], <span class="hljs-attr">message</span>: header[<span class="hljs-number">2</span>] };
+            records.<span class="hljs-title">push</span>(current);
+        } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (!line.<span class="hljs-title">trim</span>() || <span class="hljs-regexp">/^(?:Overfull|Underfull|Missing character:|Latexmk:|!|</span><span class="hljs-regexp">\[</span><span class="hljs-regexp">|Output written|Transcript written)/</span>.<span class="hljs-title">test</span>(line)) {
+            current = <span class="hljs-literal">undefined</span>;
+        } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (current) {
+            current.<span class="hljs-property">message</span> += <span class="hljs-string">' '</span> + line.<span class="hljs-title">replace</span>(<span class="hljs-regexp">/^</span><span class="hljs-regexp">\(</span><span class="hljs-regexp">[</span><span class="hljs-regexp">\w</span><span class="hljs-regexp">.-]</span><span class="hljs-regexp">+</span><span class="hljs-regexp">\)</span><span class="hljs-regexp">\s</span><span class="hljs-regexp">*/</span>, <span class="hljs-string">''</span>).<span class="hljs-title">trim</span>();
+        }
+    }
+    <span class="hljs-keyword">return</span> records.<span class="hljs-title">map</span>(<span class="hljs-params">record</span><span class="hljs-function"> =&gt;</span> ({ ...record, <span class="hljs-attr">message</span>: record.<span class="hljs-property">message</span>.<span class="hljs-title">replace</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\s</span><span class="hljs-regexp">+/g</span>, <span class="hljs-string">' '</span>).<span class="hljs-title">trim</span>() }));
+}
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of publication PDF diagnostics"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1" aria-label="Previous contribution of publication PDF diagnostics">Previous</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1" aria-label="Base contribution of publication PDF diagnostics">Base</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-3" data-literate-target="c-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-3" aria-label="Next contribution of publication PDF diagnostics">Next</a></nav>
+</div><p>Only final-log warnings determine unresolved references. latexmk exhaustion has
+its own anchored diagnostic forms, including its multi-line processing-failure
+report. Earlier TeX passes in the console transcript may legitimately request a
+rerun and are not inspected as final warnings.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-3"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073" aria-label="Definition of publication PDF diagnostics">&lt;&lt;publication PDF diagnostics&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">checkConvergence</span>(<span class="hljs-params">log: </span><span class="hljs-built_in">string</span><span class="hljs-params">, transcript: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">const</span> unresolved = <span class="hljs-regexp">/^(?:There (?:were|are) undefined (?:references|citations)</span><span class="hljs-regexp">\b</span><span class="hljs-regexp">|(?:Reference|Citation)</span><span class="hljs-regexp">\s</span><span class="hljs-regexp">+.*</span><span class="hljs-regexp">\b</span><span class="hljs-regexp">undefined</span><span class="hljs-regexp">\b</span><span class="hljs-regexp">|Label</span><span class="hljs-regexp">\(</span><span class="hljs-regexp">s</span><span class="hljs-regexp">\)</span><span class="hljs-regexp"> may have changed</span><span class="hljs-regexp">\b</span><span class="hljs-regexp">|Rerun to get</span><span class="hljs-regexp">\b</span><span class="hljs-regexp">|Please (?:</span><span class="hljs-regexp">\(</span><span class="hljs-regexp">re</span><span class="hljs-regexp">\)</span><span class="hljs-regexp">)?run (?:LaTeX|Biber|BibTeX)</span><span class="hljs-regexp">\b</span><span class="hljs-regexp">)/i</span>;
+    <span class="hljs-keyword">const</span> pending = <span class="hljs-title">texWarnings</span>(log).<span class="hljs-title">some</span>(<span class="hljs-params">record</span><span class="hljs-function"> =&gt;</span> unresolved.<span class="hljs-title">test</span>(record.<span class="hljs-property">message</span>) ||
+        (record.<span class="hljs-property">source</span> === <span class="hljs-string">'Package rerunfilecheck'</span> &amp;&amp; <span class="hljs-regexp">/^File</span><span class="hljs-regexp">\s</span><span class="hljs-regexp">+.*</span><span class="hljs-regexp">\b</span><span class="hljs-regexp">has changed</span><span class="hljs-regexp">\b</span><span class="hljs-regexp">/i</span>.<span class="hljs-title">test</span>(record.<span class="hljs-property">message</span>)));
+    <span class="hljs-keyword">const</span> exhausted = <span class="hljs-regexp">/^Latexmk:</span><span class="hljs-regexp">[ </span><span class="hljs-regexp">\t</span><span class="hljs-regexp">]</span><span class="hljs-regexp">*(?:Maximum (?:number of )?(?:runs|repeats)</span><span class="hljs-regexp">\b</span><span class="hljs-regexp">[^</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">]</span><span class="hljs-regexp">*(?:</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">?</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">[ </span><span class="hljs-regexp">\t</span><span class="hljs-regexp">]</span><span class="hljs-regexp">+</span><span class="hljs-regexp">[^</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">]</span><span class="hljs-regexp">*)?|Failure in processing file</span><span class="hljs-regexp">[^</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">]</span><span class="hljs-regexp">*</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">?</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">[ </span><span class="hljs-regexp">\t</span><span class="hljs-regexp">]</span><span class="hljs-regexp">+</span><span class="hljs-regexp">[^</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">]</span><span class="hljs-regexp">*</span><span class="hljs-regexp">\b</span><span class="hljs-regexp">needed too many passes</span><span class="hljs-regexp">\b</span><span class="hljs-regexp">)/im</span>;
+    <span class="hljs-keyword">if</span> (pending || exhausted.<span class="hljs-title">test</span>(transcript)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'PDF references did not converge; inspect book.log and fix unresolved references or rerun requirements'</span>);
+    }
+}
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of publication PDF diagnostics"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-2" data-literate-target="c-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-2" aria-label="Previous contribution of publication PDF diagnostics">Previous</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e002000500044004600200064006900610067006e006f00730074006900630073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1" aria-label="Base contribution of publication PDF diagnostics">Base</a></nav>
+</div><p>latexmk receives only literal arguments. <code>-norc</code> disables system, user and project
+rc discovery; the literal repeat limit cannot be influenced by an entry basename.
+A 180-second build deadline and five repeats bound runaway reruns. No <code>-f</code> option
+can turn a failed pass into apparent success, and shell escape stays disabled.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200050004400460020006200750069006c0064-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200050004400460020006200750069006c0064"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200050004400460020006200750069006c0064" data-literate-target="f-007000750062006c00690063006100740069006f006e00200050004400460020006200750069006c0064" aria-label="Definition of publication PDF build">&lt;&lt;publication PDF build&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">buildPdf</span>(<span class="hljs-params">runner: PdfProcessRunner, cwd: </span><span class="hljs-built_in">string</span><span class="hljs-params">,
+    env: NodeJS.ProcessEnv, check: </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">PdfCompilation</span>&gt; {
+    <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">await</span> <span class="hljs-title">runner</span>(<span class="hljs-title">requestFor</span>(<span class="hljs-string">'latexmk'</span>, [
+        <span class="hljs-string">'-norc'</span>, <span class="hljs-string">'-lualatex'</span>, <span class="hljs-string">'-interaction=nonstopmode'</span>, <span class="hljs-string">'-halt-on-error'</span>,
+        <span class="hljs-string">'-file-line-error'</span>, <span class="hljs-string">'-no-shell-escape'</span>, <span class="hljs-string">'-e'</span>, <span class="hljs-string">'$max_repeat = 5;'</span>, <span class="hljs-string">'book.tex'</span>
+    ], cwd, env, buildTimeoutMs));
+    <span class="hljs-keyword">if</span> (result.<span class="hljs-property">code</span> !== <span class="hljs-number">0</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`latexmk failed (exit </span><span class="hljs-subst">${result.code}</span><span class="hljs-string">).</span><span class="hljs-string">\n</span><span class="hljs-subst">${result.output}</span><span class="hljs-string">`</span>); }
+    <span class="hljs-keyword">const</span> log = (<span class="hljs-keyword">await</span> <span class="hljs-title">readBoundedFile</span>(path.<span class="hljs-title">join</span>(cwd, <span class="hljs-string">'book.log'</span>), maximumLogBytes, check)).<span class="hljs-title">toString</span>(<span class="hljs-string">'utf8'</span>);
+    <span class="hljs-title">checkConvergence</span>(log, result.<span class="hljs-property">output</span>);
+    <span class="hljs-keyword">const</span> pdf = <span class="hljs-keyword">await</span> <span class="hljs-title">readBoundedFile</span>(path.<span class="hljs-title">join</span>(cwd, <span class="hljs-string">'book.pdf'</span>), maximumPdfBytes, check);
+    <span class="hljs-title">check</span>();
+    <span class="hljs-keyword">if</span> (pdf.<span class="hljs-property">length</span> &lt; <span class="hljs-number">8</span> || !<span class="hljs-regexp">/^%PDF-</span><span class="hljs-regexp">[12]</span><span class="hljs-regexp">\.</span><span class="hljs-regexp">[0-9]</span><span class="hljs-regexp">/</span>.<span class="hljs-title">test</span>(pdf.<span class="hljs-title">subarray</span>(<span class="hljs-number">0</span>, <span class="hljs-number">8</span>).<span class="hljs-title">toString</span>(<span class="hljs-string">'ascii'</span>))) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'LuaLaTeX did not produce a valid PDF header in book.pdf'</span>);
+    }
+    <span class="hljs-keyword">return</span> { pdf, <span class="hljs-attr">warnings</span>: <span class="hljs-title">logWarnings</span>(log) };
+}
+</code></pre>
+
+</div>
+</div><p>The factory stages before preflight so retained failures are inspectable. Every
+error becomes the exported error type. The success value owns its PDF bytes and
+is independent of the deleted stage. Only explicit keepBuild transfers ownership
+of that stage to the caller. A final cancellation check occurs after cleanup, so
+a signal during deletion cannot turn into a successful compilation.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e" data-literate-target="f-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e" aria-label="Definition of publication PDF orchestration">&lt;&lt;publication PDF orchestration&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">compileStaged</span>(<span class="hljs-params">directory: </span><span class="hljs-built_in">string</span><span class="hljs-params">, cwd: </span><span class="hljs-built_in">string</span><span class="hljs-params">, files: Parameters&lt;PdfCompiler&gt;[</span><span class="hljs-number">0</span><span class="hljs-params">],
+    runner: PdfProcessRunner, check: </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">PdfCompilation</span>&gt; {
+    <span class="hljs-keyword">await</span> <span class="hljs-title">stageFiles</span>(directory, files, check);
+    <span class="hljs-title">check</span>();
+    <span class="hljs-keyword">const</span> env = <span class="hljs-keyword">await</span> <span class="hljs-title">buildEnvironment</span>(directory);
+    <span class="hljs-title">check</span>();
+    <span class="hljs-keyword">const</span> guarded = <span class="hljs-title">checkedRunner</span>(runner, check);
+    <span class="hljs-keyword">await</span> <span class="hljs-title">preflight</span>(guarded, cwd, env);
+    <span class="hljs-title">check</span>();
+    <span class="hljs-keyword">return</span> <span class="hljs-title">buildPdf</span>(guarded, cwd, env, check);
+}
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of publication PDF orchestration"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-2" data-literate-target="c-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-2" aria-label="Next contribution of publication PDF orchestration">Next</a></nav>
+</div><p>A directory acquired during cancellation is still owned and removed. Failure
+warnings are read before deletion, while the lifetime handlers remain installed.
+Cancellation takes precedence over a secondary filesystem or tool error.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e" data-literate-target="f-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e" aria-label="Definition of publication PDF orchestration">&lt;&lt;publication PDF orchestration&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">compileInStage</span>(<span class="hljs-params">files: Parameters&lt;PdfCompiler&gt;[</span><span class="hljs-number">0</span><span class="hljs-params">], entry: </span><span class="hljs-built_in">string</span><span class="hljs-params">, options: PdfCompileOptions,
+    runner: PdfProcessRunner, check: </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">PdfCompilation</span>&gt; {
+    <span class="hljs-keyword">const</span> directory = <span class="hljs-keyword">await</span> fs.<span class="hljs-title">mkdtemp</span>(path.<span class="hljs-title">join</span>(<span class="hljs-title">tmpdir</span>(), <span class="hljs-string">'literate-pdf-'</span>));
+    <span class="hljs-keyword">const</span> cwd = path.<span class="hljs-title">join</span>(directory, path.<span class="hljs-property">posix</span>.<span class="hljs-title">dirname</span>(entry));
+    <span class="hljs-keyword">let</span> <span class="hljs-attr">warnings</span>: <span class="hljs-built_in">string</span>[] = [];
+    <span class="hljs-keyword">try</span> {
+        <span class="hljs-keyword">let</span> <span class="hljs-attr">result</span>: <span class="hljs-title">PdfCompilation</span>;
+        <span class="hljs-keyword">try</span> {
+            result = <span class="hljs-keyword">await</span> <span class="hljs-title">compileStaged</span>(directory, cwd, files, runner, check);
+            warnings = result.<span class="hljs-property">warnings</span>;
+        } <span class="hljs-keyword">catch</span> (error) {
+            warnings = <span class="hljs-keyword">await</span> <span class="hljs-title">failureWarnings</span>(cwd);
+            <span class="hljs-keyword">throw</span> error;
+        } <span class="hljs-keyword">finally</span> {
+            <span class="hljs-keyword">if</span> (!options.<span class="hljs-property">keepBuild</span>) { <span class="hljs-keyword">await</span> fs.<span class="hljs-title">rm</span>(directory, { <span class="hljs-attr">recursive</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">force</span>: <span class="hljs-literal">true</span> }); }
+        }
+        <span class="hljs-title">check</span>();
+        <span class="hljs-keyword">return</span> options.<span class="hljs-property">keepBuild</span> ? { ...result, <span class="hljs-attr">buildDirectory</span>: directory } : result;
+    } <span class="hljs-keyword">catch</span> (error) {
+        <span class="hljs-keyword">try</span> { <span class="hljs-title">check</span>(); } <span class="hljs-keyword">catch</span> (cancellation) { error = cancellation; }
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">PdfCompilationError</span>(<span class="hljs-title">errorMessage</span>(error), options.<span class="hljs-property">keepBuild</span> ? directory : <span class="hljs-literal">undefined</span>, warnings);
+    }
+}
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of publication PDF orchestration"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1" aria-label="Previous contribution of publication PDF orchestration">Previous</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1" aria-label="Base contribution of publication PDF orchestration">Base</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-3" data-literate-target="c-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-3" aria-label="Next contribution of publication PDF orchestration">Next</a></nav>
+</div><p>Lifetime hooks are acquired before any asynchronous work and disposed only after
+the stage has been handled. Synchronous validation errors retain the same public
+error type without allocating a build directory.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-3"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e" data-literate-target="f-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e" aria-label="Definition of publication PDF orchestration">&lt;&lt;publication PDF orchestration&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">createPdfCompiler</span>(<span class="hljs-params">runner: PdfProcessRunner = runPdfProcess</span>): <span class="hljs-title">PdfCompiler</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">async</span> (files, entry, options = {}) =&gt; {
+        <span class="hljs-keyword">const</span> lifetime = <span class="hljs-title">compilerLifetime</span>();
+        <span class="hljs-keyword">try</span> {
+            <span class="hljs-keyword">const</span> prepared = <span class="hljs-title">prepareFiles</span>(files, entry);
+            lifetime.<span class="hljs-title">check</span>();
+            <span class="hljs-keyword">return</span> <span class="hljs-keyword">await</span> <span class="hljs-title">compileInStage</span>(prepared, entry, options, runner, lifetime.<span class="hljs-property">check</span>);
+        } <span class="hljs-keyword">catch</span> (error) {
+            <span class="hljs-keyword">if</span> (error <span class="hljs-keyword">instanceof</span> <span class="hljs-title">PdfCompilationError</span>) { <span class="hljs-keyword">throw</span> error; }
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">PdfCompilationError</span>(<span class="hljs-title">errorMessage</span>(error));
+        } <span class="hljs-keyword">finally</span> { lifetime.<span class="hljs-title">dispose</span>(); }
+    };
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">const</span> <span class="hljs-attr">compilePdf</span>: <span class="hljs-title">PdfCompiler</span> = <span class="hljs-title">createPdfCompiler</span>();
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of publication PDF orchestration"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-2" data-literate-target="c-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-2" aria-label="Previous contribution of publication PDF orchestration">Previous</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e00200050004400460020006f0072006300680065007300740072006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007000640066002e006c0069007400650072006100740065-1" aria-label="Base contribution of publication PDF orchestration">Base</a></nav>
+</div></div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

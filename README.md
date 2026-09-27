@@ -151,6 +151,74 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and the
 [development chapter](literate/development.literate) for the self-hosting workflow.
 Edit the literate chapters rather than their generated TypeScript.
 
+## M4: explicit PDF book compilation
+
+M4 is finished: compile a supported, **trusted** literate project explicitly with
+the CLI (omit the root to use the current directory):
+
+```sh
+yarn literate pdf path/to/project --output books/book.pdf --paper a4 --margin 20mm --json
+```
+
+The `.pdf` destination is relative to the selected project root, not the working
+directory; absolute paths and paths outside the root are rejected. `pdf` shares
+`latex` options: `--paper a4|a5|letter|legal`, `--margin`, `--margin-top`,
+`--margin-right`, `--margin-bottom`, `--margin-left`, `--font-manifest`,
+`--browser`, and `--json`. Geometry defaults and bounds are described below.
+Arguments take separate values. `--keep-build` is **PDF-only**. For example:
+
+```sh
+yarn literate pdf path/to/project --output books/book.pdf --paper a5 \
+  --margin 20mm --margin-top 18mm --margin-right 16mm --margin-bottom 22mm \
+  --font-manifest fonts.json --browser /usr/bin/chromium-browser --keep-build --json
+```
+
+Omit `--browser` for books without Mermaid; diagrams require an explicitly
+selected installed, sandbox-capable Chromium as described under M3. Portable
+fonts are opt-in; otherwise the configured families must be installed.
+
+**Prerequisites:** Pandoc, `latexmk`, LuaLaTeX (`lualatex`), and `kpsewhich` on PATH,
+plus KOMA-Script (`scrbook.cls`) and the TeX packages `fontspec`, `geometry`,
+`fvextra`, `needspace`, `xcolor`, `microtype`, `amssymb`, `amsmath`, `graphicx`,
+`ulem`, and `hyperref`. Nothing downloads or installs tools, browsers, fonts, or
+packages. The default compiler is **POSIX-only** because process-tree termination
+uses POSIX process groups; `.tex` export remains available without this compiler.
+Font availability is checked by `fontspec` at the start of compilation, not by the
+package preflight.
+
+Compilation uses a private temporary stage and private TeX caches, with a fixed
+`book.tex` entry regardless of the requested PDF name. Both the `latexmk` version
+preflight and build use `-norc`, so latexmk rc files are ignored. Shell escape is
+disabled, but this is **not a TeX/Lua sandbox: trusted inputs only**. Each preflight
+process has a 15-second timeout; the build has a 180-second deadline and
+`max_repeat = 5`. Process output and the compiler log are bounded at 4 MiB; the
+PDF is bounded at 64 MiB. Publication requires reference convergence: genuine
+final-log undefined-reference/citation or rerun warnings and exhausted passes
+fail the build, rather than matching similar words in ordinary document text.
+
+Only the requested PDF is published—no TeX, logs, auxiliary files, font/image
+companions, tangled source, or HTML. Precommit failures or cancellation preserve
+the original PDF. `SIGINT`, `SIGTERM`, and `SIGHUP` are handled throughout the
+compiler and PDF CLI lifetime, with transaction cancellation checkpoints through
+commit. A signal after commit does not undo successful publication or interrupt
+its cleanup. Do not run concurrent writers.
+
+Normally the private build is removed on success or failure. `--keep-build`
+retains it on success or compilation failure and reports its path in
+`publication.buildDirectory` (no directory exists for errors before staging).
+The caller owns cleanup: retained TeX, logs, caches, fonts and assets may contain
+sensitive material and licensed files. `publication.warnings` is an array of
+deduplicated final compiler warnings, including missing glyphs and overfull boxes;
+JSON mode reports them there, while human mode prints warnings and any retained
+build path to stderr. Successful compilation does **not** imply clean typography.
+
+`SOURCE_DATE_EPOCH` is honored via the inherited build environment, but PDF byte
+determinism is not promised. The `latex ... --output books/book.tex` command is
+unchanged and never compiles the book. Ordinary generation, activation and saves
+do not compile PDFs; extension publication commands remain future M5 work.
+See [M4 acceptance](CONTRIBUTING.md#m4-pdf-acceptance) for real CLI evidence and
+`yarn test:pdf`.
+
 ## Explicit LaTeX book export
 
 The CLI can export a supported literate project as a typeset book source:
@@ -219,8 +287,9 @@ comments use real italics rather than synthetic slant.
 Family names accept 1–100 ASCII letters, digits, spaces, dots, or hyphens,
 starting with a letter or digit. Paths and TeX options are not accepted. Repeated
 settings keep the last valid value, but any invalid occurrence blocks export.
-Without `--font-manifest`, selecting a family does not install it or verify that
-it is available. Lilex and ordinary family overrides use native style lookup.
+Without `--font-manifest`, LaTeX export does not install a selected family or
+verify that it is available; PDF compilation checks availability through `fontspec`.
+Lilex and ordinary family overrides use native style lookup.
 Only the exact legacy `D2CodingLigature Nerd Font Propo` code family retains its
 automatic slant declaration. To keep that former default, explicitly set
 `font-code=D2CodingLigature Nerd Font Propo`.
@@ -286,9 +355,10 @@ Move the `.tex` and its companion directory together. Compile from the `.tex`
 directory (or use `latexmk -cd` as below). Providing licenses is an explicit author
 responsibility: export does not check redistribution rights, parse font binaries,
 verify family/face metadata, or guarantee glyph coverage. Font/package installation,
-PDF compilation, font collections, variable-font axes, and synthesis other than
-explicit italic-face slant are outside this slice. As with the existing filesystem
-transaction, concurrent changes to inputs are not sandboxed; use a trusted,
+font collections, variable-font axes, and synthesis other than explicit italic-face
+slant are outside this portable-font slice. M4 adds explicit PDF compilation above.
+As with the existing filesystem transaction, concurrent changes to inputs are not
+sandboxed; use a trusted,
 quiescent project.
 
 To compile later, install the named fonts (or export companions) and LuaLaTeX packages `fontspec`,

@@ -156,6 +156,9 @@ It uses the engine's parser metadata, including partial metadata on invalid inpu
 <li><code>check</code> compares the generation plan with disk without writing.</li>
 <li><code>latex</code> explicitly exports one LaTeX book through Pandoc, without source/HTML
 generation, TeX execution, or PDF compilation.</li>
+<li><code>pdf</code> explicitly compiles the same book in a private build directory and writes
+only the requested PDF. <code>--keep-build</code> retains that directory for inspection.
+It never generates source or HTML first, downloads tools, or runs automatically.</li>
 <li><code>self-check</code> additionally type-checks fresh generated sources and rebuilds the
 engine to verify a fixed point. It executes this repository's trusted code;
 it is not a sandbox or a command for arbitrary untrusted projects.</li>
@@ -167,7 +170,7 @@ project fails rather than passing vacuously.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0063006c0069002000750073006100670065-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1"><span id="f-0063006c0069002000750073006100670065"></span><a class="literate-tag-name" href="#f-0063006c0069002000750073006100670065" data-literate-target="f-0063006c0069002000750073006100670065" aria-label="Definition of cli usage">&lt;&lt;cli usage&gt;&gt;=</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">const</span> commands = [<span class="hljs-string">'generate'</span>, <span class="hljs-string">'check'</span>, <span class="hljs-string">'inspect'</span>, <span class="hljs-string">'self-check'</span>, <span class="hljs-string">'latex'</span>];
+<pre><code><span class="hljs-keyword">const</span> commands = [<span class="hljs-string">'generate'</span>, <span class="hljs-string">'check'</span>, <span class="hljs-string">'inspect'</span>, <span class="hljs-string">'self-check'</span>, <span class="hljs-string">'latex'</span>, <span class="hljs-string">'pdf'</span>];
 <span class="hljs-keyword">const</span> latexMarginOptions = [
     [<span class="hljs-string">'--margin'</span>, <span class="hljs-string">'marginMm'</span>], [<span class="hljs-string">'--margin-top'</span>, <span class="hljs-string">'marginTopMm'</span>], [<span class="hljs-string">'--margin-right'</span>, <span class="hljs-string">'marginRightMm'</span>],
     [<span class="hljs-string">'--margin-bottom'</span>, <span class="hljs-string">'marginBottomMm'</span>], [<span class="hljs-string">'--margin-left'</span>, <span class="hljs-string">'marginLeftMm'</span>]
@@ -175,12 +178,15 @@ project fails rather than passing vacuously.</p>
 <span class="hljs-keyword">const</span> latexValueFlags = [<span class="hljs-string">'--output'</span>, <span class="hljs-string">'--paper'</span>, <span class="hljs-string">'--font-manifest'</span>, <span class="hljs-string">'--browser'</span>, ...latexMarginOptions.<span class="hljs-title">map</span>(<span class="hljs-function">(</span><span class="hljs-params">[flag]</span><span class="hljs-function">) =&gt;</span> flag)];
 <span class="hljs-keyword">const</span> latexUsage = <span class="hljs-string">'latex [root] --output path.tex [--paper a4|a5|letter|legal] [--margin 20mm]'</span>
     + <span class="hljs-string">' [--margin-top Nmm] [--margin-right Nmm] [--margin-bottom Nmm] [--margin-left Nmm] [--font-manifest path.json] [--browser /absolute/path] [--json]'</span>;
+<span class="hljs-keyword">const</span> pdfUsage = latexUsage.<span class="hljs-title">replace</span>(<span class="hljs-string">'latex [root] --output path.tex'</span>, <span class="hljs-string">'pdf [root] --output path.pdf'</span>) + <span class="hljs-string">' [--keep-build]'</span>;
 <span class="hljs-keyword">const</span> usage = <span class="hljs-string">'Usage: node out/cli.js generate|check|inspect|self-check [root] [--json]</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>
     + <span class="hljs-string">`       node out/cli.js </span><span class="hljs-subst">${latexUsage}</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>
+    + <span class="hljs-string">`       node out/cli.js </span><span class="hljs-subst">${pdfUsage}</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>
     + <span class="hljs-string">'       node out/cli.js &lt;command&gt; --help [--json]</span><span class="hljs-string">\n</span><span class="hljs-string">       node out/cli.js --help [--json]</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>;
 <span class="hljs-keyword">const</span> <span class="hljs-attr">descriptions</span>: <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; = <span class="hljs-title">Object</span>.<span class="hljs-title">fromEntries</span>([
     [<span class="hljs-string">'generate'</span>, <span class="hljs-string">'Write missing or changed generated files.'</span>],
     [<span class="hljs-string">'latex'</span>, <span class="hljs-string">'Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving at least an 80 × 100 mm body. Each side overrides --margin; unspecified sides use --margin or 20mm. Fonts resolve from root index.literate SETTINGS. No TeX/book PDF execution. --font-manifest opts into explicit font/license companions. --browser explicitly selects a sandbox-capable system Chromium for Mermaid PDF/SVG assets; no browser download.'</span>],
+    [<span class="hljs-string">'pdf'</span>, <span class="hljs-string">'Compile a .pdf book using Pandoc and latexmk/LuaLaTeX on PATH. Shares latex paper, margin, font-manifest and browser options; output is relative to root. Only the PDF is published. --keep-build retains the private build directory on success or compilation failure. TeX/Lua execution is for trusted inputs, not a sandbox. No source/HTML generation or tool downloads.'</span>],
     [<span class="hljs-string">'check'</span>, <span class="hljs-string">'Report missing or stale generated files without writing.'</span>],
     [<span class="hljs-string">'inspect'</span>, <span class="hljs-string">'Report documents, templates, and fragment definitions and dependencies without reading outputs or writing.'</span>],
     [<span class="hljs-string">'self-check'</span>, <span class="hljs-string">'Verify this repository’s trusted self-hosting code without generating files; all outputs must already be current.'</span>]
@@ -216,6 +222,7 @@ an attempted write succeeded. Inspection does not read or preflight output paths
     <span class="hljs-attr">outputs</span>: { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">status</span>: <span class="hljs-title">OutputStatus</span> }[];
     inspection?: <span class="hljs-title">Generation</span>[<span class="hljs-string">'inspection'</span>];
     selfHosting?: { <span class="hljs-attr">ok</span>: <span class="hljs-built_in">boolean</span>; <span class="hljs-attr">checks</span>: { <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">ok</span>: <span class="hljs-built_in">boolean</span>; message?: <span class="hljs-built_in">string</span> }[] };
+    publication?: { <span class="hljs-attr">warnings</span>: <span class="hljs-built_in">string</span>[]; buildDirectory?: <span class="hljs-built_in">string</span> };
     usage?: <span class="hljs-built_in">string</span>;
 }
 
@@ -235,6 +242,7 @@ load compiler tooling until verification is requested.</p>
 <span class="hljs-keyword">import</span> { renderLatex, <span class="hljs-title">LatexConverter</span>, <span class="hljs-title">LatexOptions</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-latex'</span>;
 <span class="hljs-keyword">import</span> { planFonts } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-fonts'</span>;
 <span class="hljs-keyword">import</span> { collectAssets, planAssets, assetKey, maximumAssetBytes } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-assets'</span>;
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">PdfCompiler</span>, <span class="hljs-title">PdfCompilationError</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-pdf'</span>;
 <span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">DiagramRenderer</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-mermaid'</span>;
 <span class="hljs-keyword">import</span> { resolvePublicationSettings } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-settings'</span>;
 <span class="hljs-keyword">import</span> { commitOutputs, <span class="hljs-title">OutputTransactionError</span>, <span class="hljs-title">TransactionIO</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./output-transactions'</span>;
@@ -627,7 +635,8 @@ Transaction failures retain the recovery/committed-cleanup semantics above.</p>
 <div class="code">
 <pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">planLatex</span>(<span class="hljs-params">root: </span><span class="hljs-built_in">string</span><span class="hljs-params">, documents: SourceDocument[], output: </span><span class="hljs-built_in">string</span><span class="hljs-params">,
     options: LatexOptions, convert: LatexConverter, manifest: </span><span class="hljs-built_in">string</span><span class="hljs-params"> | </span><span class="hljs-literal">undefined</span><span class="hljs-params">,
-        browser: </span><span class="hljs-built_in">string</span><span class="hljs-params"> | </span><span class="hljs-literal">undefined</span><span class="hljs-params">, diagrams: DiagramRenderer</span>): <span class="hljs-title">Promise</span>&lt;{
+        browser: </span><span class="hljs-built_in">string</span><span class="hljs-params"> | </span><span class="hljs-literal">undefined</span><span class="hljs-params">, diagrams: DiagramRenderer,
+        virtualOutput?: </span><span class="hljs-params">{ destinations: </span><span class="hljs-built_in">string</span><span class="hljs-params">[] }</span>): <span class="hljs-title">Promise</span>&lt;{
         <span class="hljs-attr">files</span>: { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span> | <span class="hljs-title">Uint8Array</span> }[]; <span class="hljs-attr">diagnostics</span>: <span class="hljs-title">Generation</span>[<span class="hljs-string">'diagnostics'</span>];
         inspection?: <span class="hljs-title">Generation</span>[<span class="hljs-string">'inspection'</span>];
     }&gt; {
@@ -706,7 +715,7 @@ missing destinations cannot become input directories or overwrite templates.</p>
 <div class="code">
 <pre><code><span class="hljs-keyword">const</span> inputs = [...documents.<span class="hljs-title">map</span>(<span class="hljs-params">document</span><span class="hljs-function"> =&gt;</span> <span class="hljs-variable">document</span>.<span class="hljs-property">path</span>), ...<span class="hljs-title">templateReferences</span>(documents),
     ...(companions?.<span class="hljs-property">inputs</span> ?? []), ...assets.<span class="hljs-property">inputs</span>];
-<span class="hljs-keyword">const</span> destinations = [output, ...(companions?.<span class="hljs-property">files</span>.<span class="hljs-title">map</span>(<span class="hljs-params">file</span><span class="hljs-function"> =&gt;</span> file.<span class="hljs-property">path</span>) ?? []),
+<span class="hljs-keyword">const</span> destinations = virtualOutput?.<span class="hljs-property">destinations</span> ?? [output, ...(companions?.<span class="hljs-property">files</span>.<span class="hljs-title">map</span>(<span class="hljs-params">file</span><span class="hljs-function"> =&gt;</span> file.<span class="hljs-property">path</span>) ?? []),
     ...assets.<span class="hljs-property">files</span>.<span class="hljs-title">map</span>(<span class="hljs-params">file</span><span class="hljs-function"> =&gt;</span> file.<span class="hljs-property">path</span>)];
 <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> destination <span class="hljs-keyword">of</span> destinations) {
     <span class="hljs-keyword">const</span> target = destination.<span class="hljs-title">toLowerCase</span>();
@@ -808,14 +817,18 @@ sets the exit status and emits a JSON response exactly once.</p>
 <pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">run</span>(<span class="hljs-params">args: </span><span class="hljs-built_in">string</span><span class="hljs-params">[], io: CliIO = defaultIO,
     transactionIO: </span><span class="hljs-params">(root: </span><span class="hljs-built_in">string</span><span class="hljs-params">)</span><span class="hljs-params"> =&gt; TransactionIO = createTransactionIO,
     convert: LatexConverter = runPandoc,
-    diagrams: DiagramRenderer = </span><span class="hljs-keyword">async</span><span class="hljs-params"> </span><span class="hljs-params">(...args)</span><span class="hljs-params"> =&gt; </span><span class="hljs-params">(</span><span class="hljs-keyword">await</span><span class="hljs-params"> </span><span class="hljs-keyword">import</span><span class="hljs-params">(</span><span class="hljs-string">'./publication-mermaid'</span><span class="hljs-params">)</span><span class="hljs-params">)</span><span class="hljs-params">.renderDiagrams</span><span class="hljs-params">(...args)</span><span class="hljs-params">
+    diagrams: DiagramRenderer = </span><span class="hljs-keyword">async</span><span class="hljs-params"> </span><span class="hljs-params">(...args)</span><span class="hljs-params"> =&gt; </span><span class="hljs-params">(</span><span class="hljs-keyword">await</span><span class="hljs-params"> </span><span class="hljs-keyword">import</span><span class="hljs-params">(</span><span class="hljs-string">'./publication-mermaid'</span><span class="hljs-params">)</span><span class="hljs-params">)</span><span class="hljs-params">.renderDiagrams</span><span class="hljs-params">(...args)</span><span class="hljs-params">,
+    compile: PdfCompiler = </span><span class="hljs-keyword">async</span><span class="hljs-params"> </span><span class="hljs-params">(...args)</span><span class="hljs-params"> =&gt; </span><span class="hljs-params">(</span><span class="hljs-keyword">await</span><span class="hljs-params"> </span><span class="hljs-keyword">import</span><span class="hljs-params">(</span><span class="hljs-string">'./publication-pdf'</span><span class="hljs-params">)</span><span class="hljs-params">)</span><span class="hljs-params">.compilePdf</span><span class="hljs-params">(...args)</span><span class="hljs-params">
 </span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">number</span>&gt; {
     <a class="literate-tag-name" href="#f-0063006c006900200072006500730070006f006e00730065002000730065007400750070" data-literate-target="f-0063006c006900200072006500730070006f006e00730065002000730065007400750070" aria-label="Definition of cli response setup">&lt;&lt;cli response setup&gt;&gt;</a>
     <a class="literate-tag-name" href="#f-0063006c006900200061007200670075006d0065006e0074002000700061007200730069006e0067" data-literate-target="f-0063006c006900200061007200670075006d0065006e0074002000700061007200730069006e0067" aria-label="Definition of cli argument parsing">&lt;&lt;cli argument parsing&gt;&gt;</a>
     <a class="literate-tag-name" href="#f-0063006c006900200061007200670075006d0065006e0074002000760061006c00690064006100740069006f006e00200061006e0064002000680065006c0070" data-literate-target="f-0063006c006900200061007200670075006d0065006e0074002000760061006c00690064006100740069006f006e00200061006e0064002000680065006c0070" aria-label="Definition of cli argument validation and help">&lt;&lt;cli argument validation and help&gt;&gt;</a>
+    <a class="literate-tag-name" href="#f-0063006c00690020005000440046002000630061006e00630065006c006c006100740069006f006e002000730063006f00700065" data-literate-target="f-0063006c00690020005000440046002000630061006e00630065006c006c006100740069006f006e002000730063006f00700065" aria-label="Definition of cli PDF cancellation scope">&lt;&lt;cli PDF cancellation scope&gt;&gt;</a>
     <span class="hljs-keyword">try</span> {
         <a class="literate-tag-name" href="#f-0063006c00690020006c006f00610064002000700072006f006a006500630074" data-literate-target="f-0063006c00690020006c006f00610064002000700072006f006a006500630074" aria-label="Definition of cli load project">&lt;&lt;cli load project&gt;&gt;</a>
+        checkCancelled?.();
         <a class="literate-tag-name" href="#f-0063006c0069002000760061006c0069006400610074006500200061006e006400200069006e00730070006500630074002000700072006f006a006500630074" data-literate-target="f-0063006c0069002000760061006c0069006400610074006500200061006e006400200069006e00730070006500630074002000700072006f006a006500630074" aria-label="Definition of cli validate and inspect project">&lt;&lt;cli validate and inspect project&gt;&gt;</a>
+        <a class="literate-tag-name" href="#f-0063006c006900200063006f006d00700069006c00650020005000440046" data-literate-target="f-0063006c006900200063006f006d00700069006c00650020005000440046" aria-label="Definition of cli compile PDF">&lt;&lt;cli compile PDF&gt;&gt;</a>
         <a class="literate-tag-name" href="#f-0063006c0069002000760061006c006900640061007400650020006f00750074007000750074002000640065007300740069006e006100740069006f006e0073" data-literate-target="f-0063006c0069002000760061006c006900640061007400650020006f00750074007000750074002000640065007300740069006e006100740069006f006e0073" aria-label="Definition of cli validate output destinations">&lt;&lt;cli validate output destinations&gt;&gt;</a>
         <a class="literate-tag-name" href="#f-0063006c006900200063006f006d00700061007200650020006f00750074007000750074002000620079007400650073" data-literate-target="f-0063006c006900200063006f006d00700061007200650020006f00750074007000750074002000620079007400650073" aria-label="Definition of cli compare output bytes">&lt;&lt;cli compare output bytes&gt;&gt;</a>
         <a class="literate-tag-name" href="#f-0063006c006900200072006500610064002d006f006e006c007900200063006800650063006b0073" data-literate-target="f-0063006c006900200072006500610064002d006f006e006c007900200063006800650063006b0073" aria-label="Definition of cli read-only checks">&lt;&lt;cli read-only checks&gt;&gt;</a>
@@ -825,9 +838,35 @@ sets the exit status and emits a JSON response exactly once.</p>
         response.<span class="hljs-property">errors</span>.<span class="hljs-title">push</span>(message);
         <span class="hljs-keyword">if</span> (!json) { io.<span class="hljs-title">stderr</span>(<span class="hljs-string">`literate: </span><span class="hljs-subst">${message}</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>); }
         <span class="hljs-keyword">return</span> <span class="hljs-title">finish</span>(<span class="hljs-number">1</span>);
+    } <span class="hljs-keyword">finally</span> {
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [signal, handler] <span class="hljs-keyword">of</span> cancellationHandlers) { process.<span class="hljs-title">removeListener</span>(signal, handler); }
     }
 }
 
+</code></pre>
+
+</div>
+</div><h3>Keep cancellation inside the operation boundary</h3>
+<p>PDF signal handlers latch the first cancellation without throwing from an event
+callback. Install them before the first asynchronous project read and keep them
+through transaction rollback and committed cleanup, including repeated signals.
+Child termination belongs to the compiler and Mermaid adapters; a pending Pandoc
+conversion remains bounded by its timeout and cannot publish after cancellation.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0063006c00690020005000440046002000630061006e00630065006c006c006100740069006f006e002000730063006f00700065-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1"><span id="f-0063006c00690020005000440046002000630061006e00630065006c006c006100740069006f006e002000730063006f00700065"></span><a class="literate-tag-name" href="#f-0063006c00690020005000440046002000630061006e00630065006c006c006100740069006f006e002000730063006f00700065" data-literate-target="f-0063006c00690020005000440046002000630061006e00630065006c006c006100740069006f006e002000730063006f00700065" aria-label="Definition of cli PDF cancellation scope">&lt;&lt;cli PDF cancellation scope&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">let</span> <span class="hljs-attr">cancellation</span>: <span class="hljs-title">Error</span> | <span class="hljs-literal">undefined</span>;
+<span class="hljs-keyword">const</span> cancellationHandlers = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-title">NodeJS</span>.<span class="hljs-property">Signals</span>, <span class="hljs-function">() =&gt;</span> <span class="hljs-built_in">void</span>&gt;();
+<span class="hljs-keyword">const</span> checkCancelled = command === <span class="hljs-string">'pdf'</span> ? (): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+    <span class="hljs-keyword">if</span> (cancellation) { <span class="hljs-keyword">throw</span> cancellation; }
+} : <span class="hljs-literal">undefined</span>;
+<span class="hljs-keyword">if</span> (command === <span class="hljs-string">'pdf'</span>) {
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> signal <span class="hljs-keyword">of</span> [<span class="hljs-string">'SIGINT'</span>, <span class="hljs-string">'SIGTERM'</span>, <span class="hljs-string">'SIGHUP'</span>] <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span>) {
+        <span class="hljs-keyword">const</span> handler = (): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> { cancellation ??= <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`PDF publication cancelled by </span><span class="hljs-subst">${signal}</span><span class="hljs-string">`</span>); };
+        cancellationHandlers.<span class="hljs-title">set</span>(signal, handler);
+        process.<span class="hljs-title">on</span>(signal, handler);
+    }
+}
 </code></pre>
 
 </div>
@@ -872,7 +911,7 @@ rather than silently changing which project is processed.</p>
         <span class="hljs-keyword">else</span> { values.<span class="hljs-title">set</span>(arg, value); index++; }
     } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (arg.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'-'</span>)) {
         <span class="hljs-keyword">const</span> flag = arg === <span class="hljs-string">'-h'</span> ? <span class="hljs-string">'--help'</span> : arg;
-        <span class="hljs-keyword">if</span> (![<span class="hljs-string">'--help'</span>, <span class="hljs-string">'--json'</span>].<span class="hljs-title">includes</span>(flag)) { response.<span class="hljs-property">errors</span>.<span class="hljs-title">push</span>(<span class="hljs-string">`Unknown flag: </span><span class="hljs-subst">${arg}</span><span class="hljs-string">`</span>); }
+        <span class="hljs-keyword">if</span> (![<span class="hljs-string">'--help'</span>, <span class="hljs-string">'--json'</span>, <span class="hljs-string">'--keep-build'</span>].<span class="hljs-title">includes</span>(flag)) { response.<span class="hljs-property">errors</span>.<span class="hljs-title">push</span>(<span class="hljs-string">`Unknown flag: </span><span class="hljs-subst">${arg}</span><span class="hljs-string">`</span>); }
         <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (flags.<span class="hljs-title">has</span>(flag)) { response.<span class="hljs-property">errors</span>.<span class="hljs-title">push</span>(<span class="hljs-string">`Duplicate flag: </span><span class="hljs-subst">${arg}</span><span class="hljs-string">`</span>); }
         flags.<span class="hljs-title">add</span>(flag);
     } <span class="hljs-keyword">else</span> { positional.<span class="hljs-title">push</span>(arg); }
@@ -906,7 +945,7 @@ them distinct from valid commands whose project fails validation.</p>
 <span class="hljs-keyword">if</span> (help) {
     response.<span class="hljs-property">command</span> = <span class="hljs-string">'help'</span>;
     response.<span class="hljs-property">usage</span> = topic
-        ? <span class="hljs-string">`Usage: node out/cli.js </span><span class="hljs-subst">${topic === </span><span class="hljs-string">'latex'</span><span class="hljs-subst"> ? latexUsage : topic + </span><span class="hljs-string">' [root] [--json]'</span><span class="hljs-subst">}</span><span class="hljs-string">\n</span><span class="hljs-subst">${descriptions[topic]}</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>
+        ? <span class="hljs-string">`Usage: node out/cli.js </span><span class="hljs-subst">${topic === </span><span class="hljs-string">'latex'</span><span class="hljs-subst"> ? latexUsage : topic === </span><span class="hljs-string">'pdf'</span><span class="hljs-subst"> ? pdfUsage : topic + </span><span class="hljs-string">' [root] [--json]'</span><span class="hljs-subst">}</span><span class="hljs-string">\n</span><span class="hljs-subst">${descriptions[topic]}</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>
         : usage;
     <span class="hljs-keyword">if</span> (!json) { io.<span class="hljs-title">stdout</span>(response.<span class="hljs-property">usage</span>); }
     <span class="hljs-keyword">return</span> <span class="hljs-title">finish</span>(<span class="hljs-number">0</span>);
@@ -914,10 +953,10 @@ them distinct from valid commands whose project fails validation.</p>
 </code></pre>
 
 </div>
-</div><h3>Validate LaTeX-only options</h3>
+</div><h3>Validate publication options</h3>
 <p>Reject these options on other commands, even help for another command. Help for
-LaTeX does not require an output, but supplied values must still be valid. Usage
-validation happens before discovery or spawning Pandoc. All supplied margins must
+either publication command does not require an output, but supplied values must
+still be valid. Usage validation happens before discovery or spawning Pandoc. All supplied margins must
 be finite and within 5–50 mm, including the uniform fallback even when every side
 is overridden. Opposite effective sides must leave at least an 80 × 100 mm body.
 A5 therefore permits a uniform margin above 34 mm only when explicit side overrides
@@ -925,10 +964,13 @@ leave enough width.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0063006c00690020004c006100540065005800200061007200670075006d0065006e0074002000760061006c00690064006100740069006f006e-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1"><span id="f-0063006c00690020004c006100540065005800200061007200670075006d0065006e0074002000760061006c00690064006100740069006f006e"></span><a class="literate-tag-name" href="#f-0063006c00690020004c006100540065005800200061007200670075006d0065006e0074002000760061006c00690064006100740069006f006e" data-literate-target="f-0063006c00690020004c006100540065005800200061007200670075006d0065006e0074002000760061006c00690064006100740069006f006e" aria-label="Definition of cli LaTeX argument validation">&lt;&lt;cli LaTeX argument validation&gt;&gt;=</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">if</span> (topic !== <span class="hljs-string">'latex'</span> &amp;&amp; latexValueFlags.<span class="hljs-title">some</span>(<span class="hljs-params">flag</span><span class="hljs-function"> =&gt;</span> flags.<span class="hljs-title">has</span>(flag))) {
-    response.<span class="hljs-property">errors</span>.<span class="hljs-title">push</span>(<span class="hljs-string">`</span><span class="hljs-subst">${latexValueFlags.join(</span><span class="hljs-string">', '</span><span class="hljs-subst">)}</span><span class="hljs-string"> are only valid for latex`</span>);
+<pre><code><span class="hljs-keyword">if</span> (topic !== <span class="hljs-string">'pdf'</span> &amp;&amp; flags.<span class="hljs-title">has</span>(<span class="hljs-string">'--keep-build'</span>)) {
+    response.<span class="hljs-property">errors</span>.<span class="hljs-title">push</span>(<span class="hljs-string">'--keep-build is only valid for pdf'</span>);
 }
-<span class="hljs-keyword">if</span> (topic === <span class="hljs-string">'latex'</span>) {
+<span class="hljs-keyword">if</span> (topic !== <span class="hljs-string">'latex'</span> &amp;&amp; topic !== <span class="hljs-string">'pdf'</span> &amp;&amp; latexValueFlags.<span class="hljs-title">some</span>(<span class="hljs-params">flag</span><span class="hljs-function"> =&gt;</span> flags.<span class="hljs-title">has</span>(flag))) {
+    response.<span class="hljs-property">errors</span>.<span class="hljs-title">push</span>(<span class="hljs-string">`</span><span class="hljs-subst">${latexValueFlags.join(</span><span class="hljs-string">', '</span><span class="hljs-subst">)}</span><span class="hljs-string"> are only valid for latex or pdf`</span>);
+}
+<span class="hljs-keyword">if</span> (topic === <span class="hljs-string">'latex'</span> || topic === <span class="hljs-string">'pdf'</span>) {
     <span class="hljs-keyword">const</span> browser = values.<span class="hljs-title">get</span>(<span class="hljs-string">'--browser'</span>);
     <span class="hljs-keyword">if</span> (browser !== <span class="hljs-literal">undefined</span> &amp;&amp; (!path.<span class="hljs-title">isAbsolute</span>(browser) || <span class="hljs-regexp">/</span><span class="hljs-regexp">[</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">0000-</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">001f]</span><span class="hljs-regexp">/</span>.<span class="hljs-title">test</span>(browser))) {
         response.<span class="hljs-property">errors</span>.<span class="hljs-title">push</span>(<span class="hljs-string">'--browser requires an absolute system Chromium executable path'</span>);
@@ -939,8 +981,9 @@ leave enough width.</p>
     }
     <span class="hljs-keyword">const</span> output = values.<span class="hljs-title">get</span>(<span class="hljs-string">'--output'</span>);
     latexOutput = output ? <span class="hljs-title">safeRelativePath</span>(output) || <span class="hljs-string">''</span> : <span class="hljs-string">''</span>;
-    <span class="hljs-keyword">if</span> ((!help || output !== <span class="hljs-literal">undefined</span>) &amp;&amp; (!latexOutput || !latexOutput.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'.tex'</span>))) {
-        response.<span class="hljs-property">errors</span>.<span class="hljs-title">push</span>(<span class="hljs-string">'latex requires --output with a safe root-relative .tex path'</span>);
+    <span class="hljs-keyword">const</span> extension = topic === <span class="hljs-string">'pdf'</span> ? <span class="hljs-string">'.pdf'</span> : <span class="hljs-string">'.tex'</span>;
+    <span class="hljs-keyword">if</span> ((!help || output !== <span class="hljs-literal">undefined</span>) &amp;&amp; (!latexOutput || !latexOutput.<span class="hljs-title">endsWith</span>(extension))) {
+        response.<span class="hljs-property">errors</span>.<span class="hljs-title">push</span>(<span class="hljs-string">`</span><span class="hljs-subst">${topic}</span><span class="hljs-string"> requires --output with a safe root-relative </span><span class="hljs-subst">${extension}</span><span class="hljs-string"> path`</span>);
     }
     <span class="hljs-keyword">const</span> paper = values.<span class="hljs-title">get</span>(<span class="hljs-string">'--paper'</span>) ?? <span class="hljs-string">'a4'</span>;
     <span class="hljs-keyword">if</span> (![<span class="hljs-string">'a4'</span>, <span class="hljs-string">'a5'</span>, <span class="hljs-string">'letter'</span>, <span class="hljs-string">'legal'</span>].<span class="hljs-title">includes</span>(paper)) {
@@ -1018,10 +1061,11 @@ Other commands stop on any diagnostic before examining or writing output files.<
 <div class="codefragment">
 <div class="fragmentname" id="c-0063006c0069002000760061006c0069006400610074006500200061006e006400200069006e00730070006500630074002000700072006f006a006500630074-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1"><span id="f-0063006c0069002000760061006c0069006400610074006500200061006e006400200069006e00730070006500630074002000700072006f006a006500630074"></span><a class="literate-tag-name" href="#f-0063006c0069002000760061006c0069006400610074006500200061006e006400200069006e00730070006500630074002000700072006f006a006500630074" data-literate-target="f-0063006c0069002000760061006c0069006400610074006500200061006e006400200069006e00730070006500630074002000700072006f006a006500630074" aria-label="Definition of cli validate and inspect project">&lt;&lt;cli validate and inspect project&gt;&gt;=</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">const</span> result = command === <span class="hljs-string">'latex'</span>
-    ? <span class="hljs-keyword">await</span> <span class="hljs-title">planLatex</span>(root, documents, latexOutput, latexOptions, convert,
+<pre><code><span class="hljs-keyword">const</span> entry = command === <span class="hljs-string">'pdf'</span> ? path.<span class="hljs-property">posix</span>.<span class="hljs-title">join</span>(path.<span class="hljs-property">posix</span>.<span class="hljs-title">dirname</span>(latexOutput), <span class="hljs-string">'book.tex'</span>) : latexOutput;
+<span class="hljs-keyword">const</span> result = command === <span class="hljs-string">'latex'</span> || command === <span class="hljs-string">'pdf'</span>
+    ? <span class="hljs-keyword">await</span> <span class="hljs-title">planLatex</span>(root, documents, entry, latexOptions, convert,
         values.<span class="hljs-title">has</span>(<span class="hljs-string">'--font-manifest'</span>) ? <span class="hljs-title">relative</span>(values.<span class="hljs-title">get</span>(<span class="hljs-string">'--font-manifest'</span>)!) : <span class="hljs-literal">undefined</span>,
-                values.<span class="hljs-title">get</span>(<span class="hljs-string">'--browser'</span>), diagrams)
+                values.<span class="hljs-title">get</span>(<span class="hljs-string">'--browser'</span>), diagrams, command === <span class="hljs-string">'pdf'</span> ? { <span class="hljs-attr">destinations</span>: [latexOutput] } : <span class="hljs-literal">undefined</span>)
     : <span class="hljs-title">generateProject</span>(documents, templates);
 response.<span class="hljs-property">diagnostics</span> = result.<span class="hljs-property">diagnostics</span>;
 <span class="hljs-keyword">if</span> (command === <span class="hljs-string">'inspect'</span>) {
@@ -1037,6 +1081,40 @@ response.<span class="hljs-property">diagnostics</span> = result.<span class="hl
     <span class="hljs-keyword">return</span> <span class="hljs-title">finish</span>(<span class="hljs-number">1</span>);
 }
 <span class="hljs-keyword">if</span> (command === <span class="hljs-string">'inspect'</span>) { <span class="hljs-keyword">return</span> <span class="hljs-title">finish</span>(<span class="hljs-number">0</span>); }
+</code></pre>
+
+</div>
+</div><h3>Compile only the private publication plan</h3>
+<p>The virtual entry and companions are compiler inputs, not project destinations.
+Only the final PDF is protected against project inputs and passed to the output
+transaction. An unrelated project <code>book.tex</code> is neither inspected nor replaced.
+Retained directories and compiler warnings remain visible even when compilation
+fails; JSON consumers receive them separately from the error message. Record
+compiler progress before checking cancellation so a completed private build is
+still reported even when its PDF must not be published.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0063006c006900200063006f006d00700069006c00650020005000440046-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1"><span id="f-0063006c006900200063006f006d00700069006c00650020005000440046"></span><a class="literate-tag-name" href="#f-0063006c006900200063006f006d00700069006c00650020005000440046" data-literate-target="f-0063006c006900200063006f006d00700069006c00650020005000440046" aria-label="Definition of cli compile PDF">&lt;&lt;cli compile PDF&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">if</span> (command === <span class="hljs-string">'pdf'</span>) {
+    <span class="hljs-keyword">const</span> publication = (<span class="hljs-attr">details</span>: { warnings?: <span class="hljs-built_in">string</span>[]; buildDirectory?: <span class="hljs-built_in">string</span> }): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+        response.<span class="hljs-property">publication</span> = { <span class="hljs-attr">warnings</span>: details.<span class="hljs-property">warnings</span> ?? [],
+            ...(details.<span class="hljs-property">buildDirectory</span> === <span class="hljs-literal">undefined</span> ? {} : { <span class="hljs-attr">buildDirectory</span>: details.<span class="hljs-property">buildDirectory</span> }) };
+        <span class="hljs-keyword">if</span> (!json) {
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> warning <span class="hljs-keyword">of</span> response.<span class="hljs-property">publication</span>.<span class="hljs-property">warnings</span>) { io.<span class="hljs-title">stderr</span>(<span class="hljs-string">`literate: warning: </span><span class="hljs-subst">${warning}</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>); }
+            <span class="hljs-keyword">if</span> (details.<span class="hljs-property">buildDirectory</span> !== <span class="hljs-literal">undefined</span>) { io.<span class="hljs-title">stderr</span>(<span class="hljs-string">`literate: build directory: </span><span class="hljs-subst">${details.buildDirectory}</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>); }
+        }
+    };
+    checkCancelled?.();
+    <span class="hljs-keyword">try</span> {
+        <span class="hljs-keyword">const</span> compiled = <span class="hljs-keyword">await</span> <span class="hljs-title">compile</span>(result.<span class="hljs-property">files</span>, entry, { <span class="hljs-attr">keepBuild</span>: flags.<span class="hljs-title">has</span>(<span class="hljs-string">'--keep-build'</span>) });
+        <span class="hljs-title">publication</span>(compiled);
+        result.<span class="hljs-property">files</span> = [{ <span class="hljs-attr">path</span>: latexOutput, <span class="hljs-attr">content</span>: compiled.<span class="hljs-property">pdf</span> }];
+    } <span class="hljs-keyword">catch</span> (error) {
+        <span class="hljs-keyword">if</span> (error <span class="hljs-keyword">instanceof</span> <span class="hljs-title">Error</span>) { <span class="hljs-title">publication</span>(error <span class="hljs-keyword">as</span> <span class="hljs-title">Partial</span>&lt;<span class="hljs-title">PdfCompilationError</span>&gt;); }
+        <span class="hljs-keyword">throw</span> error;
+    }
+    checkCancelled?.();
+}
 </code></pre>
 
 </div>
@@ -1120,6 +1198,11 @@ transaction coordinator before mutation. Only changed bytes are staged and insta
 Report <code>written</code> only after the complete batch commits. A committed cleanup failure
 still marks installed outputs, but fails the command and reports recovery locations.
 Other failures never claim writes succeeded. Obsolete outputs are not deleted.</p>
+<p>The PDF checkpoint is checked before writes and by the coordinator around
+preflight, after preparation, and after installation while rollback is still
+possible. Do not check cancellation after the coordinator returns: signals during
+irreversible cleanup cannot uncommit the PDF. Report success or the coordinator's
+committed cleanup error instead, keeping signal handlers installed until it settles.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0063006c00690020007700720069007400650020006300680061006e0067006500640020006f007500740070007500740073-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1"><span id="f-0063006c00690020007700720069007400650020006300680061006e0067006500640020006f007500740070007500740073"></span><a class="literate-tag-name" href="#f-0063006c00690020007700720069007400650020006300680061006e0067006500640020006f007500740070007500740073" data-literate-target="f-0063006c00690020007700720069007400650020006300680061006e0067006500640020006f007500740070007500740073" aria-label="Definition of cli write changed outputs">&lt;&lt;cli write changed outputs&gt;&gt;=</a></div>
 <div class="code">
@@ -1131,10 +1214,11 @@ Other failures never claim writes succeeded. Obsolete outputs are not deleted.</
         <span class="hljs-keyword">if</span> (!json) { io.<span class="hljs-title">stdout</span>(<span class="hljs-string">`generated: </span><span class="hljs-subst">${output.path}</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>); }
     }
 };
+checkCancelled?.();
 <span class="hljs-keyword">try</span> {
     <span class="hljs-keyword">const</span> written = <span class="hljs-keyword">await</span> <span class="hljs-title">commitOutputs</span>(files.<span class="hljs-title">map</span>(<span class="hljs-params">file</span><span class="hljs-function"> =&gt;</span> ({
         <span class="hljs-attr">path</span>: file.<span class="hljs-property">path</span>, <span class="hljs-attr">content</span>: <span class="hljs-keyword">typeof</span> file.<span class="hljs-property">content</span> === <span class="hljs-string">'string'</span> ? <span class="hljs-title">Buffer</span>.<span class="hljs-title">from</span>(file.<span class="hljs-property">content</span>, <span class="hljs-string">'utf8'</span>) : file.<span class="hljs-property">content</span>
-    })), <span class="hljs-title">transactionIO</span>(root));
+    })), <span class="hljs-title">transactionIO</span>(root), checkCancelled);
     <span class="hljs-title">markWritten</span>(written);
 } <span class="hljs-keyword">catch</span> (error) {
     <span class="hljs-keyword">if</span> (error <span class="hljs-keyword">instanceof</span> <span class="hljs-title">OutputTransactionError</span> &amp;&amp; error.<span class="hljs-property">committed</span>) {

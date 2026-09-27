@@ -79,10 +79,12 @@ function normalizeOutputs(files: readonly TransactionFile[]): TransactionFile[] 
     return outputs;
 }
 
-async function preflight(files: readonly TransactionFile[], io: TransactionIO): Promise<TransactionState> {
+async function preflight(files: readonly TransactionFile[], io: TransactionIO,
+    checkCancelled?: () => void): Promise<TransactionState> {
     const normalized = normalizeOutputs(files);
     const state: TransactionState = { outputs: [], directories: [], owned: [], parents: [], active: '' };
     try {
+        checkCancelled?.();
         for (const file of normalized) {
             for (const parent of parentPaths(file.path)) {
                 state.active = parent;
@@ -99,6 +101,7 @@ async function preflight(files: readonly TransactionFile[], io: TransactionIO): 
                 backupAttempted: false, installAttempted: false });
         }
         await reserveDirectories(state, normalized, io);
+        checkCancelled?.();
         return state;
     } catch (error) {
         throw new OutputTransactionError('preflight_failed', false, [state.active], [], error);
@@ -225,11 +228,14 @@ async function cleanupTransaction(state: TransactionState, io: TransactionIO, ro
     return failures;
 }
 
-export async function commitOutputs(files: readonly TransactionFile[], io: TransactionIO): Promise<string[]> {
-    const state = await preflight(files, io);
+export async function commitOutputs(files: readonly TransactionFile[], io: TransactionIO,
+    checkCancelled?: () => void): Promise<string[]> {
+    const state = await preflight(files, io, checkCancelled);
     try {
         await prepareOutputs(state, io);
+        checkCancelled?.();
         await installOutputs(state, io);
+        checkCancelled?.();
     } catch (error) {
         let failures = await rollbackOutputs(state, io);
         if (!failures.length) { failures = await cleanupTransaction(state, io, true); }

@@ -189,10 +189,12 @@ Preflight every output and parent, including unchanged outputs, before making an
 directory or write. A provider error rejects the batch without mutation.
 
 ```typescript: <<transaction preflight>>=
-async function preflight(files: readonly TransactionFile[], io: TransactionIO): Promise<TransactionState> {
+async function preflight(files: readonly TransactionFile[], io: TransactionIO,
+    checkCancelled?: () => void): Promise<TransactionState> {
     const normalized = normalizeOutputs(files);
     const state: TransactionState = { outputs: [], directories: [], owned: [], parents: [], active: '' };
     try {
+        checkCancelled?.();
         for (const file of normalized) {
             for (const parent of parentPaths(file.path)) {
                 state.active = parent;
@@ -209,6 +211,7 @@ async function preflight(files: readonly TransactionFile[], io: TransactionIO): 
                 backupAttempted: false, installAttempted: false });
         }
         await reserveDirectories(state, normalized, io);
+        checkCancelled?.();
         return state;
     } catch (error) {
         throw new OutputTransactionError('preflight_failed', false, [state.active], [], error);
@@ -390,16 +393,26 @@ async function cleanupTransaction(state: TransactionState, io: TransactionIO, ro
 
 ```
 
-The commit point is completion of **all** installs. Cleanup is deliberately outside
-the rollback catch: deleting backups is irreversible and cannot honestly be
-reported as a rolled-back transaction.
+The commit point is completion of **all** installs and the final cancellation
+checkpoint. An optional synchronous check lets callers abort before mutation,
+after preparation, or after installation while all backups still exist. A thrown
+cancellation follows the same restoration path as an I/O failure. Callers must
+keep their signal handlers active during restoration and cleanup.
+
+Cleanup is deliberately outside the rollback catch: deleting backups is
+irreversible and cannot honestly be reported as a rolled-back transaction. No
+cancellation check runs after the commit point; a late signal cannot undo already
+published output or interrupt its cleanup.
 
 ```typescript: <<transaction commit>>=
-export async function commitOutputs(files: readonly TransactionFile[], io: TransactionIO): Promise<string[]> {
-    const state = await preflight(files, io);
+export async function commitOutputs(files: readonly TransactionFile[], io: TransactionIO,
+    checkCancelled?: () => void): Promise<string[]> {
+    const state = await preflight(files, io, checkCancelled);
     try {
         await prepareOutputs(state, io);
+        checkCancelled?.();
         await installOutputs(state, io);
+        checkCancelled?.();
     } catch (error) {
         let failures = await rollbackOutputs(state, io);
         if (!failures.length) { failures = await cleanupTransaction(state, io, true); }

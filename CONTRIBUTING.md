@@ -84,7 +84,8 @@ Each run creates and prints a fresh ignored `out/layout-acceptance-*` directory.
 It retains fixture inputs, export/re-export JSON, byte-identical relocated TeX
 and font/license companions, build/final logs, PDFs, Poppler XML/text/font/link
 evidence, and (on success) `acceptance.json`. Failed runs remain available for
-diagnosis. The CLI itself still never invokes TeX; the harness explicitly runs
+diagnosis. The `latex` CLI command never invokes TeX; this historical relocation
+harness explicitly runs
 `latexmk -lualatex -interaction=nonstopmode -halt-on-error -file-line-error
 -no-shell-escape book.tex` after export and relocation.
 
@@ -188,10 +189,78 @@ Retained acceptance evidence:
   but its final log has **61 issues: 52 missing-glyph entries and nine overfull
   lines**. This proves compilation, **not clean full-book typography**.
 
-The current recorded full test result is **918 passed, 2 skipped**. Normal tests
-use injected adapters and do not launch Chromium; these opt-in browser/PDF checks
+The historical M3 full test result was **918 passed, 2 skipped**; it is not the
+final M4 test count. Normal tests use injected adapters and do not launch Chromium; these opt-in browser/PDF checks
 are separate evidence, not implied by a headless-suite pass. Each harness retains
 its own ignored `out/` evidence directory for diagnosis.
+
+## M4 PDF acceptance
+
+M4 is finished for explicit CLI PDF publication; see
+[README](README.md#m4-explicit-pdf-book-compilation) for the command, package list,
+limits, cancellation/transaction contract, and trusted-input restriction. The
+`latex` `.tex` export is unchanged. M3 added exportable diagrams, not an explicit
+book PDF command; M4 now supplies `pdf`. No extension publication commands exist
+yet (M5), and neither ordinary generation nor saves compile PDFs.
+
+Run the production-CLI acceptance harness explicitly:
+
+```sh
+yarn test:pdf --font-manifest /absolute/path/to/font-project/fonts.json \
+  --ulem /absolute/path/to/existing/ulem.sty \
+  --browser /usr/bin/chromium-browser
+```
+
+The font manifest is required and uses the same default-family/native four-face
+Lilex fixture contract as `test:publication`. `--ulem` is optional: if the host
+lacks that package, it exposes an existing local `ulem.sty` through an absolute
+`TEXINPUTS` directory, preserving system lookup. It does not install anything or
+add an exporter companion. `--browser` is optional and explicit; omit it to skip
+Mermaid checks. There is no browser discovery or download fallback.
+
+Use Node >=22.12 on POSIX and Python 3 without `-O`. In addition to Pandoc,
+`latexmk`, `lualatex`, `kpsewhich`, the README's TeX packages and the fixture fonts,
+the harness requires Poppler's `pdfinfo`, `pdftohtml`, `pdftotext`, `pdffonts`, and
+`pdftocairo`; Mermaid checks also need `pdfimages` and `pdftoppm`. The harness
+performs no tool/font/package downloads or installations and no source generation.
+Normal headless tests use injected adapters and need no TeX or browser.
+
+Each run prints a fresh ignored `out/pdf-acceptance-*` directory with fixture
+inputs, CLI JSON/stderr, inspection reports and `acceptance.json`. Retained build
+paths are recorded in `publication.buildDirectory`; browser cases may retain
+stages in the system temporary directory to avoid Unix socket path-length limits.
+These paths can lie outside the evidence directory. The caller must clean up all
+retained stages, including potentially sensitive fonts/assets and logs.
+
+Real evidence in `out/pdf-acceptance-57gcx3f_` records **10/10 checks passed**, no
+failures or skips:
+
+- A4 produced **11 pages**, A5 **16 pages**, with geometry/caption bounds, 95
+  semantic labels and **13 visible linked page references** checked in each.
+  The shared definition moved from page 2 to 3 and the final addition from page
+  11 to 15. The fixture includes PDF/PNG images and captions, breakable code,
+  native font faces, and clean final fixture logs.
+- Optional Mermaid A4/A5 cases checked vector diagrams and geometry through the
+  production `pdf` command, not a separate manual compilation step.
+- An rc-execution control proved the marker was effective; rc-ignore verified
+  that the production compiler ignored rc files, including during preflight.
+- Success published only the requested PDF. Default cleanup removed stages;
+  retained builds contained TeX/logs/auxiliaries and font/asset companions.
+- Real compilation failures preserved a previously published PDF, both with
+  retained builds and with default cleanup.
+
+A separate full-repository production `pdf` invocation produced
+`out/m4-book/book.pdf`: **298 A4 pages**. Its JSON result,
+`out/m4-book-result.json`, reports **15 distinct warnings** for missing glyphs and
+overfull boxes. This proves successful publication and warning reporting,
+**not clean full-book typography**; do not conflate it with the clean bounded
+fixture. Neither evidence set promises byte-identical PDFs or arbitrary-font,
+Unicode, layout, or theme coverage.
+
+The final `LITERATE_TEST_PANDOC=1 yarn test` run records **1,062 passed, 2 skipped,
+0 failed** in `out/m4-tests-final.log`, including compiler-lifetime and publication
+cancellation tests. `yarn check:self`, `yarn esbuild` and `git diff --check` also
+passed. The real PDF acceptance above is separate from the headless-suite result.
 
 ## M1 acceptance review
 
