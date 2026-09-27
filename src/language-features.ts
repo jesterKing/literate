@@ -14,6 +14,7 @@ const language = (value: string): string => Object.prototype.hasOwnProperty.call
 const family = (value: string): boolean => ['typescript', 'javascript', 'typescriptreact', 'javascriptreact'].includes(value);
 interface Server { command: string; args: string[]; initializationOptions?: ObjectValue; configuration?: ObjectValue; }
 interface RequestView { document: vscode.TextDocument; position: vscode.Position; hit: SourceProjectionPosition; }
+export interface LanguageSnapshot { documents: SourceDocument[]; templates: Record<string, string>; }
 function servers(invalid: () => void = () => undefined): Record<string, Server> {
     const raw = vscode.workspace.getConfiguration('literate').inspect<unknown>('languageServers')?.globalValue;
     const result: Record<string, Server> = Object.create(null);
@@ -37,6 +38,36 @@ function local(folder: vscode.WorkspaceFolder, document: vscode.TextDocument): b
         && document.languageId === 'markdown' && document.uri.fsPath.endsWith('.literate')
         && !!vscode.workspace.workspaceFolders?.includes(folder)
         && vscode.workspace.getWorkspaceFolder(document.uri) === folder;
+}
+function errorCategory(error: unknown): string {
+    const code = object(error) ? error.code : undefined;
+    if (code === 'ENOENT') { return 'ENOENT (executable, working directory or input file not found)'; }
+    if (code === 'EACCES' || code === 'EPERM') { return 'permission denied (check executable and input permissions)'; }
+    if (code === 'EPIPE' || code === 'ECONNRESET') { return 'server transport closed'; }
+    const message = error instanceof Error ? error.message : '';
+    if (code === 'ETIMEDOUT' || /^LSP request timed out:/.test(message)) { return 'request timeout (server did not respond)'; }
+    if (/^Language server (exited|stdout closed)/.test(message)) { return 'server exited or closed stdout'; }
+    if (/^Language server (document synchronization unsupported|open\/close synchronization required)/.test(message)) {
+        return 'server lacks required document synchronization';
+    }
+    if (message === 'Language server must use UTF-16 positions') { return 'unsupported position encoding (UTF-16 required)'; }
+    if (/^Invalid (LSP|JSON-RPC|initialize result)/.test(message)) { return 'invalid server protocol response'; }
+    if (/^LSP .*limit exceeded/.test(message)) { return 'protocol resource limit exceeded'; }
+    if (typeof code === 'number') { return 'server returned a protocol error'; }
+    return 'unclassified failure (raw error omitted for privacy)';
+}
+function projectionReason(message: string): string {
+    if (message.startsWith('Missing template:')) { return 'missing template; check template paths and captured template inputs.'; }
+    if (message.startsWith('Missing fragment:') || message.startsWith('Cannot append to missing fragment:')) {
+        return 'missing fragment; define the referenced fragment or correct its name.';
+    }
+    if (message.startsWith('Fragment cycle:')) { return 'fragment cycle; remove recursive references.'; }
+    if (message.startsWith('Duplicate fragment:')) { return 'duplicate fragment; use append syntax for additional definitions.'; }
+    if (/^Invalid (fragment header|fragment setting|template path)/.test(message)) {
+        return 'invalid fragment header, setting or template path; check fence syntax and relative template paths.';
+    }
+    if (message.includes('limit exceeded')) { return 'expansion limit exceeded; reduce repeated fragment/template expansion.'; }
+    return 'invalid project graph or inputs; check fragment definitions, references and output paths.';
 }
 function offset(text: string, value: unknown): number | undefined {
     if (!object(value) || !Number.isSafeInteger(value.line) || !Number.isSafeInteger(value.character)
@@ -153,17 +184,18 @@ function hover(view: RequestView, reply: unknown): vscode.Hover | undefined {
     return new vscode.Hover(contents, range);
 }
 export function registerLanguageFeatures(context: vscode.ExtensionContext,
-    snapshot: (folder: vscode.WorkspaceFolder) => Promise<SourceDocument[]>): void {
-    type Session = { client: LanguageClient; failed: boolean };
+    snapshot: (folder: vscode.WorkspaceFolder) => Promise<LanguageSnapshot>): void {
+    type Session = { client: LanguageClient; failed: boolean; started?: boolean };
     const sessions = new Map<string, Session>();
     let epoch = 0, busy = false, disposed = false;
     let active: AbortController | undefined;
     const invalidate = (): void => { epoch++; active?.abort(); };
     const close = (client: LanguageClient): void => { void client.dispose().catch(() => undefined); };
-    let invalidReported = false;
+    let invalidReported = false, capturing = false;
+    const templatePaths = new Map<string, Set<string>>(), reported = new Set<string>();
     const reset = (): void => {
         invalidate(); sessions.forEach(session => { if (!session.failed) { close(session.client); } });
-        sessions.clear(); invalidReported = false;
+        sessions.clear(); templatePaths.clear(); reported.clear(); invalidReported = false;
     };
     context.subscriptions.push({ dispose() { disposed = true; reset(); } });
     const output = vscode.window.createOutputChannel('Literate Language Servers');
@@ -172,6 +204,9 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
         if (disposed) { return; }
         if (lines >= 100) { output.clear(); lines = 0; }
         output.appendLine(message); lines++;
+    };
+    const reportOnce = (message: string): void => {
+        if (!reported.has(message)) { reported.add(message); report(message); }
     };
     const invalid = (): void => {
         if (invalidReported) { return; }
@@ -187,8 +222,12 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
     }), vscode.workspace.onDidChangeWorkspaceFolders(() => reset()),
     vscode.workspace.onDidChangeTextDocument(invalidate), vscode.workspace.onDidOpenTextDocument(invalidate),
     vscode.workspace.onDidCloseTextDocument(invalidate));
-    const watcher = vscode.workspace.createFileSystemWatcher('**/*.literate');
-    context.subscriptions.push(watcher, watcher.onDidChange(invalidate), watcher.onDidCreate(invalidate), watcher.onDidDelete(invalidate));
+    const watcher = vscode.workspace.createFileSystemWatcher('**/*');
+    const diskChanged = (uri: vscode.Uri): void => {
+        if (capturing || uri.fsPath.endsWith('.literate')
+            || [...templatePaths.values()].some(paths => paths.has(path.resolve(uri.fsPath)))) { invalidate(); }
+    };
+    context.subscriptions.push(watcher, watcher.onDidChange(diskChanged), watcher.onDidCreate(diskChanged), watcher.onDidDelete(diskChanged));
     async function request(document: vscode.TextDocument, cursor: vscode.Position, token: vscode.CancellationToken,
         method: 'hover' | 'completion'): Promise<vscode.Hover | vscode.CompletionItem[] | undefined> {
         const folder = vscode.workspace.getWorkspaceFolder(document.uri);
@@ -205,14 +244,23 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
             && JSON.stringify(servers()) === fingerprint;
         try {
             if (!fresh()) { return undefined; }
-            const documents = await snapshot(folder);
+            capturing = true;
+            const { documents, templates } = await snapshot(folder);
+            capturing = false;
             if (!fresh()) { return undefined; }
+            templatePaths.set(folder.uri.toString(), new Set(Object.keys(templates).map(name => path.resolve(folder.uri.fsPath, name))));
             const sourcePath = path.relative(folder.uri.fsPath, document.uri.fsPath).split(path.sep).join('/');
             if (!documents.some(source => source.path.replace(/^\.\//, '') === sourcePath && source.text === document.getText())) {
                 return undefined;
             }
-            const projected = projectLanguageSources(documents);
-            if (projected.diagnostics.length) { return undefined; }
+            phase = 'projection';
+            const projected = projectLanguageSources(documents, templates);
+            if (projected.diagnostics.length) {
+                for (const diagnostic of projected.diagnostics) {
+                    reportOnce('Language projection unavailable: ' + projectionReason(diagnostic.message));
+                }
+                return undefined;
+            }
             const hit = mapSourcePosition(projected.files, sourcePath, document.offsetAt(cursor));
             if (!hit) { return undefined; }
             const id = language(hit.file.language), config = configured[id];
@@ -220,6 +268,7 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
             sessionKey = JSON.stringify([folder.uri.toString(), id]);
             session = sessions.get(sessionKey);
             if (session?.failed) { return undefined; }
+            phase = 'initialization';
             if (!session) {
                 session = { client: new LanguageClient({ ...config, cwd: folder.uri.fsPath, rootUri: folder.uri.toString() }), failed: false };
                 sessions.set(sessionKey, session);
@@ -229,6 +278,10 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
             phase = 'initialization';
             await client.initialize();
             if (!fresh()) { return undefined; }
+            if (!session.started) {
+                session.started = true;
+                report('Language server ready: ' + id.slice(0, 80) + '; projected output ' + JSON.stringify(hit.file.path.slice(0, 200)) + '.');
+            }
             const capability = client.capabilities[method === 'hover' ? 'hoverProvider' : 'completionProvider'];
             if (!(object(capability) || (method === 'hover' && capability === true))) { return undefined; }
             phase = 'synchronization';
@@ -243,15 +296,19 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
             if (!fresh()) { return undefined; }
             const view = { document, position: cursor, hit };
             return method === 'hover' ? hover(view, reply) : completions(view, reply);
-        } catch {
+        } catch (error) {
+            if (!session && fresh()) {
+                reportOnce('Language ' + phase + ' failed: ' + errorCategory(error)
+                    + '. Check source/template inputs and global literate.languageServers settings, then retry.');
+            }
             if (session && sessions.get(sessionKey) === session && !session.failed
                 && !(phase === 'request' && controller.signal.aborted)) {
                 session.failed = true; close(session.client);
-                report('Language server ' + phase + ' failed. Check the executable and global literate.languageServers '
-                    + 'settings, then run literate.restartLanguageServers to retry. Server details are withheld.');
+                report('Language server ' + phase + ' failed: ' + errorCategory(error)
+                    + '. Check the executable and global literate.languageServers settings, then run literate.restartLanguageServers to retry.');
             }
             return undefined;
-        } finally { cancellation.dispose(); active = undefined; busy = false; }
+        } finally { cancellation.dispose(); active = undefined; busy = false; capturing = false; }
     }
     const selector: vscode.DocumentSelector = { scheme: 'file', language: 'markdown', pattern: '**/*.literate' };
     context.subscriptions.push(vscode.languages.registerHoverProvider(selector, {

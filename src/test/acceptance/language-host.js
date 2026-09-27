@@ -31,6 +31,7 @@ exports.run = async () => {
     }
     const originals = new Map();
     const children = [];
+        const serverTraces = [];
     // Guard production launches, not independent VS Code built-in extension hosts.
     // Servers' own compiler subprocesses are outside this extension-host guard.
     for (const method of ['spawn', 'exec', 'execFile', 'fork', 'spawnSync', 'execSync', 'execFileSync']) {
@@ -49,6 +50,16 @@ exports.run = async () => {
             const child = original.apply(this, arguments);
             children.push(child);
             record.pid = child.pid;
+            // Capture only isolated fixture-server replies; never alter the protocol stream.
+            const trace = { pid: child.pid, stdout: [], stderr: [], bytes: 0, truncated: false };
+            serverTraces.push(trace);
+            for (const stream of ['stdout', 'stderr']) {
+                child[stream]?.on('data', chunk => {
+                    trace.bytes += chunk.length;
+                    if (trace.bytes <= 8 * 1024 * 1024) { trace[stream].push(Buffer.from(chunk)); }
+                    else { trace.truncated = true; }
+                });
+            }
             child.once('close', (code, signal) => { record.code = code; record.signal = signal; });
             return child;
         };
@@ -87,7 +98,10 @@ exports.run = async () => {
                     assert.ok(!item.additionalTextEdits?.length, 'No additional edits accepted');
                 }
             } else {
-                record.hovers = result;
+                record.hovers = (result || []).map(hover => ({ range: hover.range,
+                                    contents: hover.contents.map(content => typeof content === 'string' ? { value: content } : {
+                                        value: content.value, isTrusted: content.isTrusted, supportHtml: content.supportHtml
+                                    }) }));
                 for (const hover of result || []) {
                     for (const content of hover.contents) {
                         if (content instanceof vscode.MarkdownString) {
@@ -121,10 +135,27 @@ exports.run = async () => {
         assert.ok(!item.additionalTextEdits?.length);
         return { item, cursor };
     }
-    async function hover(document, needle, expected) {
-        const result = await request('hover', document, position(document, needle, needle.length - 2));
-        const text = (result || []).flatMap(item => item.contents.map(content => typeof content === 'string' ? content : content.value)).join('\n');
-        assert.match(text, expected, `Expected meaningful type hover for ${needle}`);
+    async function hover(document, needle, expected, waitMs = 0) {
+        const cursor = position(document, needle, needle.length - 2);
+        const started = Date.now();
+        let text, attempts = 0;
+        do {
+            const result = await request('hover', document, cursor);
+            const rawText = (result || []).flatMap(item => item.contents.map(content => typeof content === 'string' ? content : content.value)).join('\n');
+            // VS Code appendText escapes plaintext hovers as Markdown. Compare the
+            // displayed type, while preserving raw contents and all rejection guards.
+            text = rawText.replace(/&nbsp;/g, ' ').replace(/\\([()[\]])/g, '$1');
+            const record = evidence.requests[evidence.requests.length - 1];
+            record.semanticHover = { needle, expected: expected.source, attempt: ++attempts,
+                elapsedMs: Date.now() - started, sourceLine: document.lineAt(cursor.line).text,
+                rawText, semanticText: text, matched: expected.test(text) };
+            await checkpoint();
+            if (record.semanticHover.matched || Date.now() - started + 500 >= waitMs) { break; }
+            // A nonempty `any` hover is not semantic readiness. Each attempt still
+            // goes through the full read-only inventory and source-version guard.
+            await delay(500);
+        } while (Date.now() - started < waitMs);
+        assert.match(text, expected, `Expected meaningful type hover for ${needle} after ${attempts} attempts; got ${JSON.stringify(text)}`);
     }
     async function settledInventory(phase, ready = () => true) {
         let previous = await inventory(root), stable = 0;
@@ -180,11 +211,20 @@ exports.run = async () => {
             assert.equal(document.languageId, 'markdown'); documents.push(document); originalsText.set(document, document.getText());
         }
         const [document, dependency] = documents;
+        const template = await vscode.workspace.openTextDocument(vscode.Uri.file(path.join(root, 'wrapper.template')));
+        const originalTemplate = template.getText();
         await check('Activation/open is read-only; all projections absent', async () => {
             assert.deepEqual(await inventory(root), baseline);
             for (const name of projected) { assert.equal(baseline[name], undefined); }
+                        assert.ok(baseline['wrapper.template'], 'Template is a physical baseline fixture');
+                        assert.equal(await fs.readFile(template.uri.fsPath, 'utf8'), originalTemplate);
+                        assert.ok(originalTemplate.indexOf('[CODE]') > originalTemplate.indexOf('\n\n'));
         });
         let localCompletion;
+                await check('GrabbedStateList typed this.list hover through physical multiline template', () =>
+                    hover(document, 'const grabbedHover = this.list', /GrabbedStateList\.list:\s*string\[\]/));
+                await check('GrabbedStateList this.li completion through physical multiline template', () =>
+                    complete(document, 'this.li;', 'list'));
         for (const [needle, expected] of [['local.loc;', 'localMember'], ['physical.phy;', 'physicalMember'], ['aliased.ali;', 'aliasMember'], ['overlay.ove;', 'overlayMember'], ['dep.dep;', 'dependencyValue']]) {
             await check(`Completion ${expected} on Markdown`, async () => {
                 const result = needle === 'dep.dep;'
@@ -196,7 +236,8 @@ exports.run = async () => {
             });
         }
         for (const [needle, type] of [['local.localMember', /localMember.*string|localMember[\s\S]*string/], ['physical.physicalMember', /number/], ['aliased.aliasMember', /boolean/], ['overlay.overlayMember', /string/], ['dep.dependencyValue', /u32/]]) {
-            await check(`Typed hover ${needle} on Markdown`, () => hover(document, needle, type));
+            const waitMs = ['physical.physicalMember', 'aliased.aliasMember', 'overlay.overlayMember'].includes(needle) ? 10000 : 0;
+                        await check(`Typed hover ${needle} on Markdown`, () => hover(document, needle, type, waitMs));
         }
         await check('Fragment completion inside << tag remains', async () => {
             const result = await request('completion', document, position(document, 'Tag completion stays available: <<body', 'Tag completion stays available: <<bo'.length));
@@ -213,7 +254,33 @@ exports.run = async () => {
             await edit(document, range, item.insertText, 'returned completion applied to Markdown only');
             assert.ok(document.getText().includes('local.localMember;'));
         });
-        await check('Unsaved local edit changes subsequent hover type', async () => {
+        await check('Apply list completion only to original GrabbedStateList source', async () => {
+                    const { item, cursor } = await complete(document, 'this.li;', 'list');
+                    const range = item.range instanceof vscode.Range ? item.range : item.range?.replacing;
+                    assert.ok(range instanceof vscode.Range && range.contains(cursor));
+                    assert.equal(range.start.line, cursor.line); assert.equal(range.end.line, cursor.line);
+                    assert.equal(document.getText(range), 'li');
+                    assert.equal(item.insertText, 'list');
+                    await edit(document, range, item.insertText, 'returned list completion applied to original Markdown');
+                    assert.ok(document.getText().includes('        this.list;'));
+                    await hover(document, 'const grabbedHover = this.list', /GrabbedStateList\.list:\s*string\[\]/);
+                });
+                await check('Unsaved template shifts generated positions and changes list type without disk writes', async () => {
+                    const source = document.getText();
+                    const cursor = position(document, 'const grabbedHover = this.list');
+                    const updated = '// Unsaved header line one\n// Unsaved header line two\n'
+                        + originalTemplate.replace('templateItems: string[]', 'templateItems: number[]');
+                    await edit(template, new vscode.Range(template.positionAt(0), template.positionAt(originalTemplate.length)),
+                        updated, 'unsaved physical template header shift and list type change');
+                    assert.equal(document.getText(), source);
+                    assert.deepEqual(position(document, 'const grabbedHover = this.list'), cursor);
+                    assert.equal(template.getText().split('[CODE]')[0].split('\n').length,
+                        originalTemplate.split('[CODE]')[0].split('\n').length + 2);
+                    assert.equal(await fs.readFile(template.uri.fsPath, 'utf8'), originalTemplate);
+                    await hover(document, 'const grabbedHover = this.list', /GrabbedStateList\.list:\s*number\[\]/);
+                    await complete(document, '        this.list;', 'list');
+                });
+                await check('Unsaved local edit changes subsequent hover type', async () => {
             await replace(document, 'localMember: "local"', 'localMember: 17', 'unsaved local type change');
             await hover(document, 'const localHover = local.localMember', /number/);
         });
@@ -229,7 +296,7 @@ exports.run = async () => {
             for (const name of Object.keys(baseline)) { assert.deepEqual(after[name], baseline[name], `${name} remains byte/mtime identical`); }
         });
         await check('Normal edit-triggered generation observed; only generated fixture outputs cleaned', async () => {
-            assert.equal(evidence.edits.length, 3);
+            assert.equal(evidence.edits.length, 5);
             for (const edit of evidence.edits) {
                 assert.deepEqual(edit.generatedOnEdit, generatedOutputs);
                 assert.deepEqual(edit.cleanup?.removed, generatedOutputs);
@@ -249,6 +316,15 @@ exports.run = async () => {
     finally {
         for (const [method, original] of originals) { childProcess[method] = original; }
         for (const child of children) { child.kill('SIGTERM'); }
+        evidence.serverTraces = [];
+        for (const trace of serverTraces) {
+            const files = {};
+            for (const stream of ['stdout', 'stderr']) {
+                files[stream] = `server-${trace.pid}.${stream}.log`;
+                await fs.writeFile(path.join(run, files[stream]), Buffer.concat(trace[stream]));
+            }
+            evidence.serverTraces.push({ pid: trace.pid, bytes: trace.bytes, truncated: trace.truncated, files });
+        }
         evidence.ok = evidence.checks.every(check => check.ok);
         await checkpoint();
         await fs.writeFile(path.join(run, 'report.md'), '# Installed VS Code language acceptance\n\n'

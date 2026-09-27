@@ -106,6 +106,13 @@ Verified server configurations:
   inside its installation. The tested build uses `lib/tsc` with arguments
   `["--lsp", "--stdio"]`. `code --locate-extension TypeScriptTeam.native-preview`
   reports the extension directory. This is not the older JavaScript `tsc` command.
+- **typescript-language-server:** a standalone alternative available through Mason,
+  launched with `["--stdio"]`. Hover/completion on the actual template-backed
+  `GrabbedStateList` source is verified. It can select the workspace TypeScript
+  version: with TypeScript 4.9, our disk-absent alias/dependency fixture returned
+  `any` where TypeScript 7 resolved types. Keep generated dependencies on disk if
+  needed. Set `initializationOptions.disableAutomaticTypingAcquisition` to `true`
+  to prevent this server's automatic typings installer from downloading packages.
 - **Zig:** use the ZLS executable selected by `ziglang.vscode-zig`, with no
   arguments. Its **ZLS language server** output channel identifies the path after
   activation. Set `initializationOptions.zig_exe_path` to the absolute Zig compiler
@@ -114,18 +121,24 @@ Verified server configurations:
 Server paths may change when an owning extension updates. Failed sessions remain
 stopped rather than repeatedly launching; consult **Literate Language Servers**
 in the Output panel and run **Literate: Restart Language Servers** after fixing
-configuration. Changing `literate.languageServers` also resets sessions.
+configuration. Changing `literate.languageServers` also resets sessions. The
+channel reports successful startup, projection failures (including missing
+templates and expansion limits), and categorized snapshot/server errors without
+printing source contents or server protocol payloads.
 
 The server sees assembled outputs at their intended `file:` URIs, populated from
 current literate buffers. Requests neither save nor generate files; ordinary
 edit-triggered generation remains unchanged. Same-language generated dependencies
 are synchronized too, even if their output files do not exist. Physical imports
-and project configuration are read by the server.
+and project configuration are read by the server. Source templates are included,
+with unsaved template buffers taking precedence over disk. Only the code inserted
+at `[CODE]` has fragment mappings; wrapper text cannot be edited through a fragment.
 
 Initial boundaries:
 - Only named fragments reachable from a valid output receive services. Invalid
-  fragment graphs, source-template outputs, and expansion-limit violations return
-  no results. A repeatedly used fragment selects its first deterministic expansion.
+  fragment graphs, missing templates, and expansion-limit violations return no
+  results. A repeatedly used fragment or repeated `[CODE]` slot selects its first
+  deterministic expansion.
 - Simple single-line completion replacement ranges must remain within the active
   source mapping. Snippets, commands, auxiliary edits/auto-imports and completion
   resolution are not supported. No language-specific trigger characters are

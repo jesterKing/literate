@@ -124,9 +124,9 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 <div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Mapped language sources</h1>
 <p>Direct language-server requests need tangled code, not rendered documentation.
 <code>projectLanguageSources</code> uses the engine's collected graph and validation policy.
-It performs no I/O. Template roots are deliberately omitted, even when their
-supplied templates are valid; ordinary roots still project. All fragments,
-including unused ones, must have valid dependencies before any file is returned.</p>
+It performs no I/O. Validated source templates wrap escaped code with literal,
+single-pass <code>[CODE]</code> substitution. All fragments, including unused ones, must
+have valid dependencies before any file is returned.</p>
 <p>Offsets are absolute UTF-16 string indexes, in original source or generated code.
 Mappings describe contiguous, equal-length literal segments. Inserted indentation,
 reference tags, headers, prose, and removed escape slashes have no mapping.
@@ -141,6 +141,7 @@ consumed container tab maps only its unchanged suffix, never synthesized spaces.
 <span data-literate-explore="f-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073"><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073" data-literate-target="f-00700072006f006a0065006300740069006f006e0020006c00690074006500720061006c0020007300650067006d0065006e00740073" aria-label="Definition of projection literal segments">&lt;&lt;projection literal segments&gt;&gt;</a></span>
 <span data-literate-explore="f-00700072006f006a0065006300740069006f006e00200065007800700061006e00730069006f006e"><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200065007800700061006e00730069006f006e" data-literate-target="f-00700072006f006a0065006300740069006f006e00200065007800700061006e00730069006f006e" aria-label="Definition of projection expansion">&lt;&lt;projection expansion&gt;&gt;</a></span>
 <span data-literate-explore="f-00700072006f006a0065006300740069006f006e00200065006d0069007300730069006f006e"><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200065006d0069007300730069006f006e" data-literate-target="f-00700072006f006a0065006300740069006f006e00200065006d0069007300730069006f006e" aria-label="Definition of projection emission">&lt;&lt;projection emission&gt;&gt;</a></span>
+<span data-literate-explore="f-00700072006f006a0065006300740069006f006e002000740065006d0070006c0061007400650073"><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e002000740065006d0070006c0061007400650073" data-literate-target="f-00700072006f006a0065006300740069006f006e002000740065006d0070006c0061007400650073" aria-label="Definition of projection templates">&lt;&lt;projection templates&gt;&gt;</a></span>
 <span data-literate-explore="f-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073"><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073" data-literate-target="f-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073" aria-label="Definition of projection position helpers">&lt;&lt;projection position helpers&gt;&gt;</a></span>
 </code></pre>
 
@@ -183,6 +184,8 @@ This conservative rule can omit a multiline hover range while preserving its tex
 <p>The per-call budget counts copied UTF-16 storage (at two bytes per unit) and
 segments across all intermediate expansions and outputs. Depth is bounded too;
 exceeding any limit produces an atomic diagnostic rather than partial code.
+The shared 200,000-segment cap gives the self-hosting project modest, bounded
+headroom for this intermediate accounting; the 8 MiB byte cap stays unchanged.
 These limits keep exponential reference graphs from allocating huge completions.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-00700072006f006a0065006300740069006f006e00200065006e007400720079-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00700072006f006a0065006300740069006f006e00200065006e007400720079"></span><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200065006e007400720079" data-literate-target="f-00700072006f006a0065006300740069006f006e00200065006e007400720079" aria-label="Definition of projection entry">&lt;&lt;projection entry&gt;&gt;=</a></div>
@@ -196,10 +199,11 @@ These limits keep exponential reference graphs from allocating huge completions.
     <span class="hljs-keyword">const</span> report = (<span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
         diagnostics.<span class="hljs-title">push</span>({ <span class="hljs-attr">path</span>: graph.<span class="hljs-property">parsed</span>.<span class="hljs-property">documents</span>[<span class="hljs-number">0</span>]?.<span class="hljs-property">path</span> || <span class="hljs-string">''</span>, <span class="hljs-attr">line</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span>, message });
     };
+    <span class="hljs-keyword">const</span> segmentLimit = <span class="hljs-number">200000</span>;
     <span class="hljs-keyword">let</span> bytes = <span class="hljs-number">0</span>, segments = <span class="hljs-number">0</span>;
     <span class="hljs-keyword">const</span> emit = (<span class="hljs-attr">into</span>: <span class="hljs-title">Piece</span>[], <span class="hljs-attr">piece</span>: <span class="hljs-title">Piece</span>): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
         bytes += piece.<span class="hljs-property">text</span>.<span class="hljs-property">length</span> * <span class="hljs-number">2</span>;
-        <span class="hljs-keyword">if</span> (bytes &gt; <span class="hljs-number">8</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span> || ++segments &gt; <span class="hljs-number">100000</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Language projection expansion limit exceeded'</span>); }
+        <span class="hljs-keyword">if</span> (bytes &gt; <span class="hljs-number">8</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span> || ++segments &gt; segmentLimit) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Language projection expansion limit exceeded'</span>); }
         into.<span class="hljs-title">push</span>(piece);
     };
     <span class="hljs-keyword">const</span> sources = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>(graph.<span class="hljs-property">parsed</span>.<span class="hljs-property">documents</span>.<span class="hljs-title">map</span>(<span class="hljs-params">document</span><span class="hljs-function"> =&gt;</span> [<span class="hljs-variable">document</span>.<span class="hljs-property">path</span>, <span class="hljs-variable">document</span>.<span class="hljs-property">source</span>]));
@@ -359,23 +363,21 @@ output occurrence; identity is never shared between repeated expansions.</p>
 <div class="code">
 <pre><code>    <span class="hljs-keyword">try</span> {
         <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> fragment <span class="hljs-keyword">of</span> graph.<span class="hljs-property">fragments</span>.<span class="hljs-title">values</span>()) {
-            <span class="hljs-keyword">if</span> (!fragment.<span class="hljs-property">header</span>.<span class="hljs-property">output</span> || fragment.<span class="hljs-property">header</span>.<span class="hljs-property">template</span> !== <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">continue</span>; }
+            <span class="hljs-keyword">if</span> (!fragment.<span class="hljs-property">header</span>.<span class="hljs-property">output</span>) { <span class="hljs-keyword">continue</span>; }
             <span class="hljs-keyword">const</span> pieces = <span class="hljs-title">expand</span>(fragment.<span class="hljs-property">header</span>.<span class="hljs-property">name</span>, <span class="hljs-number">0</span>);
             <span class="hljs-keyword">const</span> raw = pieces.<span class="hljs-title">map</span>(<span class="hljs-params">piece</span><span class="hljs-function"> =&gt;</span> piece.<span class="hljs-property">text</span>).<span class="hljs-title">join</span>(<span class="hljs-string">''</span>);
             <span class="hljs-keyword">const</span> removed = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>(<span class="hljs-title">Array</span>.<span class="hljs-title">from</span>(raw.<span class="hljs-title">matchAll</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\\</span><span class="hljs-regexp">\x</span><span class="hljs-regexp">3c</span><span class="hljs-regexp">\x</span><span class="hljs-regexp">3c/g</span>), <span class="hljs-params">match</span><span class="hljs-function"> =&gt;</span> match.<span class="hljs-property">index</span>!));
             <span class="hljs-keyword">const</span> <span class="hljs-attr">file</span>: <span class="hljs-title">LanguageProjection</span> = { <span class="hljs-attr">path</span>: fragment.<span class="hljs-property">header</span>.<span class="hljs-property">output</span>, <span class="hljs-attr">language</span>: fragment.<span class="hljs-property">header</span>.<span class="hljs-property">language</span>, <span class="hljs-attr">content</span>: <span class="hljs-string">''</span>, <span class="hljs-attr">mappings</span>: [] };
             <span class="hljs-keyword">let</span> rawOffset = <span class="hljs-number">0</span>;
-            <span class="hljs-keyword">const</span> <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span>[] = [];
-            <span class="hljs-keyword">let</span> generated = <span class="hljs-number">0</span>;
+            <span class="hljs-keyword">const</span> <span class="hljs-attr">body</span>: <span class="hljs-title">Piece</span>[] = [];
             <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> piece <span class="hljs-keyword">of</span> pieces) {
                 <span data-literate-explore="f-00700072006f006a0065006300740069006f006e002000660069006e0061006c0069007a0065002000700069006500630065"><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e002000660069006e0061006c0069007a0065002000700069006500630065" data-literate-target="f-00700072006f006a0065006300740069006f006e002000660069006e0061006c0069007a0065002000700069006500630065" aria-label="Definition of projection finalize piece">&lt;&lt;projection finalize piece&gt;&gt;</a></span>
             }
-            file.<span class="hljs-property">content</span> = content.<span class="hljs-title">join</span>(<span class="hljs-string">''</span>);
+            <span class="hljs-title">applyTemplate</span>(file, body, graph.<span class="hljs-property">sourceTemplates</span>.<span class="hljs-title">get</span>(fragment.<span class="hljs-property">header</span>.<span class="hljs-property">name</span>) ?? <span class="hljs-string">'[CODE]'</span>);
             files.<span class="hljs-title">push</span>(file);
         }
     } <span class="hljs-keyword">catch</span> (error) { <span class="hljs-title">report</span>(error <span class="hljs-keyword">instanceof</span> <span class="hljs-title">Error</span> ? error.<span class="hljs-property">message</span> : <span class="hljs-title">String</span>(error)); }
     <span class="hljs-keyword">return</span> { <span class="hljs-attr">files</span>: diagnostics.<span class="hljs-property">length</span> ? [] : files, diagnostics };
-}
 </code></pre>
 
 </div>
@@ -389,16 +391,67 @@ openers must not bypass the limit by splitting only during emission.</p>
     <span class="hljs-keyword">if</span> (end !== piece.<span class="hljs-property">text</span>.<span class="hljs-property">length</span> &amp;&amp; !removed.<span class="hljs-title">has</span>(rawOffset + end)) { <span class="hljs-keyword">continue</span>; }
     <span class="hljs-keyword">const</span> text = piece.<span class="hljs-property">text</span>.<span class="hljs-title">slice</span>(start, end);
     <span class="hljs-keyword">if</span> (text || (piece.<span class="hljs-property">text</span>.<span class="hljs-property">length</span> === <span class="hljs-number">0</span> &amp;&amp; piece.<span class="hljs-property">endCursor</span>)) {
-        <span class="hljs-keyword">if</span> (++segments &gt; <span class="hljs-number">100000</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Language projection segment limit exceeded'</span>); }
-        content.<span class="hljs-title">push</span>(text);
-        <span class="hljs-keyword">if</span> (piece.<span class="hljs-property">path</span>) { file.<span class="hljs-property">mappings</span>.<span class="hljs-title">push</span>({ <span class="hljs-attr">sourcePath</span>: piece.<span class="hljs-property">path</span>, <span class="hljs-attr">sourceStart</span>: piece.<span class="hljs-property">start</span> + start,
-            <span class="hljs-attr">sourceEnd</span>: piece.<span class="hljs-property">start</span> + end, <span class="hljs-attr">generatedStart</span>: generated, <span class="hljs-attr">generatedEnd</span>: generated + text.<span class="hljs-property">length</span>,
-            <span class="hljs-attr">endCursor</span>: end === piece.<span class="hljs-property">text</span>.<span class="hljs-property">length</span> &amp;&amp; piece.<span class="hljs-property">endCursor</span> }); }
-        generated += text.<span class="hljs-property">length</span>;
+        <span class="hljs-title">emit</span>(body, { text, <span class="hljs-attr">path</span>: piece.<span class="hljs-property">path</span>, <span class="hljs-attr">start</span>: piece.<span class="hljs-property">start</span> + start,
+            <span class="hljs-attr">endCursor</span>: end === piece.<span class="hljs-property">text</span>.<span class="hljs-property">length</span> &amp;&amp; piece.<span class="hljs-property">endCursor</span> });
     }
     start = end + <span class="hljs-number">1</span>;
 }
 rawOffset += piece.<span class="hljs-property">text</span>.<span class="hljs-property">length</span>;
+</code></pre>
+
+</div>
+</div><p>Templates contribute no source mappings. Each original slot gets fresh mappings;
+inserted code is never scanned for placeholders. Budget checks precede copying.
+LF normalization follows substitution, including CRLF pairs across slot seams.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f006a0065006300740069006f006e002000740065006d0070006c0061007400650073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00700072006f006a0065006300740069006f006e002000740065006d0070006c0061007400650073"></span><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e002000740065006d0070006c0061007400650073" data-literate-target="f-00700072006f006a0065006300740069006f006e002000740065006d0070006c0061007400650073" aria-label="Definition of projection templates">&lt;&lt;projection templates&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">function</span> <span class="hljs-title">applyTemplate</span>(<span class="hljs-params">file: LanguageProjection, body: Piece[], template: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span> {
+        <span class="hljs-keyword">let</span> slots = <span class="hljs-number">0</span>, cursor = <span class="hljs-number">0</span>, <span class="hljs-attr">slot</span>: <span class="hljs-built_in">number</span>;
+        <span class="hljs-keyword">while</span> ((slot = template.<span class="hljs-title">indexOf</span>(<span class="hljs-string">'[CODE]'</span>, cursor)) !== -<span class="hljs-number">1</span>) { slots++; cursor = slot + <span class="hljs-number">6</span>; }
+        <span class="hljs-keyword">const</span> units = template.<span class="hljs-property">length</span> - slots * <span class="hljs-number">6</span> + slots * body.<span class="hljs-title">reduce</span>(<span class="hljs-function">(</span><span class="hljs-params">sum, piece</span><span class="hljs-function">) =&gt;</span> sum + piece.<span class="hljs-property">text</span>.<span class="hljs-property">length</span>, <span class="hljs-number">0</span>);
+        <span class="hljs-keyword">const</span> count = slots * body.<span class="hljs-property">length</span> + slots + <span class="hljs-number">1</span>;
+        <span class="hljs-keyword">if</span> (bytes + units * <span class="hljs-number">2</span> &gt; <span class="hljs-number">8</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span> || segments + count &gt; segmentLimit) {
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Language projection expansion limit exceeded'</span>);
+        }
+        bytes += units * <span class="hljs-number">2</span>;
+        segments += count;
+        <span class="hljs-keyword">const</span> <span class="hljs-attr">content</span>: <span class="hljs-built_in">string</span>[] = [];
+        <span class="hljs-keyword">let</span> generated = <span class="hljs-number">0</span>, trailingCR = <span class="hljs-literal">false</span>;
+        <span data-literate-explore="f-00700072006f006a0065006300740069006f006e002000740065006d0070006c00610074006500200061007000700065006e0064"><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e002000740065006d0070006c00610074006500200061007000700065006e0064" data-literate-target="f-00700072006f006a0065006300740069006f006e002000740065006d0070006c00610074006500200061007000700065006e0064" aria-label="Definition of projection template append">&lt;&lt;projection template append&gt;&gt;</a></span>
+        <span class="hljs-keyword">const</span> literal = (<span class="hljs-attr">from</span>: <span class="hljs-built_in">number</span>, <span class="hljs-attr">to</span>: <span class="hljs-built_in">number</span>): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+            <span class="hljs-title">append</span>({ <span class="hljs-attr">text</span>: template.<span class="hljs-title">slice</span>(<span class="hljs-keyword">from</span>, to), <span class="hljs-attr">start</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">endCursor</span>: <span class="hljs-literal">false</span> });
+        };
+        cursor = <span class="hljs-number">0</span>;
+        <span class="hljs-keyword">while</span> ((slot = template.<span class="hljs-title">indexOf</span>(<span class="hljs-string">'[CODE]'</span>, cursor)) !== -<span class="hljs-number">1</span>) {
+            <span class="hljs-title">literal</span>(cursor, slot);
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> piece <span class="hljs-keyword">of</span> body) { <span class="hljs-title">append</span>(piece); }
+            cursor = slot + <span class="hljs-number">6</span>;
+        }
+        <span class="hljs-title">literal</span>(cursor, template.<span class="hljs-property">length</span>);
+        file.<span class="hljs-property">content</span> = content.<span class="hljs-title">join</span>(<span class="hljs-string">''</span>);
+    }
+}
+</code></pre>
+
+</div>
+</div><p>The body already has normalized newlines. Only template literals can contain CR;
+remember it across empty pieces so a following body LF is consumed, not mapped.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f006a0065006300740069006f006e002000740065006d0070006c00610074006500200061007000700065006e0064-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00700072006f006a0065006300740069006f006e002000740065006d0070006c00610074006500200061007000700065006e0064"></span><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e002000740065006d0070006c00610074006500200061007000700065006e0064" data-literate-target="f-00700072006f006a0065006300740069006f006e002000740065006d0070006c00610074006500200061007000700065006e0064" aria-label="Definition of projection template append">&lt;&lt;projection template append&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> append = (<span class="hljs-attr">piece</span>: <span class="hljs-title">Piece</span>): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+    <span class="hljs-keyword">const</span> skip = trailingCR &amp;&amp; piece.<span class="hljs-property">text</span>.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>) ? <span class="hljs-number">1</span> : <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">if</span> (piece.<span class="hljs-property">text</span>.<span class="hljs-property">length</span>) { trailingCR = piece.<span class="hljs-property">text</span>.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'</span><span class="hljs-string">\r</span><span class="hljs-string">'</span>); }
+    <span class="hljs-keyword">const</span> text = piece.<span class="hljs-property">text</span>.<span class="hljs-title">slice</span>(skip).<span class="hljs-title">replace</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">|</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">/g</span>, <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>);
+    content.<span class="hljs-title">push</span>(text);
+    <span class="hljs-keyword">if</span> (piece.<span class="hljs-property">path</span> &amp;&amp; (!skip || text.<span class="hljs-property">length</span>)) {
+        file.<span class="hljs-property">mappings</span>.<span class="hljs-title">push</span>({ <span class="hljs-attr">sourcePath</span>: piece.<span class="hljs-property">path</span>, <span class="hljs-attr">sourceStart</span>: piece.<span class="hljs-property">start</span> + skip,
+            <span class="hljs-attr">sourceEnd</span>: piece.<span class="hljs-property">start</span> + piece.<span class="hljs-property">text</span>.<span class="hljs-property">length</span>, <span class="hljs-attr">generatedStart</span>: generated,
+            <span class="hljs-attr">generatedEnd</span>: generated + text.<span class="hljs-property">length</span>, <span class="hljs-attr">endCursor</span>: piece.<span class="hljs-property">endCursor</span> });
+    }
+    generated += text.<span class="hljs-property">length</span>;
+};
 </code></pre>
 
 </div>

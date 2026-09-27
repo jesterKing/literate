@@ -25,21 +25,34 @@ The installed-host acceptance is opt-in and downloads nothing. Build first with
 absolute installed server executables and run
 `node src/test/acceptance/language-host-run.js`. Optional executable overrides are
 `LANGUAGE_HOST_CODE` and `LANGUAGE_HOST_ZIG`; TypeScript arguments can be supplied
-as a JSON array in `LANGUAGE_HOST_TYPESCRIPT_ARGS` (default `--lsp --stdio`). The
-runner uses an isolated profile and workspace with a bounded host lifetime.
+as a JSON array in `LANGUAGE_HOST_TYPESCRIPT_ARGS` (default `--lsp --stdio`).
+`LANGUAGE_HOST_MODULE_RESOLUTION` defaults to `Bundler` for TypeScript 7; select
+`Node` when testing a server that selects the workspace TypeScript 4.9. The runner
+uses an isolated profile/workspace and disables automatic type acquisition.
 
 Validated on VS Code 1.138.0/Linux ARM64 with TypeScript 7.0.2 and ZLS/Zig 0.16.0:
-19 acceptance checks passed, including 14 read-only completion/hover requests,
+23 acceptance checks passed, including 20 read-only completion/hover requests,
 source-only completion application, physical and generated imports, tsconfig
-aliases, unsaved type changes and retained fragment-name completion. Ordinary
+aliases, template-backed `this.list` hover/completion, unsaved template offsets
+and types, and retained fragment-name completion. Ordinary
 edits still trigger generation. The harness waits for that generation to settle,
 then removes only isolated generated fixtures before requesting language services;
 each request must leave those files absent and source/dependency contents and
 mtimes unchanged. Evidence is retained beneath ignored `out/language-host-*`.
 
+The full-book projection regression loads all chapters plus `tssrc.template`,
+checks parity with fresh generation, and maps the actual `this.list` source. The
+cumulative segment budget is 200,000; the intermediate byte limit remains 8 MiB.
+A separate actual-repository Mason probe returned `GrabbedStateList.list:
+GrabbedState[]` and mapped `list` completion precisely over `li`, without editing
+source or output files. The strict disk-absent fixture still reports two failures
+with Mason's workspace-selected TypeScript 4.9: initial alias and generated-import
+hovers remain `any` (21/23 checks passed). These are retained failures, not relaxed
+assertions. Evidence: `out/language-template-probe/` and `out/language-host-iuhazc/`.
+
 This does not establish compatibility with every LSP server. Dynamic registration,
-filesystem-watch forwarding, completion resolve, source templates, diagnostics,
-remote workspaces and Zig build/package graphs remain outside initial acceptance.
+filesystem-watch forwarding, completion resolve, diagnostics, remote workspaces
+and Zig build/package graphs remain outside initial acceptance.
 
 ## M7 publication closure
 

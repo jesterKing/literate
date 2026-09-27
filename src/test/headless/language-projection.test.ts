@@ -10,10 +10,10 @@ import { projectLanguageSources, mapSourcePosition, mapGeneratedRange } from '..
 const fence = (header: string, body: string) => '```' + header + '\n' + body + '\n```\n';
 const document = (text: string): SourceDocument => ({ path: 'index.literate', text });
 
-function parity(documents: SourceDocument[]) {
-    const result = projectLanguageSources(documents);
+function parity(documents: SourceDocument[], templates: Record<string, string> = {}) {
+    const result = projectLanguageSources(documents, templates);
     assert.deepEqual(result.diagnostics, []);
-    const generated = generateProject(documents);
+    const generated = generateProject(documents, templates);
     assert.deepEqual(generated.diagnostics, []);
     assert.deepEqual(result.files.map(({ path, content }) => ({ path, content })),
         generated.files.filter(file => !file.path.endsWith('.html')));
@@ -30,6 +30,25 @@ test('owned chapters assemble in memory to their checked-in TypeScript outputs',
         const output = 'src/' + name + '.ts';
         assert.equal(generated.files.find(file => file.path === output)?.content, fs.readFileSync(path.join(root, output), 'utf8'));
     }
+});
+
+test('complete self-hosting project projects and maps this.list through its source template', () => {
+    const root = path.resolve(__dirname, '../../..');
+    const paths = ['index.literate', ...fs.readdirSync(path.join(root, 'literate'))
+        .filter(name => name.endsWith('.literate')).sort().map(name => 'literate/' + name)];
+    const documents = paths.map(sourcePath => ({ path: sourcePath,
+        text: fs.readFileSync(path.join(root, sourcePath), 'utf8') }));
+    const templates = { 'tssrc.template': fs.readFileSync(path.join(root, 'tssrc.template'), 'utf8') };
+    const files = parity(documents, templates);
+    const source = documents.find(document => document.path === 'literate/literate.literate')!;
+    const offset = source.text.indexOf('this.list');
+    assert.ok(offset >= 0);
+    const hit = mapSourcePosition(files, source.path, offset);
+    assert.ok(hit);
+    assert.equal(hit.file.path, 'src/extension.ts');
+    assert.equal(hit.file.content.slice(hit.offset, hit.offset + 'this.list'.length), 'this.list');
+    assert.deepEqual(mapGeneratedRange(hit.file, hit.offset, hit.offset + 'this.list'.length, hit.mapping),
+        { start: offset, end: offset + 'this.list'.length });
 });
 
 test('parity across documents, ordered appends, multiple outputs, repeated and nested references', () => {
@@ -144,14 +163,81 @@ test('invalid declarations, unused missing references, cycles and collisions fai
     }
 });
 
-test('valid template roots are omitted explicitly, while missing templates block the project', () => {
+test('valid template roots project, while missing templates block the project', () => {
     const documents = [document(fence('ts: <<plain.*>>= plain.ts $', 'plain')
         + fence('ts: <<wrapped.*>>= wrapped.ts $ template=wrapper.txt', 'wrapped'))];
     assert.deepEqual(projectLanguageSources(documents).files, []);
     assert.ok(projectLanguageSources(documents).diagnostics.length);
-    const result = projectLanguageSources(documents, { 'wrapper.txt': '[CODE]' });
-    assert.deepEqual(result.diagnostics, []);
-    assert.deepEqual(result.files.map(file => file.path), ['plain.ts']);
+    const files = parity(documents, { 'wrapper.txt': '[CODE]' });
+    assert.deepEqual(files.map(file => file.path), ['plain.ts', 'wrapped.ts']);
+});
+
+test('template wrappers substitute literally and map each slot independently', () => {
+    const text = fence('ts: <<main.*>>= main.ts $ template=wrapper.txt',
+        '😀this.list\n\\<<escaped>> $& $` $\' $$ [CODE]');
+    const start = text.indexOf('😀this.list');
+    for (const template of ['prefix([CODE])suffix', 'class Wrapper {\n[CODE]\n}\n',
+        '😀\r\n[CODE]\r[CODE]\r\nend', '[CODE][CODE]', 'no code: $& [CONTENT]']) {
+        const files = parity([document(text)], { 'wrapper.txt': template });
+        const file = files[0];
+        const slots = template.split('[CODE]').length - 1;
+        const mappings = file.mappings.filter(mapping => mapping.sourceStart === start);
+        assert.equal(mappings.length, slots);
+        assert.equal(new Set(file.mappings).size, file.mappings.length);
+        for (const mapping of file.mappings) {
+            assert.equal(file.content.slice(mapping.generatedStart, mapping.generatedEnd),
+                text.slice(mapping.sourceStart, mapping.sourceEnd));
+        }
+        for (const mapping of mappings) {
+            assert.deepEqual(mapGeneratedRange(file, mapping.generatedStart + 2, mapping.generatedEnd, mapping),
+                { start: start + 2, end: start + '😀this.list'.length });
+        }
+        if (!slots) {
+            assert.deepEqual(file.mappings, []);
+            assert.equal(mapSourcePosition(files, 'index.literate', start), undefined);
+        } else {
+            const hit = mapSourcePosition(files, 'index.literate', start + 2)!;
+            assert.equal(hit.mapping, mappings[0]);
+            assert.equal(file.content.slice(hit.offset, hit.offset + 9), 'this.list');
+            assert.equal(mapSourcePosition(files, 'index.literate', text.indexOf('\\<<escaped>>')), undefined);
+            assert.equal(file.content.split('<<escaped>> $& $` $\' $$ [CODE]').length - 1, slots);
+            if (slots > 1) {
+                assert.equal(mapGeneratedRange(file, mappings[1].generatedStart, mappings[1].generatedEnd, mappings[0]), undefined);
+            }
+        }
+        if (template.startsWith('prefix')) {
+            assert.ok(file.mappings.every(mapping => mapping.generatedStart >= 7 && mapping.generatedEnd <= file.content.length - 7));
+        }
+    }
+});
+
+test('template CRLF normalization spans slot seams without mapping consumed LF', () => {
+    const text = fence('ts: <<main.*>>= main.ts $ template=wrapper.txt', '\n😀this.list').replace(/\n/g, '\r\n');
+    for (const template of ['before\r[CODE]\r\nafter', '\r[CODE]\r[CODE]', '\r[CODE][CODE]']) {
+        const files = parity([document(text)], { 'wrapper.txt': template });
+        const file = files[0];
+        assert.ok(!file.content.includes('\r'));
+        for (const mapping of file.mappings) {
+            assert.equal(file.content.slice(mapping.generatedStart, mapping.generatedEnd),
+                text.slice(mapping.sourceStart, mapping.sourceEnd));
+        }
+        const hit = mapSourcePosition(files, 'index.literate', text.indexOf('this.list'))!;
+        assert.equal(file.content.slice(hit.offset, hit.offset + 9), 'this.list');
+        assert.ok(!file.mappings.some(mapping => mapping.generatedStart === 0 && mapping.generatedEnd > 0));
+    }
+    const empty = '```ts: <<main.*>>= main.ts $ template=wrapper.txt\n';
+    assert.equal(parity([document(empty)], { 'wrapper.txt': '\r[CODE]\n' })[0].content, '\n');
+});
+
+test('template byte and repeated-slot budgets fail atomically before copying', () => {
+    const documents = [document(fence('ts: <<plain.*>>= plain.ts $', 'plain')
+        + fence('ts: <<main.*>>= main.ts $ template=wrapper.txt', 'this.list'))];
+    for (const template of ['x'.repeat(4 * 1024 * 1024 + 1), '[CODE]'.repeat(100001),
+        '[CODE]'.repeat(500000)]) {
+        const result = projectLanguageSources(documents, { 'wrapper.txt': template });
+        assert.deepEqual(result.files, []);
+        assert.match(result.diagnostics[0].message, /limit exceeded/);
+    }
 });
 
 test('expansion and depth budgets reject explosive graphs without partial files', () => {

@@ -2249,25 +2249,44 @@ async function getFileContent(file: vscode.Uri): Promise<string> {
 }
 ```
 
-Language requests capture source buffers independently of generation. Reading
-all texts after discovery avoids mixing asynchronous disk reads with earlier
-buffer versions: current open documents replace disk text in one synchronous
-pass. The language adapter rejects the snapshot if an editor changes during
-capture. It neither processes the repository nor saves generated files.
+Language requests capture sources and their templates independently of generation.
+Templates supply surrounding code at the same output positions the compiler sees.
+After asynchronous reads, current open buffers replace disk text in one synchronous
+pass. The language adapter rejects the snapshot if an input changes during capture.
+It neither processes the repository nor saves generated files.
 
 ```ts : <<utility functions>>=+
-async function captureLanguageSources(folder: vscode.WorkspaceFolder): Promise<SourceDocument[]> {
+async function captureLanguageSources(folder: vscode.WorkspaceFolder): Promise<LanguageSnapshot> {
   const uris = await getLiterateFileUris(folder);
   const documents = await Promise.all(uris.map(async uri => ({
     path: path.posix.relative(folder.uri.path, uri.path),
     text: await getFileContent(uri)
   })));
-  for (const document of documents) {
-    const uri = vscode.Uri.joinPath(folder.uri, document.path).toString();
+  <<capture language templates>>
+  const overlay = (name: string, text: string): string => {
+    const uri = vscode.Uri.joinPath(folder.uri, name).toString();
     const open = vscode.workspace.textDocuments.find(value => !value.isClosed && value.uri.toString() === uri);
-    if (open) { document.text = open.getText(); }
+    return open ? open.getText() : text;
+  };
+  documents.forEach(document => { document.text = overlay(document.path, document.text); });
+  Object.keys(templates).forEach(name => { templates[name] = overlay(name, templates[name]); });
+  return { documents, templates };
+}
+```
+
+Template dependency discovery uses the engine's normalized, root-relative paths.
+Missing files remain absent so projection can diagnose the declaration; other
+read failures reject the capture. An open template buffer takes precedence over
+disk even when its contents are empty.
+
+```ts : <<capture language templates>>=
+const templates: Record<string, string> = Object.create(null);
+for (const reference of templateReferences(documents)) {
+  try {
+    templates[reference] = await getFileContent(vscode.Uri.joinPath(folder.uri, reference));
+  } catch (error) {
+    if (!(error instanceof vscode.FileSystemError) || error.code !== 'FileNotFound') { throw error; }
   }
-  return documents;
 }
 ```
 
@@ -2404,7 +2423,7 @@ import { defaultThemeName } from './themes';
 import { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAnnotation,
   installScreenTermLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle, renderScreenExploration } from './publication-screen';
 import { registerPublicationCommands } from './publication-extension';
-import { registerLanguageFeatures } from './language-features';
+import { registerLanguageFeatures, LanguageSnapshot } from './language-features';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');
 import Token = require('markdown-it/lib/token');

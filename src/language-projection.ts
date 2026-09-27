@@ -29,10 +29,11 @@ export function projectLanguageSources(documents: SourceDocument[], templates: R
     const report = (message: string): void => {
         diagnostics.push({ path: graph.parsed.documents[0]?.path || '', line: 0, column: 0, message });
     };
+    const segmentLimit = 200000;
     let bytes = 0, segments = 0;
     const emit = (into: Piece[], piece: Piece): void => {
         bytes += piece.text.length * 2;
-        if (bytes > 8 * 1024 * 1024 || ++segments > 100000) { throw new Error('Language projection expansion limit exceeded'); }
+        if (bytes > 8 * 1024 * 1024 || ++segments > segmentLimit) { throw new Error('Language projection expansion limit exceeded'); }
         into.push(piece);
     };
     const sources = new Map(graph.parsed.documents.map(document => [document.path, document.source]));
@@ -140,36 +141,67 @@ export function projectLanguageSources(documents: SourceDocument[], templates: R
     }
     try {
         for (const fragment of graph.fragments.values()) {
-            if (!fragment.header.output || fragment.header.template !== undefined) { continue; }
+            if (!fragment.header.output) { continue; }
             const pieces = expand(fragment.header.name, 0);
             const raw = pieces.map(piece => piece.text).join('');
             const removed = new Set(Array.from(raw.matchAll(/\\\x3c\x3c/g), match => match.index!));
             const file: LanguageProjection = { path: fragment.header.output, language: fragment.header.language, content: '', mappings: [] };
             let rawOffset = 0;
-            const content: string[] = [];
-            let generated = 0;
+            const body: Piece[] = [];
             for (const piece of pieces) {
                 let start = 0;
                 for (let end = 0; end <= piece.text.length; end++) {
                     if (end !== piece.text.length && !removed.has(rawOffset + end)) { continue; }
                     const text = piece.text.slice(start, end);
                     if (text || (piece.text.length === 0 && piece.endCursor)) {
-                        if (++segments > 100000) { throw new Error('Language projection segment limit exceeded'); }
-                        content.push(text);
-                        if (piece.path) { file.mappings.push({ sourcePath: piece.path, sourceStart: piece.start + start,
-                            sourceEnd: piece.start + end, generatedStart: generated, generatedEnd: generated + text.length,
-                            endCursor: end === piece.text.length && piece.endCursor }); }
-                        generated += text.length;
+                        emit(body, { text, path: piece.path, start: piece.start + start,
+                            endCursor: end === piece.text.length && piece.endCursor });
                     }
                     start = end + 1;
                 }
                 rawOffset += piece.text.length;
             }
-            file.content = content.join('');
+            applyTemplate(file, body, graph.sourceTemplates.get(fragment.header.name) ?? '[CODE]');
             files.push(file);
         }
     } catch (error) { report(error instanceof Error ? error.message : String(error)); }
     return { files: diagnostics.length ? [] : files, diagnostics };
+    function applyTemplate(file: LanguageProjection, body: Piece[], template: string): void {
+        let slots = 0, cursor = 0, slot: number;
+        while ((slot = template.indexOf('[CODE]', cursor)) !== -1) { slots++; cursor = slot + 6; }
+        const units = template.length - slots * 6 + slots * body.reduce((sum, piece) => sum + piece.text.length, 0);
+        const count = slots * body.length + slots + 1;
+        if (bytes + units * 2 > 8 * 1024 * 1024 || segments + count > segmentLimit) {
+            throw new Error('Language projection expansion limit exceeded');
+        }
+        bytes += units * 2;
+        segments += count;
+        const content: string[] = [];
+        let generated = 0, trailingCR = false;
+        const append = (piece: Piece): void => {
+            const skip = trailingCR && piece.text.startsWith('\n') ? 1 : 0;
+            if (piece.text.length) { trailingCR = piece.text.endsWith('\r'); }
+            const text = piece.text.slice(skip).replace(/\r\n|\r/g, '\n');
+            content.push(text);
+            if (piece.path && (!skip || text.length)) {
+                file.mappings.push({ sourcePath: piece.path, sourceStart: piece.start + skip,
+                    sourceEnd: piece.start + piece.text.length, generatedStart: generated,
+                    generatedEnd: generated + text.length, endCursor: piece.endCursor });
+            }
+            generated += text.length;
+        };
+        const literal = (from: number, to: number): void => {
+            append({ text: template.slice(from, to), start: 0, endCursor: false });
+        };
+        cursor = 0;
+        while ((slot = template.indexOf('[CODE]', cursor)) !== -1) {
+            literal(cursor, slot);
+            for (const piece of body) { append(piece); }
+            cursor = slot + 6;
+        }
+        literal(cursor, template.length);
+        file.content = content.join('');
+    }
 }
 export function mapSourcePosition(files: LanguageProjection[], sourcePath: string, offset: number): SourceProjectionPosition | undefined {
     if (!Number.isInteger(offset) || offset < 0) { return undefined; }

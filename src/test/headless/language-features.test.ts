@@ -54,7 +54,10 @@ function fixture(body = 'console.lo') {
         }, get() { throw new Error('Merged settings are forbidden'); } }),
         onDidChangeConfiguration: event('config'), onDidChangeWorkspaceFolders: event('folders'),
         onDidChangeTextDocument: event('change'), onDidOpenTextDocument: event('open'), onDidCloseTextDocument: event('close'),
-        createFileSystemWatcher: () => ({ dispose() {}, onDidChange: event('disk'), onDidCreate: event('disk'), onDidDelete: event('disk') }) };
+        createFileSystemWatcher: (pattern: string) => {
+            assert.equal(pattern, '**/*');
+            return { dispose() {}, onDidChange: event('disk'), onDidCreate: event('create'), onDidDelete: event('delete') };
+        } };
     const token: any = { isCancellationRequested: false, onCancellationRequested: event('cancel') };
     const vscode: any = { workspace, env: {}, Uri: { file: uri }, Position, Range, CompletionTriggerKind: { Invoke: 0 },
         window: { createOutputChannel: (name: string) => {
@@ -100,7 +103,7 @@ function fixture(body = 'console.lo') {
     }, exports);
     exports.registerLanguageFeatures({ subscriptions }, async (value: any) => {
         assert.equal(value, folder); f.snapshots++; await f.onSnapshot?.();
-        return f.documents ?? [{ path: 'index.literate', text: f.text }];
+        return { documents: f.documents ?? [{ path: 'index.literate', text: f.text }], templates: f.templates ?? {} };
     });
     Object.assign(f, { vscode, workspace, document, token, folder, cursor: new Position(1, body.length),
         complete: (kind = 0) => f.completionProvider.provideCompletionItems(document, f.cursor, token, { triggerKind: kind }),
@@ -160,9 +163,10 @@ test('unsaved snapshot, aliases and family synchronization; label edit replaces 
 
 test('omitted args default to an empty array and absent configuration stays quiet', async () => {
     const f = fixture(); delete f.config.typescript.args;
-    assert.ok(await f.complete()); assert.deepEqual(f.clients[0].options.args, []); assert.deepEqual(f.logs, []);
+    assert.ok(await f.complete()); assert.deepEqual(f.clients[0].options.args, []);
+    assert.equal(f.logs.length, 1); assert.match(f.logs[0], /ready: typescript; projected output "main.ts"/);
     f.config = undefined; f.events.emit('config', { affectsConfiguration: () => true });
-    assert.equal(await f.complete(), undefined); assert.deepEqual(f.logs, []); f.dispose();
+    assert.equal(await f.complete(), undefined); assert.equal(f.logs.length, 1); f.dispose();
 });
 
 test('capabilities gate both methods before synchronization and requests', async () => {
@@ -170,7 +174,7 @@ test('capabilities gate both methods before synchronization and requests', async
         const f = fixture(); f.capabilities = { hoverProvider: capability, completionProvider: capability };
         assert.equal(await f.hover(), undefined); assert.equal(await f.complete(), undefined);
         assert.equal(f.clients[0].requests.length, 0); assert.equal(f.clients[0].syncs.length, 0);
-        assert.deepEqual(f.logs, []); f.dispose();
+        assert.equal(f.logs.length, 1); assert.match(f.logs[0], /Language server ready/); f.dispose();
     }
     const f = fixture(); f.capabilities = { hoverProvider: {}, completionProvider: true };
     f.reply = { contents: 'supported hover' }; assert.ok(await f.hover());
@@ -231,11 +235,75 @@ test('invalid graphs, template roots, prose and reference markers never start cl
     }
 });
 
+test('captured templates support mapped hover and completion without leaking source into startup logs', async () => {
+    const f = fixture('console.lo');
+    f.text = fence('console.lo', 'ts: <<main.*>>= main.ts $ template=wrapper.txt');
+    f.templates = { 'wrapper.txt': '// PRIVATE_TEMPLATE\n[CODE]' };
+    assert.ok(await f.complete());
+    assert.equal(f.clients[0].syncs[0][0].text, '// PRIVATE_TEMPLATE\nconsole.lo\n');
+    assert.deepEqual(f.clients[0].requests[0].params.position, { line: 1, character: 10 });
+    f.reply = { contents: 'hover', range: lspRange(8, 10, 1) };
+    assert.ok(await f.hover()); assert.equal(f.logs.length, 1);
+    assert.doesNotMatch(f.logs.join(''), /PRIVATE|console/); f.dispose();
+});
+
+test('projection failures diagnose safe root reasons once; prose, missing maps and unconfigured languages stay quiet', async () => {
+    for (const [text, reason] of [
+        [fence('code', 'ts: <<main.*>>= main.ts $ template=PRIVATE_TEMPLATE'), /missing template/],
+        [fence('<<PRIVATE_FRAGMENT>>'), /missing fragment/],
+        [fence('<<main.*>>'), /fragment cycle/]
+    ] as const) {
+        const f = fixture(); f.text = text;
+        for (let i = 0; i < 4; i++) { assert.equal(await f.complete(), undefined); }
+        assert.equal(f.logs.length, 1); assert.match(f.logs[0], reason);
+        assert.doesNotMatch(f.logs[0], /PRIVATE/); assert.equal(f.clients.length, 0); f.dispose();
+    }
+    for (const text of ['ordinary prose', fence('code', 'zig: <<main.*>>= main.zig $'),
+        fence('<<piece>>') + fence('code', ': <<piece>>=')]) {
+        const f = fixture(); f.text = text; f.cursor = new Position(text === 'ordinary prose' ? 0 : 1, 3);
+        assert.equal(await f.complete(), undefined); assert.deepEqual(f.logs, []); f.dispose();
+    }
+});
+
+test('snapshot and server failures retain safe actionable categories without raw details', async () => {
+    for (const stage of ['onSnapshot', 'onInitialize', 'onRequest']) {
+        for (const [error, reason] of [
+            [Object.assign(new Error('PRIVATE_PATH'), { code: 'ENOENT' }), /ENOENT/],
+            [new Error('LSP request timed out: PRIVATE_METHOD'), /request timeout/],
+            [Object.assign(new Error('PRIVATE_ARGS'), { code: 'EACCES' }), /permission denied/]
+        ] as const) {
+            const f = fixture(); f[stage] = () => { throw error; };
+            for (let i = 0; i < 4; i++) { assert.equal(await f.complete(), undefined); }
+            assert.equal(f.logs.length, stage === 'onRequest' ? 2 : 1);
+            assert.match(f.logs.at(-1), reason); assert.doesNotMatch(f.logs.join(''), /PRIVATE/); f.dispose();
+        }
+    }
+});
+
+test('template disk changes invalidate in-flight work across requests but generated outputs do not', async () => {
+    for (const event of ['disk', 'create', 'delete']) {
+        for (const stage of ['onSnapshot', 'onInitialize', 'onSync', 'onRequest']) {
+            const f = fixture(); f.templates = { 'templates/wrapper.txt': '[CODE]' };
+            assert.ok(await f.complete());
+            f[stage] = () => f.events.emit(event, uri('/project/templates/wrapper.txt'));
+            assert.equal(await f.complete(), undefined, event + ':' + stage); f.dispose();
+        }
+    }
+    const capturing = fixture();
+    capturing.onSnapshot = () => capturing.events.emit('disk', uri('/project/new-template.txt'));
+    assert.equal(await capturing.complete(), undefined); assert.equal(capturing.clients.length, 0); capturing.dispose();
+    const f = fixture();
+    f.onRequest = (signal: AbortSignal) => {
+        f.events.emit('disk', uri('/project/main.ts')); assert.equal(signal.aborted, false);
+    };
+    assert.ok(await f.complete()); f.dispose();
+});
+
 test('freshness and cancellation checked after every async boundary', async () => {
     for (const stage of ['onSnapshot', 'onInitialize', 'onSync', 'onRequest']) {
         for (const mutate of [
             (f: any) => { f.document.version++; }, (f: any) => { f.events.emit('change', {}); },
-            (f: any) => { f.events.emit('disk'); }, (f: any) => { f.workspace.isTrusted = false; },
+            (f: any) => { f.events.emit('disk', uri('/project/other.literate')); }, (f: any) => { f.workspace.isTrusted = false; },
             (f: any) => { f.workspace.workspaceFolders = []; },
             (f: any) => { f.config.typescript.args.push('changed'); },
             (f: any) => { f.token.isCancellationRequested = true; f.events.emit('cancel'); }
@@ -279,11 +347,12 @@ test('failed sessions report once and stay disabled until an explicit restart, w
         const f = fixture(); let attempts = 0;
         f[stage] = () => { attempts++; throw new Error('PRIVATE_PROTOCOL_AND_SOURCE'); };
         assert.equal(await f.complete(), undefined);
-        assert.equal(f.clients[0].disposed, 1); assert.equal(f.logs.length, 1);
-        assert.match(f.logs[0], /literate.restartLanguageServers/);
-        assert.doesNotMatch(f.logs[0], /PRIVATE/);
+        const count = stage === 'onInitialize' ? 1 : 2;
+        assert.equal(f.clients[0].disposed, 1); assert.equal(f.logs.length, count);
+        assert.match(f.logs.at(-1), /literate.restartLanguageServers/);
+        assert.doesNotMatch(f.logs.join(''), /PRIVATE/);
         for (let i = 0; i < 3; i++) { assert.equal(await f.complete(), undefined); }
-        assert.equal(attempts, 1); assert.equal(f.clients.length, 1); assert.equal(f.logs.length, 1);
+        assert.equal(attempts, 1); assert.equal(f.clients.length, 1); assert.equal(f.logs.length, count);
         f[stage] = undefined; f.restart(); assert.ok(await f.complete());
         assert.equal(f.clients.length, 2); assert.equal(f.clients[0].disposed, 1); f.dispose();
     }
@@ -305,7 +374,8 @@ test('cancelled protocol requests do not disable or diagnose a healthy session',
     const f = fixture(); f.onRequest = (signal: AbortSignal) => {
         f.events.emit('change', {}); assert.equal(signal.aborted, true); throw new Error('cancelled');
     };
-    assert.equal(await f.complete(), undefined); assert.deepEqual(f.logs, []); assert.equal(f.clients[0].disposed, 0);
+    assert.equal(await f.complete(), undefined); assert.equal(f.logs.length, 1);
+        assert.match(f.logs[0], /Language server ready/); assert.equal(f.clients[0].disposed, 0);
     f.onRequest = undefined; assert.ok(await f.complete()); assert.equal(f.clients.length, 1); f.dispose();
 });
 

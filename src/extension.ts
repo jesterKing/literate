@@ -23,7 +23,7 @@ import { defaultThemeName } from './themes';
 import { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAnnotation,
   installScreenTermLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle, renderScreenExploration } from './publication-screen';
 import { registerPublicationCommands } from './publication-extension';
-import { registerLanguageFeatures } from './language-features';
+import { registerLanguageFeatures, LanguageSnapshot } from './language-features';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');
 import Token = require('markdown-it/lib/token');
@@ -631,7 +631,6 @@ class FragmentMap {
 
   dispose()
   {
-    this.
     this.map.clear();
   }
 };
@@ -1498,18 +1497,28 @@ async function getFileContent(file: vscode.Uri): Promise<string> {
   if (document !== undefined) { return document.getText(); }
   return new TextDecoder('utf-8').decode(await vscode.workspace.fs.readFile(file));
 }
-async function captureLanguageSources(folder: vscode.WorkspaceFolder): Promise<SourceDocument[]> {
+async function captureLanguageSources(folder: vscode.WorkspaceFolder): Promise<LanguageSnapshot> {
   const uris = await getLiterateFileUris(folder);
   const documents = await Promise.all(uris.map(async uri => ({
     path: path.posix.relative(folder.uri.path, uri.path),
     text: await getFileContent(uri)
   })));
-  for (const document of documents) {
-    const uri = vscode.Uri.joinPath(folder.uri, document.path).toString();
-    const open = vscode.workspace.textDocuments.find(value => !value.isClosed && value.uri.toString() === uri);
-    if (open) { document.text = open.getText(); }
+  const templates: Record<string, string> = Object.create(null);
+  for (const reference of templateReferences(documents)) {
+    try {
+      templates[reference] = await getFileContent(vscode.Uri.joinPath(folder.uri, reference));
+    } catch (error) {
+      if (!(error instanceof vscode.FileSystemError) || error.code !== 'FileNotFound') { throw error; }
+    }
   }
-  return documents;
+  const overlay = (name: string, text: string): string => {
+    const uri = vscode.Uri.joinPath(folder.uri, name).toString();
+    const open = vscode.workspace.textDocuments.find(value => !value.isClosed && value.uri.toString() === uri);
+    return open ? open.getText() : text;
+  };
+  documents.forEach(document => { document.text = overlay(document.path, document.text); });
+  Object.keys(templates).forEach(name => { templates[name] = overlay(name, templates[name]); });
+  return { documents, templates };
 }
 function createFragmentForTag(range? : vscode.Range)
 {

@@ -131,6 +131,8 @@ siblings are synchronized together so imports can see the captured project.</p>
 <div class="code">
 <pre><code><span data-literate-explore="f-006c0061006e006700750061006700650020006600650061007400750072006500200069006d0070006f007200740073"><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200069006d0070006f007200740073" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200069006d0070006f007200740073" aria-label="Definition of language feature imports">&lt;&lt;language feature imports&gt;&gt;</a></span>
 <span data-literate-explore="f-006c0061006e0067007500610067006500200066006500610074007500720065002000730065007400740069006e00670073"><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200066006500610074007500720065002000730065007400740069006e00670073" data-literate-target="f-006c0061006e0067007500610067006500200066006500610074007500720065002000730065007400740069006e00670073" aria-label="Definition of language feature settings">&lt;&lt;language feature settings&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e00670075006100670065002000660065006100740075007200650020006500720072006f0072002000630061007400650067006f0072006900650073"><a class="literate-tag-name" href="#f-006c0061006e00670075006100670065002000660065006100740075007200650020006500720072006f0072002000630061007400650067006f0072006900650073" data-literate-target="f-006c0061006e00670075006100670065002000660065006100740075007200650020006500720072006f0072002000630061007400650067006f0072006900650073" aria-label="Definition of language feature error categories">&lt;&lt;language feature error categories&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e0067007500610067006500200066006500610074007500720065002000700072006f006a0065006300740069006f006e00200072006500610073006f006e0073"><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200066006500610074007500720065002000700072006f006a0065006300740069006f006e00200072006500610073006f006e0073" data-literate-target="f-006c0061006e0067007500610067006500200066006500610074007500720065002000700072006f006a0065006300740069006f006e00200072006500610073006f006e0073" aria-label="Definition of language feature projection reasons">&lt;&lt;language feature projection reasons&gt;&gt;</a></span>
 <span data-literate-explore="f-006c0061006e006700750061006700650020006600650061007400750072006500200070006f0073006900740069006f006e0073"><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200070006f0073006900740069006f006e0073" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200070006f0073006900740069006f006e0073" aria-label="Definition of language feature positions">&lt;&lt;language feature positions&gt;&gt;</a></span>
 <span data-literate-explore="f-006c0061006e0067007500610067006500200066006500610074007500720065002000720061006e006700650073"><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200066006500610074007500720065002000720061006e006700650073" data-literate-target="f-006c0061006e0067007500610067006500200066006500610074007500720065002000720061006e006700650073" aria-label="Definition of language feature ranges">&lt;&lt;language feature ranges&gt;&gt;</a></span>
 <span data-literate-explore="f-006c0061006e006700750061006700650020006600650061007400750072006500200077006f007200640073"><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200077006f007200640073" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200077006f007200640073" aria-label="Definition of language feature words">&lt;&lt;language feature words&gt;&gt;</a></span>
@@ -174,6 +176,7 @@ never includes configuration values, source, protocol errors or stderr.</p>
 <span class="hljs-keyword">const</span> family = (<span class="hljs-attr">value</span>: <span class="hljs-built_in">string</span>): <span class="hljs-params">boolean</span><span class="hljs-function"> =&gt;</span> [<span class="hljs-string">'typescript'</span>, <span class="hljs-string">'javascript'</span>, <span class="hljs-string">'typescriptreact'</span>, <span class="hljs-string">'javascriptreact'</span>].<span class="hljs-title">includes</span>(value);
 <span class="hljs-keyword">interface</span> <span class="hljs-title">Server</span> { <span class="hljs-attr">command</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">args</span>: <span class="hljs-built_in">string</span>[]; initializationOptions?: <span class="hljs-title">ObjectValue</span>; configuration?: <span class="hljs-title">ObjectValue</span>; }
 <span class="hljs-keyword">interface</span> <span class="hljs-title">RequestView</span> { <span class="hljs-attr">document</span>: vscode.<span class="hljs-property">TextDocument</span>; <span class="hljs-attr">position</span>: vscode.<span class="hljs-property">Position</span>; <span class="hljs-attr">hit</span>: <span class="hljs-title">SourceProjectionPosition</span>; }
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">LanguageSnapshot</span> { <span class="hljs-attr">documents</span>: <span class="hljs-title">SourceDocument</span>[]; <span class="hljs-attr">templates</span>: <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;; }
 </code></pre>
 
 </div>
@@ -213,6 +216,48 @@ clamping them. Every edit must stay in the original occurrence, on the cursor's
 line, and contain the cursor. Unsupported completion defaults reject the list;
 commands, snippets and auxiliary edits reject the item, never becoming plaintext.</p>
 <div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e00670075006100670065002000660065006100740075007200650020006500720072006f0072002000630061007400650067006f0072006900650073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e00670075006100670065002000660065006100740075007200650020006500720072006f0072002000630061007400650067006f0072006900650073"></span><a class="literate-tag-name" href="#f-006c0061006e00670075006100670065002000660065006100740075007200650020006500720072006f0072002000630061007400650067006f0072006900650073" data-literate-target="f-006c0061006e00670075006100670065002000660065006100740075007200650020006500720072006f0072002000630061007400650067006f0072006900650073" aria-label="Definition of language feature error categories">&lt;&lt;language feature error categories&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">errorCategory</span>(<span class="hljs-params">error: </span><span class="hljs-built_in">unknown</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">const</span> code = <span class="hljs-title">object</span>(error) ? error.<span class="hljs-property">code</span> : <span class="hljs-literal">undefined</span>;
+    <span class="hljs-keyword">if</span> (code === <span class="hljs-string">'ENOENT'</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">'ENOENT (executable, working directory or input file not found)'</span>; }
+    <span class="hljs-keyword">if</span> (code === <span class="hljs-string">'EACCES'</span> || code === <span class="hljs-string">'EPERM'</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">'permission denied (check executable and input permissions)'</span>; }
+    <span class="hljs-keyword">if</span> (code === <span class="hljs-string">'EPIPE'</span> || code === <span class="hljs-string">'ECONNRESET'</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">'server transport closed'</span>; }
+    <span class="hljs-keyword">const</span> message = error <span class="hljs-keyword">instanceof</span> <span class="hljs-title">Error</span> ? error.<span class="hljs-property">message</span> : <span class="hljs-string">''</span>;
+    <span class="hljs-keyword">if</span> (code === <span class="hljs-string">'ETIMEDOUT'</span> || <span class="hljs-regexp">/^LSP request timed out:/</span>.<span class="hljs-title">test</span>(message)) { <span class="hljs-keyword">return</span> <span class="hljs-string">'request timeout (server did not respond)'</span>; }
+    <span class="hljs-keyword">if</span> (<span class="hljs-regexp">/^Language server (exited|stdout closed)/</span>.<span class="hljs-title">test</span>(message)) { <span class="hljs-keyword">return</span> <span class="hljs-string">'server exited or closed stdout'</span>; }
+    <span class="hljs-keyword">if</span> (<span class="hljs-regexp">/^Language server (document synchronization unsupported|open</span><span class="hljs-regexp">\/</span><span class="hljs-regexp">close synchronization required)/</span>.<span class="hljs-title">test</span>(message)) {
+        <span class="hljs-keyword">return</span> <span class="hljs-string">'server lacks required document synchronization'</span>;
+    }
+    <span class="hljs-keyword">if</span> (message === <span class="hljs-string">'Language server must use UTF-16 positions'</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">'unsupported position encoding (UTF-16 required)'</span>; }
+    <span class="hljs-keyword">if</span> (<span class="hljs-regexp">/^Invalid (LSP|JSON-RPC|initialize result)/</span>.<span class="hljs-title">test</span>(message)) { <span class="hljs-keyword">return</span> <span class="hljs-string">'invalid server protocol response'</span>; }
+    <span class="hljs-keyword">if</span> (<span class="hljs-regexp">/^LSP .*limit exceeded/</span>.<span class="hljs-title">test</span>(message)) { <span class="hljs-keyword">return</span> <span class="hljs-string">'protocol resource limit exceeded'</span>; }
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> code === <span class="hljs-string">'number'</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">'server returned a protocol error'</span>; }
+    <span class="hljs-keyword">return</span> <span class="hljs-string">'unclassified failure (raw error omitted for privacy)'</span>;
+}
+</code></pre>
+
+</div>
+</div><div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e0067007500610067006500200066006500610074007500720065002000700072006f006a0065006300740069006f006e00200072006500610073006f006e0073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e0067007500610067006500200066006500610074007500720065002000700072006f006a0065006300740069006f006e00200072006500610073006f006e0073"></span><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200066006500610074007500720065002000700072006f006a0065006300740069006f006e00200072006500610073006f006e0073" data-literate-target="f-006c0061006e0067007500610067006500200066006500610074007500720065002000700072006f006a0065006300740069006f006e00200072006500610073006f006e0073" aria-label="Definition of language feature projection reasons">&lt;&lt;language feature projection reasons&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">projectionReason</span>(<span class="hljs-params">message: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">if</span> (message.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'Missing template:'</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-string">'missing template; check template paths and captured template inputs.'</span>; }
+    <span class="hljs-keyword">if</span> (message.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'Missing fragment:'</span>) || message.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'Cannot append to missing fragment:'</span>)) {
+        <span class="hljs-keyword">return</span> <span class="hljs-string">'missing fragment; define the referenced fragment or correct its name.'</span>;
+    }
+    <span class="hljs-keyword">if</span> (message.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'Fragment cycle:'</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-string">'fragment cycle; remove recursive references.'</span>; }
+    <span class="hljs-keyword">if</span> (message.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'Duplicate fragment:'</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-string">'duplicate fragment; use append syntax for additional definitions.'</span>; }
+    <span class="hljs-keyword">if</span> (<span class="hljs-regexp">/^Invalid (fragment header|fragment setting|template path)/</span>.<span class="hljs-title">test</span>(message)) {
+        <span class="hljs-keyword">return</span> <span class="hljs-string">'invalid fragment header, setting or template path; check fence syntax and relative template paths.'</span>;
+    }
+    <span class="hljs-keyword">if</span> (message.<span class="hljs-title">includes</span>(<span class="hljs-string">'limit exceeded'</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-string">'expansion limit exceeded; reduce repeated fragment/template expansion.'</span>; }
+    <span class="hljs-keyword">return</span> <span class="hljs-string">'invalid project graph or inputs; check fragment definitions, references and output paths.'</span>;
+}
+</code></pre>
+
+</div>
+</div><div class="codefragment">
 <div class="fragmentname" id="c-006c0061006e006700750061006700650020006600650061007400750072006500200070006f0073006900740069006f006e0073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e006700750061006700650020006600650061007400750072006500200070006f0073006900740069006f006e0073"></span><a class="literate-tag-name" href="#f-006c0061006e006700750061006700650020006600650061007400750072006500200070006f0073006900740069006f006e0073" data-literate-target="f-006c0061006e006700750061006700650020006600650061007400750072006500200070006f0073006900740069006f006e0073" aria-label="Definition of language feature positions">&lt;&lt;language feature positions&gt;&gt;=</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">offset</span>(<span class="hljs-params">text: </span><span class="hljs-built_in">string</span><span class="hljs-params">, value: </span><span class="hljs-built_in">unknown</span>): <span class="hljs-built_in">number</span> | <span class="hljs-literal">undefined</span> {
@@ -384,23 +429,25 @@ server command forwarding, diagnostics publication or automatic trigger support.
 <p>Dropping overlapping requests bounds both snapshot work and protocol pressure.
 The operation owns initialization, full synchronization and its reply as one unit.
 Every asynchronous boundary checks document version, the global revision epoch,
-folder membership, trust, configuration and cancellation. Document and disk events
-invalidate all outstanding work, including changes to other imported fragments.</p>
+folder membership, trust, configuration and cancellation. Disk events invalidate
+literate inputs and captured template paths; during capture any disk event is
+conservatively invalidating because new dependencies are not known yet.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-006c0061006e00670075006100670065002000660065006100740075007200650020006c006900660065006300790063006c0065-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e00670075006100670065002000660065006100740075007200650020006c006900660065006300790063006c0065"></span><a class="literate-tag-name" href="#f-006c0061006e00670075006100670065002000660065006100740075007200650020006c006900660065006300790063006c0065" data-literate-target="f-006c0061006e00670075006100670065002000660065006100740075007200650020006c006900660065006300790063006c0065" aria-label="Definition of language feature lifecycle">&lt;&lt;language feature lifecycle&gt;&gt;=</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">registerLanguageFeatures</span>(<span class="hljs-params">context: vscode.ExtensionContext,
-    snapshot: </span><span class="hljs-params">(folder: vscode.WorkspaceFolder)</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">Promise</span><span class="hljs-params">&lt;SourceDocument[]&gt;</span>): <span class="hljs-built_in">void</span> {
-    <span class="hljs-keyword">type</span> <span class="hljs-title">Session</span> = { <span class="hljs-attr">client</span>: <span class="hljs-title">LanguageClient</span>; <span class="hljs-attr">failed</span>: <span class="hljs-built_in">boolean</span> };
+    snapshot: </span><span class="hljs-params">(folder: vscode.WorkspaceFolder)</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">Promise</span><span class="hljs-params">&lt;LanguageSnapshot&gt;</span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">type</span> <span class="hljs-title">Session</span> = { <span class="hljs-attr">client</span>: <span class="hljs-title">LanguageClient</span>; <span class="hljs-attr">failed</span>: <span class="hljs-built_in">boolean</span>; started?: <span class="hljs-built_in">boolean</span> };
     <span class="hljs-keyword">const</span> sessions = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">Session</span>&gt;();
     <span class="hljs-keyword">let</span> epoch = <span class="hljs-number">0</span>, busy = <span class="hljs-literal">false</span>, disposed = <span class="hljs-literal">false</span>;
     <span class="hljs-keyword">let</span> <span class="hljs-attr">active</span>: <span class="hljs-title">AbortController</span> | <span class="hljs-literal">undefined</span>;
     <span class="hljs-keyword">const</span> invalidate = (): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> { epoch++; active?.<span class="hljs-title">abort</span>(); };
     <span class="hljs-keyword">const</span> close = (<span class="hljs-attr">client</span>: <span class="hljs-title">LanguageClient</span>): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> { <span class="hljs-built_in">void</span> client.<span class="hljs-title">dispose</span>().<span class="hljs-title">catch</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-literal">undefined</span>); };
-    <span class="hljs-keyword">let</span> invalidReported = <span class="hljs-literal">false</span>;
+    <span class="hljs-keyword">let</span> invalidReported = <span class="hljs-literal">false</span>, capturing = <span class="hljs-literal">false</span>;
+    <span class="hljs-keyword">const</span> templatePaths = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;&gt;(), reported = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
     <span class="hljs-keyword">const</span> reset = (): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
         <span class="hljs-title">invalidate</span>(); sessions.<span class="hljs-title">forEach</span>(<span class="hljs-params">session</span><span class="hljs-function"> =&gt;</span> { <span class="hljs-keyword">if</span> (!session.<span class="hljs-property">failed</span>) { <span class="hljs-title">close</span>(session.<span class="hljs-property">client</span>); } });
-        sessions.<span class="hljs-title">clear</span>(); invalidReported = <span class="hljs-literal">false</span>;
+        sessions.<span class="hljs-title">clear</span>(); templatePaths.<span class="hljs-title">clear</span>(); reported.<span class="hljs-title">clear</span>(); invalidReported = <span class="hljs-literal">false</span>;
     };
     context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title">push</span>({ <span class="hljs-title">dispose</span>() { disposed = <span class="hljs-literal">true</span>; <span class="hljs-title">reset</span>(); } });
 </code></pre>
@@ -420,6 +467,9 @@ revision, with at most 100 retained lines. No automatic restart loop is possible
         <span class="hljs-keyword">if</span> (disposed) { <span class="hljs-keyword">return</span>; }
         <span class="hljs-keyword">if</span> (lines &gt;= <span class="hljs-number">100</span>) { output.<span class="hljs-title">clear</span>(); lines = <span class="hljs-number">0</span>; }
         output.<span class="hljs-title">appendLine</span>(message); lines++;
+    };
+    <span class="hljs-keyword">const</span> reportOnce = (<span class="hljs-attr">message</span>: <span class="hljs-built_in">string</span>): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+        <span class="hljs-keyword">if</span> (!reported.<span class="hljs-title">has</span>(message)) { reported.<span class="hljs-title">add</span>(message); <span class="hljs-title">report</span>(message); }
     };
     <span class="hljs-keyword">const</span> invalid = (): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
         <span class="hljs-keyword">if</span> (invalidReported) { <span class="hljs-keyword">return</span>; }
@@ -441,8 +491,12 @@ revision, with at most 100 retained lines. No automatic restart loop is possible
     }), vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">onDidChangeWorkspaceFolders</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title">reset</span>()),
     vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">onDidChangeTextDocument</span>(invalidate), vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">onDidOpenTextDocument</span>(invalidate),
     vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">onDidCloseTextDocument</span>(invalidate));
-    <span class="hljs-keyword">const</span> watcher = vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">createFileSystemWatcher</span>(<span class="hljs-string">'**/*.literate'</span>);
-    context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title">push</span>(watcher, watcher.<span class="hljs-title">onDidChange</span>(invalidate), watcher.<span class="hljs-title">onDidCreate</span>(invalidate), watcher.<span class="hljs-title">onDidDelete</span>(invalidate));
+    <span class="hljs-keyword">const</span> watcher = vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">createFileSystemWatcher</span>(<span class="hljs-string">'**/*'</span>);
+    <span class="hljs-keyword">const</span> diskChanged = (<span class="hljs-attr">uri</span>: vscode.<span class="hljs-property">Uri</span>): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+        <span class="hljs-keyword">if</span> (capturing || uri.<span class="hljs-property">fsPath</span>.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'.literate'</span>)
+            || [...templatePaths.<span class="hljs-title">values</span>()].<span class="hljs-title">some</span>(<span class="hljs-params">paths</span><span class="hljs-function"> =&gt;</span> paths.<span class="hljs-title">has</span>(path.<span class="hljs-title">resolve</span>(uri.<span class="hljs-property">fsPath</span>)))) { <span class="hljs-title">invalidate</span>(); }
+    };
+    context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title">push</span>(watcher, watcher.<span class="hljs-title">onDidChange</span>(diskChanged), watcher.<span class="hljs-title">onDidCreate</span>(diskChanged), watcher.<span class="hljs-title">onDidDelete</span>(diskChanged));
     <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">request</span>(<span class="hljs-variable">document</span><span class="hljs-params">: vscode.TextDocument, cursor: vscode.Position, token: vscode.CancellationToken,
         method: </span><span class="hljs-string">'hover'</span><span class="hljs-params"> | </span><span class="hljs-string">'completion'</span>): <span class="hljs-title">Promise</span>&lt;vscode.<span class="hljs-property">Hover</span> | vscode.<span class="hljs-property">CompletionItem</span>[] | <span class="hljs-literal">undefined</span>&gt; {
 </code></pre>
@@ -465,8 +519,11 @@ revision, with at most 100 retained lines. No automatic restart loop is possible
             &amp;&amp; <span class="hljs-title">JSON</span>.<span class="hljs-title">stringify</span>(<span class="hljs-title">servers</span>()) === fingerprint;
         <span class="hljs-keyword">try</span> {
             <span class="hljs-keyword">if</span> (!<span class="hljs-title">fresh</span>()) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
-            <span class="hljs-keyword">const</span> documents = <span class="hljs-keyword">await</span> <span class="hljs-title">snapshot</span>(folder);
+            capturing = <span class="hljs-literal">true</span>;
+            <span class="hljs-keyword">const</span> { documents, templates } = <span class="hljs-keyword">await</span> <span class="hljs-title">snapshot</span>(folder);
+            capturing = <span class="hljs-literal">false</span>;
             <span class="hljs-keyword">if</span> (!<span class="hljs-title">fresh</span>()) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+            templatePaths.<span class="hljs-title">set</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>(), <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>(<span class="hljs-title">Object</span>.<span class="hljs-title">keys</span>(templates).<span class="hljs-title">map</span>(<span class="hljs-params">name</span><span class="hljs-function"> =&gt;</span> path.<span class="hljs-title">resolve</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-property">fsPath</span>, name))));
 </code></pre>
 
 </div>
@@ -477,8 +534,14 @@ revision, with at most 100 retained lines. No automatic restart loop is possible
             <span class="hljs-keyword">if</span> (!documents.<span class="hljs-title">some</span>(<span class="hljs-params">source</span><span class="hljs-function"> =&gt;</span> source.<span class="hljs-property">path</span>.<span class="hljs-title">replace</span>(<span class="hljs-regexp">/^</span><span class="hljs-regexp">\.</span><span class="hljs-regexp">\/</span><span class="hljs-regexp">/</span>, <span class="hljs-string">''</span>) === sourcePath &amp;&amp; source.<span class="hljs-property">text</span> === <span class="hljs-variable">document</span>.<span class="hljs-title">getText</span>())) {
                 <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
             }
-            <span class="hljs-keyword">const</span> projected = <span class="hljs-title">projectLanguageSources</span>(documents);
-            <span class="hljs-keyword">if</span> (projected.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+            phase = <span class="hljs-string">'projection'</span>;
+            <span class="hljs-keyword">const</span> projected = <span class="hljs-title">projectLanguageSources</span>(documents, templates);
+            <span class="hljs-keyword">if</span> (projected.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) {
+                <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> diagnostic <span class="hljs-keyword">of</span> projected.<span class="hljs-property">diagnostics</span>) {
+                    <span class="hljs-title">reportOnce</span>(<span class="hljs-string">'Language projection unavailable: '</span> + <span class="hljs-title">projectionReason</span>(diagnostic.<span class="hljs-property">message</span>));
+                }
+                <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
+            }
             <span class="hljs-keyword">const</span> hit = <span class="hljs-title">mapSourcePosition</span>(projected.<span class="hljs-property">files</span>, sourcePath, <span class="hljs-variable">document</span>.<span class="hljs-title">offsetAt</span>(cursor));
             <span class="hljs-keyword">if</span> (!hit) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
             <span class="hljs-keyword">const</span> id = <span class="hljs-title">language</span>(hit.<span class="hljs-property">file</span>.<span class="hljs-property">language</span>), config = configured[id];
@@ -486,21 +549,26 @@ revision, with at most 100 retained lines. No automatic restart loop is possible
             sessionKey = <span class="hljs-title">JSON</span>.<span class="hljs-title">stringify</span>([folder.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>(), id]);
             session = sessions.<span class="hljs-title">get</span>(sessionKey);
             <span class="hljs-keyword">if</span> (session?.<span class="hljs-property">failed</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+            phase = <span class="hljs-string">'initialization'</span>;
             <span class="hljs-keyword">if</span> (!session) {
                 session = { <span class="hljs-attr">client</span>: <span class="hljs-keyword">new</span> <span class="hljs-title">LanguageClient</span>({ ...config, <span class="hljs-attr">cwd</span>: folder.<span class="hljs-property">uri</span>.<span class="hljs-property">fsPath</span>, <span class="hljs-attr">rootUri</span>: folder.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>() }), <span class="hljs-attr">failed</span>: <span class="hljs-literal">false</span> };
                 sessions.<span class="hljs-title">set</span>(sessionKey, session);
             }
-            <span class="hljs-keyword">const</span> client = session.<span class="hljs-property">client</span>;
-            <span class="hljs-keyword">const</span> uri = (<span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>): <span class="hljs-params">string</span><span class="hljs-function"> =&gt;</span> vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title">file</span>(path.<span class="hljs-title">resolve</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-property">fsPath</span>, name)).<span class="hljs-title">toString</span>();
 </code></pre>
 
 </div>
 </div><div class="codefragment">
 <div class="fragmentname" id="c-006c0061006e0067007500610067006500200066006500610074007500720065002000730079006e006300680072006f006e0069007a006100740069006f006e-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e0067007500610067006500200066006500610074007500720065002000730079006e006300680072006f006e0069007a006100740069006f006e"></span><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200066006500610074007500720065002000730079006e006300680072006f006e0069007a006100740069006f006e" data-literate-target="f-006c0061006e0067007500610067006500200066006500610074007500720065002000730079006e006300680072006f006e0069007a006100740069006f006e" aria-label="Definition of language feature synchronization">&lt;&lt;language feature synchronization&gt;&gt;=</a></div>
 <div class="code">
-<pre><code>            phase = <span class="hljs-string">'initialization'</span>;
+<pre><code>            <span class="hljs-keyword">const</span> client = session.<span class="hljs-property">client</span>;
+            <span class="hljs-keyword">const</span> uri = (<span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>): <span class="hljs-params">string</span><span class="hljs-function"> =&gt;</span> vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title">file</span>(path.<span class="hljs-title">resolve</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-property">fsPath</span>, name)).<span class="hljs-title">toString</span>();
+            phase = <span class="hljs-string">'initialization'</span>;
             <span class="hljs-keyword">await</span> client.<span class="hljs-title">initialize</span>();
             <span class="hljs-keyword">if</span> (!<span class="hljs-title">fresh</span>()) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+            <span class="hljs-keyword">if</span> (!session.<span class="hljs-property">started</span>) {
+                session.<span class="hljs-property">started</span> = <span class="hljs-literal">true</span>;
+                <span class="hljs-title">report</span>(<span class="hljs-string">'Language server ready: '</span> + id.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">80</span>) + <span class="hljs-string">'; projected output '</span> + <span class="hljs-title">JSON</span>.<span class="hljs-title">stringify</span>(hit.<span class="hljs-property">file</span>.<span class="hljs-property">path</span>.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">200</span>)) + <span class="hljs-string">'.'</span>);
+            }
             <span class="hljs-keyword">const</span> capability = client.<span class="hljs-property">capabilities</span>[method === <span class="hljs-string">'hover'</span> ? <span class="hljs-string">'hoverProvider'</span> : <span class="hljs-string">'completionProvider'</span>];
             <span class="hljs-keyword">if</span> (!(<span class="hljs-title">object</span>(capability) || (method === <span class="hljs-string">'hover'</span> &amp;&amp; capability === <span class="hljs-literal">true</span>))) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
             phase = <span class="hljs-string">'synchronization'</span>;
@@ -521,15 +589,19 @@ revision, with at most 100 retained lines. No automatic restart loop is possible
 </div><div class="codefragment">
 <div class="fragmentname" id="c-006c0061006e00670075006100670065002000660065006100740075007200650020006600610069006c007500720065-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e00670075006100670065002000660065006100740075007200650020006600610069006c007500720065"></span><a class="literate-tag-name" href="#f-006c0061006e00670075006100670065002000660065006100740075007200650020006600610069006c007500720065" data-literate-target="f-006c0061006e00670075006100670065002000660065006100740075007200650020006600610069006c007500720065" aria-label="Definition of language feature failure">&lt;&lt;language feature failure&gt;&gt;=</a></div>
 <div class="code">
-<pre><code>        } <span class="hljs-keyword">catch</span> {
+<pre><code>        } <span class="hljs-keyword">catch</span> (error) {
+            <span class="hljs-keyword">if</span> (!session &amp;&amp; <span class="hljs-title">fresh</span>()) {
+                <span class="hljs-title">reportOnce</span>(<span class="hljs-string">'Language '</span> + phase + <span class="hljs-string">' failed: '</span> + <span class="hljs-title">errorCategory</span>(error)
+                    + <span class="hljs-string">'. Check source/template inputs and global literate.languageServers settings, then retry.'</span>);
+            }
             <span class="hljs-keyword">if</span> (session &amp;&amp; sessions.<span class="hljs-title">get</span>(sessionKey) === session &amp;&amp; !session.<span class="hljs-property">failed</span>
                 &amp;&amp; !(phase === <span class="hljs-string">'request'</span> &amp;&amp; controller.<span class="hljs-property">signal</span>.<span class="hljs-property">aborted</span>)) {
                 session.<span class="hljs-property">failed</span> = <span class="hljs-literal">true</span>; <span class="hljs-title">close</span>(session.<span class="hljs-property">client</span>);
-                <span class="hljs-title">report</span>(<span class="hljs-string">'Language server '</span> + phase + <span class="hljs-string">' failed. Check the executable and global literate.languageServers '</span>
-                    + <span class="hljs-string">'settings, then run literate.restartLanguageServers to retry. Server details are withheld.'</span>);
+                <span class="hljs-title">report</span>(<span class="hljs-string">'Language server '</span> + phase + <span class="hljs-string">' failed: '</span> + <span class="hljs-title">errorCategory</span>(error)
+                    + <span class="hljs-string">'. Check the executable and global literate.languageServers settings, then run literate.restartLanguageServers to retry.'</span>);
             }
             <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
-        } <span class="hljs-keyword">finally</span> { cancellation.<span class="hljs-title">dispose</span>(); active = <span class="hljs-literal">undefined</span>; busy = <span class="hljs-literal">false</span>; }
+        } <span class="hljs-keyword">finally</span> { cancellation.<span class="hljs-title">dispose</span>(); active = <span class="hljs-literal">undefined</span>; busy = <span class="hljs-literal">false</span>; capturing = <span class="hljs-literal">false</span>; }
     }
 </code></pre>
 

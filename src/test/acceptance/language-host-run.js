@@ -1,7 +1,9 @@
 // Opt-in, installed VS Code only; no build/download/install or ordinary-profile changes.
 // Run: node src/test/acceptance/language-host-run.js
 // Required: LANGUAGE_HOST_TYPESCRIPT and LANGUAGE_HOST_ZLS (absolute executables).
-// Optional: LANGUAGE_HOST_CODE, LANGUAGE_HOST_ZIG, LANGUAGE_HOST_TYPESCRIPT_ARGS (JSON array).
+// Optional: LANGUAGE_HOST_CODE, LANGUAGE_HOST_ZIG, LANGUAGE_HOST_TYPESCRIPT_ARGS (JSON array),
+// LANGUAGE_HOST_MODULE_RESOLUTION (Node for Mason/TS4, Bundler for TS7).
+// Defaults target TS7. Mason needs args '["--stdio"]' and resolution Node for TS4.
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
@@ -31,6 +33,8 @@ async function main() {
     if (!typescript || !zls) { throw new Error('Set LANGUAGE_HOST_TYPESCRIPT and LANGUAGE_HOST_ZLS to installed server executables'); }
     const zig = process.env.LANGUAGE_HOST_ZIG || '/usr/bin/zig';
     const args = JSON.parse(process.env.LANGUAGE_HOST_TYPESCRIPT_ARGS || '["--lsp","--stdio"]');
+    const moduleResolution = process.env.LANGUAGE_HOST_MODULE_RESOLUTION || 'Bundler';
+    if (!['Node', 'Bundler'].includes(moduleResolution)) { throw new Error('LANGUAGE_HOST_MODULE_RESOLUTION must be Node or Bundler'); }
     if (!Array.isArray(args) || !args.every(arg => typeof arg === 'string')) { throw new Error('Expected JSON string array for TypeScript args'); }
     for (const file of [code, typescript, zls, zig]) {
         if (!path.isAbsolute(file)) { throw new Error(`Executable must be absolute: ${file}`); }
@@ -42,7 +46,7 @@ async function main() {
     await fs.mkdir(workspace);
     await fs.mkdir(path.join(run, 'profile/User'), { recursive: true });
     await fs.mkdir(path.join(run, 'extensions'));
-    const servers = { typescript: { command: typescript, args }, zig: { command: zls, args: [], initializationOptions: { zig_exe_path: zig } } };
+    const servers = { typescript: { command: typescript, args, initializationOptions: { disableAutomaticTypingAcquisition: true } }, zig: { command: zls, args: [], initializationOptions: { zig_exe_path: zig } } };
     await fs.writeFile(path.join(run, 'profile/User/settings.json'), JSON.stringify({
         'files.autoSave': 'off', 'files.hotExit': 'off', 'files.associations': { '*.literate': 'markdown' },
                 'workbench.startupEditor': 'none', 'editor.snippetSuggestions': 'none',
@@ -52,9 +56,10 @@ async function main() {
     }, null, 2));
     const fixtures = {
         'index.literate': '# Language host acceptance\n\nProse must survive every source edit.\n\n'
-            + fence('ts: <<main.*>>= main.ts $', '<<imports>>\n<<body>>')
+            + fence('ts: <<main.*>>= main.ts $ template=wrapper.template', '<<imports>>\n<<body>>\n<<grabbed state list>>')
             + fence(': <<imports>>=', 'import { physical } from "./physical";\nimport { aliased } from "@fixture/alias";\nimport { overlay } from "./overlay";')
             + fence(': <<body>>=', 'const local = { localMember: "local" };\nlocal.loc;\nphysical.phy;\naliased.ali;\noverlay.ove;\nconst localHover = local.localMember;\nconst physicalHover = physical.physicalMember;\nconst aliasHover = aliased.aliasMember;\nconst overlayHover = overlay.overlayMember;')
+            + fence(': <<grabbed state list>>=', 'export class GrabbedStateList {\n    list = templateItems;\n    inspect() {\n        const grabbedHover = this.list;\n        this.li;\n        return grabbedHover;\n    }\n}')
             + '\nTag completion stays available: <<body>>\n\n'
             + fence('zig: <<zig.*>>= main.zig $', '<<zig imports>>\n<<zig body>>')
             + fence(': <<zig imports>>=', 'const dep = @import("dep.zig");')
@@ -62,14 +67,16 @@ async function main() {
         'dependency.literate': '# Overlay dependency\n\nNever materialize overlay.ts during language requests.\n\n'
             + fence('ts: <<overlay.*>>= overlay.ts $', '<<overlay body>>')
             + fence(': <<overlay body>>=', 'export const overlay = { overlayMember: "overlay" };'),
+        'wrapper.template': '// Physical multiline wrapper header\n// Source mappings must account for every header line.\nconst templateItems: string[] = [];\n\n[CODE]\n// Wrapper footer\n',
         'physical.ts': 'export const physical = { physicalMember: 123 };\n',
         'alias.ts': 'export const aliased = { aliasMember: true };\n',
         'dep.zig': 'pub const dependencyValue: u32 = 42;\n',
-        'tsconfig.json': JSON.stringify({ compilerOptions: { strict: true, target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', paths: { '@fixture/alias': ['./alias.ts'] } }, include: ['*.ts'] }, null, 2)
+        // Mason's server can select the workspace TypeScript 4.9, before Bundler resolution existed.
+        'tsconfig.json': JSON.stringify({ compilerOptions: { strict: true, target: 'ES2022', module: 'ESNext', moduleResolution, paths: { '@fixture/alias': ['./alias.ts'] } }, include: ['*.ts'] }, null, 2)
     };
     for (const [name, text] of Object.entries(fixtures)) { await fs.writeFile(path.join(workspace, name), text); }
     await fs.writeFile(path.join(run, 'baseline.json'), JSON.stringify(await inventory(workspace), null, 2));
-    await fs.writeFile(path.join(run, 'launch.json'), JSON.stringify({ code, servers, zig, mainSha256: createHash('sha256').update(main).digest('hex') }, null, 2));
+    await fs.writeFile(path.join(run, 'launch.json'), JSON.stringify({ code, servers, zig, moduleResolution, mainSha256: createHash('sha256').update(main).digest('hex') }, null, 2));
     console.log('LANGUAGE_HOST_EVIDENCE', run);
     const child = spawn(process.execPath, [__filename, '--child'], { detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, LANGUAGE_HOST_RUN: run } });
     let log = '', timedOut = false;
