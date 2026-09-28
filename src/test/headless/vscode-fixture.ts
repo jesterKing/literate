@@ -221,6 +221,7 @@ export function fixture(workspaceUri = 'file:///project') {
         },
         onDidChangeWorkspaceFolders: workspaceEvents.event,
         onDidChangeConfiguration: () => disposable(),
+        onDidGrantWorkspaceTrust: () => disposable(),
         onDidOpenTextDocument: () => disposable(),
         onDidCloseTextDocument: () => disposable(),
         getConfiguration: () => ({ inspect: () => undefined }),
@@ -361,6 +362,9 @@ export function fixture(workspaceUri = 'file:///project') {
             return controls.externalUri ? controls.externalUri(uri) : Uri.parse(uri.toString() + '?windowId%3D1');
         } },
         window: {
+            onDidChangeActiveTextEditor: () => disposable(),
+            onDidChangeTextEditorSelection: () => disposable(),
+            onDidChangeWindowState: () => disposable(),
             createOutputChannel: () => ({ appendLine() {}, clear() {}, show() {}, dispose() {} }),
             registerUriHandler(handler: { handleUri(uri: Uri): Promise<void> }) {
                 assert.equal(uriHandler, undefined, 'one URI handler per activation');

@@ -54,6 +54,25 @@ This does not establish compatibility with every LSP server. Dynamic registratio
 filesystem-watch forwarding, completion resolve, diagnostics, remote workspaces
 and Zig build/package graphs remain outside initial acceptance.
 
+### Automatic completion UI acceptance
+
+Build with `yarn esbuild`, set `LANGUAGE_AUTO_HOST_TYPESCRIPT` to the absolute
+installed `typescript-language-server` executable, then run
+`node src/test/acceptance/language-auto-host-run.js`. The runner uses an isolated
+Microsoft VS Code profile, an ephemeral loopback CDP port, and bounded cleanup.
+It disables Markdown quick suggestions, suggestion trigger characters, word-based
+suggestions and automatic type acquisition.
+
+Twelve real UI checks pass with the Mason TypeScript server: cold `this.` typing
+opens a visible widget containing `list`, further `li` typing filters it, and
+Enter inserts exactly `this.list`. Prose, headers, reference markers, ordinary
+Markdown and opt-out remain quiet. Cursor/editor moves and real Escape cancel
+pending suggestions; visible-widget Escape retains its normal behavior. Original
+fixtures stay unchanged; normal edit-triggered generation is allowed only for
+the declared generated files. Evidence lives under ignored `out/language-auto-host-*`.
+Headless tests additionally cover queued typing during slow initialization, context
+key lifetime, stale caches, cancellation and generated-file watcher noise.
+
 ## M7 publication closure
 
 The agreed book-publication scope is complete, including bounded screen fragment

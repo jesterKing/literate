@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
-import { SourceDocument } from './engine';
+import { parseProject, parseFragmentHeader, scanFragmentTags, SourceDocument } from './engine';
 import { LanguageClient } from './language-client';
 import { mapGeneratedRange, mapSourcePosition, projectLanguageSources, SourceProjectionPosition } from './language-projection';
 
@@ -38,6 +38,28 @@ function local(folder: vscode.WorkspaceFolder, document: vscode.TextDocument): b
         && document.languageId === 'markdown' && document.uri.fsPath.endsWith('.literate')
         && !!vscode.workspace.workspaceFolders?.includes(folder)
         && vscode.workspace.getWorkspaceFolder(document.uri) === folder;
+}
+function localBody(document: vscode.TextDocument, cursor: vscode.Position): boolean {
+    try {
+        const text = document.getText(), lines = text.split(/\r\n|\r|\n/);
+        const parsed = parseProject([{ path: 'input.literate', text }]);
+        const token = parsed.documents[0]?.tokens.find(value => value.type === 'fence' && value.map
+            && cursor.line > value.map[0] && cursor.line < value.map[1]);
+        if (!token?.map) { return false; }
+        const header = parseFragmentHeader(token.info);
+        if (!header || (header.language && !servers()[language(header.language)])) { return false; }
+        const bodyLines = token.content.split('\n'), index = cursor.line - token.map[0] - 1;
+        if (index >= bodyLines.length - (token.content.endsWith('\n') ? 1 : 0)) { return false; }
+        const body = bodyLines[index], column = cursor.character - (lines[cursor.line].length - body.length);
+        if (column <= 0 || column > body.length) { return false; }
+        const before = body.slice(0, column - 1) + body.slice(column);
+        if (before.trim().startsWith(token.markup)) { return false; }
+        if (scanFragmentTags(body).some(tag => column >= tag.start && column <= tag.end + (tag.modifier?.length ?? 0))) {
+            return false;
+        }
+        const prefix = body.slice(0, column);
+        return prefix.lastIndexOf('<<') <= prefix.lastIndexOf('>>');
+    } catch { return false; }
 }
 function errorCategory(error: unknown): string {
     const code = object(error) ? error.code : undefined;
@@ -189,9 +211,10 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
     const sessions = new Map<string, Session>();
     let epoch = 0, busy = false, disposed = false;
     let active: AbortController | undefined;
-    const invalidate = (): void => { epoch++; active?.abort(); };
+    const invalidate = (): void => { epoch++; active?.abort(); cancelAutomatic(); };
     const close = (client: LanguageClient): void => { void client.dispose().catch(() => undefined); };
     let invalidReported = false, capturing = false;
+    const captureChanges = new Set<string>();
     const templatePaths = new Map<string, Set<string>>(), reported = new Set<string>();
     const reset = (): void => {
         invalidate(); sessions.forEach(session => { if (!session.failed) { close(session.client); } });
@@ -217,19 +240,105 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
     context.subscriptions.push(output, vscode.commands.registerCommand('literate.restartLanguageServers', () => {
         if (!disposed) { reset(); }
     }));
+    type Edit = { editor: vscode.TextEditor; document: vscode.TextDocument; cursor: vscode.Position;
+        version: number; revision: number; character: string; selectionSeen: boolean; body: boolean };
+    let candidate: Edit | undefined, pending: Edit | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let cached: { edit: Edit; items: vscode.CompletionItem[] } | undefined;
+    function cancelAutomatic(keepContext = false): void {
+        if (timer) { clearTimeout(timer); timer = undefined; }
+        candidate = pending = undefined; cached = undefined;
+        if (!keepContext) { setPending(false); }
+    }
+    function enabled(document: vscode.TextDocument): boolean {
+        const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+        return !!folder && local(folder, document)
+            && vscode.workspace.getConfiguration('literate', document.uri).get<boolean>('automaticCompletion', true);
+    }
+    let pendingContext: boolean | undefined;
+    function setPending(value: boolean): void {
+        if (pendingContext === value) { return; }
+        pendingContext = value;
+        void vscode.commands.executeCommand('setContext', 'literate.automaticCompletionPending', value)
+            .then(undefined, () => undefined);
+    }
+    setPending(false);
+    function current(edit: Edit): boolean {
+        const editor = vscode.window.activeTextEditor;
+        return !disposed && candidate === edit && epoch === edit.revision
+            && vscode.window.state.focused && editor === edit.editor && editor.document === edit.document
+            && edit.document.version === edit.version && enabled(edit.document)
+            && editor.selections.length === 1 && editor.selection.isEmpty
+            && editor.selection.active.isEqual(edit.cursor);
+    }
+    async function drain(): Promise<void> {
+        if (busy || timer || !pending) { return; }
+        const edit = pending; pending = undefined;
+        if (!current(edit)) { if (candidate === edit) { cancelAutomatic(); } return; }
+        const cancellation = new vscode.CancellationTokenSource();
+        try {
+            const result = await request(edit.document, edit.cursor, cancellation.token, 'completion', edit);
+            if (!Array.isArray(result) || !result.length || !current(edit)) { return; }
+            cached = { edit, items: result }; setPending(false);
+            await vscode.commands.executeCommand('editor.action.triggerSuggest');
+        } catch { if (candidate === edit) { cancelAutomatic(); } }
+        finally {
+            cancellation.dispose();
+            if (candidate === edit) {
+                setPending(false);
+                if (cached?.edit !== edit) { cancelAutomatic(); }
+            }
+        }
+    }
+    function changed(event: vscode.TextDocumentChangeEvent): void {
+        if (event.contentChanges.length === 0) { return; }
+        epoch++; active?.abort(); cancelAutomatic(true);
+        try {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor || !vscode.window.state.focused || event.document !== editor.document
+                || event.reason !== undefined || event.contentChanges.length !== 1
+                || editor.selections.length !== 1 || !editor.selection.isEmpty || !enabled(event.document)
+                || !Object.keys(servers()).length) { return; }
+            const change = event.contentChanges[0];
+            if (change.rangeLength !== 0 || change.text.length !== 1 || /[\r\n]/.test(change.text)) { return; }
+            const cursor = event.document.positionAt(change.rangeOffset + 1), before = change.range.start;
+            if (!editor.selection.active.isEqual(before) && !editor.selection.active.isEqual(cursor)) { return; }
+            candidate = pending = { editor, document: event.document, cursor, version: event.document.version,
+                revision: epoch, character: change.text, selectionSeen: false, body: localBody(event.document, cursor) };
+            timer = setTimeout(() => { timer = undefined; void drain(); }, 200);
+        } finally { setPending(candidate?.body ?? false); }
+    }
+    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(invalidate),
+        vscode.window.onDidChangeWindowState(invalidate), vscode.workspace.onDidGrantWorkspaceTrust(reset),
+        vscode.window.onDidChangeTextEditorSelection(event => {
+            if (!candidate) { return; }
+            if (event.textEditor === candidate.editor && !candidate.selectionSeen
+                && event.kind === vscode.TextEditorSelectionChangeKind.Keyboard && current(candidate)) {
+                candidate.selectionSeen = true; return;
+            }
+            invalidate();
+        }), vscode.commands.registerCommand('literate.cancelAutomaticCompletion', () => {
+            invalidate();
+        }));
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
         if (event.affectsConfiguration('literate.languageServers')) { reset(); }
+        else { invalidate(); }
     }), vscode.workspace.onDidChangeWorkspaceFolders(() => reset()),
-    vscode.workspace.onDidChangeTextDocument(invalidate), vscode.workspace.onDidOpenTextDocument(invalidate),
+    vscode.workspace.onDidChangeTextDocument(changed), vscode.workspace.onDidOpenTextDocument(invalidate),
     vscode.workspace.onDidCloseTextDocument(invalidate));
     const watcher = vscode.workspace.createFileSystemWatcher('**/*');
     const diskChanged = (uri: vscode.Uri): void => {
-        if (capturing || uri.fsPath.endsWith('.literate')
-            || [...templatePaths.values()].some(paths => paths.has(path.resolve(uri.fsPath)))) { invalidate(); }
+        const changedPath = path.resolve(uri.fsPath);
+        if (uri.fsPath.endsWith('.literate') || [...templatePaths.values()].some(paths => paths.has(changedPath))) {
+            invalidate();
+        } else if (capturing) {
+            if (captureChanges.size >= 1000) { invalidate(); }
+            else { captureChanges.add(changedPath); }
+        }
     };
     context.subscriptions.push(watcher, watcher.onDidChange(diskChanged), watcher.onDidCreate(diskChanged), watcher.onDidDelete(diskChanged));
     async function request(document: vscode.TextDocument, cursor: vscode.Position, token: vscode.CancellationToken,
-        method: 'hover' | 'completion'): Promise<vscode.Hover | vscode.CompletionItem[] | undefined> {
+        method: 'hover' | 'completion', edit?: Edit): Promise<vscode.Hover | vscode.CompletionItem[] | undefined> {
         const folder = vscode.workspace.getWorkspaceFolder(document.uri);
         if (disposed || busy || token.isCancellationRequested || !folder || !local(folder, document)) { return undefined; }
         const configured = servers(invalid), fingerprint = JSON.stringify(configured);
@@ -241,10 +350,10 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
         let session: Session | undefined, sessionKey = '', phase = 'snapshot';
         const fresh = (): boolean => !disposed && !controller.signal.aborted && !token.isCancellationRequested
             && epoch === revision && document.version === version && local(folder, document)
-            && JSON.stringify(servers()) === fingerprint;
+            && JSON.stringify(servers()) === fingerprint && (!edit || current(edit));
         try {
             if (!fresh()) { return undefined; }
-            capturing = true;
+            captureChanges.clear(); capturing = true;
             const { documents, templates } = await snapshot(folder);
             capturing = false;
             if (!fresh()) { return undefined; }
@@ -261,6 +370,9 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
                 }
                 return undefined;
             }
+            if ([...captureChanges].some(name => templatePaths.get(folder.uri.toString())!.has(name))) {
+                invalidate(); return undefined;
+            }
             const hit = mapSourcePosition(projected.files, sourcePath, document.offsetAt(cursor));
             if (!hit) { return undefined; }
             const id = language(hit.file.language), config = configured[id];
@@ -268,6 +380,7 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
             sessionKey = JSON.stringify([folder.uri.toString(), id]);
             session = sessions.get(sessionKey);
             if (session?.failed) { return undefined; }
+            if (edit) { setPending(true); }
             phase = 'initialization';
             if (!session) {
                 session = { client: new LanguageClient({ ...config, cwd: folder.uri.fsPath, rootUri: folder.uri.toString() }), failed: false };
@@ -284,6 +397,9 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
             }
             const capability = client.capabilities[method === 'hover' ? 'hoverProvider' : 'completionProvider'];
             if (!(object(capability) || (method === 'hover' && capability === true))) { return undefined; }
+            const triggered = edit && object(capability) && Array.isArray(capability.triggerCharacters)
+                && capability.triggerCharacters.includes(edit.character);
+            if (edit && !triggered && !/[\p{L}\p{N}_$]/u.test(edit.character)) { return undefined; }
             phase = 'synchronization';
             await client.sync(projected.files.filter(file => language(file.language) === id || (family(id) && family(language(file.language))))
                 .map(file => ({ uri: uri(file.path), languageId: language(file.language), text: file.content })));
@@ -291,7 +407,8 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
             phase = 'request';
             const reply = await client.request('textDocument/' + method, {
                 textDocument: { uri: uri(hit.file.path) }, position: position(hit.file.content, hit.offset),
-                ...(method === 'completion' ? { context: { triggerKind: 1 } } : {})
+                ...(method === 'completion' ? { context: triggered
+                    ? { triggerKind: 2, triggerCharacter: edit!.character } : { triggerKind: 1 } } : {})
             }, controller.signal);
             if (!fresh()) { return undefined; }
             const view = { document, position: cursor, hit };
@@ -308,13 +425,23 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
                     + '. Check the executable and global literate.languageServers settings, then run literate.restartLanguageServers to retry.');
             }
             return undefined;
-        } finally { cancellation.dispose(); active = undefined; busy = false; capturing = false; }
+        } finally {
+            cancellation.dispose(); active = undefined; busy = false; capturing = false; captureChanges.clear();
+            void drain();
+        }
     }
     const selector: vscode.DocumentSelector = { scheme: 'file', language: 'markdown', pattern: '**/*.literate' };
     context.subscriptions.push(vscode.languages.registerHoverProvider(selector, {
         provideHover: (document, cursor, token) => request(document, cursor, token, 'hover') as Promise<vscode.Hover | undefined>
     }), vscode.languages.registerCompletionItemProvider(selector, {
         provideCompletionItems: (document, cursor, token, completionContext) => {
+            if (token.isCancellationRequested) {
+                if (cached?.edit.document === document && cached.edit.cursor.isEqual(cursor)) { cancelAutomatic(); }
+                return undefined;
+            }
+            if (cached && cached.edit.document === document && cached.edit.cursor.isEqual(cursor) && current(cached.edit)) {
+                const items = cached.items; cancelAutomatic(); return items;
+            }
             if (completionContext.triggerKind !== vscode.CompletionTriggerKind.Invoke) { return undefined; }
             return request(document, cursor, token, 'completion') as Promise<vscode.CompletionItem[] | undefined>;
         }

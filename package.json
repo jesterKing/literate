@@ -57,6 +57,10 @@
     "configuration": {
       "title": "Literate",
       "properties": {
+        "literate.automaticCompletion": {
+          "type": "boolean", "default": true, "scope": "resource",
+          "description": "Show language-server suggestions after typing inside mapped literate code fragments, without enabling suggestions throughout Markdown. Manual completion remains available when disabled."
+        },
         "literate.languageServers": {
           "type": "object", "default": {}, "scope": "machine", "restricted": true,
           "description": "Direct stdio language servers keyed by language ID (for example typescript or zig). User settings only, trusted local workspaces only. Executables are not installed automatically; each server runs separately from other extensions.",
@@ -84,6 +88,13 @@
         }
       }
     },
+    "keybindings": [
+      {
+        "key": "escape",
+        "command": "literate.cancelAutomaticCompletion",
+        "when": "editorTextFocus && literate.automaticCompletionPending && !suggestWidgetVisible && !findWidgetVisible && !renameInputVisible && !inSnippetMode"
+      }
+    ],
     "commands": [
       { "command": "literate.restartLanguageServers", "title": "Literate: Restart Language Servers", "enablement": "isWorkspaceTrusted" },
       { "command": "literate.exportLatex", "title": "Literate: Export LaTeX", "enablement": "isWorkspaceTrusted" },

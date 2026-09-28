@@ -81,8 +81,24 @@ external input create/change/delete events are debounced per workspace. Associat
 
 Associate `*.literate` with **Markdown**, open a trusted local workspace, and
 configure `literate.languageServers` in **User settings**. Hover over a code symbol
-or press **Ctrl+Space** inside a named fragment. Fragment-name suggestions remain
-available inside unfinished `<<` tags.
+or type inside a named fragment: after a short pause, Literate automatically opens
+suggestions when the server has matching results. **Ctrl+Space** remains available.
+Fragment-name suggestions remain available inside unfinished `<<` tags.
+
+Automatic completion is scoped to mapped fragment code, including template-backed
+outputs. Identifier typing and the server's advertised trigger characters (such
+as TypeScript's `.`) are supported without enabling Markdown-wide quick suggestions.
+Literate does not trigger language suggestions in prose, fence headers, fragment
+reference markers or ordinary `.md` files. Cursor/editor changes and Escape cancel
+pending suggestions. Only the latest typing position is retained while a server
+starts or finishes another request.
+
+To keep completion manual, set `"literate.automaticCompletion": false` in User or
+workspace settings. No changes to `[markdown].editor.quickSuggestions` are needed.
+Automatic triggering handles single-character insertions in a single empty
+selection; undo/redo, replacements and multi-character/multiline paste do not
+trigger it. VS Code reports a one-character paste like an insertion, so it can
+trigger suggestions too.
 
 Each entry is keyed by a canonical VS Code language ID and contains an **absolute
 server executable path**, optional `args`, optional `initializationOptions`, and
@@ -141,8 +157,8 @@ Initial boundaries:
   deterministic expansion.
 - Simple single-line completion replacement ranges must remain within the active
   source mapping. Snippets, commands, auxiliary edits/auto-imports and completion
-  resolution are not supported. No language-specific trigger characters are
-  registered; use Ctrl+Space to request suggestions.
+  resolution are not supported. Trigger characters are interpreted only after
+  confirming a mapped code position, not registered globally for Markdown.
 - Hover Markdown is untrusted; unsafe mapped ranges are rejected. UTF-16 position
   support and document open/change/close synchronization are required from servers.
 - Requests are serialized; overlapping requests can return no result. Cancelled
