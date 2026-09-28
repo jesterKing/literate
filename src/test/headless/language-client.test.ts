@@ -23,6 +23,7 @@ function handle(message) {
     if (!message.method) { replies.push(message); return; }
     if (message.method === 'initialize') {
         initialization = message.params;
+        send({method:'test/early', params:{ignored:true}});
         process.stderr.write('fake server stderr');
         if (mode === 'init-hang') return;
         send({id:'config', method:'workspace/configuration', params:{items:[{section:'zls'}, {section:'ts.format'}, {section:'missing'}, {}]}});
@@ -35,9 +36,19 @@ function handle(message) {
             : {openClose:!mode.startsWith('no-open-close-'), change:kind};
         send({id:message.id, result:{capabilities:{positionEncoding:mode === 'utf8' ? 'utf-8' : 'utf-16',
             textDocumentSync:sync}}});
+    } else if (message.method === 'events') {
+        send({method:'textDocument/publishDiagnostics', params:{uri:'file:///a', version:1,
+            diagnostics:[{message:'héllo 😀'}]}});
+        send({id:'refresh', method:'workspace/diagnostic/refresh'});
+        send({id:'not-an-event', method:'test/early', params:{ignored:true}});
+        send({id:message.id, result:null});
+    } else if (message.method === 'textDocument/diagnostic') {
+        send({id:message.id, result:{kind:'full', resultId:'next', items:[], previous:message.params.previousResultId}});
     } else if (message.method === 'state') {
         send({id:message.id, result:{initialization, notifications, replies}});
-    } else if (message.method === 'textDocument/hover' || message.method === 'textDocument/completion') {
+    } else if (['textDocument/hover', 'textDocument/completion', 'completionItem/resolve',
+        'textDocument/signatureHelp', 'textDocument/definition', 'textDocument/typeDefinition',
+        'textDocument/implementation', 'textDocument/references'].includes(message.method)) {
         send({id:message.id, result:{text:'héllo 😀', params:message.params}});
     } else if (message.method === '$/cancelRequest') {
         notifications.push(message);
@@ -98,8 +109,11 @@ const state = async (connection: LanguageClient) => await connection.request('st
 
 test('language client chapter generates exactly the owned source', () => {
     const root = path.resolve(__dirname, '../../..');
-    const generated = generateProject([{ path: 'literate/language-client.literate',
-        text: fs.readFileSync(path.join(root, 'literate/language-client.literate'), 'utf8') }]);
+    const text = fs.readFileSync(path.join(root, 'literate/language-client.literate'), 'utf8');
+    for (const fragment of text.matchAll(/```ts[^\n]*\n([\s\S]*?)```/g)) {
+        assert.ok(fragment[1].trimEnd().split('\n').length <= 30, 'fragments stay within 30 lines');
+    }
+    const generated = generateProject([{ path: 'literate/language-client.literate', text }]);
     assert.deepEqual(generated.diagnostics, []);
     assert.equal(generated.files.find(file => file.path === 'src/language-client.ts')?.content,
         fs.readFileSync(path.join(root, 'src/language-client.ts'), 'utf8'));
@@ -116,8 +130,18 @@ test('deduplicated initialization, split Unicode frames, server requests and doc
     await connection.sync([]);
     const snapshot = await state(connection);
     assert.deepEqual(snapshot.initialization.capabilities.general.positionEncodings, ['utf-16']);
-    assert.deepEqual(snapshot.initialization.capabilities.textDocument.completion.completionItem,
-        { snippetSupport: false, insertReplaceSupport: true });
+    assert.deepEqual(snapshot.initialization.capabilities.textDocument, {
+        synchronization: { dynamicRegistration: false },
+        completion: { completionItem: { snippetSupport: true, insertReplaceSupport: true,
+            documentationFormat: ['markdown', 'plaintext'], resolveSupport: { properties: ['documentation', 'detail'] } } },
+        signatureHelp: { contextSupport: true, signatureInformation: {
+            documentationFormat: ['markdown', 'plaintext'], parameterInformation: { labelOffsetSupport: true } } },
+        definition: { linkSupport: true }, typeDefinition: { linkSupport: true }, implementation: { linkSupport: true },
+        references: { dynamicRegistration: false },
+        publishDiagnostics: { versionSupport: true, relatedInformation: true, tagSupport: { valueSet: [1, 2] } },
+        diagnostic: { dynamicRegistration: false, relatedDocumentSupport: false },
+        hover: { contentFormat: ['plaintext', 'markdown'] }
+    });
     assert.deepEqual(snapshot.initialization.initializationOptions, { cache: false });
     assert.deepEqual(snapshot.notifications.map(item => item.method),
         ['initialized', 'textDocument/didOpen', 'textDocument/didChange', 'textDocument/didClose']);
@@ -132,9 +156,85 @@ test('deduplicated initialization, split Unicode frames, server requests and doc
         { applied: false, failureReason: 'Read-only language client' });
     assert.equal(snapshot.replies.find(item => item.id === 'unknown')?.error?.code, -32601);
     assert.match(logs.join(''), /fake server stderr/);
-    for (const method of ['textDocument/hover', 'textDocument/completion']) {
+    for (const method of ['textDocument/hover', 'textDocument/completion', 'completionItem/resolve',
+        'textDocument/signatureHelp', 'textDocument/definition', 'textDocument/typeDefinition',
+        'textDocument/implementation', 'textDocument/references']) {
         assert.deepEqual(await connection.request(method, { text: '日本😀' }), { text: 'héllo 😀', params: { text: '日本😀' } });
     }
+});
+
+test('framed notifications, refresh acknowledgement, listener isolation and generic diagnostic pull', async t => {
+    const logs: string[] = [], connection = client('full', message => logs.push(message));
+    t.after(() => connection.dispose());
+    let early = 0, disposed = 0, refresh = 0;
+    const events: unknown[] = [];
+    connection.onNotification('test/early', () => early++);
+    connection.onNotification('textDocument/publishDiagnostics', () => { throw new Error('secret payload'); });
+    const remove = connection.onNotification('textDocument/publishDiagnostics', () => disposed++);
+    connection.onNotification('textDocument/publishDiagnostics', value => events.push(value));
+    connection.onNotification('workspace/diagnostic/refresh', () => {
+        refresh++;
+        void connection.notify('test/refreshed', {});
+    });
+    remove(); remove();
+    await connection.notify('test/ready', { value: '😀' });
+    await connection.request('events', {});
+    const snapshot = await state(connection);
+    assert.equal(early, 0); assert.equal(disposed, 0); assert.equal(refresh, 1);
+    assert.deepEqual(events, [{ uri: 'file:///a', version: 1, diagnostics: [{ message: 'héllo 😀' }] }]);
+    assert.deepEqual(snapshot.replies.find(item => item.id === 'refresh'), { jsonrpc: '2.0', id: 'refresh', result: null });
+    assert.equal(snapshot.replies.find(item => item.id === 'not-an-event')?.error?.code, -32601);
+    assert.ok(snapshot.notifications.some(item => item.method === 'test/refreshed'));
+    assert.ok(logs.includes('Language client listener failed'));
+    assert.ok(!logs.join('').includes('secret payload'));
+    assert.deepEqual(await connection.request('textDocument/diagnostic', { previousResultId: 'old' }),
+        { kind: 'full', resultId: 'next', items: [], previous: 'old' });
+});
+
+test('document state precedes wire writes and versions never repeat across reopen', async t => {
+    const connection = client(); t.after(() => connection.dispose());
+    await connection.initialize();
+    const doc = { uri: 'file:///a', languageId: 'zig', text: 'one' };
+    // Observe the synchronous write boundary, where a fast in-process transport could deliver diagnostics.
+    const transport = connection as unknown as { send(message: { method?: string; params?: unknown }): void };
+    const original = transport.send.bind(connection);
+    const seen: (number | undefined)[] = [];
+    transport.send = message => {
+        if (message.method?.startsWith('textDocument/did')) { seen.push(connection.documentVersion(doc.uri)); }
+        original(message);
+    };
+    assert.equal(connection.documentVersion(doc.uri), undefined);
+    await connection.sync([doc]); await connection.sync([doc]);
+    await connection.sync([{ ...doc, text: 'two' }]);
+    await connection.sync([]); await connection.sync([doc]);
+    await connection.sync([{ ...doc, languageId: 'typescript' }]);
+    assert.deepEqual(seen, [1, 2, undefined, 3, undefined, 4]);
+    const versions = (await state(connection)).notifications.filter(item => item.params?.textDocument?.version)
+        .map(item => item.params.textDocument.version);
+    assert.deepEqual(versions, [1, 2, 3, 4]);
+    await connection.dispose(); assert.equal(connection.documentVersion(doc.uri), undefined);
+});
+
+test('subscriptions share a bound and stop callbacks are isolated, disposable and once-only', async t => {
+    const connection = client('full', () => { throw new Error('logger failure'); });
+    t.after(() => connection.dispose());
+    const removers = Array.from({ length: 128 }, () => connection.onNotification('unused', () => {}));
+    assert.throws(() => connection.onDidStop(() => {}), /listener limit/);
+    assert.throws(() => connection.onNotification('overflow', () => {}), /listener limit/);
+    removers.forEach(remove => { remove(); remove(); });
+    let stops = 0, removed = 0;
+    const remove = connection.onDidStop(() => removed++); remove();
+    connection.onDidStop(() => { throw new Error('stop failure'); });
+    connection.onDidStop(() => { stops++; assert.equal(connection.documentVersion('file:///a'), undefined); });
+    await connection.sync([{ uri: 'file:///a', languageId: 'zig', text: '' }]);
+    await assert.rejects(connection.request('crash', {}));
+    assert.equal(stops, 1); assert.equal(removed, 0);
+    await connection.dispose(); assert.equal(stops, 1);
+    connection.onDidStop(() => stops++); assert.equal(stops, 2);
+    const internals = connection as unknown as { listeners: Set<unknown> };
+    assert.equal(internals.listeners.size, 0);
+    connection.onNotification('ignored', () => {}); assert.equal(internals.listeners.size, 0);
+    await assert.rejects(connection.notify('test/closed', {}));
 });
 
 test('incremental servers get full replacement UTF-16 ranges; language changes reopen', async t => {
@@ -255,9 +355,12 @@ test('shutdown omits params, exits gracefully, and forced shutdown is bounded', 
     const marker = path.join(directory, 'exit'), graceful = client('marker:' + marker);
     t.after(() => graceful.dispose());
     await graceful.initialize();
+    let stops = 0;
+    graceful.onDidStop(() => stops++);
     assert.equal(graceful.dispose(), graceful.dispose());
     await graceful.dispose();
     assert.equal(fs.readFileSync(marker, 'utf8'), 'graceful');
+    assert.equal(stops, 1);
     const stalled = client('shutdown-hang'); t.after(() => stalled.dispose());
     await stalled.initialize();
     const start = Date.now(); await stalled.dispose();

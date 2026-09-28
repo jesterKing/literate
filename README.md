@@ -77,13 +77,15 @@ folders. Edits to referenced source/HTML templates also regenerate automatically
 external input create/change/delete events are debounced per workspace. Associate
 `*.literate` files with Markdown to enable the editor providers.
 
-## Language hover and completion inside fragments
+## Language services inside fragments
 
 Associate `*.literate` with **Markdown**, open a trusted local workspace, and
 configure `literate.languageServers` in **User settings**. Hover over a code symbol
 or type inside a named fragment: after a short pause, Literate automatically opens
 suggestions when the server has matching results. **Ctrl+Space** remains available.
-Fragment-name suggestions remain available inside unfinished `<<` tags.
+Fragment-name suggestions remain available inside unfinished `<<` tags. Language
+services also include signature help, snippets and completion details, code
+navigation, and mapped diagnostics.
 
 Automatic completion is scoped to mapped fragment code, including template-backed
 outputs. Identifier typing and the server's advertised trigger characters (such
@@ -150,21 +152,45 @@ and project configuration are read by the server. Source templates are included,
 with unsaved template buffers taking precedence over disk. Only the code inserted
 at `[CODE]` has fragment mappings; wrapper text cannot be edited through a fragment.
 
-Initial boundaries:
+Supported services (subject to the server's advertised capabilities):
+- **Signature help:** parameter hints in mapped code, including server-advertised
+  trigger/retrigger characters and parameter labels/documentation.
+- **Completion:** plain text and snippets, incomplete lists with follow-up
+  requests, and lazy completion resolution. Resolve copies **documentation and
+  detail only**; it cannot change the accepted insertion, range or label.
+- **Navigation:** definition, type definition, implementation and references.
+  Generated-output targets map back to literate sources; validated ordinary local
+  `file:` targets can open directly. Repeated results are deduplicated.
+- **Diagnostics:** server problems map into literate sources in the separate
+  `literate-language` collection, without replacing Literate's fragment/engine
+  diagnostics. The resource-scoped `literate.languageDiagnostics` setting defaults
+  to `true`; set it to `false` for a resource or workspace to disable language
+  diagnostics without disabling the other services. Open/edit activity can start
+  configured servers for background diagnostics. Pull diagnostics are preferred
+  when advertised; otherwise push diagnostics are used.
+
+Boundaries:
 - Only named fragments reachable from a valid output receive services. Invalid
   fragment graphs, missing templates, and expansion-limit violations return no
-  results. A repeatedly used fragment or repeated `[CODE]` slot selects its first
-  deterministic expansion.
-- Simple single-line completion replacement ranges must remain within the active
-  source mapping. Snippets, commands, auxiliary edits/auto-imports and completion
-  resolution are not supported. Trigger characters are interpreted only after
-  confirming a mapped code position, not registered globally for Markdown.
-- Hover Markdown is untrusted; unsafe mapped ranges are rejected. UTF-16 position
-  support and document open/change/close synchronization are required from servers.
-- Requests are serialized; overlapping requests can return no result. Cancelled
-  or stale results are discarded. Diagnostics, rename, definitions and general
-  server filesystem-watch registration are not forwarded. Restart servers if
-  external dependency or project-configuration changes are not picked up.
+  results. A request in a repeatedly used fragment or repeated `[CODE]` slot uses
+  its first deterministic expansion.
+- Completion replacement ranges must be single-line and remain within the active
+  source mapping. Commands and auxiliary edits/auto-imports are not applied,
+  including during resolve. Snippets do not grant access to other source ranges.
+- Hover, completion and signature Markdown is untrusted; unsafe mapped ranges
+  are rejected. UTF-16 positions and document open/change/close synchronization
+  are required from servers.
+- Unmapped diagnostics (for example, template-wrapper-only ranges) are omitted,
+  not attached to an invented source location. Diagnostic `relatedInformation`
+  is omitted. Matching versions and captured input freshness reject known stale
+  reports; **unversioned push freshness is best effort**, since a late report
+  cannot reliably be correlated with the source version that produced it.
+- Interactive requests are serialized; overlapping requests can return no result.
+  Cancelled or stale results are discarded. Language-server rename, code actions
+  and formatting are **not forwarded**. Existing fragment-name completion,
+  definition/reference navigation, rename and fragment code actions are unchanged.
+- General server filesystem-watch registration is not forwarded. Restart servers
+  if external dependency or project-configuration changes are not picked up.
 
 ## Exploring fragment references
 

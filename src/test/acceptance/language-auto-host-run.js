@@ -2,7 +2,8 @@
 // Run: node src/test/acceptance/language-auto-host-run.js
 // Required LANGUAGE_AUTO_HOST_TYPESCRIPT (absolute executable).
 // Optional LANGUAGE_AUTO_HOST_CODE, LANGUAGE_AUTO_HOST_TYPESCRIPT_ARGS (JSON string array),
-// LANGUAGE_AUTO_HOST_CDP_PORT.
+// LANGUAGE_AUTO_HOST_CDP_PORT, LANGUAGE_AUTO_HOST_EXTENSION (isolated built extension),
+// LANGUAGE_AUTO_HOST_DIAGNOSTICS=false (preserve cold typing baseline with background diagnostics available).
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const net = require('node:net');
@@ -15,7 +16,7 @@ async function main() {
         const run = process.env.LANGUAGE_AUTO_HOST_RUN;
         const launch = JSON.parse(await fs.readFile(path.join(run, 'launch.json'), 'utf8'));
         await require('@vscode/test-electron').runTests({
-            vscodeExecutablePath: launch.code, extensionDevelopmentPath: project,
+            vscodeExecutablePath: launch.code, extensionDevelopmentPath: launch.extension || project,
             extensionTestsPath: path.join(__dirname, 'language-auto-host.js'),
             extensionTestsEnv: { LANGUAGE_AUTO_HOST_RUN: run },
             launchArgs: [path.join(run, 'workspace'), `--user-data-dir=${path.join(run, 'profile')}`,
@@ -45,7 +46,11 @@ async function main() {
             server.close(error => error ? reject(error) : resolve(selected));
         });
     });
-    const main = await fs.readFile(path.join(project, 'out/main.js'));
+    const extension = process.env.LANGUAGE_AUTO_HOST_EXTENSION || project;
+        if (!path.isAbsolute(extension)) { throw new Error('LANGUAGE_AUTO_HOST_EXTENSION must be absolute'); }
+        const diagnostics = process.env.LANGUAGE_AUTO_HOST_DIAGNOSTICS;
+        if (diagnostics !== undefined && !['true', 'false'].includes(diagnostics)) { throw new Error('LANGUAGE_AUTO_HOST_DIAGNOSTICS must be true or false'); }
+        const main = await fs.readFile(path.join(extension, 'out/main.js'));
     const run = await fs.mkdtemp(path.join(project, 'out/language-auto-host-'));
     const workspace = path.join(run, 'workspace');
     await fs.mkdir(workspace);
@@ -61,7 +66,8 @@ async function main() {
         'git.enabled': false, 'npm.autoDetect': 'off', 'task.autoDetect': 'off',
         'extensions.autoUpdate': false, 'extensions.autoCheckUpdates': false, 'update.mode': 'none',
         'telemetry.telemetryLevel': 'off',
-        'literate.languageServers': { typescript: { command, args, initializationOptions: { disableAutomaticTypingAcquisition: true } } }
+        ...(diagnostics === undefined ? {} : { 'literate.languageDiagnostics': diagnostics === 'true' }),
+                'literate.languageServers': { typescript: { command, args, initializationOptions: { disableAutomaticTypingAcquisition: true } } }
     };
     await fs.writeFile(path.join(run, 'profile/User/settings.json'), JSON.stringify(settings, null, 2));
     const fence = (header, body) => '```' + header + '\n' + body + '\n```\n';
@@ -78,7 +84,7 @@ async function main() {
     };
     for (const [name, text] of Object.entries(fixtures)) { await fs.writeFile(path.join(workspace, name), text); }
     await fs.writeFile(path.join(run, 'baseline.json'), JSON.stringify(await inventory(workspace), null, 2));
-    await fs.writeFile(path.join(run, 'launch.json'), JSON.stringify({ code, port, command, args, settings,
+    await fs.writeFile(path.join(run, 'launch.json'), JSON.stringify({ code, port, command, args, settings, extension,
         mainSha256: createHash('sha256').update(main).digest('hex') }, null, 2));
     console.log('LANGUAGE_AUTO_HOST_EVIDENCE', run);
     const child = spawn(process.execPath, [__filename, '--child'], { detached: true, stdio: ['ignore', 'pipe', 'pipe'],

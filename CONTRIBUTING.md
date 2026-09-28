@@ -13,12 +13,70 @@ yarn esbuild
 
 ## Direct language-server acceptance
 
-`literate/language-projection.literate`, `literate/language-client.literate` and
-`literate/language-features.literate` own the mapping, transport and editor adapter.
-Their headless tests cover projection parity, UTF-16/line endings/indentation,
-repeated references and empty appends, framing and synchronization, lifecycle,
-trust/configuration, cancellation/staleness, and conservative response mapping.
-All implementation fragments in these chapters are at most 30 lines.
+The authoritative production sources are `literate/language-projection.literate`,
+`literate/language-client.literate`, `literate/language-features.literate`,
+`literate/language-navigation.literate` and `literate/language-diagnostics.literate`.
+Edit the chapters, not their generated `src/language-*.ts` outputs. Their headless
+tests cover projection parity, UTF-16/line endings/indentation, repeated references
+and empty appends, framing and synchronization, lifecycle, trust/configuration,
+cancellation/staleness, and conservative response mapping.
+
+### Language-service coverage
+
+1. **Signature help:** capability-gated requests, parameter labels/documentation,
+   trigger/retrigger characters and stale/cancelled result suppression.
+2. **Completion:** snippets, incomplete lists and their retrigger context, plus
+   capability-gated lazy resolve of **documentation/detail only**. Resolve must
+   preserve insertion text, range and label; commands and additional edits,
+   including auto-imports, must never be applied.
+3. **Navigation:** definition, type definition, implementation and references,
+   mapping generated targets back to literate source and deduplicating results.
+   Validate local file targets and reject unsafe URIs/ranges. Ordinary local file
+   targets can remain direct navigation targets.
+4. **Diagnostics:** a separate named `literate-language` collection, resource-scoped
+   `literate.languageDiagnostics` (default `true`), background synchronization,
+   push reports and preferred pull diagnostics. Test version/snapshot correlation,
+   invalidation, collection clearing, deduplication, budgets and lifecycle cleanup.
+   Unmapped diagnostics are omitted, including template-wrapper-only ranges;
+   `relatedInformation` is omitted. Unversioned pushes have **best-effort freshness**:
+   after synchronization, a late unversioned report cannot be proven current.
+
+Language-server rename, code actions and formatting remain out of scope. Preserve
+existing fragment-name completion, definition/reference navigation, rename and
+fragment code actions; these are separate from language-symbol services. Requests
+must not write generated outputs or apply server-provided workspace edits.
+
+The shared `src/test/headless/vscode-fixture.ts` records all registrations per
+provider kind in `providerRegistrations` (including selectors and trigger arguments),
+while `providers` retains the latest provider for existing callers. Named
+`diagnosticCollections` keep language problems separate from the legacy
+`diagnostics` map for the fixture repository's `literate` collection. Collection
+mocks support single-URI and bulk set, deletion, clear, iteration and disposal.
+Fixture module loading isolates the editor adapters so separate activations do
+not retain a previous fixture's VS Code mock.
+
+For focused validation without regenerating production files:
+
+```sh
+yarn test-compile
+node --test out/test/headless/language-*.test.js out/test/headless/extension-adapter.test.js out/test/headless/editor-symbols.test.js out/test/headless/code-actions.test.js
+```
+
+Headless checks alone do not establish real editor UI/server compatibility.
+The expanded installed-host suite (`node src/test/acceptance/language-groups-host-run.js`)
+passes 18 checks on VS Code 1.138.0 with TS7 and Mason CSS/HTML: rendered signature
+hints, metadata resolution, mapped snippet insertion and tabstops, navigation,
+and background diagnostic appearance/clearing/movement without hover. It builds
+an isolated source snapshot and downloads nothing. See
+[src/test/acceptance/language-groups-acceptance.md](src/test/acceptance/language-groups-acceptance.md)
+for executable overrides, evidence and limitations. The automatic UI baseline
+also passes all 12 checks against that bundle, with diagnostics disabled to retain
+its cold-first-typing assertion; an initial editor-focus setup failure is recorded.
+
+Full validation: 1,405 headless tests passed, three skipped, zero failed;
+`yarn check:self`, extension bundling and whitespace checks passed. Evidence:
+`out/language-services-tests.log`, `out/language-groups-host-vKuS4Q/` and
+`out/language-auto-host-sXqtV5/`. The earlier hover/completion acceptance follows.
 
 The installed-host acceptance is opt-in and downloads nothing. Build first with
 `yarn esbuild`, then set `LANGUAGE_HOST_TYPESCRIPT` and `LANGUAGE_HOST_ZLS` to the
@@ -50,9 +108,11 @@ with Mason's workspace-selected TypeScript 4.9: initial alias and generated-impo
 hovers remain `any` (21/23 checks passed). These are retained failures, not relaxed
 assertions. Evidence: `out/language-template-probe/` and `out/language-host-iuhazc/`.
 
-This does not establish compatibility with every LSP server. Dynamic registration,
-filesystem-watch forwarding, completion resolve, diagnostics, remote workspaces
-and Zig build/package graphs remain outside initial acceptance.
+This does not establish compatibility with every LSP server. Completion resolve,
+signatures, navigation and diagnostics are implemented but were not covered by
+that initial installed-host acceptance. General dynamic registration,
+filesystem-watch forwarding, remote workspaces and Zig build/package graphs
+remain outside that acceptance.
 
 ### Automatic completion UI acceptance
 

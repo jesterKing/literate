@@ -165,7 +165,7 @@ exports.run = async () => {
         assert.ok(page, 'VS Code renderer CDP target');
         await page.bringToFront();
         const extension = vscode.extensions.getExtension('jesterking.literate');
-        assert.equal(extension.extensionPath, path.resolve(__dirname, '../../..'));
+        assert.equal(extension.extensionPath, launch.extension || path.resolve(__dirname, '../../..'));
         await extension.activate();
         document = await vscode.workspace.openTextDocument(path.join(root, 'index.literate'));
         ordinary = await vscode.workspace.openTextDocument(path.join(root, 'ordinary.md'));

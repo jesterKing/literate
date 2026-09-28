@@ -9,7 +9,9 @@ async function preview(f = fixture()) {
     const api = await f.extension.activate({ subscriptions } as unknown as vscode.ExtensionContext);
     const repository = subscriptions.find(value => value instanceof f.extension.FragmentRepository) as
         InstanceType<typeof f.extension.FragmentRepository>;
-    return { ...f, repository,
+    // Activation creates a new repository and collection, independent of the fixture's initial repository.
+    const diagnostics = f.diagnosticCollections.get('literate')!.diagnostics;
+    return { ...f, repository, diagnostics,
         process: (folder = f.folder) => repository.processLiterateFiles(folder as unknown as vscode.WorkspaceFolder),
         extend: (md: MarkdownIt) => api.extendMarkdownIt(md) as MarkdownIt };
 }
@@ -148,7 +150,11 @@ test('standalone and missing-document previews default, ignoring local SETTINGS'
 });
 
 test('invalid root theme diagnostics force the preview default, even after a valid choice', async () => {
-    const f = await preview();
+    const setup = fixture();
+    const f = await preview(setup);
+    const languageDiagnostics = f.diagnosticCollections.get('literate-language')!;
+    assert.notEqual(f.diagnostics, setup.diagnostics);
+    assert.notEqual(f.diagnostics, languageDiagnostics.diagnostics);
     const md = f.extend(new MarkdownIt());
     for (const invalid of ['', 'unknown', '\" onmouseover=\"bad', '</div><script>bad</script>']) {
         f.open('index.literate', fence('SETTINGS', 'theme=rosepine\ntheme=' + invalid));
@@ -156,6 +162,10 @@ test('invalid root theme diagnostics force the preview default, even after a val
             wrapped('<p>Safe</p>\n'));
         await f.process();
         assert.ok([...f.diagnostics.values()].flat().some(value => /theme/i.test(value.message)));
+        assert.equal(setup.diagnostics.size, 0, 'preview processing uses the activated repository');
+        const problems = [...f.diagnostics.entries()];
+        languageDiagnostics.clear();
+        assert.deepEqual([...f.diagnostics.entries()], problems, 'clearing language diagnostics preserves engine problems');
         f.workspace.textDocuments = [];
         assert.equal(md.render('Safe', { currentDocument: f.document('chapter.literate', '').uri }),
             wrapped('<p>Safe</p>\n'), 'invalid snapshot also defaults');
@@ -167,27 +177,35 @@ test('remote snapshots refresh previews only when the effective theme changes', 
     const f = await preview(fixture('vscode-remote://ssh-remote+host/project'));
     const md = f.extend(new MarkdownIt());
     const env = { currentDocument: f.document('chapter.literate', '').uri };
-    assert.deepEqual(f.executedCommands, []);
+    const assertCommands = (refreshes: number) => {
+        const expected = [
+            { name: 'setContext', args: ['literate.automaticCompletionPending', false] },
+            ...Array.from({ length: refreshes }, () => ({ name: 'markdown.preview.refresh', args: [] }))
+        ];
+        assert.deepEqual(f.executedCommandCalls, expected);
+        assert.deepEqual(f.executedCommands, expected.map(call => call.name));
+    };
+    assertCommands(0);
     f.put('index.literate', fence('SETTINGS', 'theme=rosepine'));
     await f.process();
     assert.equal(md.render('Remote', env), wrapped('<p>Remote</p>\n', 'rosepine'));
-    assert.deepEqual(f.executedCommands, ['markdown.preview.refresh']);
+    assertCommands(1);
     await f.process();
     f.put('chapter.literate', 'Unrelated edit');
     await f.process();
-    assert.equal(f.executedCommands.length, 1);
+    assertCommands(1);
     f.open('index.literate', fence('SETTINGS', 'theme=rosepine-dawn'));
     await f.process();
-    assert.equal(f.executedCommands.length, 2);
+    assertCommands(2);
     assert.equal(md.render('Remote', env), wrapped('<p>Remote</p>\n', 'rosepine-dawn'));
     f.open('index.literate', fence('SETTINGS', 'theme=rosepine'));
     await f.process();
-    assert.equal(f.executedCommands.length, 3);
+    assertCommands(3);
     assert.equal(md.render('Remote', env), wrapped('<p>Remote</p>\n', 'rosepine'));
     f.open('index.literate', fence('SETTINGS', 'theme=invalid'));
     await f.process();
     await f.process();
-    assert.equal(f.executedCommands.length, 4);
+    assertCommands(4);
     assert.equal(md.render('Remote', env), wrapped('<p>Remote</p>\n'));
     assert.deepEqual(f.writes, []);
 });

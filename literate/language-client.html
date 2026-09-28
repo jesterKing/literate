@@ -134,16 +134,25 @@ and sends <code>$/cancelRequest</code> once a request is on the wire. Protocol f
 all pending work and terminate the process; stderr is drained in bounded chunks.</p>
 <p><code>sync</code> accepts the complete current document set, at most 1024 documents and
 4 MiB of serialized document data. Unchanged text sends nothing. Changed language
-IDs close/reopen; versions increase within each open lifetime. Sync kind 0 is
-unsupported, kind 1 sends full text, and kind 2 replaces the old UTF-16 range.
+IDs close/reopen; a session-wide counter keeps each URI's versions increasing even
+across closes/reopens without retaining an unbounded history of closed URIs.
+Sync kind 0 is unsupported, kind 1 sends full text, and kind 2 replaces the old
+UTF-16 range.
 Projected documents require open/close support to establish their initial text:
 object-form synchronization must advertise <code>openClose: true</code>; legacy numeric
 kinds 1 and 2 imply open/close support without a separate flag. Configuration
 uses exact section keys first, then dotted own-property lookup; missing values
 are null. This client neither applies edits nor registers dynamic capabilities,
-watchers, diagnostics promises, or background restart loops.</p>
+watchers, server commands, or background restart loops. Diagnostics payloads remain
+untrusted: adapters validate them and compare versions against <code>documentVersion</code>.
+Closed documents and stopped sessions return undefined; state changes precede wire
+writes so even immediate diagnostics see the current version.</p>
 <p>Disposal rejects outstanding work and allows 500 ms for shutdown and another
 500 ms for exit before SIGKILL. Shutdown deliberately omits params for TS7.
+<code>onDidStop</code> runs once for failure or disposal after document versions are cleared;
+all subscriptions are then released. <code>notify</code> waits only when initialization is
+needed; <code>request</code> remains the generic entry point for pull diagnostics and other
+approved language requests.
 There is no VS Code or third-party runtime dependency.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0064006900720065006300740020006c0061006e0067007500610067006500200063006c00690065006e0074002e002a-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d0063006c00690065006e0074002e006c0069007400650072006100740065-1"><span id="f-0064006900720065006300740020006c0061006e0067007500610067006500200063006c00690065006e0074002e002a"></span><a class="literate-tag-name" href="#f-0064006900720065006300740020006c0061006e0067007500610067006500200063006c00690065006e0074002e002a" data-literate-target="f-0064006900720065006300740020006c0061006e0067007500610067006500200063006c00690065006e0074002e002a" aria-label="Definition of direct language client.*">&lt;&lt;direct language client.*&gt;&gt;= src/language-client.ts $</a></div>
@@ -152,6 +161,9 @@ There is no VS Code or third-party runtime dependency.</p>
 <span data-literate-explore="f-006c0061006e0067007500610067006500200063006c00690065006e0074002000730074006100740065"><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200063006c00690065006e0074002000730074006100740065" data-literate-target="f-006c0061006e0067007500610067006500200063006c00690065006e0074002000730074006100740065" aria-label="Definition of language client state">&lt;&lt;language client state&gt;&gt;</a></span>
 <span data-literate-explore="f-006c0061006e0067007500610067006500200063006c00690065006e007400200069006e0069007400690061006c0069007a0065"><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200063006c00690065006e007400200069006e0069007400690061006c0069007a0065" data-literate-target="f-006c0061006e0067007500610067006500200063006c00690065006e007400200069006e0069007400690061006c0069007a0065" aria-label="Definition of language client initialize">&lt;&lt;language client initialize&gt;&gt;</a></span>
 <span data-literate-explore="f-006c0061006e0067007500610067006500200063006c00690065006e0074002000730074006100720074"><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200063006c00690065006e0074002000730074006100720074" data-literate-target="f-006c0061006e0067007500610067006500200063006c00690065006e0074002000730074006100720074" aria-label="Definition of language client start">&lt;&lt;language client start&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e0067007500610067006500200063006c00690065006e0074002000610064007600650072007400690073006500640020006300610070006100620069006c00690074006900650073"><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200063006c00690065006e0074002000610064007600650072007400690073006500640020006300610070006100620069006c00690074006900650073" data-literate-target="f-006c0061006e0067007500610067006500200063006c00690065006e0074002000610064007600650072007400690073006500640020006300610070006100620069006c00690074006900650073" aria-label="Definition of language client advertised capabilities">&lt;&lt;language client advertised capabilities&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e0067007500610067006500200063006c00690065006e00740020006c0069007300740065006e006500720073"><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200063006c00690065006e00740020006c0069007300740065006e006500720073" data-literate-target="f-006c0061006e0067007500610067006500200063006c00690065006e00740020006c0069007300740065006e006500720073" aria-label="Definition of language client listeners">&lt;&lt;language client listeners&gt;&gt;</a></span>
+<span data-literate-explore="f-006c0061006e0067007500610067006500200063006c00690065006e00740020006500760065006e00740073"><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200063006c00690065006e00740020006500760065006e00740073" data-literate-target="f-006c0061006e0067007500610067006500200063006c00690065006e00740020006500760065006e00740073" aria-label="Definition of language client events">&lt;&lt;language client events&gt;&gt;</a></span>
 <span data-literate-explore="f-006c0061006e0067007500610067006500200063006c00690065006e00740020006c00610075006e00630068"><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200063006c00690065006e00740020006c00610075006e00630068" data-literate-target="f-006c0061006e0067007500610067006500200063006c00690065006e00740020006c00610075006e00630068" aria-label="Definition of language client launch">&lt;&lt;language client launch&gt;&gt;</a></span>
 <span data-literate-explore="f-006c0061006e0067007500610067006500200063006c00690065006e007400200063006f006e00730075006d0065"><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200063006c00690065006e007400200063006f006e00730075006d0065" data-literate-target="f-006c0061006e0067007500610067006500200063006c00690065006e007400200063006f006e00730075006d0065" aria-label="Definition of language client consume">&lt;&lt;language client consume&gt;&gt;</a></span>
 <span data-literate-explore="f-006c0061006e0067007500610067006500200063006c00690065006e0074002000640069007300700061007400630068"><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200063006c00690065006e0074002000640069007300700061007400630068" data-literate-target="f-006c0061006e0067007500610067006500200063006c00690065006e0074002000640069007300700061007400630068" aria-label="Definition of language client dispatch">&lt;&lt;language client dispatch&gt;&gt;</a></span>
@@ -191,6 +203,7 @@ There is no VS Code or third-party runtime dependency.</p>
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">LanguageDocument</span> { <span class="hljs-attr">uri</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">languageId</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">text</span>: <span class="hljs-built_in">string</span>; }
 <span class="hljs-keyword">type</span> <span class="hljs-title">ObjectValue</span> = <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">unknown</span>&gt;;
 <span class="hljs-keyword">type</span> <span class="hljs-title">Pending</span> = { <span class="hljs-attr">finish</span>: <span class="hljs-function">(</span><span class="hljs-params">error?: </span><span class="hljs-built_in">Error</span><span class="hljs-params">, value?: </span><span class="hljs-built_in">unknown</span><span class="hljs-function">) =&gt;</span> <span class="hljs-built_in">void</span> };
+<span class="hljs-keyword">type</span> <span class="hljs-title">Listener</span> = { method?: <span class="hljs-built_in">string</span>; <span class="hljs-attr">handler</span>: <span class="hljs-function">(</span><span class="hljs-params">params: </span><span class="hljs-built_in">unknown</span><span class="hljs-function">) =&gt;</span> <span class="hljs-built_in">void</span> };
 <span class="hljs-keyword">const</span> limit = <span class="hljs-number">8</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>;
 <span class="hljs-keyword">const</span> <span class="hljs-built_in">object</span> = (<span class="hljs-attr">value</span>: <span class="hljs-built_in">unknown</span>): value is <span class="hljs-title">ObjectValue</span> =&gt; value !== <span class="hljs-literal">null</span> &amp;&amp; <span class="hljs-keyword">typeof</span> value === <span class="hljs-string">'object'</span> &amp;&amp; !<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(value);
 <span class="hljs-keyword">const</span> failure = (<span class="hljs-attr">value</span>: <span class="hljs-built_in">unknown</span>): <span class="hljs-params">Error</span><span class="hljs-function"> =&gt;</span> value <span class="hljs-keyword">instanceof</span> <span class="hljs-title">Error</span> ? value : <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-title">String</span>(value));
@@ -211,6 +224,8 @@ There is no VS Code or third-party runtime dependency.</p>
     <span class="hljs-keyword">private</span> closing = <span class="hljs-literal">false</span>;
     <span class="hljs-keyword">private</span> initialized = <span class="hljs-literal">false</span>;
     <span class="hljs-keyword">private</span> sequence = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">private</span> documentSequence = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">private</span> listeners = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-title">Listener</span>&gt;();
     <span class="hljs-keyword">private</span> waiting = <span class="hljs-number">0</span>;
     <span class="hljs-keyword">private</span> pending = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">number</span>, <span class="hljs-title">Pending</span>&gt;();
     <span class="hljs-keyword">private</span> documents = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">LanguageDocument</span> &amp; { <span class="hljs-attr">version</span>: <span class="hljs-built_in">number</span> }&gt;();
@@ -236,7 +251,8 @@ There is no VS Code or third-party runtime dependency.</p>
 </code></pre>
 
 </div>
-</div><p>Negotiate UTF-16 and plain insertions before making document requests.</p>
+</div><p>Negotiate UTF-16 before making document requests. Completion resolution promises
+only documentation and detail, never edits or commands.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-006c0061006e0067007500610067006500200063006c00690065006e0074002000730074006100720074-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d0063006c00690065006e0074002e006c0069007400650072006100740065-1"><span id="f-006c0061006e0067007500610067006500200063006c00690065006e0074002000730074006100720074"></span><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200063006c00690065006e0074002000730074006100720074" data-literate-target="f-006c0061006e0067007500610067006500200063006c00690065006e0074002000730074006100720074" aria-label="Definition of language client start">&lt;&lt;language client start&gt;&gt;=</a></div>
 <div class="code">
@@ -246,13 +262,7 @@ There is no VS Code or third-party runtime dependency.</p>
             <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">await</span> <span class="hljs-variable">this</span>.<span class="hljs-title">rpc</span>(<span class="hljs-string">'initialize'</span>, {
                 <span class="hljs-attr">processId</span>: process.<span class="hljs-property">pid</span>, <span class="hljs-attr">rootUri</span>: <span class="hljs-variable">this</span>.<span class="hljs-property">options</span>.<span class="hljs-property">rootUri</span>,
                 <span class="hljs-attr">workspaceFolders</span>: <span class="hljs-variable">this</span>.<span class="hljs-title">folders</span>(), <span class="hljs-attr">initializationOptions</span>: <span class="hljs-variable">this</span>.<span class="hljs-property">options</span>.<span class="hljs-property">initializationOptions</span>,
-                <span class="hljs-attr">capabilities</span>: {
-                    <span class="hljs-attr">general</span>: { <span class="hljs-attr">positionEncodings</span>: [<span class="hljs-string">'utf-16'</span>] },
-                    <span class="hljs-attr">workspace</span>: { <span class="hljs-attr">configuration</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">workspaceFolders</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">applyEdit</span>: <span class="hljs-literal">false</span> },
-                    <span class="hljs-attr">textDocument</span>: { <span class="hljs-attr">synchronization</span>: { <span class="hljs-attr">dynamicRegistration</span>: <span class="hljs-literal">false</span> },
-                        <span class="hljs-attr">completion</span>: { <span class="hljs-attr">completionItem</span>: { <span class="hljs-attr">snippetSupport</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">insertReplaceSupport</span>: <span class="hljs-literal">true</span> } },
-                        <span class="hljs-attr">hover</span>: { <span class="hljs-attr">contentFormat</span>: [<span class="hljs-string">'plaintext'</span>, <span class="hljs-string">'markdown'</span>] } }
-                }
+                <span class="hljs-attr">capabilities</span>: <span class="hljs-variable">this</span>.<span class="hljs-title">advertisedCapabilities</span>()
             }, <span class="hljs-literal">undefined</span>, <span class="hljs-number">15000</span>);
             <span class="hljs-keyword">if</span> (!<span class="hljs-title">object</span>(result) || !<span class="hljs-title">object</span>(result.<span class="hljs-property">capabilities</span>)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Invalid initialize result'</span>); }
             <span class="hljs-variable">this</span>.<span class="hljs-property">capabilities</span> = result.<span class="hljs-property">capabilities</span>;
@@ -262,6 +272,91 @@ There is no VS Code or third-party runtime dependency.</p>
             <span class="hljs-variable">this</span>.<span class="hljs-title">send</span>({ <span class="hljs-attr">method</span>: <span class="hljs-string">'initialized'</span>, <span class="hljs-attr">params</span>: {} });
             <span class="hljs-variable">this</span>.<span class="hljs-property">initialized</span> = <span class="hljs-literal">true</span>;
         } <span class="hljs-keyword">catch</span> (error) { <span class="hljs-variable">this</span>.<span class="hljs-title">fail</span>(<span class="hljs-title">failure</span>(error)); <span class="hljs-keyword">throw</span> error; }
+    }
+
+</code></pre>
+
+</div>
+</div><p>Static capabilities describe only the adapter-approved read surface. Refresh is a
+server request, acknowledged before callbacks schedule another generic pull request.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e0067007500610067006500200063006c00690065006e0074002000610064007600650072007400690073006500640020006300610070006100620069006c00690074006900650073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d0063006c00690065006e0074002e006c0069007400650072006100740065-1"><span id="f-006c0061006e0067007500610067006500200063006c00690065006e0074002000610064007600650072007400690073006500640020006300610070006100620069006c00690074006900650073"></span><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200063006c00690065006e0074002000610064007600650072007400690073006500640020006300610070006100620069006c00690074006900650073" data-literate-target="f-006c0061006e0067007500610067006500200063006c00690065006e0074002000610064007600650072007400690073006500640020006300610070006100620069006c00690074006900650073" aria-label="Definition of language client advertised capabilities">&lt;&lt;language client advertised capabilities&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">private</span> <span class="hljs-title">advertisedCapabilities</span>(): <span class="hljs-title">ObjectValue</span> {
+        <span class="hljs-keyword">return</span> {
+            <span class="hljs-attr">general</span>: { <span class="hljs-attr">positionEncodings</span>: [<span class="hljs-string">'utf-16'</span>] },
+            <span class="hljs-attr">workspace</span>: { <span class="hljs-attr">configuration</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">workspaceFolders</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">applyEdit</span>: <span class="hljs-literal">false</span>,
+                <span class="hljs-attr">diagnostics</span>: { <span class="hljs-attr">refreshSupport</span>: <span class="hljs-literal">true</span> } },
+            <span class="hljs-attr">textDocument</span>: {
+                <span class="hljs-attr">synchronization</span>: { <span class="hljs-attr">dynamicRegistration</span>: <span class="hljs-literal">false</span> },
+                <span class="hljs-attr">completion</span>: { <span class="hljs-attr">completionItem</span>: { <span class="hljs-attr">snippetSupport</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">insertReplaceSupport</span>: <span class="hljs-literal">true</span>,
+                    <span class="hljs-attr">documentationFormat</span>: [<span class="hljs-string">'markdown'</span>, <span class="hljs-string">'plaintext'</span>],
+                    <span class="hljs-attr">resolveSupport</span>: { <span class="hljs-attr">properties</span>: [<span class="hljs-string">'documentation'</span>, <span class="hljs-string">'detail'</span>] } } },
+                <span class="hljs-attr">signatureHelp</span>: { <span class="hljs-attr">contextSupport</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">signatureInformation</span>: {
+                    <span class="hljs-attr">documentationFormat</span>: [<span class="hljs-string">'markdown'</span>, <span class="hljs-string">'plaintext'</span>], <span class="hljs-attr">parameterInformation</span>: { <span class="hljs-attr">labelOffsetSupport</span>: <span class="hljs-literal">true</span> } } },
+                <span class="hljs-attr">definition</span>: { <span class="hljs-attr">linkSupport</span>: <span class="hljs-literal">true</span> }, <span class="hljs-attr">typeDefinition</span>: { <span class="hljs-attr">linkSupport</span>: <span class="hljs-literal">true</span> },
+                <span class="hljs-attr">implementation</span>: { <span class="hljs-attr">linkSupport</span>: <span class="hljs-literal">true</span> }, <span class="hljs-attr">references</span>: { <span class="hljs-attr">dynamicRegistration</span>: <span class="hljs-literal">false</span> },
+                <span class="hljs-attr">publishDiagnostics</span>: { <span class="hljs-attr">versionSupport</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">relatedInformation</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">tagSupport</span>: { <span class="hljs-attr">valueSet</span>: [<span class="hljs-number">1</span>, <span class="hljs-number">2</span>] } },
+                <span class="hljs-attr">diagnostic</span>: { <span class="hljs-attr">dynamicRegistration</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">relatedDocumentSupport</span>: <span class="hljs-literal">false</span> },
+                <span class="hljs-attr">hover</span>: { <span class="hljs-attr">contentFormat</span>: [<span class="hljs-string">'plaintext'</span>, <span class="hljs-string">'markdown'</span>] }
+            }
+        };
+    }
+
+</code></pre>
+
+</div>
+</div><p>Listeners are method-specific but not an execution surface: unknown server requests
+still fail closed. All subscriptions share 128 slots, return idempotent disposers,
+and may be registered before initialization. A late stop subscription fires immediately.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e0067007500610067006500200063006c00690065006e00740020006c0069007300740065006e006500720073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d0063006c00690065006e0074002e006c0069007400650072006100740065-1"><span id="f-006c0061006e0067007500610067006500200063006c00690065006e00740020006c0069007300740065006e006500720073"></span><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200063006c00690065006e00740020006c0069007300740065006e006500720073" data-literate-target="f-006c0061006e0067007500610067006500200063006c00690065006e00740020006c0069007300740065006e006500720073" aria-label="Definition of language client listeners">&lt;&lt;language client listeners&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">public</span> <span class="hljs-title">onNotification</span>(<span class="hljs-attr">method</span>: <span class="hljs-built_in">string</span>, <span class="hljs-attr">handler</span>: <span class="hljs-function">(</span><span class="hljs-params">params: </span><span class="hljs-built_in">unknown</span><span class="hljs-function">) =&gt;</span> <span class="hljs-built_in">void</span>): <span class="hljs-function">() =&gt;</span> <span class="hljs-built_in">void</span> {
+        <span class="hljs-keyword">if</span> (<span class="hljs-variable">this</span>.<span class="hljs-property">stopped</span> || <span class="hljs-variable">this</span>.<span class="hljs-property">closing</span>) { <span class="hljs-keyword">return</span> <span class="hljs-function">() =&gt;</span> {}; }
+        <span class="hljs-keyword">return</span> <span class="hljs-variable">this</span>.<span class="hljs-title">listen</span>({ method, handler });
+    }
+
+    <span class="hljs-keyword">public</span> <span class="hljs-title">onDidStop</span>(<span class="hljs-attr">handler</span>: <span class="hljs-function">() =&gt;</span> <span class="hljs-built_in">void</span>): <span class="hljs-function">() =&gt;</span> <span class="hljs-built_in">void</span> {
+        <span class="hljs-keyword">if</span> (<span class="hljs-variable">this</span>.<span class="hljs-property">stopped</span>) { <span class="hljs-variable">this</span>.<span class="hljs-title">invoke</span>({ handler }, <span class="hljs-literal">undefined</span>); <span class="hljs-keyword">return</span> <span class="hljs-function">() =&gt;</span> {}; }
+        <span class="hljs-keyword">return</span> <span class="hljs-variable">this</span>.<span class="hljs-title">listen</span>({ handler });
+    }
+
+    <span class="hljs-keyword">private</span> <span class="hljs-title">listen</span>(<span class="hljs-attr">listener</span>: <span class="hljs-title">Listener</span>): <span class="hljs-function">() =&gt;</span> <span class="hljs-built_in">void</span> {
+        <span class="hljs-keyword">if</span> (<span class="hljs-variable">this</span>.<span class="hljs-property">listeners</span>.<span class="hljs-property">size</span> &gt;= <span class="hljs-number">128</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'LSP listener limit exceeded'</span>); }
+        <span class="hljs-variable">this</span>.<span class="hljs-property">listeners</span>.<span class="hljs-title">add</span>(listener);
+        <span class="hljs-keyword">return</span> <span class="hljs-function">() =&gt;</span> { <span class="hljs-variable">this</span>.<span class="hljs-property">listeners</span>.<span class="hljs-title">delete</span>(listener); };
+    }
+
+    <span class="hljs-keyword">public</span> <span class="hljs-title">documentVersion</span>(<span class="hljs-attr">uri</span>: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">number</span> | <span class="hljs-literal">undefined</span> { <span class="hljs-keyword">return</span> <span class="hljs-variable">this</span>.<span class="hljs-property">documents</span>.<span class="hljs-title">get</span>(uri)?.<span class="hljs-property">version</span>; }
+
+</code></pre>
+
+</div>
+</div><p>Notifications are delivered synchronously only after readiness and outside shutdown.
+Callbacks added during delivery wait for the next event; removed callbacks stay removed.
+Failures log a constant message, never callback exceptions or notification payloads.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e0067007500610067006500200063006c00690065006e00740020006500760065006e00740073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d0063006c00690065006e0074002e006c0069007400650072006100740065-1"><span id="f-006c0061006e0067007500610067006500200063006c00690065006e00740020006500760065006e00740073"></span><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200063006c00690065006e00740020006500760065006e00740073" data-literate-target="f-006c0061006e0067007500610067006500200063006c00690065006e00740020006500760065006e00740073" aria-label="Definition of language client events">&lt;&lt;language client events&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">private</span> <span class="hljs-title">emit</span>(<span class="hljs-attr">method</span>: <span class="hljs-built_in">string</span>, <span class="hljs-attr">params</span>: <span class="hljs-built_in">unknown</span>): <span class="hljs-built_in">void</span> {
+        <span class="hljs-keyword">if</span> (!<span class="hljs-variable">this</span>.<span class="hljs-property">initialized</span> || <span class="hljs-variable">this</span>.<span class="hljs-property">closing</span> || <span class="hljs-variable">this</span>.<span class="hljs-property">stopped</span>) { <span class="hljs-keyword">return</span>; }
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> listener <span class="hljs-keyword">of</span> [...<span class="hljs-variable">this</span>.<span class="hljs-property">listeners</span>]) {
+            <span class="hljs-keyword">if</span> (listener.<span class="hljs-property">method</span> === method &amp;&amp; <span class="hljs-variable">this</span>.<span class="hljs-property">listeners</span>.<span class="hljs-title">has</span>(listener)) { <span class="hljs-variable">this</span>.<span class="hljs-title">invoke</span>(listener, params); }
+        }
+    }
+
+    <span class="hljs-keyword">private</span> <span class="hljs-title">invoke</span>(<span class="hljs-attr">listener</span>: <span class="hljs-title">Listener</span>, <span class="hljs-attr">params</span>: <span class="hljs-built_in">unknown</span>): <span class="hljs-built_in">void</span> {
+        <span class="hljs-keyword">try</span> { listener.<span class="hljs-title">handler</span>(params); }
+        <span class="hljs-keyword">catch</span> {
+            <span class="hljs-keyword">try</span> { <span class="hljs-variable">this</span>.<span class="hljs-property">options</span>.<span class="hljs-property">log</span>?.(<span class="hljs-string">'Language client listener failed'</span>); } <span class="hljs-keyword">catch</span> {  }
+        }
+    }
+
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">async</span> <span class="hljs-title">notify</span>(<span class="hljs-attr">method</span>: <span class="hljs-built_in">string</span>, <span class="hljs-attr">params</span>: <span class="hljs-built_in">unknown</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; {
+        <span class="hljs-keyword">if</span> (!<span class="hljs-variable">this</span>.<span class="hljs-property">initialized</span>) { <span class="hljs-keyword">await</span> <span class="hljs-variable">this</span>.<span class="hljs-title">waitForInitialization</span>(); }
+        <span class="hljs-keyword">if</span> (<span class="hljs-variable">this</span>.<span class="hljs-property">closing</span> || <span class="hljs-variable">this</span>.<span class="hljs-property">stopped</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-variable">this</span>.<span class="hljs-property">stopped</span> || <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Language client disposed'</span>); }
+        <span class="hljs-variable">this</span>.<span class="hljs-title">send</span>({ method, ...(params === <span class="hljs-literal">undefined</span> ? {} : { params }) });
     }
 
 </code></pre>
@@ -340,7 +435,7 @@ There is no VS Code or third-party runtime dependency.</p>
             <span class="hljs-keyword">if</span> (message.<span class="hljs-property">id</span> !== <span class="hljs-literal">undefined</span>) {
                 <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> message.<span class="hljs-property">id</span> !== <span class="hljs-string">'number'</span> &amp;&amp; <span class="hljs-keyword">typeof</span> message.<span class="hljs-property">id</span> !== <span class="hljs-string">'string'</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Invalid request id'</span>); }
                 <span class="hljs-variable">this</span>.<span class="hljs-title">answer</span>(message.<span class="hljs-property">method</span>, message.<span class="hljs-property">params</span>, message.<span class="hljs-property">id</span>);
-            }
+            } <span class="hljs-keyword">else</span> { <span class="hljs-variable">this</span>.<span class="hljs-title">emit</span>(message.<span class="hljs-property">method</span>, message.<span class="hljs-property">params</span>); }
             <span class="hljs-keyword">return</span>;
         }
         <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> message.<span class="hljs-property">id</span> !== <span class="hljs-string">'number'</span> || ((<span class="hljs-string">'result'</span> <span class="hljs-keyword">in</span> message) === (<span class="hljs-string">'error'</span> <span class="hljs-keyword">in</span> message))) {
@@ -398,6 +493,9 @@ There is no VS Code or third-party runtime dependency.</p>
         <span class="hljs-keyword">if</span> (method === <span class="hljs-string">'workspace/configuration'</span> &amp;&amp; <span class="hljs-title">object</span>(params) &amp;&amp; <span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(params.<span class="hljs-property">items</span>)) {
             result = params.<span class="hljs-property">items</span>.<span class="hljs-title">map</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">object</span>(item) ? <span class="hljs-variable">this</span>.<span class="hljs-title">section</span>(item.<span class="hljs-property">section</span>) : <span class="hljs-literal">null</span>);
         } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (method === <span class="hljs-string">'workspace/workspaceFolders'</span>) { result = <span class="hljs-variable">this</span>.<span class="hljs-title">folders</span>(); }
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (method === <span class="hljs-string">'workspace/diagnostic/refresh'</span> &amp;&amp; <span class="hljs-variable">this</span>.<span class="hljs-property">initialized</span> &amp;&amp; !<span class="hljs-variable">this</span>.<span class="hljs-property">closing</span>) {
+            <span class="hljs-variable">this</span>.<span class="hljs-title">send</span>({ id, <span class="hljs-attr">result</span>: <span class="hljs-literal">null</span> }); <span class="hljs-variable">this</span>.<span class="hljs-title">emit</span>(method, params); <span class="hljs-keyword">return</span>;
+        }
         <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (method === <span class="hljs-string">'workspace/applyEdit'</span>) { result = { <span class="hljs-attr">applied</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">failureReason</span>: <span class="hljs-string">'Read-only language client'</span> }; }
         <span class="hljs-keyword">else</span> {
             <span class="hljs-variable">this</span>.<span class="hljs-title">send</span>({ id, <span class="hljs-attr">error</span>: { <span class="hljs-attr">code</span>: -<span class="hljs-number">32601</span>, <span class="hljs-attr">message</span>: <span class="hljs-string">`Unsupported method: </span><span class="hljs-subst">${method}</span><span class="hljs-string">`</span> } }); <span class="hljs-keyword">return</span>;
@@ -522,8 +620,8 @@ There is no VS Code or third-party runtime dependency.</p>
         }
         <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [uri, old] <span class="hljs-keyword">of</span> <span class="hljs-variable">this</span>.<span class="hljs-property">documents</span>) {
             <span class="hljs-keyword">if</span> (!next.<span class="hljs-title">has</span>(uri) || next.<span class="hljs-title">get</span>(uri)!.<span class="hljs-property">languageId</span> !== old.<span class="hljs-property">languageId</span>) {
-                <span class="hljs-keyword">if</span> (openClose) { <span class="hljs-variable">this</span>.<span class="hljs-title">send</span>({ <span class="hljs-attr">method</span>: <span class="hljs-string">'textDocument/didClose'</span>, <span class="hljs-attr">params</span>: { <span class="hljs-attr">textDocument</span>: { uri } } }); }
                 <span class="hljs-variable">this</span>.<span class="hljs-property">documents</span>.<span class="hljs-title">delete</span>(uri);
+                <span class="hljs-keyword">if</span> (openClose) { <span class="hljs-variable">this</span>.<span class="hljs-title">send</span>({ <span class="hljs-attr">method</span>: <span class="hljs-string">'textDocument/didClose'</span>, <span class="hljs-attr">params</span>: { <span class="hljs-attr">textDocument</span>: { uri } } }); }
             }
         }
         <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> doc <span class="hljs-keyword">of</span> next.<span class="hljs-title">values</span>()) { <span class="hljs-variable">this</span>.<span class="hljs-title">updateDocument</span>(doc, kind, openClose); }
@@ -539,7 +637,11 @@ There is no VS Code or third-party runtime dependency.</p>
 <pre><code>    <span class="hljs-keyword">private</span> <span class="hljs-title">updateDocument</span>(<span class="hljs-attr">doc</span>: <span class="hljs-title">LanguageDocument</span>, <span class="hljs-attr">kind</span>: <span class="hljs-built_in">unknown</span>, <span class="hljs-attr">openClose</span>: <span class="hljs-built_in">boolean</span>): <span class="hljs-built_in">void</span> {
         <span class="hljs-keyword">const</span> old = <span class="hljs-variable">this</span>.<span class="hljs-property">documents</span>.<span class="hljs-title">get</span>(doc.<span class="hljs-property">uri</span>);
         <span class="hljs-keyword">if</span> (old?.<span class="hljs-property">text</span> === doc.<span class="hljs-property">text</span>) { <span class="hljs-keyword">return</span>; }
-        <span class="hljs-keyword">const</span> version = (old?.<span class="hljs-property">version</span> || <span class="hljs-number">0</span>) + <span class="hljs-number">1</span>;
+        <span class="hljs-keyword">if</span> (<span class="hljs-variable">this</span>.<span class="hljs-property">documentSequence</span> &gt;= <span class="hljs-number">2147483647</span>) {
+            <span class="hljs-keyword">const</span> error = <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'LSP document version limit exceeded'</span>); <span class="hljs-variable">this</span>.<span class="hljs-title">fail</span>(error); <span class="hljs-keyword">throw</span> error;
+        }
+        <span class="hljs-keyword">const</span> version = ++<span class="hljs-variable">this</span>.<span class="hljs-property">documentSequence</span>;
+        <span class="hljs-variable">this</span>.<span class="hljs-property">documents</span>.<span class="hljs-title">set</span>(doc.<span class="hljs-property">uri</span>, { ...doc, version });
         <span class="hljs-keyword">if</span> (!old &amp;&amp; openClose) {
             <span class="hljs-variable">this</span>.<span class="hljs-title">send</span>({ <span class="hljs-attr">method</span>: <span class="hljs-string">'textDocument/didOpen'</span>, <span class="hljs-attr">params</span>: { <span class="hljs-attr">textDocument</span>: { ...doc, version } } });
         } <span class="hljs-keyword">else</span> {
@@ -549,7 +651,6 @@ There is no VS Code or third-party runtime dependency.</p>
                 <span class="hljs-attr">textDocument</span>: { <span class="hljs-attr">uri</span>: doc.<span class="hljs-property">uri</span>, version }, <span class="hljs-attr">contentChanges</span>: [{ ...(kind === <span class="hljs-number">2</span> ? { range } : {}), <span class="hljs-attr">text</span>: doc.<span class="hljs-property">text</span> }]
             } });
         }
-        <span class="hljs-variable">this</span>.<span class="hljs-property">documents</span>.<span class="hljs-title">set</span>(doc.<span class="hljs-property">uri</span>, { ...doc, version });
     }
 
 </code></pre>
@@ -564,6 +665,10 @@ There is no VS Code or third-party runtime dependency.</p>
         <span class="hljs-variable">this</span>.<span class="hljs-property">stopped</span> = error;
         <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> pending <span class="hljs-keyword">of</span> <span class="hljs-variable">this</span>.<span class="hljs-property">pending</span>.<span class="hljs-title">values</span>()) { pending.<span class="hljs-title">finish</span>(error); }
         <span class="hljs-variable">this</span>.<span class="hljs-property">documents</span>.<span class="hljs-title">clear</span>(); <span class="hljs-variable">this</span>.<span class="hljs-property">header</span> = <span class="hljs-title">Buffer</span>.<span class="hljs-title">alloc</span>(<span class="hljs-number">0</span>); <span class="hljs-variable">this</span>.<span class="hljs-property">body</span> = <span class="hljs-literal">undefined</span>;
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> listener <span class="hljs-keyword">of</span> [...<span class="hljs-variable">this</span>.<span class="hljs-property">listeners</span>]) {
+            <span class="hljs-keyword">if</span> (listener.<span class="hljs-property">method</span> === <span class="hljs-literal">undefined</span> &amp;&amp; <span class="hljs-variable">this</span>.<span class="hljs-property">listeners</span>.<span class="hljs-title">has</span>(listener)) { <span class="hljs-variable">this</span>.<span class="hljs-title">invoke</span>(listener, <span class="hljs-literal">undefined</span>); }
+        }
+        <span class="hljs-variable">this</span>.<span class="hljs-property">listeners</span>.<span class="hljs-title">clear</span>();
         <span class="hljs-variable">this</span>.<span class="hljs-property">child</span>?.<span class="hljs-property">stdin</span>.<span class="hljs-title">destroy</span>(); <span class="hljs-variable">this</span>.<span class="hljs-property">child</span>?.<span class="hljs-property">stdout</span>.<span class="hljs-title">destroy</span>(); <span class="hljs-variable">this</span>.<span class="hljs-property">child</span>?.<span class="hljs-property">stderr</span>.<span class="hljs-title">destroy</span>();
         <span class="hljs-keyword">if</span> (<span class="hljs-variable">this</span>.<span class="hljs-property">child</span> &amp;&amp; <span class="hljs-variable">this</span>.<span class="hljs-property">child</span>.<span class="hljs-property">exitCode</span> === <span class="hljs-literal">null</span> &amp;&amp; <span class="hljs-variable">this</span>.<span class="hljs-property">child</span>.<span class="hljs-property">signalCode</span> === <span class="hljs-literal">null</span>) { <span class="hljs-variable">this</span>.<span class="hljs-property">child</span>.<span class="hljs-title">kill</span>(<span class="hljs-string">'SIGKILL'</span>); }
     }

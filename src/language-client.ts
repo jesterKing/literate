@@ -14,6 +14,7 @@ export interface LanguageClientOptions {
 export interface LanguageDocument { uri: string; languageId: string; text: string; }
 type ObjectValue = Record<string, unknown>;
 type Pending = { finish: (error?: Error, value?: unknown) => void };
+type Listener = { method?: string; handler: (params: unknown) => void };
 const limit = 8 * 1024 * 1024;
 const object = (value: unknown): value is ObjectValue => value !== null && typeof value === 'object' && !Array.isArray(value);
 const failure = (value: unknown): Error => value instanceof Error ? value : new Error(String(value));
@@ -27,6 +28,8 @@ export class LanguageClient {
     private closing = false;
     private initialized = false;
     private sequence = 0;
+    private documentSequence = 0;
+    private listeners = new Set<Listener>();
     private waiting = 0;
     private pending = new Map<number, Pending>();
     private documents = new Map<string, LanguageDocument & { version: number }>();
@@ -48,13 +51,7 @@ export class LanguageClient {
             const result = await this.rpc('initialize', {
                 processId: process.pid, rootUri: this.options.rootUri,
                 workspaceFolders: this.folders(), initializationOptions: this.options.initializationOptions,
-                capabilities: {
-                    general: { positionEncodings: ['utf-16'] },
-                    workspace: { configuration: true, workspaceFolders: true, applyEdit: false },
-                    textDocument: { synchronization: { dynamicRegistration: false },
-                        completion: { completionItem: { snippetSupport: false, insertReplaceSupport: true } },
-                        hover: { contentFormat: ['plaintext', 'markdown'] } }
-                }
+                capabilities: this.advertisedCapabilities()
             }, undefined, 15000);
             if (!object(result) || !object(result.capabilities)) { throw new Error('Invalid initialize result'); }
             this.capabilities = result.capabilities;
@@ -64,6 +61,65 @@ export class LanguageClient {
             this.send({ method: 'initialized', params: {} });
             this.initialized = true;
         } catch (error) { this.fail(failure(error)); throw error; }
+    }
+
+    private advertisedCapabilities(): ObjectValue {
+        return {
+            general: { positionEncodings: ['utf-16'] },
+            workspace: { configuration: true, workspaceFolders: true, applyEdit: false,
+                diagnostics: { refreshSupport: true } },
+            textDocument: {
+                synchronization: { dynamicRegistration: false },
+                completion: { completionItem: { snippetSupport: true, insertReplaceSupport: true,
+                    documentationFormat: ['markdown', 'plaintext'],
+                    resolveSupport: { properties: ['documentation', 'detail'] } } },
+                signatureHelp: { contextSupport: true, signatureInformation: {
+                    documentationFormat: ['markdown', 'plaintext'], parameterInformation: { labelOffsetSupport: true } } },
+                definition: { linkSupport: true }, typeDefinition: { linkSupport: true },
+                implementation: { linkSupport: true }, references: { dynamicRegistration: false },
+                publishDiagnostics: { versionSupport: true, relatedInformation: true, tagSupport: { valueSet: [1, 2] } },
+                diagnostic: { dynamicRegistration: false, relatedDocumentSupport: false },
+                hover: { contentFormat: ['plaintext', 'markdown'] }
+            }
+        };
+    }
+
+    public onNotification(method: string, handler: (params: unknown) => void): () => void {
+        if (this.stopped || this.closing) { return () => {}; }
+        return this.listen({ method, handler });
+    }
+
+    public onDidStop(handler: () => void): () => void {
+        if (this.stopped) { this.invoke({ handler }, undefined); return () => {}; }
+        return this.listen({ handler });
+    }
+
+    private listen(listener: Listener): () => void {
+        if (this.listeners.size >= 128) { throw new Error('LSP listener limit exceeded'); }
+        this.listeners.add(listener);
+        return () => { this.listeners.delete(listener); };
+    }
+
+    public documentVersion(uri: string): number | undefined { return this.documents.get(uri)?.version; }
+
+    private emit(method: string, params: unknown): void {
+        if (!this.initialized || this.closing || this.stopped) { return; }
+        for (const listener of [...this.listeners]) {
+            if (listener.method === method && this.listeners.has(listener)) { this.invoke(listener, params); }
+        }
+    }
+
+    private invoke(listener: Listener, params: unknown): void {
+        try { listener.handler(params); }
+        catch {
+            try { this.options.log?.('Language client listener failed'); } catch { /* Logging is best effort. */ }
+        }
+    }
+
+    public async notify(method: string, params: unknown): Promise<void> {
+        if (!this.initialized) { await this.waitForInitialization(); }
+        if (this.closing || this.stopped) { throw this.stopped || new Error('Language client disposed'); }
+        this.send({ method, ...(params === undefined ? {} : { params }) });
     }
 
     private launch(): void {
@@ -121,7 +177,7 @@ export class LanguageClient {
             if (message.id !== undefined) {
                 if (typeof message.id !== 'number' && typeof message.id !== 'string') { throw new Error('Invalid request id'); }
                 this.answer(message.method, message.params, message.id);
-            }
+            } else { this.emit(message.method, message.params); }
             return;
         }
         if (typeof message.id !== 'number' || (('result' in message) === ('error' in message))) {
@@ -158,6 +214,9 @@ export class LanguageClient {
         if (method === 'workspace/configuration' && object(params) && Array.isArray(params.items)) {
             result = params.items.map(item => object(item) ? this.section(item.section) : null);
         } else if (method === 'workspace/workspaceFolders') { result = this.folders(); }
+        else if (method === 'workspace/diagnostic/refresh' && this.initialized && !this.closing) {
+            this.send({ id, result: null }); this.emit(method, params); return;
+        }
         else if (method === 'workspace/applyEdit') { result = { applied: false, failureReason: 'Read-only language client' }; }
         else {
             this.send({ id, error: { code: -32601, message: `Unsupported method: ${method}` } }); return;
@@ -240,8 +299,8 @@ export class LanguageClient {
         }
         for (const [uri, old] of this.documents) {
             if (!next.has(uri) || next.get(uri)!.languageId !== old.languageId) {
-                if (openClose) { this.send({ method: 'textDocument/didClose', params: { textDocument: { uri } } }); }
                 this.documents.delete(uri);
+                if (openClose) { this.send({ method: 'textDocument/didClose', params: { textDocument: { uri } } }); }
             }
         }
         for (const doc of next.values()) { this.updateDocument(doc, kind, openClose); }
@@ -250,7 +309,11 @@ export class LanguageClient {
     private updateDocument(doc: LanguageDocument, kind: unknown, openClose: boolean): void {
         const old = this.documents.get(doc.uri);
         if (old?.text === doc.text) { return; }
-        const version = (old?.version || 0) + 1;
+        if (this.documentSequence >= 2147483647) {
+            const error = new Error('LSP document version limit exceeded'); this.fail(error); throw error;
+        }
+        const version = ++this.documentSequence;
+        this.documents.set(doc.uri, { ...doc, version });
         if (!old && openClose) {
             this.send({ method: 'textDocument/didOpen', params: { textDocument: { ...doc, version } } });
         } else {
@@ -260,7 +323,6 @@ export class LanguageClient {
                 textDocument: { uri: doc.uri, version }, contentChanges: [{ ...(kind === 2 ? { range } : {}), text: doc.text }]
             } });
         }
-        this.documents.set(doc.uri, { ...doc, version });
     }
 
     private fail(error: Error): void {
@@ -268,6 +330,10 @@ export class LanguageClient {
         this.stopped = error;
         for (const pending of this.pending.values()) { pending.finish(error); }
         this.documents.clear(); this.header = Buffer.alloc(0); this.body = undefined;
+        for (const listener of [...this.listeners]) {
+            if (listener.method === undefined && this.listeners.has(listener)) { this.invoke(listener, undefined); }
+        }
+        this.listeners.clear();
         this.child?.stdin.destroy(); this.child?.stdout.destroy(); this.child?.stderr.destroy();
         if (this.child && this.child.exitCode === null && this.child.signalCode === null) { this.child.kill('SIGKILL'); }
     }

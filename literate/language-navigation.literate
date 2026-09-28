@@ -1,0 +1,295 @@
+# Read-only language locations
+
+Definition, references, type-definition and implementation share a pure mapper.
+The caller owns approval, session lifecycle and snapshot freshness. These helpers
+neither open documents nor touch the filesystem. Ordinary local library locations
+are preserved; a known generated output must map to captured literal source.
+
+```ts : <<language navigation.*>>= ./src/language-navigation.ts $
+<<navigation imports>>
+<<navigation coordinates>>
+<<navigation local uri>>
+<<navigation text index>>
+<<navigation text positions>>
+<<navigation context>>
+<<navigation source spans>>
+<<navigation intersections>>
+<<navigation mapped locations>>
+<<navigation target>>
+<<navigation replies>>
+<<navigation diagnostics>>
+```
+
+The public context is an immutable captured snapshot: do not mutate its root,
+arrays, documents, projections or mappings after either helper receives it.
+Create a new context object for each changed snapshot. A WeakMap keyed by context
+identity shares prepared source indexes and lazy generated indexes across calls,
+so a diagnostic batch scans book text once without retaining discarded snapshots.
+
+All coordinates are UTF-16, matching
+LSP and VS Code. Range coordinates must be nonnegative safe integers; generated
+and captured source ranges must also fit their text, excluding newline columns.
+Unknown library files can only receive structural validation without I/O.
+
+```ts : <<navigation imports>>=
+import * as vscode from 'vscode';
+import * as path from 'node:path';
+import type { SourceDocument } from './engine';
+import type { LanguageProjection } from './language-projection';
+
+/** Immutable snapshot, including nested arrays and records; replace the context on change. */
+export interface LanguageLocationContext {
+    root: vscode.Uri;
+    files: LanguageProjection[];
+    documents: SourceDocument[];
+}
+type RecordValue = Record<string, unknown>;
+const record = (value: unknown): value is RecordValue =>
+    value !== null && typeof value === 'object' && !Array.isArray(value);
+const coordinate = (value: unknown): value is number =>
+    typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+interface Point { line: number; character: number; }
+interface Span { start: Point; end: Point; }
+const compare = (a: Point, b: Point): number => a.line - b.line || a.character - b.character;
+```
+
+```ts : <<navigation coordinates>>=
+function point(value: unknown): value is Point {
+    return record(value) && coordinate(value.line) && coordinate(value.character);
+}
+function span(value: unknown): value is Span {
+    return record(value) && point(value.start) && point(value.end) && compare(value.start, value.end) <= 0;
+}
+function range(value: Span): vscode.Range {
+    return new vscode.Range(new vscode.Position(value.start.line, value.start.character),
+        new vscode.Position(value.end.line, value.end.character));
+}
+function key(location: vscode.Location): string {
+    const { start, end } = location.range;
+    return JSON.stringify([location.uri.toString(), start.line, start.character, end.line, end.character]);
+}
+```
+
+Only absolute local file URIs qualify, including for external imports. Reject raw
+and encoded control characters, backslashes, authorities (even localhost), queries
+and fragments before normalization. Path normalization makes repeated spellings
+of a generated output resolve to the same captured projection, never a fallback.
+
+```ts : <<navigation local uri>>=
+function localUri(value: unknown): vscode.Uri | undefined {
+    if (typeof value !== 'string' || !/^file:\//i.test(value) || /[?#\\\x00-\x20\x7f]/.test(value)) { return; }
+    const body = value.slice(5);
+    if (body.startsWith('//') && !body.startsWith('///')) { return; }
+    try {
+        const decoded = decodeURIComponent(body);
+        if (/[\\\x00-\x1f\x7f]/.test(decoded) || decoded.startsWith('////')) { return; }
+        const uri = vscode.Uri.parse(value, true);
+        if (uri.scheme !== 'file' || uri.authority || uri.query || uri.fragment
+            || !path.isAbsolute(uri.fsPath) || uri.fsPath.startsWith('//')) { return; }
+        return vscode.Uri.file(path.normalize(uri.fsPath));
+    } catch { return; }
+}
+```
+
+```ts : <<navigation text index>>=
+class TextIndex {
+    readonly starts = [0];
+    readonly ends: number[] = [];
+    constructor(readonly text: string) {
+        for (const match of text.matchAll(/\r\n|\r|\n/g)) {
+            this.ends.push(match.index!);
+            this.starts.push(match.index! + match[0].length);
+        }
+        this.ends.push(text.length);
+    }
+    offset(value: Point): number | undefined {
+        const start = this.starts[value.line], end = this.ends[value.line];
+        return start !== undefined && value.character <= end - start ? start + value.character : undefined;
+    }
+    offsets(value: Span): [number, number] | undefined {
+        const start = this.offset(value.start), end = this.offset(value.end);
+        return start !== undefined && end !== undefined ? [start, end] : undefined;
+    }
+```
+
+```ts : <<navigation text positions>>=
+    position(offset: number): vscode.Position {
+        let low = 0, high = this.starts.length;
+        while (low + 1 < high) {
+            const middle = Math.floor((low + high) / 2);
+            if (this.starts[middle] <= offset) { low = middle; } else { high = middle; }
+        }
+        return new vscode.Position(low, Math.min(offset, this.ends[low]) - this.starts[low]);
+    }
+}
+interface Source { uri: vscode.Uri; index: TextIndex; }
+interface Prepared {
+    files: Map<string, LanguageProjection>;
+    sources: Map<string, Source>;
+    documents: Map<string, Source>;
+    indexes: Map<LanguageProjection, TextIndex>;
+}
+```
+
+```ts : <<navigation context>>=
+const preparedContexts = new WeakMap<LanguageLocationContext, Prepared>();
+function prepare(context: LanguageLocationContext): Prepared | undefined {
+    const cached = preparedContexts.get(context);
+    if (cached) { return cached; }
+    const root = localUri(context.root.toString());
+    if (!root) { return; }
+    const result: Prepared = { files: new Map(), sources: new Map(), documents: new Map(), indexes: new Map() };
+    const resolve = (relative: string): vscode.Uri | undefined => localUri(vscode.Uri.file(path.resolve(root.fsPath, relative)).toString());
+    for (const file of context.files) {
+        const uri = resolve(file.path);
+        if (uri) { result.files.set(uri.fsPath, file); }
+    }
+    for (const document of context.documents) {
+        const uri = resolve(document.path);
+        if (!uri) { continue; }
+        const source = { uri, index: new TextIndex(document.text) };
+        result.sources.set(document.path, source);
+        result.documents.set(uri.fsPath, source);
+    }
+    preparedContexts.set(context, result);
+    return result;
+}
+interface Intersection { source: Source; start: number; end: number; from: number; to: number; }
+function connected(a: Intersection, b: Intersection): boolean {
+    if (a.source !== b.source || a.to !== b.from) { return false; }
+    return a.end === b.start || (b.start === a.end + 1
+        && a.source.index.text.slice(a.end, b.start + 1) === '\r\n');
+}
+```
+
+Projection mappings are occurrence-specific. Intersections use their source
+offsets, never a search for equal text. Adjacent segments merge only when both
+generated and source offsets are contiguous; a CR omitted by normalization is
+the sole allowed gap. Tags, wrappers, indentation and fragment seams are not
+invented as enclosing source ranges.
+
+```ts : <<navigation source spans>>=
+function intersection(file: LanguageProjection, mapping: LanguageProjection['mappings'][number],
+    start: number, end: number, state: Prepared): Intersection | undefined {
+    const source = state.sources.get(mapping.sourcePath);
+    if (!source || ![mapping.sourceStart, mapping.sourceEnd, mapping.generatedStart, mapping.generatedEnd].every(coordinate)
+        || mapping.sourceEnd > source.index.text.length || mapping.generatedEnd > file.content.length
+        || mapping.sourceEnd - mapping.sourceStart !== mapping.generatedEnd - mapping.generatedStart
+        || mapping.sourceStart > mapping.sourceEnd || mapping.generatedStart > mapping.generatedEnd) { return; }
+    const from = Math.max(start, mapping.generatedStart), to = Math.min(end, mapping.generatedEnd);
+    if (start === end) {
+        if (from !== start || to !== end || (start === mapping.generatedEnd && !mapping.endCursor)) { return; }
+    } else if (from >= to) { return; }
+    return { source, from, to, start: mapping.sourceStart + from - mapping.generatedStart,
+        end: mapping.sourceStart + to - mapping.generatedStart };
+}
+function location(hit: Intersection): vscode.Location {
+    return new vscode.Location(hit.source.uri, new vscode.Range(
+        hit.source.index.position(hit.start), hit.source.index.position(hit.end)));
+}
+```
+
+Navigation selects the first literal intersection in generated order and extends
+only its contiguous source sequence. A contained LocationLink selection therefore
+maps exactly; a cross-seam selection deterministically stops at the first seam.
+Diagnostics may split across seams, with at most 100 unique mapped ranges.
+Zero-width ranges require a mapped character or an explicitly allowed end cursor.
+
+```ts : <<navigation intersections>>=
+function mapped(file: LanguageProjection, bounds: [number, number], state: Prepared, limit: number): vscode.Location[] {
+    const result: vscode.Location[] = [], seen = new Set<string>();
+    let pending: Intersection | undefined;
+    const flush = (): void => {
+        if (!pending) { return; }
+        const value = location(pending), id = key(value);
+        if (!seen.has(id)) { seen.add(id); result.push(value); }
+    };
+    for (const mapping of file.mappings) {
+        const next = intersection(file, mapping, bounds[0], bounds[1], state);
+        if (!next) { continue; }
+        if (pending && connected(pending, next)) { pending.end = next.end; pending.to = next.to; continue; }
+        flush();
+        if (result.length >= limit) { return result; }
+        pending = next;
+    }
+    flush();
+    return result;
+}
+```
+
+```ts : <<navigation mapped locations>>=
+function mapRange(uri: vscode.Uri, value: Span, state: Prepared, limit: number): vscode.Location[] {
+    const file = state.files.get(uri.fsPath);
+    if (file) {
+        let index = state.indexes.get(file);
+        if (!index) { index = new TextIndex(file.content); state.indexes.set(file, index); }
+        const bounds = index.offsets(value);
+        return bounds ? mapped(file, bounds, state, limit) : [];
+    }
+    const source = state.documents.get(uri.fsPath);
+    if (source && !source.index.offsets(value)) { return []; }
+    return [new vscode.Location(uri, range(value))];
+}
+function validTargetRange(uri: vscode.Uri, value: Span, state: Prepared): boolean {
+    const file = state.files.get(uri.fsPath);
+    if (file) {
+        let index = state.indexes.get(file);
+        if (!index) { index = new TextIndex(file.content); state.indexes.set(file, index); }
+        return !!index.offsets(value);
+    }
+    const source = state.documents.get(uri.fsPath);
+    return !source || !!source.index.offsets(value);
+}
+```
+
+LocationLink targetRange is mandatory and validated even when the preferred
+selection is supplied. A supplied malformed or out-of-target selection rejects
+the entry, rather than widening it. If selection is absent, use targetRange.
+
+```ts : <<navigation target>>=
+function target(value: unknown, state: Prepared): { uri: vscode.Uri; range: Span } | undefined {
+    if (!record(value)) { return; }
+    const link = 'targetUri' in value;
+    const uri = localUri(link ? value.targetUri : value.uri);
+    const outer = link ? value.targetRange : value.range;
+    if (!uri || !span(outer) || !validTargetRange(uri, outer, state)) { return; }
+    const selection = link && value.targetSelectionRange !== undefined ? value.targetSelectionRange : outer;
+    if (!span(selection) || compare(selection.start, outer.start) < 0 || compare(selection.end, outer.end) > 0) { return; }
+    return { uri, range: selection };
+}
+```
+
+The navigation API accepts a single Location or an array of Locations/LocationLinks.
+Only the first 1000 entries are examined (including invalid ones), avoiding
+unbounded traversal of hostile replies. Results are deduplicated by local path
+and range. Null, malformed replies and unmapped generated wrappers yield nothing.
+
+```ts : <<navigation replies>>=
+export function mapLanguageLocations(reply: unknown, context: LanguageLocationContext): vscode.Location[] {
+    const state = prepare(context);
+    if (!state) { return []; }
+    const entries = Array.isArray(reply) ? reply : [reply];
+    const result: vscode.Location[] = [], seen = new Set<string>();
+    for (let index = 0; index < Math.min(entries.length, 1000); index++) {
+        const value = target(entries[index], state);
+        if (!value) { continue; }
+        for (const mappedLocation of mapRange(value.uri, value.range, state, 1)) {
+            const id = key(mappedLocation);
+            if (!seen.has(id)) { seen.add(id); result.push(mappedLocation); }
+        }
+    }
+    return result;
+}
+```
+
+The diagnostic controller imports the same context and range mapper. It owns
+publication, diagnostic metadata and stale-session policy; the helper only returns
+bounded locations. External local ranges obey the same no-I/O policy.
+
+```ts : <<navigation diagnostics>>=
+export function mapLanguageDiagnosticRange(uri: string, value: unknown, context: LanguageLocationContext): vscode.Location[] {
+    if (!span(value)) { return []; }
+    const targetUri = localUri(uri), state = prepare(context);
+    return targetUri && state ? mapRange(targetUri, value, state, 100) : [];
+}
+```

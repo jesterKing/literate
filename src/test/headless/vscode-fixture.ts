@@ -112,7 +112,58 @@ class CodeAction {
 }
 class Diagnostic {
     code?: vscode.Diagnostic['code'];
-    constructor(readonly range: Range, readonly message: string, readonly severity: number) {}
+    source?: string;
+    tags?: vscode.DiagnosticTag[];
+    constructor(readonly range: Range, readonly message: string, readonly severity = 0) {}
+}
+class DiagnosticCollection {
+    constructor(readonly name: string, readonly diagnostics = new Map<string, Diagnostic[]>()) {}
+    get(uri: Uri) { return this.diagnostics.get(uri.toString()); }
+    has(uri: Uri) { return this.diagnostics.has(uri.toString()); }
+    forEach(callback: (uri: Uri, values: Diagnostic[], collection: DiagnosticCollection) => void, thisArg?: unknown): void {
+        for (const [key, values] of this.diagnostics) { callback.call(thisArg, Uri.parse(key), values, this); }
+    }
+    set(uri: Uri, values: readonly Diagnostic[] | undefined): void;
+    set(entries: readonly [Uri, readonly Diagnostic[] | undefined][] | undefined): void;
+    set(value: Uri | readonly [Uri, readonly Diagnostic[] | undefined][] | undefined, values?: readonly Diagnostic[]): void {
+        if (value === undefined) { this.clear(); return; }
+        if (value instanceof Uri) {
+            if (values === undefined) { this.delete(value); }
+            else { this.diagnostics.set(value.toString(), [...values]); }
+            return;
+        }
+        // Duplicate URIs in one bulk update merge; undefined resets that URI's pending values.
+        const merged = new Map<string, Diagnostic[]>();
+        for (const [uri, items] of value) {
+            const key = uri.toString();
+            if (items === undefined) { merged.delete(key); this.delete(uri); }
+            else { merged.set(key, [...(merged.get(key) || []), ...items]); }
+        }
+        for (const [key, items] of merged) { this.diagnostics.set(key, items); }
+    }
+    delete(uri: Uri): void { this.diagnostics.delete(uri.toString()); }
+    clear(): void { this.diagnostics.clear(); }
+    dispose(): void { this.clear(); }
+    *[Symbol.iterator](): IterableIterator<[Uri, Diagnostic[]]> {
+        for (const [key, values] of this.diagnostics) { yield [Uri.parse(key), values]; }
+    }
+}
+class SnippetString { constructor(public value = '') {} }
+class CompletionItem { constructor(public label: string, public kind?: number) {} }
+class CompletionList {
+    constructor(public items: CompletionItem[] = [], public isIncomplete = false) {}
+}
+class ParameterInformation {
+    constructor(public label: string | [number, number], public documentation?: string | MarkdownString) {}
+}
+class SignatureInformation {
+    parameters: ParameterInformation[] = [];
+    constructor(public label: string, public documentation?: string | MarkdownString) {}
+}
+class SignatureHelp {
+    signatures: SignatureInformation[] = [];
+    activeSignature = 0;
+    activeParameter = 0;
 }
 
 export const tick = () => new Promise<void>(resolve => setImmediate(resolve));
@@ -142,6 +193,7 @@ export function fixture(workspaceUri = 'file:///project') {
         return undefined;
     };
     const diagnostics = new Map<string, Diagnostic[]>();
+    const diagnosticCollections = new Map<string, DiagnosticCollection>();
     // writes tracks installed outputs; stagedWrites tracks provider writeFile calls.
     const reads: string[] = [], writes: string[] = [], stagedWrites: string[] = [], directories: string[] = [], errors: string[] = [];
     const renames: { from: string; to: string }[] = [];
@@ -189,13 +241,11 @@ export function fixture(workspaceUri = 'file:///project') {
             }
         } as unknown as vscode.TextDocument;
     };
-    const collection = {
-        forEach(callback: (uri: Uri, values: Diagnostic[]) => void) {
-            for (const [key, values] of diagnostics) { callback(Uri.parse(key), values); }
-        },
-        set(uri: Uri, values: Diagnostic[]) { diagnostics.set(uri.toString(), values); },
-        delete(uri: Uri) { diagnostics.delete(uri.toString()); },
-        dispose() {}
+    const createDiagnosticCollection = (name = '') => {
+        const collection = new DiagnosticCollection(name,
+            name === 'literate' && !diagnosticCollections.has(name) ? diagnostics : undefined);
+        diagnosticCollections.set(name, collection);
+        return collection;
     };
     const opened: { document: vscode.TextDocument; selection: Range }[] = [];
     const externalUris: Uri[] = [];
@@ -224,7 +274,7 @@ export function fixture(workspaceUri = 'file:///project') {
         onDidGrantWorkspaceTrust: () => disposable(),
         onDidOpenTextDocument: () => disposable(),
         onDidCloseTextDocument: () => disposable(),
-        getConfiguration: () => ({ inspect: () => undefined }),
+        getConfiguration: () => ({ inspect: () => undefined, get: <T>(_key: string, fallback?: T) => fallback }),
         createFileSystemWatcher(pattern: string) {
             assert.ok(pattern === '**/*' || pattern === '**/*.literate');
             return { onDidCreate: fileEvents.create.event, onDidChange: fileEvents.change.event,
@@ -333,17 +383,36 @@ export function fixture(workspaceUri = 'file:///project') {
     const providers = new Map<string, unknown>();
     const commands = new Map<string, (...args: unknown[]) => unknown>();
     const executedCommands: string[] = [];
-    const register = (kind: string) => (_selector: unknown, provider: unknown) => {
-        providers.set(kind, provider); return disposable();
+    const executedCommandCalls: { name: string; args: unknown[] }[] = [];
+    const providerRegistrations = new Map<string, { selector: unknown; provider: unknown; triggers: unknown[] }[]>();
+    const register = (kind: string) => (selector: unknown, provider: unknown, ...triggers: unknown[]) => {
+        const registrations = providerRegistrations.get(kind) || [];
+        const entry = { selector, provider, triggers };
+        registrations.push(entry); providerRegistrations.set(kind, registrations);
+        providers.set(kind, provider);
+        return { dispose() {
+            const index = registrations.indexOf(entry);
+            if (index >= 0) { registrations.splice(index, 1); }
+            if (registrations.length) { providers.set(kind, registrations[registrations.length - 1].provider); }
+            else { providers.delete(kind); }
+        } };
     };
     const mock = {
         Uri, FileSystemError, FileType: fileType, Position, Range, WorkspaceEdit, Location, Hover, MarkdownString, EventEmitter,
-        Diagnostic, DiagnosticSeverity: { Error: 0 }, CodeAction, CodeActionKind, EndOfLine: { LF: 1, CRLF: 2 }, RelativePattern, workspace,
+        Diagnostic, DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2, Hint: 3 },
+        DiagnosticTag: { Unnecessary: 1, Deprecated: 2 },
+        SnippetString, CompletionItem, CompletionList, SignatureHelp, SignatureInformation, ParameterInformation,
+        CompletionItemKind: { Text: 0, Method: 1, Function: 2, Folder: 18 },
+        CompletionTriggerKind: { Invoke: 0, TriggerCharacter: 1, TriggerForIncompleteCompletions: 2 },
+        CodeAction, CodeActionKind, EndOfLine: { LF: 1, CRLF: 2 }, RelativePattern, workspace,
         TreeItem: class { constructor(readonly label: string, readonly collapsibleState: number) {} },
         ThemeIcon: class { constructor(readonly id: string) {} },
         TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
         languages: {
-            createDiagnosticCollection: () => collection,
+            createDiagnosticCollection,
+            registerSignatureHelpProvider: register('signatureHelp'),
+            registerTypeDefinitionProvider: register('typeDefinition'),
+            registerImplementationProvider: register('implementation'),
             registerCompletionItemProvider: register('completion'), registerDefinitionProvider: register('definition'),
             registerReferenceProvider: register('references'), registerHoverProvider: register('hover'),
             registerRenameProvider: register('rename'), registerCodeActionsProvider: register('codeActions')
@@ -354,6 +423,7 @@ export function fixture(workspaceUri = 'file:///project') {
             },
             async executeCommand(name: string, ...args: unknown[]) {
                 executedCommands.push(name);
+                executedCommandCalls.push({ name, args });
                 return commands.get(name)?.(...args);
             }
         },
@@ -387,13 +457,14 @@ export function fixture(workspaceUri = 'file:///project') {
     };
     const originalLoad = loader._load;
     const extensionPath = require.resolve('../../extension'); // out/extension.js after compilation
-    const previousModule = require.cache[extensionPath];
-    const publicationPath = require.resolve('../../publication-extension');
-    const previousPublication = require.cache[publicationPath];
+    // Modules importing vscode must capture this fixture, not a previous fixture's mock.
+    const isolatedPaths = [extensionPath, require.resolve('../../publication-extension'),
+        require.resolve('../../language-features'), require.resolve('../../language-diagnostics'),
+        require.resolve('../../language-navigation')];
+    const previousModules = isolatedPaths.map(modulePath => [modulePath, require.cache[modulePath]] as const);
     let extension: typeof import('../../extension');
     try {
-        delete require.cache[extensionPath];
-        delete require.cache[publicationPath];
+        for (const modulePath of isolatedPaths) { delete require.cache[modulePath]; }
         loader._load = function (request, parent, isMain) {
             if ((request === 'fs/promises' || request === 'node:fs/promises') && parent?.filename === extensionPath) {
                 // Only the extension's mode operations are mocked; never touch real /project files.
@@ -421,10 +492,10 @@ export function fixture(workspaceUri = 'file:///project') {
         extension = require(extensionPath) as typeof import('../../extension');
     } finally {
         loader._load = originalLoad;
-        if (previousModule) { require.cache[extensionPath] = previousModule; }
-        else { delete require.cache[extensionPath]; }
-        if (previousPublication) { require.cache[publicationPath] = previousPublication; }
-        else { delete require.cache[publicationPath]; }
+        for (const [modulePath, previous] of previousModules) {
+            if (previous) { require.cache[modulePath] = previous; }
+            else { delete require.cache[modulePath]; }
+        }
     }
     const repository = new extension.FragmentRepository({ subscriptions: [] } as unknown as vscode.ExtensionContext);
     const uri = (name: string, base = folder) => Uri.joinPath(base.uri, name).toString();
@@ -448,7 +519,8 @@ export function fixture(workspaceUri = 'file:///project') {
     const process = (writeFiles?: boolean) => repository.processLiterateFiles(
         folder as unknown as vscode.WorkspaceFolder, writeFiles);
     return { folder, other, disk, modes, modeStats, modeChanges, types, statErrors, stats, listings, diagnostics, reads, writes, stagedWrites, renames, deletions, directories, errors, controls,
-        workspace, repository, extension, mock, providers, commands, executedCommands, document, open, uri, put, change, process,
+        workspace, repository, extension, mock, providers, providerRegistrations, diagnosticCollections,
+        commands, executedCommands, executedCommandCalls, document, open, uri, put, change, process,
                 opened, externalUris, navigate: async (href: string) => uriHandler?.handleUri(Uri.parse(href)),
                         workspaceChanged: () => workspaceEvents.fire({ added: [], removed: [folder] }),
         fileEvent(kind: keyof typeof fileEvents, name: string, base = folder) {

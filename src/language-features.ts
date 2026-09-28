@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 import { parseProject, parseFragmentHeader, scanFragmentTags, SourceDocument } from './engine';
 import { LanguageClient } from './language-client';
+import { LanguageDiagnostics } from './language-diagnostics';
+import { mapLanguageLocations } from './language-navigation';
 import { mapGeneratedRange, mapSourcePosition, projectLanguageSources, SourceProjectionPosition } from './language-projection';
 
 type ObjectValue = Record<string, unknown>;
@@ -127,18 +129,57 @@ function wordRange(view: RequestView): vscode.Range {
         && document.offsetAt(word.end) <= hit.mapping.sourceEnd) { return word; }
     return new vscode.Range(cursor, cursor);
 }
-function completions(view: RequestView, reply: unknown): vscode.CompletionItem[] | undefined {
-    if (object(reply) && ('itemDefaults' in reply || 'editDefaults' in reply)) { return undefined; }
+type CompletionResult = vscode.CompletionItem[] | vscode.CompletionList;
+const completionItems = (result: CompletionResult): vscode.CompletionItem[] => Array.isArray(result) ? result : result.items;
+function completions(view: RequestView, reply: unknown,
+    retain: (item: vscode.CompletionItem, raw: ObjectValue) => void): CompletionResult | undefined {
+    if (object(reply) && 'editDefaults' in reply) { return undefined; }
+    const defaults = object(reply) && 'itemDefaults' in reply ? reply.itemDefaults : undefined;
+    if (defaults !== undefined && !completionDefaults(view, defaults)) { return undefined; }
     const items = Array.isArray(reply) ? reply : object(reply) && Array.isArray(reply.items) ? reply.items : undefined;
-    return items?.slice(0, 1000).flatMap(value => {
+    if (!items) { return undefined; }
+    const converted = items.slice(0, 1000).flatMap(raw => {
+        const value = inheritCompletion(raw, defaults as ObjectValue | undefined);
         const item = completion(view, value);
+        if (item) { retain(item, value as ObjectValue); }
         return item ? [item] : [];
     });
+    return object(reply) ? new vscode.CompletionList(converted, reply.isIncomplete === true) : converted;
+}
+function completionDefaults(view: RequestView, value: unknown): value is ObjectValue {
+    if (!object(value) || Object.keys(value).some(key => !['editRange', 'insertTextFormat', 'insertTextMode', 'data'].includes(key))
+        || (value.insertTextFormat !== undefined && value.insertTextFormat !== 1 && value.insertTextFormat !== 2)
+        || (value.insertTextMode !== undefined && value.insertTextMode !== 1)) { return false; }
+    if (value.editRange === undefined) { return true; }
+    const range = value.editRange;
+    if (!object(range)) { return false; }
+    if ('start' in range || 'end' in range) {
+        return !('insert' in range || 'replace' in range) && !!mappedRange(view, range);
+    }
+    const inserting = mappedRange(view, range.insert), replacing = mappedRange(view, range.replace);
+    return !!inserting && !!replacing && inserting.start.isEqual(replacing.start) && replacing.contains(inserting);
+}
+function inheritCompletion(raw: unknown, defaults: ObjectValue | undefined): unknown {
+    if (!object(raw) || !defaults) { return raw; }
+    const value = { ...raw };
+    for (const key of ['insertTextFormat', 'insertTextMode', 'data']) {
+        if (value[key] === undefined && defaults[key] !== undefined) { value[key] = defaults[key]; }
+    }
+    if (defaults.editRange !== undefined) {
+        if (value.textEditText !== undefined && typeof value.textEditText !== 'string') { return undefined; }
+        if (value.textEdit === undefined) {
+            const range = defaults.editRange as ObjectValue;
+            const newText = value.textEditText ?? value.insertText ?? value.label;
+            value.textEdit = 'start' in range ? { range, newText } : { insert: range.insert, replace: range.replace, newText };
+        }
+        delete value.textEditText;
+    }
+    return value;
 }
 function completion(view: RequestView, value: unknown): vscode.CompletionItem | undefined {
     if (!object(value) || typeof value.label !== 'string' || !value.label.length || value.label.length > 4096
-        || 'command' in value || 'editDefaults' in value || 'textEditText' in value || value.kind === 15
-        || (value.insertTextFormat !== undefined && value.insertTextFormat !== 1)
+        || 'command' in value || 'editDefaults' in value || 'textEditText' in value
+        || (value.insertTextFormat !== undefined && value.insertTextFormat !== 1 && value.insertTextFormat !== 2)
         || (value.insertTextMode !== undefined && value.insertTextMode !== 1)
         || (value.additionalTextEdits !== undefined && (!Array.isArray(value.additionalTextEdits) || value.additionalTextEdits.length))
         || (value.insertText !== undefined && typeof value.insertText !== 'string')) { return undefined; }
@@ -162,7 +203,8 @@ function completion(view: RequestView, value: unknown): vscode.CompletionItem | 
         }
     }
     if (text.length > 65536) { return undefined; }
-    item.insertText = text;
+    item.insertText = value.insertTextFormat === 2 ? new vscode.SnippetString(text) : text;
+    item.documentation = hoverText(value.documentation);
     for (const key of ['sortText', 'filterText', 'detail'] as const) {
         const text = value[key];
         if (typeof text === 'string') { item[key] = text.slice(0, 4096); }
@@ -205,24 +247,111 @@ function hover(view: RequestView, reply: unknown): vscode.Hover | undefined {
     if (!range) { return undefined; }
     return new vscode.Hover(contents, range);
 }
+function signature(reply: unknown): vscode.SignatureHelp | undefined {
+    if (!object(reply) || !Array.isArray(reply.signatures) || !reply.signatures.length || reply.signatures.length > 100) { return; }
+    const result = new vscode.SignatureHelp();
+    for (const raw of reply.signatures) {
+        if (!object(raw) || typeof raw.label !== 'string' || raw.label.length > 8192) { return; }
+        const info = new vscode.SignatureInformation(raw.label, hoverText(raw.documentation));
+        if (raw.parameters !== undefined && (!Array.isArray(raw.parameters) || raw.parameters.length > 100)) { return; }
+        for (const parameter of (raw.parameters || []) as unknown[]) {
+            if (!object(parameter)) { return; }
+            const label = parameter.label;
+            if (typeof label === 'string') {
+                if (!raw.label.includes(label)) { return; }
+            } else if (!Array.isArray(label) || label.length !== 2 || !label.every(Number.isSafeInteger)
+                || label[0] < 0 || label[1] < label[0] || label[1] > raw.label.length) { return; }
+            info.parameters.push(new vscode.ParameterInformation(label as string | [number, number], hoverText(parameter.documentation)));
+        }
+        if (raw.activeParameter !== undefined) { info.activeParameter = boundedIndex(raw.activeParameter, info.parameters.length); }
+        result.signatures.push(info);
+    }
+    result.activeSignature = boundedIndex(reply.activeSignature, result.signatures.length);
+    result.activeParameter = result.signatures[result.activeSignature].activeParameter
+        ?? boundedIndex(reply.activeParameter, result.signatures[result.activeSignature].parameters.length);
+    return result;
+}
+function boundedIndex(value: unknown, length: number): number {
+    return Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) < length ? value as number : 0;
+}
+type Method = 'hover' | 'completion' | 'signatureHelp' | 'definition' | 'typeDefinition' | 'implementation' | 'references';
+type Result = vscode.Hover | CompletionResult | vscode.SignatureHelp | vscode.Location[] | undefined;
 export function registerLanguageFeatures(context: vscode.ExtensionContext,
     snapshot: (folder: vscode.WorkspaceFolder) => Promise<LanguageSnapshot>): void {
-    type Session = { client: LanguageClient; failed: boolean; started?: boolean };
+    type Session = { client: LanguageClient; failed: boolean; started?: boolean; stop?: () => void };
     const sessions = new Map<string, Session>();
+    const snapshots = new Map<string, string>();
     let epoch = 0, busy = false, disposed = false;
     let active: AbortController | undefined;
-    const invalidate = (): void => { epoch++; active?.abort(); cancelAutomatic(); };
+    const invalidate = (): void => { epoch++; active?.abort(); cancelAutomatic(); wakeWaiters(); };
     const close = (client: LanguageClient): void => { void client.dispose().catch(() => undefined); };
     let invalidReported = false, capturing = false;
     const captureChanges = new Set<string>();
     const templatePaths = new Map<string, Set<string>>(), reported = new Set<string>();
     const reset = (): void => {
-        invalidate(); sessions.forEach(session => { if (!session.failed) { close(session.client); } });
-        sessions.clear(); templatePaths.clear(); reported.clear(); invalidReported = false;
+        invalidate(); invalidateInputs(); sessions.forEach(session => { session.stop?.(); if (!session.failed) { close(session.client); } });
+        sessions.clear(); snapshots.clear(); templatePaths.clear(); reported.clear(); invalidReported = false;
     };
     context.subscriptions.push({ dispose() { disposed = true; reset(); } });
+    const waiters = new Set<() => void>();
+    function wakeWaiters(): void { for (const wake of [...waiters]) { wake(); } }
+    async function acquire(signal: AbortSignal, fresh: () => boolean): Promise<boolean> {
+        if (waiters.size >= 32) { return false; }
+        while (busy && fresh()) {
+            await new Promise<void>(resolve => {
+                const wake = (): void => { waiters.delete(wake); signal.removeEventListener('abort', wake); resolve(); };
+                waiters.add(wake); signal.addEventListener('abort', wake, { once: true });
+                if (signal.aborted) { wake(); }
+            });
+        }
+        if (!fresh()) { return false; }
+        busy = true; return true;
+    }
+    function release(): void {
+        active = undefined; busy = false; capturing = false; captureChanges.clear();
+        wakeWaiters();
+        queueMicrotask(() => { void drain(); void drainBackground(); });
+    }
+    function invalidateFolder(folder: vscode.WorkspaceFolder): void {
+        for (const key of sessions.keys()) {
+            if (JSON.parse(key)[0] === folder.uri.toString()) { diagnostics.invalidate(key); }
+        }
+    }
+    function acceptSnapshot(folder: vscode.WorkspaceFolder, documents: SourceDocument[], templates: Record<string, string>): void {
+        const key = folder.uri.toString(), identity = JSON.stringify([documents, templates]);
+        if (snapshots.get(key) !== identity) { invalidateFolder(folder); snapshots.set(key, identity); }
+    }
+    function matchesBuffers(folder: vscode.WorkspaceFolder, documents: SourceDocument[]): boolean {
+        return vscode.workspace.textDocuments.filter(document => local(folder, document)).every(document => {
+            const name = path.relative(folder.uri.fsPath, document.uri.fsPath).split(path.sep).join('/');
+            return documents.some(source => source.path.replace(/^\.\//, '') === name && source.text === document.getText());
+        });
+    }
     const output = vscode.window.createOutputChannel('Literate Language Servers');
     let lines = 0;
+    let sourceRevision = 0;
+    const diagnostics = new LanguageDiagnostics(context, message => report(message));
+    let backgroundTimer: ReturnType<typeof setTimeout> | undefined;
+    const background = new Map<string, vscode.TextDocument>();
+    function diagnosticEnabled(document: vscode.TextDocument): boolean {
+        return vscode.workspace.getConfiguration('literate', document.uri).get<boolean>('languageDiagnostics', true);
+    }
+    function inputUri(uri: vscode.Uri): boolean {
+        return uri.fsPath.endsWith('.literate') || [...templatePaths.values()].some(paths => paths.has(path.resolve(uri.fsPath)));
+    }
+    function invalidateInputs(): void {
+        sourceRevision++; diagnostics.invalidate();
+        if (backgroundTimer) { clearTimeout(backgroundTimer); backgroundTimer = undefined; }
+        background.clear();
+        if (!disposed) { for (const document of vscode.workspace.textDocuments) { scheduleBackground(document); } }
+    }
+    function scheduleBackground(document: vscode.TextDocument): void {
+        const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+        if (disposed || !folder || !local(folder, document) || !diagnosticEnabled(document) || !Object.keys(servers()).length) { return; }
+        background.set(folder.uri.toString(), document);
+        if (backgroundTimer) { clearTimeout(backgroundTimer); }
+        backgroundTimer = setTimeout(() => { backgroundTimer = undefined; void drainBackground(); }, 400);
+    }
     const report = (message: string): void => {
         if (disposed) { return; }
         if (lines >= 100) { output.clear(); lines = 0; }
@@ -244,10 +373,14 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
         version: number; revision: number; character: string; selectionSeen: boolean; body: boolean };
     let candidate: Edit | undefined, pending: Edit | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    let cached: { edit: Edit; items: vscode.CompletionItem[] } | undefined;
+    let cached: { edit: Edit; items: CompletionResult } | undefined;
+    let signatureCache: { edit: Edit; value: vscode.SignatureHelp } | undefined;
+    const signatureTriggers = new Set(['(', ',']);
+    let signatureRegistration: vscode.Disposable | undefined;
+    const retained = new WeakMap<vscode.CompletionItem, { raw: ObjectValue; client: LanguageClient; fresh: () => boolean }>();
     function cancelAutomatic(keepContext = false): void {
         if (timer) { clearTimeout(timer); timer = undefined; }
-        candidate = pending = undefined; cached = undefined;
+        candidate = pending = undefined; cached = undefined; signatureCache = undefined;
         if (!keepContext) { setPending(false); }
     }
     function enabled(document: vscode.TextDocument): boolean {
@@ -277,22 +410,31 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
         if (!current(edit)) { if (candidate === edit) { cancelAutomatic(); } return; }
         const cancellation = new vscode.CancellationTokenSource();
         try {
-            const result = await request(edit.document, edit.cursor, cancellation.token, 'completion', edit);
-            if (!Array.isArray(result) || !result.length || !current(edit)) { return; }
-            cached = { edit, items: result }; setPending(false);
-            await vscode.commands.executeCommand('editor.action.triggerSuggest');
+            const method = signatureTriggers.has(edit.character) ? 'signatureHelp' : 'completion';
+            const result = await request(edit.document, edit.cursor, cancellation.token, method, edit);
+            if (!result || !current(edit)) { return; }
+            if (result instanceof vscode.SignatureHelp) {
+                signatureCache = { edit, value: result as vscode.SignatureHelp }; setPending(false);
+                await vscode.commands.executeCommand('editor.action.triggerParameterHints');
+            } else {
+                if (!completionItems(result as CompletionResult).length) { return; }
+                cached = { edit, items: result as CompletionResult }; setPending(false);
+                await vscode.commands.executeCommand('editor.action.triggerSuggest');
+            }
         } catch { if (candidate === edit) { cancelAutomatic(); } }
         finally {
             cancellation.dispose();
             if (candidate === edit) {
                 setPending(false);
-                if (cached?.edit !== edit) { cancelAutomatic(); }
+                if (cached?.edit !== edit && signatureCache?.edit !== edit) { cancelAutomatic(); }
             }
         }
     }
     function changed(event: vscode.TextDocumentChangeEvent): void {
         if (event.contentChanges.length === 0) { return; }
-        epoch++; active?.abort(); cancelAutomatic(true);
+        if (!inputUri(event.document.uri)) { diskChanged(event.document.uri); return; }
+        invalidateInputs();
+        epoch++; active?.abort(); cancelAutomatic(true); wakeWaiters();
         try {
             const editor = vscode.window.activeTextEditor;
             if (!editor || !vscode.window.state.focused || event.document !== editor.document
@@ -311,7 +453,7 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
     context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(invalidate),
         vscode.window.onDidChangeWindowState(invalidate), vscode.workspace.onDidGrantWorkspaceTrust(reset),
         vscode.window.onDidChangeTextEditorSelection(event => {
-            if (!candidate) { return; }
+            if (!candidate) { invalidate(); return; }
             if (event.textEditor === candidate.editor && !candidate.selectionSeen
                 && event.kind === vscode.TextEditorSelectionChangeKind.Keyboard && current(candidate)) {
                 candidate.selectionSeen = true; return;
@@ -322,35 +464,37 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
         }));
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
         if (event.affectsConfiguration('literate.languageServers')) { reset(); }
-        else { invalidate(); }
+        else { invalidate(); invalidateInputs(); }
     }), vscode.workspace.onDidChangeWorkspaceFolders(() => reset()),
-    vscode.workspace.onDidChangeTextDocument(changed), vscode.workspace.onDidOpenTextDocument(invalidate),
-    vscode.workspace.onDidCloseTextDocument(invalidate));
+    vscode.workspace.onDidChangeTextDocument(changed), vscode.workspace.onDidOpenTextDocument(document => {
+        diskChanged(document.uri); scheduleBackground(document);
+    }), vscode.workspace.onDidCloseTextDocument(document => diskChanged(document.uri)));
     const watcher = vscode.workspace.createFileSystemWatcher('**/*');
     const diskChanged = (uri: vscode.Uri): void => {
         const changedPath = path.resolve(uri.fsPath);
-        if (uri.fsPath.endsWith('.literate') || [...templatePaths.values()].some(paths => paths.has(changedPath))) {
-            invalidate();
+        if (inputUri(uri)) {
+            invalidate(); invalidateInputs();
         } else if (capturing) {
-            if (captureChanges.size >= 1000) { invalidate(); }
+            if (captureChanges.size >= 1000) { invalidate(); invalidateInputs(); }
             else { captureChanges.add(changedPath); }
         }
     };
     context.subscriptions.push(watcher, watcher.onDidChange(diskChanged), watcher.onDidCreate(diskChanged), watcher.onDidDelete(diskChanged));
     async function request(document: vscode.TextDocument, cursor: vscode.Position, token: vscode.CancellationToken,
-        method: 'hover' | 'completion', edit?: Edit): Promise<vscode.Hover | vscode.CompletionItem[] | undefined> {
+        method: Method, edit?: Edit, requestContext?: ObjectValue): Promise<Result> {
         const folder = vscode.workspace.getWorkspaceFolder(document.uri);
-        if (disposed || busy || token.isCancellationRequested || !folder || !local(folder, document)) { return undefined; }
+        if (disposed || token.isCancellationRequested || !folder || !local(folder, document)) { return undefined; }
         const configured = servers(invalid), fingerprint = JSON.stringify(configured);
         if (!Object.keys(configured).length) { return undefined; }
-        const revision = epoch, version = document.version;
+        const revision = epoch, version = document.version, inputs = sourceRevision;
         const controller = new AbortController();
         const cancellation = token.onCancellationRequested(() => controller.abort());
-        active = controller; busy = true;
         let session: Session | undefined, sessionKey = '', phase = 'snapshot';
         const fresh = (): boolean => !disposed && !controller.signal.aborted && !token.isCancellationRequested
-            && epoch === revision && document.version === version && local(folder, document)
+            && epoch === revision && sourceRevision === inputs && document.version === version && local(folder, document)
             && JSON.stringify(servers()) === fingerprint && (!edit || current(edit));
+        if (!await acquire(controller.signal, fresh)) { cancellation.dispose(); return undefined; }
+        active = controller;
         try {
             if (!fresh()) { return undefined; }
             captureChanges.clear(); capturing = true;
@@ -358,20 +502,22 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
             capturing = false;
             if (!fresh()) { return undefined; }
             templatePaths.set(folder.uri.toString(), new Set(Object.keys(templates).map(name => path.resolve(folder.uri.fsPath, name))));
+            acceptSnapshot(folder, documents, templates);
             const sourcePath = path.relative(folder.uri.fsPath, document.uri.fsPath).split(path.sep).join('/');
-            if (!documents.some(source => source.path.replace(/^\.\//, '') === sourcePath && source.text === document.getText())) {
-                return undefined;
+            if (!matchesBuffers(folder, documents)) {
+                invalidateFolder(folder); return undefined;
             }
             phase = 'projection';
             const projected = projectLanguageSources(documents, templates);
             if (projected.diagnostics.length) {
+                invalidateFolder(folder);
                 for (const diagnostic of projected.diagnostics) {
                     reportOnce('Language projection unavailable: ' + projectionReason(diagnostic.message));
                 }
                 return undefined;
             }
             if ([...captureChanges].some(name => templatePaths.get(folder.uri.toString())!.has(name))) {
-                invalidate(); return undefined;
+                invalidate(); invalidateInputs(); return undefined;
             }
             const hit = mapSourcePosition(projected.files, sourcePath, document.offsetAt(cursor));
             if (!hit) { return undefined; }
@@ -384,7 +530,7 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
             phase = 'initialization';
             if (!session) {
                 session = { client: new LanguageClient({ ...config, cwd: folder.uri.fsPath, rootUri: folder.uri.toString() }), failed: false };
-                sessions.set(sessionKey, session);
+                sessions.set(sessionKey, session); observeSession(sessionKey, session);
             }
             const client = session.client;
             const uri = (name: string): string => vscode.Uri.file(path.resolve(folder.uri.fsPath, name)).toString();
@@ -395,42 +541,189 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
                 session.started = true;
                 report('Language server ready: ' + id.slice(0, 80) + '; projected output ' + JSON.stringify(hit.file.path.slice(0, 200)) + '.');
             }
-            const capability = client.capabilities[method === 'hover' ? 'hoverProvider' : 'completionProvider'];
-            if (!(object(capability) || (method === 'hover' && capability === true))) { return undefined; }
+            updateSignatureTriggers(client);
+            if (edit) { method = signatureTrigger(client, edit.character) ? 'signatureHelp' : 'completion'; }
+            if (method === 'signatureHelp' && requestContext?.triggerKind === 2
+                && !signatureTrigger(client, requestContext.triggerCharacter, requestContext.isRetrigger === true)) { return; }
+            const capability = client.capabilities[method + 'Provider'];
+            if (!(object(capability) || (!['completion', 'signatureHelp'].includes(method) && capability === true))) { return undefined; }
             const triggered = edit && object(capability) && Array.isArray(capability.triggerCharacters)
                 && capability.triggerCharacters.includes(edit.character);
-            if (edit && !triggered && !/[\p{L}\p{N}_$]/u.test(edit.character)) { return undefined; }
+            if (edit && method === 'completion' && !triggered && !/[\p{L}\p{N}_$]/u.test(edit.character)) { return undefined; }
             phase = 'synchronization';
-            await client.sync(projected.files.filter(file => language(file.language) === id || (family(id) && family(language(file.language))))
-                .map(file => ({ uri: uri(file.path), languageId: language(file.language), text: file.content })));
+            const wire = projected.files.filter(file => language(file.language) === id || (family(id) && family(language(file.language))))
+                .map(file => ({ uri: uri(file.path), languageId: language(file.language), text: file.content }));
+            const diagnosticFresh = (): boolean => !disposed && sourceRevision === inputs && local(folder, document)
+                && diagnosticEnabled(document) && document.version === version && JSON.stringify(servers()) === fingerprint;
+            if (diagnosticEnabled(document)) {
+                await diagnostics.synchronize(sessionKey, client, { root: folder.uri, files: projected.files, documents }, wire, diagnosticFresh);
+            } else { diagnostics.invalidate(sessionKey); await client.sync(wire); }
             if (!fresh()) { return undefined; }
             phase = 'request';
             const reply = await client.request('textDocument/' + method, {
                 textDocument: { uri: uri(hit.file.path) }, position: position(hit.file.content, hit.offset),
-                ...(method === 'completion' ? { context: triggered
-                    ? { triggerKind: 2, triggerCharacter: edit!.character } : { triggerKind: 1 } } : {})
+                ...(method === 'completion' ? { context: requestContext || (triggered
+                    ? { triggerKind: 2, triggerCharacter: edit!.character } : { triggerKind: 1 }) } : {}),
+                ...(method === 'references' ? { context: { includeDeclaration: requestContext?.includeDeclaration === true } } : {}),
+                ...(method === 'signatureHelp' ? { context: requestContext || {
+                    triggerKind: edit ? 2 : 1, ...(edit ? { triggerCharacter: edit.character } : {}), isRetrigger: false } } : {})
             }, controller.signal);
             if (!fresh()) { return undefined; }
             const view = { document, position: cursor, hit };
-            return method === 'hover' ? hover(view, reply) : completions(view, reply);
+            if (method === 'hover') { return hover(view, reply); }
+            if (method === 'signatureHelp') { return signature(reply); }
+            if (method !== 'completion') { return mapLanguageLocations(reply, { root: folder.uri, files: projected.files, documents }); }
+            return completions(view, reply, (item, raw) => retained.set(item, { raw, client,
+                fresh: () => !disposed && epoch === revision && sourceRevision === inputs && document.version === version
+                    && local(folder, document) && sessions.get(sessionKey) === session && !session?.failed
+                    && JSON.stringify(servers()) === fingerprint }));
         } catch (error) {
+            if (!session && sourceRevision === inputs) { invalidateFolder(folder); }
             if (!session && fresh()) {
                 reportOnce('Language ' + phase + ' failed: ' + errorCategory(error)
                     + '. Check source/template inputs and global literate.languageServers settings, then retry.');
             }
             if (session && sessions.get(sessionKey) === session && !session.failed
                 && !(phase === 'request' && controller.signal.aborted)) {
-                session.failed = true; close(session.client);
+                session.failed = true; diagnostics.invalidate(sessionKey); close(session.client);
                 report('Language server ' + phase + ' failed: ' + errorCategory(error)
                     + '. Check the executable and global literate.languageServers settings, then run literate.restartLanguageServers to retry.');
             }
             return undefined;
         } finally {
-            cancellation.dispose(); active = undefined; busy = false; capturing = false; captureChanges.clear();
-            void drain();
+            cancellation.dispose(); release();
         }
     }
+    async function resolveCompletion(item: vscode.CompletionItem, token: vscode.CancellationToken): Promise<vscode.CompletionItem> {
+        const saved = retained.get(item);
+        if (!saved || busy || !saved.fresh() || token.isCancellationRequested
+            || !object(saved.client.capabilities.completionProvider)
+            || saved.client.capabilities.completionProvider.resolveProvider !== true) { return item; }
+        const controller = new AbortController(), cancellation = token.onCancellationRequested(() => controller.abort());
+        busy = true; active = controller;
+        try {
+            const reply = await saved.client.request('completionItem/resolve', saved.raw, controller.signal);
+            if (saved.fresh() && !controller.signal.aborted && !token.isCancellationRequested && object(reply)) {
+
+                if (typeof reply.detail === 'string') { item.detail = reply.detail.slice(0, 4096); }
+                const documentation = hoverText(reply.documentation);
+                if (documentation) { item.documentation = documentation; }
+            }
+        } catch { /* Optional metadata failure must not disable a healthy session. */ }
+        finally { cancellation.dispose(); release(); }
+        return item;
+    }
+    async function drainBackground(): Promise<void> {
+        if (disposed || busy || pending || timer || backgroundTimer || !background.size) { return; }
+        const [key, document] = background.entries().next().value as [string, vscode.TextDocument];
+        background.delete(key);
+        const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+        if (!folder || !local(folder, document) || !diagnosticEnabled(document)) { return; }
+        const inputs = sourceRevision, configured = servers(invalid), fingerprint = JSON.stringify(configured);
+        const fresh = (): boolean => !disposed && sourceRevision === inputs && local(folder, document)
+            && diagnosticEnabled(document) && JSON.stringify(servers()) === fingerprint;
+        busy = true;
+        try {
+            captureChanges.clear(); capturing = true;
+            const { documents, templates } = await snapshot(folder); capturing = false;
+            if (!fresh()) { return; }
+            acceptSnapshot(folder, documents, templates);
+            const paths = new Set(Object.keys(templates).map(name => path.resolve(folder.uri.fsPath, name)));
+            templatePaths.set(key, paths);
+            if ([...captureChanges].some(name => paths.has(name))) { invalidateInputs(); return; }
+            const projected = projectLanguageSources(documents, templates);
+            if (!matchesBuffers(folder, documents) || projected.diagnostics.length) { invalidateFolder(folder); return; }
+            for (const id of new Set(projected.files.map(file => language(file.language)))) {
+                if (!fresh()) { break; }
+                if (!configured[id]) { continue; }
+                const sessionKey = JSON.stringify([key, id]);
+                let session = sessions.get(sessionKey);
+                if (session?.failed) { continue; }
+                if (!session) {
+                    session = { client: new LanguageClient({ ...configured[id], cwd: folder.uri.fsPath, rootUri: key }), failed: false };
+                    sessions.set(sessionKey, session); observeSession(sessionKey, session);
+                }
+                try {
+                    await session.client.initialize();
+                    if (!fresh()) { break; }
+                    updateSignatureTriggers(session.client);
+                    const wire = projected.files.filter(file => language(file.language) === id || (family(id) && family(language(file.language))))
+                        .map(file => ({ uri: vscode.Uri.file(path.resolve(folder.uri.fsPath, file.path)).toString(),
+                            languageId: language(file.language), text: file.content }));
+                    await diagnostics.synchronize(sessionKey, session.client,
+                        { root: folder.uri, files: projected.files, documents }, wire, fresh);
+                } catch (error) {
+                    if (sessions.get(sessionKey) === session && fresh()) {
+                        session.failed = true; diagnostics.invalidate(sessionKey); close(session.client);
+                        report('Language background synchronization failed: ' + errorCategory(error) + '. Restart language servers to retry.');
+                    }
+                }
+                if (pending || waiters.size) { background.set(key, document); break; }
+            }
+        } catch (error) {
+            if (sourceRevision === inputs) { invalidateFolder(folder); }
+            if (fresh()) { reportOnce('Language background snapshot failed: ' + errorCategory(error)); }
+        } finally { release(); }
+    }
+    function observeSession(key: string, session: Session): void {
+        session.stop = session.client.onDidStop(() => {
+            if (sessions.get(key) === session && !session.failed) {
+                session.failed = true; diagnostics.invalidate(key);
+                report('Language server stopped. Check global literate.languageServers and run literate.restartLanguageServers to retry.');
+            }
+        });
+    }
+    function updateSignatureTriggers(client: LanguageClient): void {
+        const provider = client.capabilities.signatureHelpProvider;
+        if (!object(provider)) { return; }
+        let changed = false;
+        for (const values of [provider.triggerCharacters, provider.retriggerCharacters]) {
+            if (!Array.isArray(values)) { continue; }
+            for (const value of values.slice(0, 64)) {
+                if (typeof value === 'string' && value.length === 1 && !/[\r\n]/.test(value) && !signatureTriggers.has(value)) {
+                    signatureTriggers.add(value); changed = true;
+                }
+            }
+        }
+        if (changed) { registerSignature(); }
+    }
+    function signatureTrigger(client: LanguageClient, character: unknown, retrigger = false): boolean {
+        const provider = client.capabilities.signatureHelpProvider;
+        if (!object(provider) || typeof character !== 'string') { return false; }
+        const triggers = Array.isArray(provider.triggerCharacters) ? provider.triggerCharacters : ['(', ','];
+        return triggers.includes(character) || (retrigger && Array.isArray(provider.retriggerCharacters)
+            && provider.retriggerCharacters.includes(character));
+    }
+    function registerSignature(): void {
+        signatureRegistration?.dispose();
+        signatureRegistration = vscode.languages.registerSignatureHelpProvider(selector, {
+            provideSignatureHelp(document, cursor, token, signatureContext) {
+                if (token.isCancellationRequested) { return; }
+                if (signatureContext.triggerKind !== 1 && (!enabled(document) || !vscode.window.state.focused
+                    || !localBody(document, cursor))) { return; }
+                if (signatureCache && signatureCache.edit.document === document && signatureCache.edit.cursor.isEqual(cursor)
+                    && current(signatureCache.edit)) { const value = signatureCache.value; cancelAutomatic(); return value; }
+                return request(document, cursor, token, 'signatureHelp', undefined, {
+                    triggerKind: signatureContext.triggerKind, isRetrigger: signatureContext.isRetrigger,
+                    ...(signatureContext.triggerCharacter ? { triggerCharacter: signatureContext.triggerCharacter } : {})
+                }) as Promise<vscode.SignatureHelp | undefined>;
+            }
+        }, ...signatureTriggers);
+    }
     const selector: vscode.DocumentSelector = { scheme: 'file', language: 'markdown', pattern: '**/*.literate' };
+    registerSignature();
+    context.subscriptions.push({ dispose: () => signatureRegistration?.dispose() });
+    context.subscriptions.push(vscode.languages.registerDefinitionProvider(selector, {
+        provideDefinition: (d, p, t) => request(d, p, t, 'definition') as Promise<vscode.Location[] | undefined>
+    }), vscode.languages.registerTypeDefinitionProvider(selector, {
+        provideTypeDefinition: (d, p, t) => request(d, p, t, 'typeDefinition') as Promise<vscode.Location[] | undefined>
+    }), vscode.languages.registerImplementationProvider(selector, {
+        provideImplementation: (d, p, t) => request(d, p, t, 'implementation') as Promise<vscode.Location[] | undefined>
+    }), vscode.languages.registerReferenceProvider(selector, {
+        provideReferences: (d, p, c, t) => request(d, p, t, 'references', undefined,
+            { includeDeclaration: c.includeDeclaration }) as Promise<vscode.Location[] | undefined>
+    }));
+    for (const document of vscode.workspace.textDocuments) { scheduleBackground(document); }
     context.subscriptions.push(vscode.languages.registerHoverProvider(selector, {
         provideHover: (document, cursor, token) => request(document, cursor, token, 'hover') as Promise<vscode.Hover | undefined>
     }), vscode.languages.registerCompletionItemProvider(selector, {
@@ -442,8 +735,12 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
             if (cached && cached.edit.document === document && cached.edit.cursor.isEqual(cursor) && current(cached.edit)) {
                 const items = cached.items; cancelAutomatic(); return items;
             }
-            if (completionContext.triggerKind !== vscode.CompletionTriggerKind.Invoke) { return undefined; }
-            return request(document, cursor, token, 'completion') as Promise<vscode.CompletionItem[] | undefined>;
-        }
+            if (completionContext.triggerKind !== vscode.CompletionTriggerKind.Invoke
+                && completionContext.triggerKind !== vscode.CompletionTriggerKind.TriggerForIncompleteCompletions) { return undefined; }
+            return request(document, cursor, token, 'completion', undefined, {
+                triggerKind: completionContext.triggerKind === vscode.CompletionTriggerKind.TriggerForIncompleteCompletions ? 3 : 1
+            }) as Promise<CompletionResult | undefined>;
+        },
+        resolveCompletionItem: resolveCompletion
     }));
 }

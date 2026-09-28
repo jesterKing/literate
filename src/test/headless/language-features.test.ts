@@ -33,7 +33,7 @@ function fixture(body = 'console.lo') {
         events.on(name, fn); return { dispose: () => events.off(name, fn) };
     };
     const folder = { uri: uri('/project'), name: 'project', index: 0 };
-    const f: any = { text: fence(body), config: { typescript: { command: '/bin/server', args: [] } }, clients,
+    const f: any = { languageDiagnostics: false, text: fence(body), config: { typescript: { command: '/bin/server', args: [] } }, clients,
         reply: [{ label: 'log', kind: 3 }], snapshots: 0, events, subscriptions, logs: [], commands: new Map(), contexts: [],
         capabilities: { hoverProvider: true, completionProvider: {} } };
     const document: any = { uri: uri('/project/index.literate'), languageId: 'markdown', version: 1, isClosed: false,
@@ -48,11 +48,11 @@ function fixture(body = 'console.lo') {
             }
             return undefined;
         } };
-    const workspace: any = { isTrusted: true, workspaceFolders: [folder], getWorkspaceFolder: () => workspace.workspaceFolders[0],
+    const workspace: any = { textDocuments: [document], isTrusted: true, workspaceFolders: [folder], getWorkspaceFolder: () => workspace.workspaceFolders[0],
         getConfiguration: () => ({ inspect: (key: string) => {
             assert.equal(key, 'languageServers'); return { globalValue: f.config, workspaceValue: f.workspaceConfig };
         }, get(key: string, fallback: boolean) {
-            assert.equal(key, 'automaticCompletion'); return f.automaticCompletion ?? fallback;
+            assert.ok(['automaticCompletion', 'languageDiagnostics'].includes(key)); return f[key] ?? fallback;
         } }),
         onDidGrantWorkspaceTrust: event('trust'), onDidChangeConfiguration: event('config'), onDidChangeWorkspaceFolders: event('folders'),
         onDidChangeTextDocument: event('change'), onDidOpenTextDocument: event('open'), onDidCloseTextDocument: event('close'),
@@ -61,7 +61,7 @@ function fixture(body = 'console.lo') {
             return { dispose() {}, onDidChange: event('disk'), onDidCreate: event('create'), onDidDelete: event('delete') };
         } };
     const token: any = { isCancellationRequested: false, onCancellationRequested: event('cancel') };
-    const vscode: any = { workspace, env: {}, Uri: { file: uri }, Position, Range, CompletionTriggerKind: { Invoke: 0 },
+    const vscode: any = { workspace, env: {}, Uri: { file: uri }, Position, Range, CompletionTriggerKind: { Invoke: 0, TriggerForIncompleteCompletions: 2 },
         CancellationTokenSource: class {
             token = { isCancellationRequested: false, onCancellationRequested: () => ({ dispose() {} }) };
             dispose() {}
@@ -79,6 +79,9 @@ function fixture(body = 'console.lo') {
                 assert.equal(key, 'literate.automaticCompletionPending'); f.contexts.push(value); f.pendingContext = value;
                 await f.onContext?.(value); return;
             }
+            if (name === 'editor.action.triggerParameterHints') {
+                f.hints = (f.hints || 0) + 1; f.signature = await f.signatureProvider.provideSignatureHelp(document, f.cursor, token, { triggerKind: 0 }); return;
+            }
             assert.equal(name, 'editor.action.triggerSuggest'); assert.equal(f.pendingContext, false);
             f.suggestions = (f.suggestions || 0) + 1;
             await f.onSuggest?.(); f.items = await f.complete();
@@ -87,10 +90,22 @@ function fixture(body = 'console.lo') {
         } },
         CompletionItemKind: { Text: 0, Method: 1, Function: 2, Folder: 18 },
         CompletionItem: class { constructor(public label: string) {} },
+        CompletionList: class { constructor(public items: any[], public isIncomplete: boolean) {} },
+        SnippetString: class { constructor(public value: string) {} },
+        SignatureHelp: class { signatures: any[] = []; },
+        SignatureInformation: class { parameters: any[] = []; constructor(public label: any, public documentation: any) {} },
+        ParameterInformation: class { constructor(public label: any, public documentation: any) {} },
         MarkdownString: class { value = ''; appendMarkdown(s: string) { this.value += s; } appendText(s: string) { this.value += s; }
             appendCodeblock(s: string, lang: string) { this.value += lang + '\n' + s; } },
         Hover: class { constructor(public contents: any, public range: any) {} },
         languages: {
+            registerSignatureHelpProvider(_s: any, provider: any, ...triggers: any[]) {
+                f.signatureProvider = provider; f.signatureTriggers = triggers; return { dispose() {} };
+            },
+            registerDefinitionProvider(_s: any, p: any) { f.definitionProvider = p; return { dispose() {} }; },
+            registerTypeDefinitionProvider(_s: any, p: any) { f.typeDefinitionProvider = p; return { dispose() {} }; },
+            registerImplementationProvider(_s: any, p: any) { f.implementationProvider = p; return { dispose() {} }; },
+            registerReferenceProvider(_s: any, p: any) { f.referencesProvider = p; return { dispose() {} }; },
             registerHoverProvider(selector: any, provider: any) {
                 f.hoverSelector = selector; f.hoverProvider = provider; return { dispose() {} };
             },
@@ -103,6 +118,7 @@ function fixture(body = 'console.lo') {
         disposed = 0; syncs: any[] = []; requests: any[] = [];
         capabilities = f.capabilities;
         constructor(public options: any) { clients.push(this); }
+        onDidStop(callback: () => void) { f.stopClient = callback; return () => { f.stopUnsubscribed = true; }; }
         async initialize() { await f.onInitialize?.(); }
         async sync(docs: any) { this.syncs.push(docs); await f.onSync?.(); }
         async request(method: string, params: any, signal: AbortSignal) {
@@ -114,6 +130,21 @@ function fixture(body = 'console.lo') {
     const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 } });
     new Function('require', 'exports', compiled.outputText)((name: string) => {
         if (name === 'vscode') { return vscode; }
+        if (name === './language-navigation') { return { mapLanguageLocations: (reply: any, ctx: any) => {
+            f.navigationContext = ctx; return reply;
+        } }; }
+        if (name === './language-diagnostics') { return { LanguageDiagnostics: class {
+            constructor(context: any) { context.subscriptions.push(this); }
+            invalidate(key?: string) {
+                f.invalidations = (f.invalidations || 0) + 1;
+                (f.invalidatedKeys ??= []).push(key);
+                if (key === undefined || key === f.diagnosticSync?.key) { f.visibleDiagnostics = false; }
+            }
+            dispose() {}
+            async synchronize(key: string, client: any, ctx: any, docs: any, fresh: any) {
+                f.diagnosticSync = { key, ctx, fresh }; await client.sync(docs); f.visibleDiagnostics = fresh();
+            }
+        } }; }
         if (name === './language-client') { return { LanguageClient: Client }; }
         if (name === './language-projection') { return projection; }
         if (name === './engine') { return { parseProject, parseFragmentHeader, scanFragmentTags }; }
@@ -145,6 +176,319 @@ function fixture(body = 'console.lo') {
     };
     return f;
 }
+test('snippet completion and resolve preserve edits and copy only untrusted metadata', async () => {
+    const f = fixture(); f.capabilities.completionProvider.resolveProvider = true;
+    f.reply = [{ label: 'log', kind: 15, insertTextFormat: 2, insertText: 'log(${1:value})$0', data: { id: 7 } }];
+    const [item] = await f.complete(), original = item.insertText, range = item.range;
+    assert.equal(original.value, 'log(${1:value})$0');
+    f.reply = { label: 'evil', detail: 'resolved', documentation: { kind: 'markdown', value: '[bad](command:evil)' },
+        textEdit: { range: lspRange(0, 10), newText: 'evil' }, command: { command: 'evil' }, additionalTextEdits: [{}] };
+    assert.equal(await f.completionProvider.resolveCompletionItem(item, f.token), item);
+    assert.equal(item.detail, 'resolved'); assert.equal(item.documentation.isTrusted, false);
+    assert.equal(item.insertText, original); assert.equal(item.range, range); assert.equal(item.command, undefined);
+    assert.equal(item.additionalTextEdits, undefined); assert.equal(item.label, 'log');
+    assert.deepEqual(f.clients[0].requests[1].params.data, { id: 7 }); f.dispose();
+});
+
+test('resolve requires capability and current input, view, configuration and cancellation', async () => {
+    for (const mutate of [
+        (f: any) => { f.capabilities.completionProvider.resolveProvider = false; },
+        (f: any) => { f.document.version++; }, (f: any) => { f.select(new Position(1, 1)); },
+        (f: any) => { f.config.typescript.args.push('changed'); },
+        (f: any) => { f.token.isCancellationRequested = true; }, (f: any) => { f.restart(); }
+    ]) {
+        const f = fixture(); f.capabilities.completionProvider.resolveProvider = true;
+        const [item] = await f.complete(); mutate(f); f.reply = { detail: 'stale' };
+        await f.completionProvider.resolveCompletionItem(item, f.token);
+        assert.equal(item.detail, undefined); assert.equal(f.clients[0].requests.length, 1); f.dispose();
+    }
+    const f = fixture(); f.capabilities.completionProvider.resolveProvider = true;
+    const [item] = await f.complete(); f.reply = { detail: 'late' }; f.onRequest = () => { f.document.version++; };
+    await f.completionProvider.resolveCompletionItem(item, f.token); assert.equal(item.detail, undefined); f.dispose();
+});
+
+test('Mason CSS rgb snippet survives list editRange defaults with explicit item edits', async () => {
+    const f = fixture(); f.text = fence('a {\n    color: rg\n}', 'css: <<main.*>>= main.css $');
+    f.config = { css: { command: '/bin/server' } }; f.cursor = new Position(2, 13);
+    // Shape captured from language-groups-host-46Amon/server-traces.json, CSS response id 9.
+    const range = lspRange(11, 13, 1), snippet = 'rgb(${1:red}, ${2:green}, ${3:blue})';
+    f.reply = { isIncomplete: false, itemDefaults: { editRange: range }, items: [
+        { label: 'rgb', detail: 'rgb($red, $green, $blue)', textEdit: { range, newText: snippet }, insertTextFormat: 2, kind: 3 },
+        { label: 'unsafe', command: { command: 'editor.action.triggerSuggest' } }
+    ] };
+    const result = await f.complete(); assert.equal(result.items.length, 1);
+    assert.equal(result.items[0].insertText.value, snippet);
+    assert.deepEqual(result.items[0].range, new Range(new Position(2, 11), new Position(2, 13))); f.dispose();
+});
+
+test('completion defaults inherit safe ranges, snippets and data without overriding item fields', async () => {
+    const f = fixture(); f.capabilities.completionProvider.resolveProvider = true;
+    f.reply = { isIncomplete: true, itemDefaults: {
+        editRange: lspRange(8, 10), insertTextFormat: 2, insertTextMode: 1, data: { inherited: true }
+    }, items: [
+        { label: 'snippet', textEditText: 'log(${1:value})', insertText: 'ignored' },
+        { label: 'plain', insertTextFormat: 1, insertText: 'plain text', data: { own: true } },
+        { label: 'label fallback' },
+        { label: 'explicit', textEdit: { range: lspRange(9, 10), newText: 'own edit' } },
+        { label: 'extra', additionalTextEdits: [{}] }, { label: 'command', command: {} },
+        { label: 'invalid mode', insertTextMode: 2 }, { label: 'invalid text', textEditText: 3 }
+    ] };
+    const result = await f.complete(), items = result.items;
+    assert.equal(result.isIncomplete, true); assert.equal(items.length, 4);
+    assert.equal(items[0].insertText.value, 'log(${1:value})'); assert.equal(items[0].range.start.character, 8);
+    assert.equal(items[1].insertText, 'plain text'); assert.equal(items[2].insertText.value, 'label fallback');
+    assert.equal(items[3].insertText.value, 'own edit'); assert.equal(items[3].range.start.character, 9);
+    f.reply = { detail: 'resolved', command: {}, additionalTextEdits: [{}], insertText: 'evil' };
+    for (const item of items.slice(0, 2)) { await f.completionProvider.resolveCompletionItem(item, f.token); }
+    assert.deepEqual(f.clients[0].requests[1].params.data, { inherited: true });
+    assert.deepEqual(f.clients[0].requests[2].params.data, { own: true });
+    assert.equal(items[0].insertText.value, 'log(${1:value})'); assert.equal(items[0].command, undefined);
+    assert.equal(items[0].additionalTextEdits, undefined); f.dispose();
+});
+
+test('default insert/replace ranges preserve containment and item overrides', async () => {
+    const f = fixture('console.log'); f.cursor = new Position(1, 10);
+    f.reply = { itemDefaults: { editRange: { insert: lspRange(8, 10), replace: lspRange(8, 11) } },
+        items: [{ label: 'log', textEditText: 'log()' }] };
+    const [item] = (await f.complete()).items;
+    assert.equal(item.insertText, 'log()'); assert.equal(item.range.inserting.end.character, 10);
+    assert.equal(item.range.replacing.end.character, 11); f.dispose();
+});
+
+test('meaningful unsupported, malformed and unsafe completion defaults fail closed', async () => {
+    for (const defaults of [null, [], 'invalid', { command: {} }, { additionalTextEdits: [] },
+        { commitCharacters: [';'] }, { unknown: true }, { insertTextFormat: 3 }, { insertTextMode: 2 },
+        { editRange: null }, { editRange: lspRange(0, 999) }, { editRange: lspRange(0, 2) },
+        { editRange: { insert: lspRange(8, 10), replace: lspRange(9, 10) } },
+        { editRange: { ...lspRange(8, 10), insert: lspRange(8, 10) } }
+    ]) {
+        const f = fixture(); f.reply = { itemDefaults: defaults, items: [{ label: 'log' }] };
+        assert.equal(await f.complete(), undefined, JSON.stringify(defaults)); f.dispose();
+    }
+    const f = fixture(); f.text = fence('<<piece>>\n<<piece>>') + fence('obj.lo', ': <<piece>>=');
+    f.cursor = new Position(5, 6);
+    f.reply = { itemDefaults: { editRange: lspRange(4, 6, 1) }, items: [{ label: 'log' }] };
+    assert.equal(await f.complete(), undefined, 'a different expansion occurrence is not the active mapping'); f.dispose();
+});
+
+test('incomplete completion retriggers use LSP kind 3', async () => {
+    const f = fixture(); f.reply = { isIncomplete: true, items: [{ label: 'log' }] };
+    assert.equal((await f.complete()).isIncomplete, true);
+    await f.complete(2); assert.deepEqual(f.clients[0].requests[1].params.context, { triggerKind: 3 }); f.dispose();
+});
+
+test('navigation providers gate capabilities and forward captured context and references', async () => {
+    for (const [method, provider, call] of [
+        ['definition', 'definitionProvider', 'provideDefinition'], ['typeDefinition', 'typeDefinitionProvider', 'provideTypeDefinition'],
+        ['implementation', 'implementationProvider', 'provideImplementation'], ['references', 'referencesProvider', 'provideReferences']
+    ]) {
+        const f = fixture();
+        const invoke = () => method === 'references'
+            ? f[provider][call](f.document, f.cursor, { includeDeclaration: true }, f.token)
+            : f[provider][call](f.document, f.cursor, f.token);
+        assert.equal(await invoke(), undefined); assert.equal(f.clients[0].syncs.length, 0);
+        f.capabilities[method + 'Provider'] = true; f.reply = [{ safe: 'mapper result' }];
+        assert.deepEqual(await invoke(), f.reply); assert.equal(f.clients[0].requests[0].method, 'textDocument/' + method);
+        assert.equal(f.navigationContext.root, f.folder.uri); assert.equal(f.navigationContext.files[0].path, 'main.ts');
+        assert.equal(f.navigationContext.documents[0].text, f.text);
+        if (method === 'references') { assert.deepEqual(f.clients[0].requests[0].params.context, { includeDeclaration: true }); }
+        f.text = fence('<<piece>>') + fence('code', ': <<piece>>='); f.cursor = new Position(1, 4);
+        assert.equal(await invoke(), undefined); f.dispose();
+    }
+});
+
+test('signature help validates UTF16 offsets and clamps active indices', async () => {
+    const f = fixture('call('), invoke = () => f.signatureProvider.provideSignatureHelp(f.document, f.cursor, f.token,
+        { triggerKind: 1, isRetrigger: false });
+    assert.equal(await invoke(), undefined); assert.equal(f.clients[0].syncs.length, 0);
+    f.capabilities.signatureHelpProvider = { triggerCharacters: ['@'], retriggerCharacters: [';'] };
+    f.reply = { signatures: [{ label: 'f(😀, x)', documentation: 'docs', parameters: [{ label: [2, 4] }, { label: 'x' }] }],
+        activeSignature: 99, activeParameter: 1 };
+    const help = await invoke(); assert.equal(help.activeSignature, 0); assert.equal(help.activeParameter, 1);
+    assert.deepEqual(help.signatures[0].parameters[0].label, [2, 4]);
+    assert.equal(help.signatures[0].documentation.isTrusted, false); assert.ok(f.signatureTriggers.includes('@'));
+    assert.ok(f.signatureTriggers.includes(';')); assert.equal(f.clients[0].requests[0].params.context.triggerKind, 1);
+    for (const label of [[-1, 2], [4, 2], [0, 100], [1.5, 2], 'missing']) {
+        f.reply.signatures[0].parameters = [{ label }]; assert.equal(await invoke(), undefined);
+    }
+    f.reply = { signatures: [{ label: 'f(x)', activeParameter: -1, parameters: [{ label: 'x' }] }], activeSignature: -1 };
+    assert.equal((await invoke()).activeParameter, 0); f.dispose();
+});
+
+test('automatic signature help survives cold startup and shares the manual gate', async () => {
+    const f = fixture('call'); f.capabilities.signatureHelpProvider = {};
+    f.reply = { signatures: [{ label: 'call(x)', parameters: [{ label: 'x' }] }] };
+    f.type('('); await debounce(); assert.equal(f.hints, 1); assert.ok(f.signature);
+    assert.equal(f.clients[0].requests[0].method, 'textDocument/signatureHelp');
+    assert.deepEqual(f.clients[0].requests[0].params.context, { triggerKind: 2, triggerCharacter: '(', isRetrigger: false });
+    assert.equal(f.clients[0].requests.length, 1); f.dispose();
+});
+
+test('background diagnostics sync without requests or focus and retain freshness across selection', async () => {
+    const f = fixture(); f.languageDiagnostics = true; f.vscode.window.state.focused = false;
+    f.events.emit('open', f.document); await new Promise(resolve => setTimeout(resolve, 450));
+    assert.equal(f.clients.length, 1); assert.equal(f.clients[0].requests.length, 0);
+    assert.equal(f.clients[0].syncs.length, 1); assert.equal(f.diagnosticSync.fresh(), true);
+    const sync = f.diagnosticSync, invalidations = f.invalidations;
+    f.select(new Position(1, 2)); f.events.emit('focus'); assert.equal(f.invalidations, invalidations);
+    assert.equal(sync.fresh(), true);
+    const generated = { ...f.document, uri: uri('/project/main.ts') };
+    f.events.emit('change', { document: generated, contentChanges: [{ text: 'output noise' }] });
+    f.events.emit('open', generated); f.events.emit('close', generated);
+    assert.equal(f.invalidations, invalidations); assert.equal(sync.fresh(), true);
+    f.type('x'); assert.equal(sync.fresh(), false); assert.ok(f.invalidations > invalidations);
+    await new Promise(resolve => setTimeout(resolve, 450)); assert.equal(f.clients[0].syncs.length, 2);
+    f.languageDiagnostics = false; f.events.emit('config', { affectsConfiguration: () => false });
+    assert.equal(f.diagnosticSync.fresh(), false); await f.complete(); assert.equal(f.clients[0].syncs.length, 3); f.dispose();
+});
+
+test('cold advertised signature trigger chooses signature after initialization', async () => {
+    const f = fixture('call'); f.capabilities.signatureHelpProvider = { triggerCharacters: ['@'] };
+    f.reply = { signatures: [{ label: 'call(x)' }] }; f.type('@'); await debounce();
+    assert.equal(f.hints, 1); assert.equal(f.suggestions, undefined);
+    assert.equal(f.clients[0].requests[0].method, 'textDocument/signatureHelp'); f.dispose();
+});
+
+test('background initialization yields to newest typing without poisoning the shared session', async () => {
+    const f = fixture('this.'); f.languageDiagnostics = true;
+    let release!: () => void; f.onInitialize = () => new Promise<void>(resolve => { release = resolve; });
+    f.events.emit('open', f.document); await new Promise(resolve => setTimeout(resolve, 450));
+    f.type('l'); f.type('i'); await debounce(); f.onInitialize = undefined; release(); await debounce();
+    assert.equal(f.clients.length, 1); assert.equal(f.suggestions, 1); assert.equal(f.clients[0].requests.length, 1);
+    assert.equal(f.diagnosticSync.fresh(), true);
+    const invalidations = f.invalidations; f.stopClient(); assert.ok(f.invalidations > invalidations);
+    assert.equal(await f.complete(), undefined); f.dispose(); assert.equal(f.stopUnsubscribed, true);
+});
+
+test('foreground snapshot failures, mismatches and removed outputs clear old diagnostics', async () => {
+    for (const mutate of [
+        (f: any) => { f.onSnapshot = () => { throw new Error('PRIVATE'); }; },
+        (f: any) => { f.documents = [{ path: 'index.literate', text: 'stale' }]; },
+        (f: any) => { f.documents = [{ path: 'index.literate', text: f.text }, { path: 'bad.literate', text: fence('<<missing>>') }]; },
+        (f: any) => { f.text = 'No generated output remains'; f.cursor = new Position(0, 2); }
+    ]) {
+        const f = fixture(); f.languageDiagnostics = true; await f.complete();
+        assert.equal(f.visibleDiagnostics, true); const key = f.diagnosticSync.key;
+        mutate(f); assert.equal(await f.complete(), undefined);
+        assert.equal(f.visibleDiagnostics, false); assert.equal(f.invalidatedKeys.at(-1), key);
+        assert.doesNotMatch(f.logs.join(''), /PRIVATE/); f.dispose();
+    }
+});
+
+test('snapshot errors still clear diagnostics after a focus change; request failures clear their session', async () => {
+    for (const stage of ['onSnapshot', 'onRequest']) {
+        const f = fixture(); f.languageDiagnostics = true; await f.complete();
+        assert.equal(f.visibleDiagnostics, true);
+        f[stage] = () => {
+            if (stage === 'onSnapshot') { f.events.emit('focus'); }
+            throw new Error('PRIVATE');
+        };
+        assert.equal(await f.complete(), undefined); assert.equal(f.visibleDiagnostics, false);
+        assert.doesNotMatch(f.logs.join(''), /PRIVATE/); f.dispose();
+    }
+});
+
+test('capture event overflow invalidates source freshness, not just the foreground epoch', async () => {
+    const f = fixture(); f.languageDiagnostics = true;
+    f.events.emit('open', f.document); await f.complete();
+    const previous = f.diagnosticSync;
+    f.onSnapshot = () => {
+        for (let i = 0; i <= 1000; i++) { f.events.emit('disk', uri('/project/noise-' + i)); }
+    };
+    await new Promise(resolve => setTimeout(resolve, 450));
+    assert.equal(previous.fresh(), false); assert.equal(f.visibleDiagnostics, false);
+    assert.equal(f.clients[0].syncs.length, 1); f.dispose();
+});
+
+test('background snapshot errors and buffer mismatches clear existing diagnostics', async () => {
+    for (const failure of [true, false]) {
+        const f = fixture(); f.languageDiagnostics = true;
+        // Schedule background capture, then publish diagnostics before its debounce expires.
+        const other = { ...f.document, uri: uri('/project/other.literate') };
+        f.events.emit('open', other); await f.complete(); assert.equal(f.visibleDiagnostics, true);
+        if (failure) { f.onSnapshot = () => { throw new Error('PRIVATE'); }; }
+        else { f.documents = [{ path: 'index.literate', text: 'stale' }]; }
+        await new Promise(resolve => setTimeout(resolve, 450));
+        assert.equal(f.visibleDiagnostics, false); assert.doesNotMatch(f.logs.join(''), /PRIVATE/); f.dispose();
+    }
+});
+
+test('explicit foreground requests wait behind background initialization and remain serialized', async () => {
+    const f = fixture(); f.languageDiagnostics = true;
+    let release!: () => void;
+    f.onInitialize = () => new Promise<void>(resolve => { release = resolve; });
+    f.events.emit('open', f.document); await new Promise(resolve => setTimeout(resolve, 450));
+    const first = f.complete(), second = f.complete();
+    await Promise.resolve(); assert.equal(f.clients[0].requests.length, 0);
+    f.onInitialize = undefined; release();
+    assert.equal((await first)[0].label, 'log'); assert.equal((await second)[0].label, 'log');
+    assert.equal(f.clients.length, 1); assert.equal(f.clients[0].requests.length, 2); f.dispose();
+});
+
+test('queued foreground cancellation and view invalidation cannot replay stale requests', async () => {
+    for (const cancel of [true, false]) {
+        const f = fixture(); f.languageDiagnostics = true; let release!: () => void;
+        f.onInitialize = () => new Promise<void>(resolve => { release = resolve; });
+        f.events.emit('open', f.document); await new Promise(resolve => setTimeout(resolve, 450));
+        const result = f.complete();
+        if (cancel) { f.token.isCancellationRequested = true; f.events.emit('cancel'); }
+        else { f.select(new Position(1, 2)); }
+        f.onInitialize = undefined; release(); assert.equal(await result, undefined);
+        await Promise.resolve(); assert.equal(f.clients[0].requests.length, 0);
+        assert.equal(f.diagnosticSync.fresh(), true); f.dispose();
+    }
+});
+
+test('signature triggers from other servers and retrigger-only characters do not steal completion', async () => {
+    for (const retrigger of [true, false]) {
+        const f = fixture('call');
+        f.capabilities.signatureHelpProvider = { triggerCharacters: ['@'] };
+        await f.complete(); assert.ok(f.signatureTriggers.includes('@'));
+        f.capabilities.signatureHelpProvider = retrigger
+            ? { triggerCharacters: ['('], retriggerCharacters: ['@'] } : { triggerCharacters: ['('] };
+        f.capabilities.completionProvider.triggerCharacters = ['@'];
+        f.type('@'); await debounce();
+        assert.equal(f.suggestions, 1); assert.equal(f.hints, undefined);
+        assert.equal(f.clients[0].requests.at(-1).method, 'textDocument/completion'); f.dispose();
+    }
+});
+
+test('native automatic signature callbacks respect opt-out, focus, body and server triggers', async () => {
+    for (const mutate of [
+        (f: any) => { f.automaticCompletion = false; },
+        (f: any) => { f.vscode.window.state.focused = false; },
+        (f: any) => { f.text = 'prose('; f.cursor = new Position(0, 6); },
+        (f: any) => { f.capabilities.signatureHelpProvider.triggerCharacters = ['@']; }
+    ]) {
+        const f = fixture('call('); f.capabilities.signatureHelpProvider = { triggerCharacters: ['('] }; mutate(f);
+        const result = await f.signatureProvider.provideSignatureHelp(f.document, f.cursor, f.token,
+            { triggerKind: 2, triggerCharacter: '(', isRetrigger: false });
+        assert.equal(result, undefined); assert.equal(f.clients[0]?.requests.length ?? 0, 0); f.dispose();
+    }
+    const f = fixture('call('); f.automaticCompletion = false; f.capabilities.signatureHelpProvider = {};
+    f.reply = { signatures: [{ label: 'call(x)' }] };
+    assert.ok(await f.signatureProvider.provideSignatureHelp(f.document, f.cursor, f.token,
+        { triggerKind: 1, isRetrigger: false })); f.dispose();
+});
+
+test('background template and configuration changes invalidate captured diagnostics', async () => {
+    const f = fixture(); f.languageDiagnostics = true; f.templates = { 'wrapper.txt': 'prefix' };
+    await f.complete(); const first = f.diagnosticSync;
+    f.events.emit('disk', uri('/project/wrapper.txt')); assert.equal(first.fresh(), false);
+    await new Promise(resolve => setTimeout(resolve, 450)); assert.equal(f.diagnosticSync.fresh(), true);
+    const second = f.diagnosticSync; f.events.emit('folders'); assert.equal(second.fresh(), false); f.dispose();
+});
+
+test('background diagnostics reject invalid, untrusted and opted-out inputs', async () => {
+    for (const mutate of [
+        (f: any) => { f.text = fence('<<missing>>'); }, (f: any) => { f.workspace.isTrusted = false; },
+        (f: any) => { f.languageDiagnostics = false; }, (f: any) => { f.config = {}; }
+    ]) {
+        const f = fixture(); f.languageDiagnostics = true; mutate(f); f.events.emit('open', f.document);
+        await new Promise(resolve => setTimeout(resolve, 450)); assert.equal(f.clients.length, 0); f.dispose();
+    }
+});
+
 function throwIfUnexpected(name: string) { assert.equal(name, 'node:path', 'adapter must not import generation or I/O'); }
 const lspRange = (start: number, end: number, line = 0) => ({ start: { line, character: start }, end: { line, character: end } });
 const debounce = () => new Promise(resolve => setTimeout(resolve, 240));
@@ -205,11 +549,11 @@ test('cold latest input survives publication and transaction output events durin
     assert.equal(f.clients[0].syncs[0][0].text, 'this.li\n'); f.dispose();
 });
 
-test('typing this.li lazily prefetches once and consumes a validated array', async () => {
+test('typing this.li lazily prefetches once and preserves an incomplete list', async () => {
     const f = fixture('this.'); f.reply = { isIncomplete: true, items: [{ label: 'list' }] };
     f.type('l'); f.type('i'); await debounce();
     assert.equal(f.clients.length, 1); assert.equal(f.clients[0].requests.length, 1);
-    assert.equal(f.suggestions, 1); assert.equal(f.items[0].label, 'list');
+    assert.equal(f.suggestions, 1); assert.equal(f.items.items[0].label, 'list'); assert.equal(f.items.isIncomplete, true);
     assert.equal(f.clients[0].requests[0].params.context.triggerKind, 1); f.dispose();
 });
 
@@ -296,7 +640,7 @@ test('reset, Escape command and dispose clear pending timers; empty or unsafe it
     fixtures[0].restart(); fixtures[1].commands.get('literate.cancelAutomaticCompletion')(); fixtures[2].dispose();
     await debounce();
     for (const f of fixtures) { assert.equal(f.snapshots, 0); f.dispose(); }
-    for (const reply of [[], [{ label: 'bad', insertTextFormat: 2 }], { items: [{ label: 'bad' }], itemDefaults: {} }]) {
+    for (const reply of [[], [{ label: 'bad', insertTextFormat: 3 }], { items: [{ label: 'bad' }], itemDefaults: { command: {} } }]) {
         const f = fixture(); f.reply = reply; f.type('x'); await debounce();
         assert.equal(f.suggestions, undefined); f.dispose();
     }
@@ -462,7 +806,9 @@ test('failed and empty drains plus restart and disposal always clear mapped pend
 });
 
 test('chapter has bounded fragments and exactly assembles the owned output', () => {
-    for (const chunk of chunks) { assert.ok(chunk.split('\n').length <= 30); }
+    for (const match of chapter.matchAll(/```ts [^\n]+\n([\s\S]*?)\n```/g)) {
+        assert.ok(match[1].split('\n').length <= 30, match[0].split('\n')[0]);
+    }
     assert.equal(source, fs.readFileSync(path.join(root, 'src/language-features.ts'), 'utf8'));
     const generated = generateProject([{ path: 'language-features.literate', text: chapter }]);
     assert.deepEqual(generated.diagnostics, []);
@@ -490,7 +836,7 @@ test('trust, locality, global-only settings and explicit invocation gate all sna
         const f = fixture(); f.workspaceConfig = f.config; change(f);
         assert.equal(await f.complete(), undefined); assert.equal(f.snapshots, 0); assert.equal(f.clients.length, 0); f.dispose();
     }
-    const f = fixture(); assert.equal(await f.complete(1), undefined); assert.equal(await f.complete(2), undefined);
+    const f = fixture(); assert.equal(await f.complete(1), undefined); assert.equal(await f.complete(99), undefined);
     assert.equal(f.snapshots, 0); f.dispose();
 });
 
@@ -549,10 +895,10 @@ test('untrusted completion edits reject unsupported or unsafe variants and prese
         { label: 'ambiguous', textEdit: { range: lspRange(8, 10), insert: lspRange(8, 10), newText: 'x' } },
         { label: 'default', textEditText: 'x' }, { label: 'badtext', insertText: 3 }, null
     ];
-    const items = await f.complete(); assert.deepEqual(items.map((item: any) => item.label), ['ok', 'pair']);
+    const items = await f.complete(); assert.deepEqual(items.map((item: any) => item.label), ['ok', 'pair', 'snippet', 'snippet kind']);
     assert.equal(items[0].sortText, 'a'); assert.equal(items[0].filterText, 'lo'); assert.equal(items[0].detail, 'detail');
     assert.equal(items[0].kind, 18); assert.ok(items[1].range.inserting);
-    f.reply = { items: [{ label: 'x' }], itemDefaults: {} }; assert.equal(await f.complete(), undefined);
+    f.reply = { items: [{ label: 'x' }], itemDefaults: {} }; assert.equal((await f.complete()).items[0].label, 'x');
     f.reply = { items: [{ label: 'x' }], editDefaults: {} }; assert.equal(await f.complete(), undefined); f.dispose();
 });
 
@@ -649,7 +995,7 @@ test('template disk changes invalidate in-flight work across requests but genera
 test('freshness and cancellation checked after every async boundary', async () => {
     for (const stage of ['onSnapshot', 'onInitialize', 'onSync', 'onRequest']) {
         for (const mutate of [
-            (f: any) => { f.document.version++; }, (f: any) => { f.events.emit('change', { contentChanges: [{}] }); },
+            (f: any) => { f.document.version++; }, (f: any) => { f.events.emit('change', { document: f.document, contentChanges: [{}] }); },
             (f: any) => { f.events.emit('disk', uri('/project/other.literate')); }, (f: any) => { f.workspace.isTrusted = false; },
             (f: any) => { f.workspace.workspaceFolders = []; },
             (f: any) => { f.config.typescript.args.push('changed'); },
@@ -663,15 +1009,18 @@ test('freshness and cancellation checked after every async boundary', async () =
     assert.equal(await f.complete(), undefined); assert.equal(f.clients.length, 0); f.dispose();
 });
 
-test('no waiting queue; document cancellation reaches request and lifecycle catches disposal errors', async () => {
+test('bounded waiting queue; document cancellation reaches requests and lifecycle catches disposal errors', async () => {
     const f = fixture(); let release!: () => void, entered!: () => void;
     const ready = new Promise<void>(resolve => { entered = resolve; });
     f.onRequest = async (signal: AbortSignal) => {
         f.signal = signal; entered(); await new Promise<void>(resolve => { release = resolve; });
     };
     const first = f.complete(); await ready;
+    const queued = Array.from({ length: 32 }, () => f.complete());
     assert.equal(await f.complete(), undefined); assert.equal(f.snapshots, 1);
-    f.events.emit('change', { contentChanges: [{}] }); assert.equal(f.signal.aborted, true); release(); assert.equal(await first, undefined);
+    f.events.emit('change', { document: f.document, contentChanges: [{}] }); assert.equal(f.signal.aborted, true);
+    assert.deepEqual(await Promise.all(queued), Array(32).fill(undefined));
+    release(); assert.equal(await first, undefined);
     f.onRequest = undefined; await f.complete();
     f.disposeFailure = true; f.events.emit('config', { affectsConfiguration: () => true });
     assert.equal(f.clients[0].disposed, 1); await f.complete(); assert.equal(f.clients.length, 2);
@@ -712,14 +1061,15 @@ test('restart during initialization invalidates old work without poisoning the n
         entered(); await new Promise<void>(resolve => { release = resolve; }); throw new Error('old server exited');
     };
     const pending = f.complete(); await ready; f.restart();
-    assert.equal(f.clients[0].disposed, 1); assert.equal(await f.complete(), undefined);
-    release(); assert.equal(await pending, undefined); assert.deepEqual(f.logs, []);
-    f.onInitialize = undefined; assert.ok(await f.complete()); assert.equal(f.clients.length, 2); f.dispose();
+    assert.equal(f.clients[0].disposed, 1); const next = f.complete();
+    f.onInitialize = undefined; release(); assert.equal(await pending, undefined);
+    assert.ok(await next); assert.equal(f.clients.length, 2);
+    assert.equal(f.logs.length, 1); assert.match(f.logs[0], /Language server ready/); f.dispose();
 });
 
 test('cancelled protocol requests do not disable or diagnose a healthy session', async () => {
     const f = fixture(); f.onRequest = (signal: AbortSignal) => {
-        f.events.emit('change', { contentChanges: [{}] }); assert.equal(signal.aborted, true); throw new Error('cancelled');
+        f.events.emit('change', { document: f.document, contentChanges: [{}] }); assert.equal(signal.aborted, true); throw new Error('cancelled');
     };
     assert.equal(await f.complete(), undefined); assert.equal(f.logs.length, 1);
     assert.match(f.logs[0], /Language server ready/); assert.equal(f.clients[0].disposed, 0);
