@@ -276,11 +276,23 @@ or Puppeteer browser downloader/launcher dependency. The VSIX ships the runtime
 files, not the metadata or `node_modules`; local external tools/fonts are still
 required. The acceptance closure check is not a complete transitive license audit.
 
-An actual archive, `out/literate-m5.vsix`, was built with **VSCE 4 `--no-dependencies`**.
-The evidence below identifies the tested archive by hash. The final archive has
-19 entries (4.72 MB), excluding Yarn state/configuration, plans and fonts. After
+Package the extension with:
+
+```sh
+yarn package:vsix
+```
+
+The script pins VSCE 4 and passes `--no-dependencies` because the extension's
+runtime dependencies are already bundled by `vscode:prepublish`. Without that
+flag, VSCE detects `yarn.lock` and invokes the Yarn Classic command
+`yarn list --prod --json`, which Yarn 4 does not implement. The direct equivalent
+is `yarn dlx @vscode/vsce@4.0.0 package --no-dependencies --out out/literate-0.15.0.vsix`;
+if VSCE is installed locally, `yarn vsce package --no-dependencies` also avoids the
+incompatible dependency scan.
+
+The VSIX excludes Yarn state/configuration, plans, fonts and `node_modules`. After
 any repackage, rerun acceptance and retain the new evidence path/hash rather than
-treating an older archive proof as proof of new bytes.
+treating older archive proof as proof of new bytes.
 
 ### Real desktop host
 
