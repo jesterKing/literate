@@ -15,7 +15,8 @@ yarn esbuild
 
 The authoritative production sources are `literate/language-projection.literate`,
 `literate/language-client.literate`, `literate/language-features.literate`,
-`literate/language-navigation.literate` and `literate/language-diagnostics.literate`.
+`literate/language-navigation.literate`, `literate/language-diagnostics.literate`
+and `literate/language-actions.literate`.
 Edit the chapters, not their generated `src/language-*.ts` outputs. Their headless
 tests cover projection parity, UTF-16/line endings/indentation, repeated references
 and empty appends, framing and synchronization, lifecycle, trust/configuration,
@@ -40,11 +41,16 @@ cancellation/staleness, and conservative response mapping.
    Unmapped diagnostics are omitted, including template-wrapper-only ranges;
    `relatedInformation` is omitted. Unversioned pushes have **best-effort freshness**:
    after synchronization, a late unversioned report cannot be proven current.
+5. **Code actions:** only explicitly invoked, eager edit-only `quickfix` and
+   `refactor` actions. Require the complete non-overlapping edit set to target one
+   generated URI and map into the current uniquely expanded fragment. Reject
+   commands, resolution, disabled/malformed actions, repeated expansions, snippets,
+   document/resource operations, annotations, cross-file edits and stale snapshots.
 
-Language-server rename, code actions and formatting remain out of scope. Preserve
+Language-server rename and formatting remain out of scope. Preserve
 existing fragment-name completion, definition/reference navigation, rename and
-fragment code actions; these are separate from language-symbol services. Requests
-must not write generated outputs or apply server-provided workspace edits.
+fragment code actions; these are separate from language-symbol services. Requests must not write generated outputs. The provider returns validated mapped
+workspace edits to VS Code; it never applies them itself.
 
 The shared `src/test/headless/vscode-fixture.ts` records all registrations per
 provider kind in `providerRegistrations` (including selectors and trigger arguments),
@@ -64,19 +70,21 @@ node --test out/test/headless/language-*.test.js out/test/headless/extension-ada
 
 Headless checks alone do not establish real editor UI/server compatibility.
 The expanded installed-host suite (`node src/test/acceptance/language-groups-host-run.js`)
-passes 18 checks on VS Code 1.138.0 with TS7 and Mason CSS/HTML: rendered signature
+passes 23 checks on VS Code 1.138.0 with TS7 and Mason CSS/HTML: rendered signature
 hints, metadata resolution, mapped snippet insertion and tabstops, navigation,
-and background diagnostic appearance/clearing/movement without hover. It builds
+background diagnostics, command rejection, controlled edit-only action mapping
+and application, and coexistence with native fragment quick fixes. It builds
 an isolated source snapshot and downloads nothing. See
 [src/test/acceptance/language-groups-acceptance.md](src/test/acceptance/language-groups-acceptance.md)
 for executable overrides, evidence and limitations. The automatic UI baseline
 also passes all 12 checks against that bundle, with diagnostics disabled to retain
 its cold-first-typing assertion; an initial editor-focus setup failure is recorded.
 
-Full validation: 1,405 headless tests passed, three skipped, zero failed;
-`yarn check:self`, extension bundling and whitespace checks passed. Evidence:
-`out/language-services-tests.log`, `out/language-groups-host-vKuS4Q/` and
-`out/language-auto-host-sXqtV5/`. The earlier hover/completion acceptance follows.
+The installed Mason CSS server returns private `_css.applyCodeAction` commands,
+which are deliberately rejected. A controlled stdio server supplies the positive
+edit-only integration case; this does not claim that Mason CSS actions are usable.
+Latest evidence is under `out/language-groups-host-xzrPg0/`. The earlier
+hover/completion acceptance follows.
 
 The installed-host acceptance is opt-in and downloads nothing. Build first with
 `yarn esbuild`, then set `LANGUAGE_HOST_TYPESCRIPT` and `LANGUAGE_HOST_ZLS` to the

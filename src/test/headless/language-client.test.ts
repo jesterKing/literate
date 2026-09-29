@@ -34,8 +34,10 @@ function handle(message) {
         const sync = mode === 'none' ? 0 : mode.startsWith('numeric-') ? kind
             : mode.startsWith('omitted-') ? {change:kind}
             : {openClose:!mode.startsWith('no-open-close-'), change:kind};
+        const actions = mode === 'code-action-false' ? false : mode === 'code-action-object' ? {codeActionKinds:['quickfix']}
+            : mode === 'code-action-invalid' ? 'yes' : true;
         send({id:message.id, result:{capabilities:{positionEncoding:mode === 'utf8' ? 'utf-8' : 'utf-16',
-            textDocumentSync:sync}}});
+            textDocumentSync:sync, codeActionProvider:actions}}});
     } else if (message.method === 'events') {
         send({method:'textDocument/publishDiagnostics', params:{uri:'file:///a', version:1,
             diagnostics:[{message:'héllo 😀'}]}});
@@ -48,7 +50,7 @@ function handle(message) {
         send({id:message.id, result:{initialization, notifications, replies}});
     } else if (['textDocument/hover', 'textDocument/completion', 'completionItem/resolve',
         'textDocument/signatureHelp', 'textDocument/definition', 'textDocument/typeDefinition',
-        'textDocument/implementation', 'textDocument/references'].includes(message.method)) {
+        'textDocument/implementation', 'textDocument/references', 'textDocument/codeAction'].includes(message.method)) {
         send({id:message.id, result:{text:'héllo 😀', params:message.params}});
     } else if (message.method === '$/cancelRequest') {
         notifications.push(message);
@@ -99,8 +101,9 @@ function client(mode = 'full', log?: (message: string) => void): LanguageClient 
 }
 // The fake server's state is a test-only wire contract.
 interface State {
-    initialization: { capabilities: { general: { positionEncodings: string[] }; textDocument: {
-        completion: { completionItem: { snippetSupport: boolean; insertReplaceSupport: boolean } } } };
+    initialization: { capabilities: { general: { positionEncodings: string[] }; workspace: {
+        workspaceEdit: { documentChanges: boolean; resourceOperations: string[]; failureHandling: string } };
+        textDocument: { completion: { completionItem: { snippetSupport: boolean; insertReplaceSupport: boolean } } } };
         initializationOptions: unknown };
     notifications: { method: string; params: { textDocument: { uri: string; version?: number }; contentChanges?: unknown[]; id?: number } }[];
     replies: { id: string; result?: unknown; error?: { code: number } }[];
@@ -130,8 +133,13 @@ test('deduplicated initialization, split Unicode frames, server requests and doc
     await connection.sync([]);
     const snapshot = await state(connection);
     assert.deepEqual(snapshot.initialization.capabilities.general.positionEncodings, ['utf-16']);
+    assert.deepEqual(snapshot.initialization.capabilities.workspace.workspaceEdit,
+        { documentChanges: false, resourceOperations: [], failureHandling: 'abort' });
+    assert.ok(!('applyEdit' in snapshot.initialization.capabilities.workspace));
     assert.deepEqual(snapshot.initialization.capabilities.textDocument, {
         synchronization: { dynamicRegistration: false },
+        codeAction: { dynamicRegistration: false, codeActionLiteralSupport: {
+            codeActionKind: { valueSet: ['quickfix', 'refactor'] } } },
         completion: { completionItem: { snippetSupport: true, insertReplaceSupport: true,
             documentationFormat: ['markdown', 'plaintext'], resolveSupport: { properties: ['documentation', 'detail'] } } },
         signatureHelp: { contextSupport: true, signatureInformation: {
@@ -158,9 +166,20 @@ test('deduplicated initialization, split Unicode frames, server requests and doc
     assert.match(logs.join(''), /fake server stderr/);
     for (const method of ['textDocument/hover', 'textDocument/completion', 'completionItem/resolve',
         'textDocument/signatureHelp', 'textDocument/definition', 'textDocument/typeDefinition',
-        'textDocument/implementation', 'textDocument/references']) {
+        'textDocument/implementation', 'textDocument/references', 'textDocument/codeAction']) {
         assert.deepEqual(await connection.request(method, { text: '日本😀' }), { text: 'héllo 😀', params: { text: '日本😀' } });
     }
+});
+
+test('code action support accepts only boolean true or an options object', async t => {
+    const yes = client(), no = client('code-action-false'), options = client('code-action-object');
+    const malformed = client('code-action-invalid');
+    t.after(async () => Promise.all([yes.dispose(), no.dispose(), options.dispose(), malformed.dispose()]));
+    await Promise.all([yes.initialize(), no.initialize(), options.initialize(), malformed.initialize()]);
+    assert.equal(yes.supportsCodeActions(), true);
+    assert.equal(options.supportsCodeActions(), true);
+    assert.equal(no.supportsCodeActions(), false);
+    assert.equal(malformed.supportsCodeActions(), false);
 });
 
 test('framed notifications, refresh acknowledgement, listener isolation and generic diagnostic pull', async t => {

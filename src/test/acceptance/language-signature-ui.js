@@ -18,8 +18,22 @@ exports.signatureUI = async (port, doc, evidence) => {
         const position = doc.positionAt(offset + replacement.length - 1);
         editor.selection = new vscode.Selection(position, position);
         editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
-        await page.bringToFront(); await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
-        await delay(1200); assert.equal(vscode.window.state.focused, true);
+        // Recover focus only during setup, never while observing a pending signature.
+        const focusStart = Date.now();
+        let focused = false;
+        do {
+            await page.bringToFront(); await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
+            await delay(250);
+            focused = vscode.window.state.focused && await page.evaluate(() => document.hasFocus()
+                && !!document.activeElement?.closest('.monaco-editor'));
+            if (focused) {
+                await delay(250);
+                focused = vscode.window.state.focused && await page.evaluate(() => document.hasFocus());
+            }
+        } while (!focused && Date.now() - focusStart < 5000);
+        evidence.signatureFocusSetup = { elapsedMs: Date.now() - focusStart, focused };
+        assert.equal(vscode.window.state.focused, true);
+        assert.equal(focused, true, 'Host editor must be stably focused before real signature typing');
         await page.keyboard.press('Escape');
         const before = doc.getText();
         async function waitHints(name, parameter) {

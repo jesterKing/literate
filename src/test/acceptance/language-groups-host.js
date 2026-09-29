@@ -20,7 +20,7 @@ exports.run = async () => {
         cp[method] = function (command, args, options) {
             const stack = new Error().stack || '';
                         if (!stack.includes(path.join(run, 'extension/out/main.js')) && !stack.includes(path.join(run, 'extension/src/'))) { return original.apply(this, arguments); }
-            const config = Object.values(launch.servers).find(server => server.command === command);
+            const config = [...Object.values(launch.servers), launch.controlledCss].find(server => server.command === command);
             assert.ok(method === 'spawn' && config, 'Only configured direct servers may launch');
             assert.deepEqual(args, config.args); assert.equal(options?.shell, false);
             const child = original.apply(this, arguments);
@@ -204,7 +204,9 @@ exports.run = async () => {
                     await require('./language-signature-ui').signatureUI(launch.port, doc, evidence);
                     await settle();
                 });
-                await check('Prose/headers and all physical fixtures remain unchanged; only normal edit outputs allowed', async () => {
+        await require('./language-actions-host').actionsHost({ root, launch, evidence, traces,
+            check, query, pos, replace, settle, waitDiagnostics });
+        await check('Prose/headers and all physical fixtures remain unchanged; only normal edit outputs allowed', async () => {
             const markup = text => text.split('\n').filter(line => line.startsWith('```') || line.startsWith('#') || line.startsWith('Prose') || /^<<.*>>$/.test(line));
             assert.deepEqual(markup(doc.getText()), markup(original));
             const after = await settle(); evidence.finalInventory = after;

@@ -39,6 +39,11 @@ export class LanguageClient {
     private exited?: Promise<void>;
     constructor(private readonly options: LanguageClientOptions) {}
 
+    public supportsCodeActions(): boolean {
+        const provider = this.capabilities.codeActionProvider;
+        return provider === true || object(provider);
+    }
+
     public initialize(): Promise<void> {
         if (this.closing || this.stopped) { return Promise.reject(this.stopped || new Error('Language client disposed')); }
         if (!this.initialization) { this.initialization = this.start(); }
@@ -66,10 +71,13 @@ export class LanguageClient {
     private advertisedCapabilities(): ObjectValue {
         return {
             general: { positionEncodings: ['utf-16'] },
-            workspace: { configuration: true, workspaceFolders: true, applyEdit: false,
+            workspace: { configuration: true, workspaceFolders: true,
+                workspaceEdit: { documentChanges: false, resourceOperations: [], failureHandling: 'abort' },
                 diagnostics: { refreshSupport: true } },
             textDocument: {
                 synchronization: { dynamicRegistration: false },
+                codeAction: { dynamicRegistration: false, codeActionLiteralSupport: {
+                    codeActionKind: { valueSet: ['quickfix', 'refactor'] } } },
                 completion: { completionItem: { snippetSupport: true, insertReplaceSupport: true,
                     documentationFormat: ['markdown', 'plaintext'],
                     resolveSupport: { properties: ['documentation', 'detail'] } } },

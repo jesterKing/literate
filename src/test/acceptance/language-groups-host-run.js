@@ -27,7 +27,8 @@ async function main() {
     const code = process.env.LANGUAGE_GROUPS_CODE || '/usr/share/code/code';
     const servers = {
         typescript: { command: process.env.LANGUAGE_GROUPS_TYPESCRIPT || '/home/jesterking/.vscode/extensions/typescriptteam.native-preview-0.20260708.2-linux-arm64/lib/tsc', args: ['--lsp', '--stdio'] },
-        css: { command: process.env.LANGUAGE_GROUPS_CSS || '/home/jesterking/.local/share/nvim/mason/bin/vscode-css-language-server', args: ['--stdio'] },
+        css: { command: process.env.LANGUAGE_GROUPS_CSS || '/home/jesterking/.local/share/nvim/mason/bin/vscode-css-language-server', args: ['--stdio'],
+                    configuration: { css: { validate: true, lint: { unknownProperties: 'warning' } } } },
         html: { command: process.env.LANGUAGE_GROUPS_HTML || '/home/jesterking/.local/share/nvim/mason/bin/vscode-html-language-server', args: ['--stdio'] }
     };
     for (const file of [code, ...Object.values(servers).map(s => s.command)]) {
@@ -43,6 +44,10 @@ async function main() {
     for (const dir of [extension, workspace, 'profile/User', 'extensions'].map(p => path.isAbsolute(p) ? p : path.join(run, p))) {
         await fs.mkdir(dir, { recursive: true });
     }
+    const controlledSource = await fs.readFile(path.join(__dirname, 'language-actions-server.js'));
+    const controlledPath = path.join(run, 'language-actions-server.js');
+    await fs.writeFile(controlledPath, controlledSource);
+    const controlledCss = { command: process.execPath, args: [controlledPath] };
     // Copy a stable source snapshot. Abort rather than silently build across parallel edits.
     const sourceHashes = {};
     await fs.mkdir(path.join(extension, 'src'));
@@ -65,7 +70,8 @@ async function main() {
             + fence(': <<imports>>=', 'import { physical } from "./physical";\nimport { overlay } from "./overlay";')
             + fence(': <<body>>=', '/** Render a greeting. */\nfunction greet(name: string, count: number): string { return name.repeat(count); }\nconst greeting = greet("Ada", 2);\ninterface Shape { size: number; }\nclass Square implements Shape { size = 4; }\nconst shape: Shape = new Square();\nconst size = shape.size;\nconst physicalUse = physical;\nconst overlayUse = overlay;\nconst members = {\n    /** Documented member. */\n    documentedMember: 1\n};\nmembers.doc;\nconst broken: number = "wrong";'),
         'dependency.literate': '# Dependency\n\n' + fence('ts: <<overlay.*>>= overlay.ts $', 'export const overlay = 42;'),
-        'style.literate': '# CSS\n\n' + fence('css: <<style.*>>= style.css $', '.color {\n    color: rg;\n}\n.sample {\n    dis\n}'),
+        'style.literate': '# CSS\n\n' + fence('css: <<style.*>>= style.css $', '<<css action body>>\n.color {\n    color: rg;\n}\n.sample {\n    dis\n}')
+                    + '\nCSS action prose sentinel.\n\n' + fence('css: <<css action body>>=', '.typo {\n    colr: red;\n}'),
         'page.literate': '# HTML\n\n' + fence('html: <<page.*>>= generated-page.html $', '<div cl'),
         'wrapper.template': '// Header one\n// Header two\n\n[CODE]\n// Footer\n',
         'physical.ts': '/** Physical fixture. */\nexport const physical = 7;\n',
@@ -76,11 +82,13 @@ async function main() {
         'files.autoSave': 'off', 'files.hotExit': 'off', 'files.associations': { '*.literate': 'markdown' },
         'workbench.startupEditor': 'none', 'git.enabled': false, 'npm.autoDetect': 'off', 'task.autoDetect': 'off',
         'extensions.autoUpdate': false, 'extensions.autoCheckUpdates': false, 'update.mode': 'none',
+                'chat.disableAIFeatures': true,
         'telemetry.telemetryLevel': 'off', 'editor.snippetSuggestions': 'none',
                 'editor.autoClosingBrackets': 'never', 'editor.autoClosingQuotes': 'never', 'literate.languageServers': servers
     }, null, 2));
     await fs.writeFile(path.join(run, 'baseline.json'), JSON.stringify(await inventory(workspace), null, 2));
-    await fs.writeFile(path.join(run, 'launch.json'), JSON.stringify({ code, port, servers, sourceHashes,
+    await fs.writeFile(path.join(run, 'launch.json'), JSON.stringify({ code, port, servers, sourceHashes, controlledCss,
+            controlledServerSha256: hash(controlledSource),
         mainSha256: hash(await fs.readFile(path.join(extension, 'out/main.js'))) }, null, 2));
     console.log('LANGUAGE_GROUPS_EVIDENCE', run);
     const child = spawn(process.execPath, [__filename, '--child'], { detached: true, stdio: ['ignore', 'pipe', 'pipe'],

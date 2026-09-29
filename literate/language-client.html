@@ -143,7 +143,9 @@ object-form synchronization must advertise <code>openClose: true</code>; legacy 
 kinds 1 and 2 imply open/close support without a separate flag. Configuration
 uses exact section keys first, then dotted own-property lookup; missing values
 are null. This client neither applies edits nor registers dynamic capabilities,
-watchers, server commands, or background restart loops. Diagnostics payloads remain
+watchers, server commands, or background restart loops. It advertises only user-invoked
+quick fixes and refactors, with no resource operations or edit annotation support.
+Diagnostics payloads remain
 untrusted: adapters validate them and compare versions against <code>documentVersion</code>.
 Closed documents and stopped sessions return undefined; state changes precede wire
 writes so even immediate diagnostics see the current version.</p>
@@ -235,6 +237,11 @@ There is no VS Code or third-party runtime dependency.</p>
     <span class="hljs-keyword">private</span> exited?: <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt;;
     <span class="hljs-title">constructor</span>(<span class="hljs-keyword">private</span><span class="hljs-params"> </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> options: LanguageClientOptions</span>) {}
 
+    <span class="hljs-keyword">public</span> <span class="hljs-title">supportsCodeActions</span>(): <span class="hljs-built_in">boolean</span> {
+        <span class="hljs-keyword">const</span> provider = <span class="hljs-variable">this</span>.<span class="hljs-property">capabilities</span>.<span class="hljs-property">codeActionProvider</span>;
+        <span class="hljs-keyword">return</span> provider === <span class="hljs-literal">true</span> || <span class="hljs-title">object</span>(provider);
+    }
+
 </code></pre>
 
 </div>
@@ -285,10 +292,13 @@ server request, acknowledged before callbacks schedule another generic pull requ
 <pre><code>    <span class="hljs-keyword">private</span> <span class="hljs-title">advertisedCapabilities</span>(): <span class="hljs-title">ObjectValue</span> {
         <span class="hljs-keyword">return</span> {
             <span class="hljs-attr">general</span>: { <span class="hljs-attr">positionEncodings</span>: [<span class="hljs-string">'utf-16'</span>] },
-            <span class="hljs-attr">workspace</span>: { <span class="hljs-attr">configuration</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">workspaceFolders</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">applyEdit</span>: <span class="hljs-literal">false</span>,
+            <span class="hljs-attr">workspace</span>: { <span class="hljs-attr">configuration</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">workspaceFolders</span>: <span class="hljs-literal">true</span>,
+                <span class="hljs-attr">workspaceEdit</span>: { <span class="hljs-attr">documentChanges</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">resourceOperations</span>: [], <span class="hljs-attr">failureHandling</span>: <span class="hljs-string">'abort'</span> },
                 <span class="hljs-attr">diagnostics</span>: { <span class="hljs-attr">refreshSupport</span>: <span class="hljs-literal">true</span> } },
             <span class="hljs-attr">textDocument</span>: {
                 <span class="hljs-attr">synchronization</span>: { <span class="hljs-attr">dynamicRegistration</span>: <span class="hljs-literal">false</span> },
+                <span class="hljs-attr">codeAction</span>: { <span class="hljs-attr">dynamicRegistration</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">codeActionLiteralSupport</span>: {
+                    <span class="hljs-attr">codeActionKind</span>: { <span class="hljs-attr">valueSet</span>: [<span class="hljs-string">'quickfix'</span>, <span class="hljs-string">'refactor'</span>] } } },
                 <span class="hljs-attr">completion</span>: { <span class="hljs-attr">completionItem</span>: { <span class="hljs-attr">snippetSupport</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">insertReplaceSupport</span>: <span class="hljs-literal">true</span>,
                     <span class="hljs-attr">documentationFormat</span>: [<span class="hljs-string">'markdown'</span>, <span class="hljs-string">'plaintext'</span>],
                     <span class="hljs-attr">resolveSupport</span>: { <span class="hljs-attr">properties</span>: [<span class="hljs-string">'documentation'</span>, <span class="hljs-string">'detail'</span>] } } },

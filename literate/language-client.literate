@@ -23,7 +23,9 @@ object-form synchronization must advertise `openClose: true`; legacy numeric
 kinds 1 and 2 imply open/close support without a separate flag. Configuration
 uses exact section keys first, then dotted own-property lookup; missing values
 are null. This client neither applies edits nor registers dynamic capabilities,
-watchers, server commands, or background restart loops. Diagnostics payloads remain
+watchers, server commands, or background restart loops. It advertises only user-invoked
+quick fixes and refactors, with no resource operations or edit annotation support.
+Diagnostics payloads remain
 untrusted: adapters validate them and compare versions against `documentVersion`.
 Closed documents and stopped sessions return undefined; state changes precede wire
 writes so even immediate diagnostics see the current version.
@@ -111,6 +113,11 @@ export class LanguageClient {
     private exited?: Promise<void>;
     constructor(private readonly options: LanguageClientOptions) {}
 
+    public supportsCodeActions(): boolean {
+        const provider = this.capabilities.codeActionProvider;
+        return provider === true || object(provider);
+    }
+
 ```
 
 Concurrent callers share initialization, never a second process.
@@ -155,10 +162,13 @@ server request, acknowledged before callbacks schedule another generic pull requ
     private advertisedCapabilities(): ObjectValue {
         return {
             general: { positionEncodings: ['utf-16'] },
-            workspace: { configuration: true, workspaceFolders: true, applyEdit: false,
+            workspace: { configuration: true, workspaceFolders: true,
+                workspaceEdit: { documentChanges: false, resourceOperations: [], failureHandling: 'abort' },
                 diagnostics: { refreshSupport: true } },
             textDocument: {
                 synchronization: { dynamicRegistration: false },
+                codeAction: { dynamicRegistration: false, codeActionLiteralSupport: {
+                    codeActionKind: { valueSet: ['quickfix', 'refactor'] } } },
                 completion: { completionItem: { snippetSupport: true, insertReplaceSupport: true,
                     documentationFormat: ['markdown', 'plaintext'],
                     resolveSupport: { properties: ['documentation', 'detail'] } } },

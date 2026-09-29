@@ -168,12 +168,16 @@ Supported services (subject to the server's advertised capabilities):
   diagnostics without disabling the other services. Open/edit activity can start
   configured servers for background diagnostics. Pull diagnostics are preferred
   when advertised; otherwise push diagnostics are used.
+- **Code actions:** explicitly invoked edit-only quick fixes and refactorings whose
+  complete edit set maps into the current, uniquely expanded fragment. VS Code
+  presents the action for review and applies it only after the user selects it.
 
 Boundaries:
 - Only named fragments reachable from a valid output receive services. Invalid
   fragment graphs, missing templates, and expansion-limit violations return no
   results. A request in a repeatedly used fragment or repeated `[CODE]` slot uses
-  its first deterministic expansion.
+  its first deterministic expansion. Mutating code actions are stricter and reject
+  repeatedly expanded fragments because one source edit would affect every use.
 - Completion replacement ranges must be single-line and remain within the active
   source mapping. Commands and auxiliary edits/auto-imports are not applied,
   including during resolve. Snippets do not grant access to other source ranges.
@@ -185,10 +189,15 @@ Boundaries:
   is omitted. Matching versions and captured input freshness reject known stale
   reports; **unversioned push freshness is best effort**, since a late report
   cannot reliably be correlated with the source version that produced it.
+- Code actions must be explicit, eager `WorkspaceEdit.changes` replies for one
+  generated URI. Every non-overlapping edit must map into the current fragment.
+  Commands, disabled or malformed actions, partial mappings, cross-file edits,
+  file operations, annotations, snippets, repeated expansions and oversized edits
+  are rejected as a whole. Only `quickfix` and `refactor` kinds are accepted.
 - Interactive requests are serialized; overlapping requests can return no result.
-  Cancelled or stale results are discarded. Language-server rename, code actions
-  and formatting are **not forwarded**. Existing fragment-name completion,
-  definition/reference navigation, rename and fragment code actions are unchanged.
+  Cancelled or stale results are discarded. Language-server rename and formatting
+  are **not forwarded**. Existing fragment-name completion, definition/reference
+  navigation, rename and fragment code actions are unchanged.
 - General server filesystem-watch registration is not forwarded. Restart servers
   if external dependency or project-configuration changes are not picked up.
 

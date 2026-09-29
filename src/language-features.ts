@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { parseProject, parseFragmentHeader, scanFragmentTags, SourceDocument } from './engine';
 import { LanguageClient } from './language-client';
 import { LanguageDiagnostics } from './language-diagnostics';
+import { mapLanguageCodeActions } from './language-actions';
 import { mapLanguageLocations } from './language-navigation';
 import { mapGeneratedRange, mapSourcePosition, projectLanguageSources, SourceProjectionPosition } from './language-projection';
 
@@ -120,6 +121,29 @@ function mappedRange(view: RequestView, value: unknown): vscode.Range | undefine
     const range = new vscode.Range(view.document.positionAt(mapped.start), view.document.positionAt(mapped.end));
     return range.start.line === range.end.line && range.start.line === view.position.line && range.contains(view.position)
         ? range : undefined;
+}
+function actionRange(document: vscode.TextDocument, hit: SourceProjectionPosition, range: vscode.Range): ObjectValue | undefined {
+    const start = document.offsetAt(range.start), end = document.offsetAt(range.end), mapping = hit.mapping;
+    if (start < mapping.sourceStart || end < start || end > mapping.sourceEnd) { return; }
+    return { start: position(hit.file.content, mapping.generatedStart + start - mapping.sourceStart),
+        end: position(hit.file.content, mapping.generatedStart + end - mapping.sourceStart) };
+}
+function actionContext(document: vscode.TextDocument, hit: SourceProjectionPosition, range: vscode.Range,
+    context: vscode.CodeActionContext): ObjectValue | undefined {
+    const mapped = actionRange(document, hit, range);
+    if (!mapped) { return; }
+    const diagnostics = context.diagnostics.slice(0, 100).flatMap(value => {
+        const target = actionRange(document, hit, value.range);
+        if (!target || typeof value.message !== 'string') { return []; }
+        const code = typeof value.code === 'object' ? value.code.value : value.code;
+        return [{ range: target, message: value.message.slice(0, 8192), severity: value.severity + 1,
+            ...(typeof code === 'string' || typeof code === 'number' ? { code } : {}),
+            ...(typeof value.source === 'string' ? { source: value.source.slice(0, 256) } : {}),
+            ...(value.tags?.every(tag => tag === 1 || tag === 2) ? { tags: [...value.tags] } : {}) }];
+    });
+    const only = context.only?.value;
+    if (only !== undefined && !/^[\w.-]{1,256}$/.test(only)) { return; }
+    return { range: mapped, context: { diagnostics, ...(only === undefined ? {} : { only: [only] }), triggerKind: 1 } };
 }
 function wordRange(view: RequestView): vscode.Range {
     const { document, position: cursor, hit } = view;
@@ -274,8 +298,8 @@ function signature(reply: unknown): vscode.SignatureHelp | undefined {
 function boundedIndex(value: unknown, length: number): number {
     return Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) < length ? value as number : 0;
 }
-type Method = 'hover' | 'completion' | 'signatureHelp' | 'definition' | 'typeDefinition' | 'implementation' | 'references';
-type Result = vscode.Hover | CompletionResult | vscode.SignatureHelp | vscode.Location[] | undefined;
+type Method = 'hover' | 'completion' | 'signatureHelp' | 'definition' | 'typeDefinition' | 'implementation' | 'references' | 'codeAction';
+type Result = vscode.Hover | CompletionResult | vscode.SignatureHelp | vscode.Location[] | vscode.CodeAction[] | undefined;
 export function registerLanguageFeatures(context: vscode.ExtensionContext,
     snapshot: (folder: vscode.WorkspaceFolder) => Promise<LanguageSnapshot>): void {
     type Session = { client: LanguageClient; failed: boolean; started?: boolean; stop?: () => void };
@@ -521,6 +545,10 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
             }
             const hit = mapSourcePosition(projected.files, sourcePath, document.offsetAt(cursor));
             if (!hit) { return undefined; }
+            const action = method === 'codeAction' && requestContext
+                ? actionContext(document, hit, requestContext.range as vscode.Range, requestContext.context as vscode.CodeActionContext)
+                : undefined;
+            if (method === 'codeAction' && !action) { return undefined; }
             const id = language(hit.file.language), config = configured[id];
             if (!config) { return undefined; }
             sessionKey = JSON.stringify([folder.uri.toString(), id]);
@@ -546,7 +574,8 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
             if (method === 'signatureHelp' && requestContext?.triggerKind === 2
                 && !signatureTrigger(client, requestContext.triggerCharacter, requestContext.isRetrigger === true)) { return; }
             const capability = client.capabilities[method + 'Provider'];
-            if (!(object(capability) || (!['completion', 'signatureHelp'].includes(method) && capability === true))) { return undefined; }
+            if (method === 'codeAction' ? !client.supportsCodeActions()
+                : !(object(capability) || (!['completion', 'signatureHelp'].includes(method) && capability === true))) { return undefined; }
             const triggered = edit && object(capability) && Array.isArray(capability.triggerCharacters)
                 && capability.triggerCharacters.includes(edit.character);
             if (edit && method === 'completion' && !triggered && !/[\p{L}\p{N}_$]/u.test(edit.character)) { return undefined; }
@@ -560,7 +589,9 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
             } else { diagnostics.invalidate(sessionKey); await client.sync(wire); }
             if (!fresh()) { return undefined; }
             phase = 'request';
-            const reply = await client.request('textDocument/' + method, {
+            const reply = await client.request('textDocument/' + method, method === 'codeAction' ? {
+                textDocument: { uri: uri(hit.file.path) }, ...action
+            } : {
                 textDocument: { uri: uri(hit.file.path) }, position: position(hit.file.content, hit.offset),
                 ...(method === 'completion' ? { context: requestContext || (triggered
                     ? { triggerKind: 2, triggerCharacter: edit!.character } : { triggerKind: 1 }) } : {}),
@@ -572,6 +603,9 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
             const view = { document, position: cursor, hit };
             if (method === 'hover') { return hover(view, reply); }
             if (method === 'signatureHelp') { return signature(reply); }
+            if (method === 'codeAction') { return mapLanguageCodeActions(reply, { document, sourcePath,
+                generatedUri: vscode.Uri.file(path.resolve(folder.uri.fsPath, hit.file.path)), file: hit.file,
+                mapping: hit.mapping, requestVersion: version, triggerKind: vscode.CodeActionTriggerKind.Invoke }); }
             if (method !== 'completion') { return mapLanguageLocations(reply, { root: folder.uri, files: projected.files, documents }); }
             return completions(view, reply, (item, raw) => retained.set(item, { raw, client,
                 fresh: () => !disposed && epoch === revision && sourceRevision === inputs && document.version === version
@@ -713,6 +747,13 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
     const selector: vscode.DocumentSelector = { scheme: 'file', language: 'markdown', pattern: '**/*.literate' };
     registerSignature();
     context.subscriptions.push({ dispose: () => signatureRegistration?.dispose() });
+    context.subscriptions.push(vscode.languages.registerCodeActionsProvider(selector, {
+        provideCodeActions(document, range, codeContext, token) {
+            if (token.isCancellationRequested || codeContext.triggerKind !== vscode.CodeActionTriggerKind.Invoke) { return; }
+            return request(document, range.start, token, 'codeAction', undefined,
+                { range, context: codeContext }) as Promise<vscode.CodeAction[] | undefined>;
+        }
+    }));
     context.subscriptions.push(vscode.languages.registerDefinitionProvider(selector, {
         provideDefinition: (d, p, t) => request(d, p, t, 'definition') as Promise<vscode.Location[] | undefined>
     }), vscode.languages.registerTypeDefinitionProvider(selector, {
@@ -726,7 +767,8 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
     for (const document of vscode.workspace.textDocuments) { scheduleBackground(document); }
     context.subscriptions.push(vscode.languages.registerHoverProvider(selector, {
         provideHover: (document, cursor, token) => request(document, cursor, token, 'hover') as Promise<vscode.Hover | undefined>
-    }), vscode.languages.registerCompletionItemProvider(selector, {
+    }));
+    context.subscriptions.push(vscode.languages.registerCompletionItemProvider(selector, {
         provideCompletionItems: (document, cursor, token, completionContext) => {
             if (token.isCancellationRequested) {
                 if (cached?.edit.document === document && cached.edit.cursor.isEqual(cursor)) { cancelAutomatic(); }

@@ -1,6 +1,47 @@
-# Real VS Code acceptance: LSP groups 1–4
+# Real VS Code acceptance: LSP groups 1–4 and narrow code actions
 
-## Latest observed result (2026-09-28)
+## Latest code-action acceptance (2026-09-29)
+
+**23/23 checks passed; exit 0, no timeout. All original 18 checks still pass unchanged.** Installed Mason CSS command actions are rejected; a controlled stdio server exercises the positive edit-only path through the real VS Code host.
+
+Final evidence: `out/language-groups-host-xzrPg0/`:
+
+- `evidence.json`: all 23 passing checks, exact real and controlled protocol assertions, accepted mapped edits, and before/after source.
+- `server-traces.json`: TS7/CSS/HTML and controlled-server protocol streams.
+- `launch.json`: source hashes, server configuration, controlled-server hash, and isolated bundle hash.
+- `baseline.json`, `runner.json`, `host.log`: fixture integrity, successful process outcome and cleanup, and host output.
+- After the run, every recorded top-level production source hash and the copied manifest still matched the repository.
+
+### Deterministic real CSS probe and blocker
+
+`node src/test/acceptance/language-css-actions-probe.js` ran the installed Mason CSS executable directly with a 15-second bound. Evidence: `out/language-css-actions-probe-weegFk/evidence.json`. This probe is separate from, and not a substitute for, the subsequent real VS Code host checks.
+
+Fixture `.typo { colr: red; }` produces diagnostic `unknownProperties`, message `Unknown property: 'colr'`. In the host it resides in the named `css action body` fragment, separated from the root fragment by prose. The provider maps its source range back to generated `style.css`, line 1, characters 4–8, and sends an invoked quickfix request with the real diagnostic.
+
+Both probe and host receive three legacy Commands: `Rename to 'color'`, `Rename to 'clear'`, and `Rename to 'clip'`, each with `command: "_css.applyCodeAction"` and edit-shaped arguments. The installed server's handler calls `doCodeActions`, which wraps its internal edits as Commands even when literal CodeAction support is advertised. Current production `src/language-actions.ts` intentionally rejects any `command` member and accepts only eager `WorkspaceEdit.changes` targeting the current generated document and fragment.
+
+Thus `vscode.executeCodeActionProvider` correctly returns **no Mason CSS actions**. The test does not translate or execute `_css.applyCodeAction`. A controlled local stdio protocol fixture then returns one eager `WorkspaceEdit.changes` quick fix. Through the real VS Code provider, it maps `colr` back into the named fragment, applies only `colr` → `color`, leaves unrelated buffers unchanged, and clears its diagnostic.
+
+### New checks and observed outcomes
+
+- **PASS:** real CSS `unknownProperties` diagnostic maps exactly to `colr` in the current fragment.
+- **PASS:** real Mason command actions are observed and rejected without mutating source or disk.
+- **PASS:** the controlled edit-only quick fix maps and applies exactly one `colr` → `color` source edit, leaves unrelated buffers unchanged, permits normal generation settling, and clears its diagnostic.
+- **PASS:** cross-fragment and prose requests return no actions.
+- **PASS:** native `Create fragment for <<acceptance missing>>` still coexists with the language provider. Its request is read-only; applying its single source-URI edit inserts exactly `~~~ css : <<acceptance missing>>=` after the fence and clears the native diagnostic. Other buffers stay unchanged. This is a **native** fix, not a substitute for the blocked server-backed application.
+- The final existing fixture-integrity check still passes: physical sources/config/templates remain byte/mtime identical. Ordinary edit-triggered generated outputs are permitted only by the original allowlist. No generated-file cleanup masks request effects.
+
+### Isolated configuration and limitations
+
+The CSS fixture explicitly configures `css.validate: true` and `css.lint.unknownProperties: "warning"` through the existing language-server configuration setting. Without an explicit CSS object the installed server received `null`, logged a `validProperties` error, and returned empty diagnostics; that initial run is retained at `out/language-groups-host-VBvfnC/`.
+
+The isolated profile sets `chat.disableAIFeatures: true`. Without it, this VS Code build adds an unrelated built-in `inlineChat.start` “Fix” action to the aggregate provider results; that run is retained at `out/language-groups-host-AgXiSb/`. No provider results are filtered by the harness, and ordinary user settings are untouched.
+
+Code-action acceptance uses the actual VS Code provider API, not the rendered lightbulb menu. Native and server providers are tested sequentially in the same host; the intentionally missing fragment invalidates language projection during the native case. Adversarial cross-file/resource operations and stale replies still require controlled headless tests. The automatic completion baseline below is historical and was **not rerun for this code-action snapshot**; the expanded suite did rerun its existing rendered signature test and all 18 original checks.
+
+Implementation files: `language-actions-host.js` adds the action checks; `language-actions-server.js` is the controlled edit-only stdio fixture; `language-css-actions-probe.js` supplies the standalone real-server probe; the groups runner adds the named fragment and isolated configuration. No production or shared build files are written by acceptance.
+
+## Previous groups 1–4 acceptance (2026-09-28)
 
 VS Code **1.138.0**, installed Linux ARM64 host, actual stdio language servers:
 
@@ -79,7 +120,7 @@ Both launchers bound execution, terminate their owned process groups, and remove
 
 ## Scope and limitations
 
-- Only `src/test/acceptance/language*` source/docs were edited. In this final rerun, only this findings document and the CSS rejection test's descriptive name changed; all assertions stayed intact. Shared `out/main.js` and production sources were not written. Parallel work was left untouched; no commit was made.
+- Only `src/test/acceptance/language*` source/docs were edited. The latest code-action extension preserves all original assertions and adds five checks. Shared `out/main.js` and production sources were not written. Parallel work was left untouched; no commit was made.
 - Navigation is tested through actual VS Code provider commands, not the rendered peek/go-to interface. Signature UI is warm-server; cold signature UI is not claimed.
 - No hover is used anywhere in the expanded suite. Diagnostic idle retention is sampled for two seconds, not a long-duration soak.
 - Real servers are not adversarial fixtures: stale/malicious replies, cancellation races, untrusted workspace behavior, and snippet security policy need separate headless tests.

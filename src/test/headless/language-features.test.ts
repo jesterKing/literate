@@ -35,7 +35,7 @@ function fixture(body = 'console.lo') {
     const folder = { uri: uri('/project'), name: 'project', index: 0 };
     const f: any = { languageDiagnostics: false, text: fence(body), config: { typescript: { command: '/bin/server', args: [] } }, clients,
         reply: [{ label: 'log', kind: 3 }], snapshots: 0, events, subscriptions, logs: [], commands: new Map(), contexts: [],
-        capabilities: { hoverProvider: true, completionProvider: {} } };
+        capabilities: { hoverProvider: true, completionProvider: {}, codeActionProvider: true }, actions: [{ title: 'mapped action' }] };
     const document: any = { uri: uri('/project/index.literate'), languageId: 'markdown', version: 1, isClosed: false,
         getText: () => f.text,
         offsetAt: (p: Position) => f.text.split('\n').slice(0, p.line).reduce((n: number, line: string) => n + line.length + 1, 0) + p.character,
@@ -61,7 +61,8 @@ function fixture(body = 'console.lo') {
             return { dispose() {}, onDidChange: event('disk'), onDidCreate: event('create'), onDidDelete: event('delete') };
         } };
     const token: any = { isCancellationRequested: false, onCancellationRequested: event('cancel') };
-    const vscode: any = { workspace, env: {}, Uri: { file: uri }, Position, Range, CompletionTriggerKind: { Invoke: 0, TriggerForIncompleteCompletions: 2 },
+    const vscode: any = { workspace, env: {}, Uri: { file: uri }, Position, Range,
+        CompletionTriggerKind: { Invoke: 0, TriggerForIncompleteCompletions: 2 }, CodeActionTriggerKind: { Invoke: 1, Automatic: 2 },
         CancellationTokenSource: class {
             token = { isCancellationRequested: false, onCancellationRequested: () => ({ dispose() {} }) };
             dispose() {}
@@ -106,6 +107,7 @@ function fixture(body = 'console.lo') {
             registerTypeDefinitionProvider(_s: any, p: any) { f.typeDefinitionProvider = p; return { dispose() {} }; },
             registerImplementationProvider(_s: any, p: any) { f.implementationProvider = p; return { dispose() {} }; },
             registerReferenceProvider(_s: any, p: any) { f.referencesProvider = p; return { dispose() {} }; },
+            registerCodeActionsProvider(selector: any, p: any) { f.codeActionSelector = selector; f.codeActionProvider = p; return { dispose() {} }; },
             registerHoverProvider(selector: any, provider: any) {
                 f.hoverSelector = selector; f.hoverProvider = provider; return { dispose() {} };
             },
@@ -118,6 +120,10 @@ function fixture(body = 'console.lo') {
         disposed = 0; syncs: any[] = []; requests: any[] = [];
         capabilities = f.capabilities;
         constructor(public options: any) { clients.push(this); }
+        supportsCodeActions() { f.supportChecks = (f.supportChecks || 0) + 1;
+            return this.capabilities.codeActionProvider === true
+            || this.capabilities.codeActionProvider !== null && typeof this.capabilities.codeActionProvider === 'object'
+                && !Array.isArray(this.capabilities.codeActionProvider); }
         onDidStop(callback: () => void) { f.stopClient = callback; return () => { f.stopUnsubscribed = true; }; }
         async initialize() { await f.onInitialize?.(); }
         async sync(docs: any) { this.syncs.push(docs); await f.onSync?.(); }
@@ -130,6 +136,9 @@ function fixture(body = 'console.lo') {
     const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 } });
     new Function('require', 'exports', compiled.outputText)((name: string) => {
         if (name === 'vscode') { return vscode; }
+        if (name === './language-actions') { return { mapLanguageCodeActions: (reply: any, ctx: any) => {
+            f.actionReply = reply; f.actionContext = ctx; return f.actions;
+        } }; }
         if (name === './language-navigation') { return { mapLanguageLocations: (reply: any, ctx: any) => {
             f.navigationContext = ctx; return reply;
         } }; }
@@ -157,6 +166,9 @@ function fixture(body = 'console.lo') {
     Object.assign(f, { vscode, workspace, document, token, folder, cursor: new Position(1, body.length),
         complete: (kind = 0) => f.completionProvider.provideCompletionItems(document, f.cursor, token, { triggerKind: kind }),
         hover: () => f.hoverProvider.provideHover(document, f.cursor, token),
+        codeActions: (range = new Range(new Position(1, 0), f.cursor), context: any = {
+            diagnostics: [], triggerKind: 1
+        }) => f.codeActionProvider.provideCodeActions(document, range, context, token),
         restart: () => f.commands.get('literate.restartLanguageServers')(),
         dispose: () => subscriptions.forEach(item => item.dispose()) });
     f.editor = { document, selections: [], selection: undefined };
@@ -275,6 +287,37 @@ test('incomplete completion retriggers use LSP kind 3', async () => {
     const f = fixture(); f.reply = { isIncomplete: true, items: [{ label: 'log' }] };
     assert.equal((await f.complete()).isIncomplete, true);
     await f.complete(2); assert.deepEqual(f.clients[0].requests[1].params.context, { triggerKind: 3 }); f.dispose();
+});
+
+test('explicit code actions map request range and sanitize context without resolve or commands', async () => {
+    const f = fixture();
+    const diagnostic = { range: new Range(new Position(1, 8), new Position(1, 10)), message: 'problem', severity: 1,
+        code: { value: 'code', target: uri('/ignore') }, source: 'server', tags: [1], relatedInformation: [{}] };
+    const result = await f.codeActions(undefined, { diagnostics: [diagnostic], only: { value: 'quickfix' }, triggerKind: 1 });
+    assert.deepEqual(result, f.actions); assert.equal(f.clients[0].requests[0].method, 'textDocument/codeAction');
+    assert.deepEqual(Object.keys(f.clients[0].requests[0].params).sort(), ['context', 'range', 'textDocument']);
+    assert.deepEqual(f.clients[0].requests[0].params.range, lspRange(0, 10));
+    assert.deepEqual(f.clients[0].requests[0].params.context, { diagnostics: [{ range: lspRange(8, 10), message: 'problem',
+        severity: 2, code: 'code', source: 'server', tags: [1] }], only: ['quickfix'], triggerKind: 1 });
+    assert.equal(f.actionContext.requestVersion, f.document.version); assert.equal(f.actionContext.triggerKind, 1);
+    assert.equal(f.supportChecks, 1);
+    assert.equal('resolveCodeAction' in f.codeActionProvider, false); assert.equal(f.actionReply, f.reply); f.dispose();
+});
+
+test('code actions require explicit invocation, capability, mapped range, freshness and cancellation', async () => {
+    for (const mutate of [
+        (f: any) => { f.capabilities.codeActionProvider = false; },
+        (f: any) => { f.token.isCancellationRequested = true; }
+    ]) {
+        const f = fixture(); mutate(f); assert.equal(await f.codeActions(), undefined);
+        assert.equal(f.clients[0]?.requests.length ?? 0, 0); f.dispose();
+    }
+    const automatic = fixture(); assert.equal(await automatic.codeActions(undefined, { diagnostics: [], triggerKind: 2 }), undefined);
+    assert.equal(automatic.snapshots, 0); automatic.dispose();
+    const outside = fixture(); assert.equal(await outside.codeActions(new Range(new Position(0, 0), new Position(1, 2))), undefined);
+    assert.equal(outside.clients[0]?.requests.length ?? 0, 0); outside.dispose();
+    const stale = fixture(); stale.onRequest = () => { stale.document.version++; };
+    assert.equal(await stale.codeActions(), undefined); stale.dispose();
 });
 
 test('navigation providers gate capabilities and forward captured context and references', async () => {
@@ -819,6 +862,7 @@ test('selectors match markdown .literate files, with independent runtime guards'
     const f = fixture();
     const expected = { scheme: 'file', language: 'markdown', pattern: '**/*.literate' };
     assert.deepEqual(f.hoverSelector, expected); assert.deepEqual(f.completionSelector, expected);
+    assert.deepEqual(f.codeActionSelector, expected);
     f.document.uri = uri('/project/readme.md');
     assert.equal(await f.hover(), undefined); assert.equal(await f.complete(), undefined);
     f.document.uri = uri('/project/index.literate'); f.document.languageId = 'plaintext';

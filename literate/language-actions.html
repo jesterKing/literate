@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Safe language code actions</h1>
+<p>Code actions are mutating protocol replies, so this boundary is narrower than
+navigation. The caller supplies the exact projection occurrence used for the
+request and both request and current source versions. Only an explicit Invoke
+may cross the boundary; automatic triggers, stale snapshots and closed documents
+produce no actions.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e0067007500610067006500200061006300740069006f006e0073002e002a-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d0061006300740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e0067007500610067006500200061006300740069006f006e0073002e002a"></span><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200061006300740069006f006e0073002e002a" data-literate-target="f-006c0061006e0067007500610067006500200061006300740069006f006e0073002e002a" aria-label="Definition of language actions.*">&lt;&lt;language actions.*&gt;&gt;= src/language-actions.ts $</a></div>
+<div class="code">
+<pre><code><span data-literate-explore="f-0061006300740069006f006e00200069006d0070006f00720074007300200061006e006400200063006f006e0074006500780074"><a class="literate-tag-name" href="#f-0061006300740069006f006e00200069006d0070006f00720074007300200061006e006400200063006f006e0074006500780074" data-literate-target="f-0061006300740069006f006e00200069006d0070006f00720074007300200061006e006400200063006f006e0074006500780074" aria-label="Definition of action imports and context">&lt;&lt;action imports and context&gt;&gt;</a></span>
+<span data-literate-explore="f-0061006300740069006f006e00200063006f006f007200640069006e0061007400650073"><a class="literate-tag-name" href="#f-0061006300740069006f006e00200063006f006f007200640069006e0061007400650073" data-literate-target="f-0061006300740069006f006e00200063006f006f007200640069006e0061007400650073" aria-label="Definition of action coordinates">&lt;&lt;action coordinates&gt;&gt;</a></span>
+<span data-literate-explore="f-0061006300740069006f006e00200073006e0061007000730068006f0074"><a class="literate-tag-name" href="#f-0061006300740069006f006e00200073006e0061007000730068006f0074" data-literate-target="f-0061006300740069006f006e00200073006e0061007000730068006f0074" aria-label="Definition of action snapshot">&lt;&lt;action snapshot&gt;&gt;</a></span>
+<span data-literate-explore="f-0061006300740069006f006e00200065006400690074002000700061007200730069006e0067"><a class="literate-tag-name" href="#f-0061006300740069006f006e00200065006400690074002000700061007200730069006e0067" data-literate-target="f-0061006300740069006f006e00200065006400690074002000700061007200730069006e0067" aria-label="Definition of action edit parsing">&lt;&lt;action edit parsing&gt;&gt;</a></span>
+<span data-literate-explore="f-0061006300740069006f006e0020006f007600650072006c00610070"><a class="literate-tag-name" href="#f-0061006300740069006f006e0020006f007600650072006c00610070" data-literate-target="f-0061006300740069006f006e0020006f007600650072006c00610070" aria-label="Definition of action overlap">&lt;&lt;action overlap&gt;&gt;</a></span>
+<span data-literate-explore="f-0061006300740069006f006e00200064006900610067006e006f00730074006900630073"><a class="literate-tag-name" href="#f-0061006300740069006f006e00200064006900610067006e006f00730074006900630073" data-literate-target="f-0061006300740069006f006e00200064006900610067006e006f00730074006900630073" aria-label="Definition of action diagnostics">&lt;&lt;action diagnostics&gt;&gt;</a></span>
+<span data-literate-explore="f-0061006300740069006f006e00200063006f006e00760065007200730069006f006e"><a class="literate-tag-name" href="#f-0061006300740069006f006e00200063006f006e00760065007200730069006f006e" data-literate-target="f-0061006300740069006f006e00200063006f006e00760065007200730069006f006e" aria-label="Definition of action conversion">&lt;&lt;action conversion&gt;&gt;</a></span>
+<span data-literate-explore="f-0061006300740069006f006e0020007200650070006c006900650073"><a class="literate-tag-name" href="#f-0061006300740069006f006e0020007200650070006c006900650073" data-literate-target="f-0061006300740069006f006e0020007200650070006c006900650073" aria-label="Definition of action replies">&lt;&lt;action replies&gt;&gt;</a></span>
+</code></pre>
+
+</div>
+</div><p>The API mirrors the language-features request view without depending on its
+private types. <code>sourcePath</code> identifies the occurrence's captured literate
+source, while <code>generatedUri</code> is the URI sent to the server. Contexts are
+immutable snapshots and must be replaced when projection or document changes.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0061006300740069006f006e00200069006d0070006f00720074007300200061006e006400200063006f006e0074006500780074-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d0061006300740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-0061006300740069006f006e00200069006d0070006f00720074007300200061006e006400200063006f006e0074006500780074"></span><a class="literate-tag-name" href="#f-0061006300740069006f006e00200069006d0070006f00720074007300200061006e006400200063006f006e0074006500780074" data-literate-target="f-0061006300740069006f006e00200069006d0070006f00720074007300200061006e006400200063006f006e0074006500780074" aria-label="Definition of action imports and context">&lt;&lt;action imports and context&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> vscode <span class="hljs-keyword">from</span> <span class="hljs-string">'vscode'</span>;
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">LanguageProjection</span>, <span class="hljs-title">ProjectionMapping</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./language-projection'</span>;
+<span class="hljs-keyword">import</span> { mapGeneratedRange } <span class="hljs-keyword">from</span> <span class="hljs-string">'./language-projection'</span>;
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">LanguageCodeActionContext</span> {
+    <span class="hljs-attr">document</span>: vscode.<span class="hljs-property">TextDocument</span>;
+    <span class="hljs-attr">sourcePath</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">generatedUri</span>: vscode.<span class="hljs-property">Uri</span>;
+    <span class="hljs-attr">file</span>: <span class="hljs-title">LanguageProjection</span>;
+    <span class="hljs-attr">mapping</span>: <span class="hljs-title">ProjectionMapping</span>;
+    <span class="hljs-attr">requestVersion</span>: <span class="hljs-built_in">number</span>;
+    <span class="hljs-attr">triggerKind</span>: vscode.<span class="hljs-property">CodeActionTriggerKind</span>;
+}
+<span class="hljs-keyword">type</span> <span class="hljs-title">Value</span> = <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">unknown</span>&gt;;
+<span class="hljs-keyword">interface</span> <span class="hljs-title">Point</span> { <span class="hljs-attr">line</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">character</span>: <span class="hljs-built_in">number</span>; }
+<span class="hljs-keyword">interface</span> <span class="hljs-title">Span</span> { <span class="hljs-attr">start</span>: <span class="hljs-title">Point</span>; <span class="hljs-attr">end</span>: <span class="hljs-title">Point</span>; }
+<span class="hljs-keyword">interface</span> <span class="hljs-title">ParsedEdit</span> { <span class="hljs-attr">start</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">end</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">range</span>: vscode.<span class="hljs-property">Range</span>; <span class="hljs-attr">newText</span>: <span class="hljs-built_in">string</span>; }
+<span class="hljs-keyword">const</span> <span class="hljs-built_in">object</span> = (<span class="hljs-attr">value</span>: <span class="hljs-built_in">unknown</span>): value is <span class="hljs-title">Value</span> =&gt; value !== <span class="hljs-literal">null</span> &amp;&amp; <span class="hljs-keyword">typeof</span> value === <span class="hljs-string">'object'</span> &amp;&amp; !<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(value);
+<span class="hljs-keyword">const</span> integer = (<span class="hljs-attr">value</span>: <span class="hljs-built_in">unknown</span>): value is <span class="hljs-built_in">number</span> =&gt; <span class="hljs-keyword">typeof</span> value === <span class="hljs-string">'number'</span> &amp;&amp; <span class="hljs-title">Number</span>.<span class="hljs-title">isSafeInteger</span>(value) &amp;&amp; value &gt;= <span class="hljs-number">0</span>;
+</code></pre>
+
+</div>
+</div><p>Protocol coordinates are UTF-16 and must address real generated lines, never a
+newline column. Conversion then delegates to the occurrence-specific projection
+primitive; this excludes wrappers, reference seams, other fragment occurrences,
+and even adjacent mappings in the same source file.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0061006300740069006f006e00200063006f006f007200640069006e0061007400650073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d0061006300740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-0061006300740069006f006e00200063006f006f007200640069006e0061007400650073"></span><a class="literate-tag-name" href="#f-0061006300740069006f006e00200063006f006f007200640069006e0061007400650073" data-literate-target="f-0061006300740069006f006e00200063006f006f007200640069006e0061007400650073" aria-label="Definition of action coordinates">&lt;&lt;action coordinates&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">point</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">unknown</span>): value is <span class="hljs-title">Point</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-title">object</span>(value) &amp;&amp; <span class="hljs-title">integer</span>(value.<span class="hljs-property">line</span>) &amp;&amp; <span class="hljs-title">integer</span>(value.<span class="hljs-property">character</span>);
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title">span</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">unknown</span>): value is <span class="hljs-title">Span</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-title">object</span>(value) &amp;&amp; <span class="hljs-title">point</span>(value.<span class="hljs-property">start</span>) &amp;&amp; <span class="hljs-title">point</span>(value.<span class="hljs-property">end</span>)
+        &amp;&amp; (value.<span class="hljs-property">start</span>.<span class="hljs-property">line</span> &lt; value.<span class="hljs-property">end</span>.<span class="hljs-property">line</span>
+            || value.<span class="hljs-property">start</span>.<span class="hljs-property">line</span> === value.<span class="hljs-property">end</span>.<span class="hljs-property">line</span> &amp;&amp; value.<span class="hljs-property">start</span>.<span class="hljs-property">character</span> &lt;= value.<span class="hljs-property">end</span>.<span class="hljs-property">character</span>);
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title">generatedOffset</span>(<span class="hljs-params">text: </span><span class="hljs-built_in">string</span><span class="hljs-params">, value: Point</span>): <span class="hljs-built_in">number</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">let</span> line = <span class="hljs-number">0</span>, start = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> match <span class="hljs-keyword">of</span> text.<span class="hljs-title">matchAll</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">|</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">|</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">/g</span>)) {
+        <span class="hljs-keyword">if</span> (line === value.<span class="hljs-property">line</span>) {
+            <span class="hljs-keyword">return</span> value.<span class="hljs-property">character</span> &lt;= match.<span class="hljs-property">index</span>! - start ? start + value.<span class="hljs-property">character</span> : <span class="hljs-literal">undefined</span>;
+        }
+        line++;
+        start = match.<span class="hljs-property">index</span>! + match[<span class="hljs-number">0</span>].<span class="hljs-property">length</span>;
+    }
+    <span class="hljs-keyword">return</span> line === value.<span class="hljs-property">line</span> &amp;&amp; value.<span class="hljs-property">character</span> &lt;= text.<span class="hljs-property">length</span> - start ? start + value.<span class="hljs-property">character</span> : <span class="hljs-literal">undefined</span>;
+}
+</code></pre>
+
+</div>
+</div><p>Freshness and mapping integrity are checked again at reply time. A source interval
+must have one generated occurrence: editing repeated expansion would amplify one
+server edit into several generated changes. Equal lengths and exact captured bytes
+also reject malformed mappings and stale source snapshots.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0061006300740069006f006e00200073006e0061007000730068006f0074-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d0061006300740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-0061006300740069006f006e00200073006e0061007000730068006f0074"></span><a class="literate-tag-name" href="#f-0061006300740069006f006e00200073006e0061007000730068006f0074" data-literate-target="f-0061006300740069006f006e00200073006e0061007000730068006f0074" aria-label="Definition of action snapshot">&lt;&lt;action snapshot&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">fresh</span>(<span class="hljs-params">context: LanguageCodeActionContext</span>): <span class="hljs-built_in">boolean</span> {
+    <span class="hljs-keyword">const</span> { <span class="hljs-variable">document</span>, file, mapping } = context;
+    <span class="hljs-keyword">return</span> context.<span class="hljs-property">triggerKind</span> === vscode.<span class="hljs-property">CodeActionTriggerKind</span>.<span class="hljs-property">Invoke</span>
+        &amp;&amp; <span class="hljs-title">integer</span>(context.<span class="hljs-property">requestVersion</span>) &amp;&amp; <span class="hljs-variable">document</span>.<span class="hljs-property">version</span> === context.<span class="hljs-property">requestVersion</span> &amp;&amp; !<span class="hljs-variable">document</span>.<span class="hljs-property">isClosed</span>
+        &amp;&amp; context.<span class="hljs-property">sourcePath</span> === mapping.<span class="hljs-property">sourcePath</span> &amp;&amp; file.<span class="hljs-property">mappings</span>.<span class="hljs-title">includes</span>(mapping)
+        &amp;&amp; file.<span class="hljs-property">mappings</span>.<span class="hljs-title">filter</span>(<span class="hljs-params">value</span><span class="hljs-function"> =&gt;</span> value.<span class="hljs-property">sourcePath</span> === mapping.<span class="hljs-property">sourcePath</span>
+            &amp;&amp; value.<span class="hljs-property">sourceStart</span> === mapping.<span class="hljs-property">sourceStart</span> &amp;&amp; value.<span class="hljs-property">sourceEnd</span> === mapping.<span class="hljs-property">sourceEnd</span>).<span class="hljs-property">length</span> === <span class="hljs-number">1</span>
+        &amp;&amp; [mapping.<span class="hljs-property">sourceStart</span>, mapping.<span class="hljs-property">sourceEnd</span>, mapping.<span class="hljs-property">generatedStart</span>, mapping.<span class="hljs-property">generatedEnd</span>].<span class="hljs-title">every</span>(integer)
+        &amp;&amp; mapping.<span class="hljs-property">sourceStart</span> &lt;= mapping.<span class="hljs-property">sourceEnd</span> &amp;&amp; mapping.<span class="hljs-property">generatedStart</span> &lt;= mapping.<span class="hljs-property">generatedEnd</span>
+        &amp;&amp; mapping.<span class="hljs-property">sourceEnd</span> &lt;= <span class="hljs-variable">document</span>.<span class="hljs-title">getText</span>().<span class="hljs-property">length</span> &amp;&amp; mapping.<span class="hljs-property">generatedEnd</span> &lt;= file.<span class="hljs-property">content</span>.<span class="hljs-property">length</span>
+        &amp;&amp; mapping.<span class="hljs-property">sourceEnd</span> - mapping.<span class="hljs-property">sourceStart</span> === mapping.<span class="hljs-property">generatedEnd</span> - mapping.<span class="hljs-property">generatedStart</span>
+        &amp;&amp; <span class="hljs-variable">document</span>.<span class="hljs-title">getText</span>().<span class="hljs-title">slice</span>(mapping.<span class="hljs-property">sourceStart</span>, mapping.<span class="hljs-property">sourceEnd</span>)
+            === file.<span class="hljs-property">content</span>.<span class="hljs-title">slice</span>(mapping.<span class="hljs-property">generatedStart</span>, mapping.<span class="hljs-property">generatedEnd</span>)
+        &amp;&amp; context.<span class="hljs-property">generatedUri</span>.<span class="hljs-property">scheme</span> === <span class="hljs-string">'file'</span> &amp;&amp; !context.<span class="hljs-property">generatedUri</span>.<span class="hljs-property">authority</span>;
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title">mappedRange</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">unknown</span><span class="hljs-params">, context: LanguageCodeActionContext</span>): <span class="hljs-title">ParsedEdit</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">span</span>(value)) { <span class="hljs-keyword">return</span>; }
+    <span class="hljs-keyword">const</span> start = <span class="hljs-title">generatedOffset</span>(context.<span class="hljs-property">file</span>.<span class="hljs-property">content</span>, value.<span class="hljs-property">start</span>);
+    <span class="hljs-keyword">const</span> end = <span class="hljs-title">generatedOffset</span>(context.<span class="hljs-property">file</span>.<span class="hljs-property">content</span>, value.<span class="hljs-property">end</span>);
+    <span class="hljs-keyword">if</span> (start === <span class="hljs-literal">undefined</span> || end === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span>; }
+    <span class="hljs-keyword">const</span> mapped = <span class="hljs-title">mapGeneratedRange</span>(context.<span class="hljs-property">file</span>, start, end, context.<span class="hljs-property">mapping</span>);
+    <span class="hljs-keyword">if</span> (!mapped) { <span class="hljs-keyword">return</span>; }
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">start</span>: mapped.<span class="hljs-property">start</span>, <span class="hljs-attr">end</span>: mapped.<span class="hljs-property">end</span>,
+        <span class="hljs-attr">range</span>: <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">Range</span>(context.<span class="hljs-property">document</span>.<span class="hljs-title">positionAt</span>(mapped.<span class="hljs-property">start</span>), context.<span class="hljs-property">document</span>.<span class="hljs-title">positionAt</span>(mapped.<span class="hljs-property">end</span>)), <span class="hljs-attr">newText</span>: <span class="hljs-string">''</span> };
+}
+</code></pre>
+
+</div>
+</div><p>Workspace edits have many extensible forms. This boundary recognizes only the
+single <code>changes</code> form and exact plain TextEdit records. Thus document changes,
+resource operations, annotations, snippets and future unknown forms fail closed.
+Every edit must map; there is no partial action or truncation. Resource caps
+apply to the complete replacement set and reject oversized replies rather than
+silently changing semantics.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0061006300740069006f006e00200065006400690074002000700061007200730069006e0067-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d0061006300740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-0061006300740069006f006e00200065006400690074002000700061007200730069006e0067"></span><a class="literate-tag-name" href="#f-0061006300740069006f006e00200065006400690074002000700061007200730069006e0067" data-literate-target="f-0061006300740069006f006e00200065006400690074002000700061007200730069006e0067" aria-label="Definition of action edit parsing">&lt;&lt;action edit parsing&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">edits</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">unknown</span><span class="hljs-params">, context: LanguageCodeActionContext</span>): <span class="hljs-title">ParsedEdit</span>[] | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">object</span>(value) || <span class="hljs-title">Object</span>.<span class="hljs-title">keys</span>(value).<span class="hljs-title">some</span>(<span class="hljs-params">key</span><span class="hljs-function"> =&gt;</span> key !== <span class="hljs-string">'changes'</span>) || !<span class="hljs-title">object</span>(value.<span class="hljs-property">changes</span>)) { <span class="hljs-keyword">return</span>; }
+    <span class="hljs-keyword">const</span> entries = <span class="hljs-title">Object</span>.<span class="hljs-title">entries</span>(value.<span class="hljs-property">changes</span>);
+    <span class="hljs-keyword">if</span> (entries.<span class="hljs-property">length</span> !== <span class="hljs-number">1</span> || entries[<span class="hljs-number">0</span>][<span class="hljs-number">0</span>] !== context.<span class="hljs-property">generatedUri</span>.<span class="hljs-title">toString</span>() || !<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(entries[<span class="hljs-number">0</span>][<span class="hljs-number">1</span>])) { <span class="hljs-keyword">return</span>; }
+    <span class="hljs-keyword">const</span> raw = entries[<span class="hljs-number">0</span>][<span class="hljs-number">1</span>];
+    <span class="hljs-keyword">if</span> (!raw.<span class="hljs-property">length</span> || raw.<span class="hljs-property">length</span> &gt; <span class="hljs-number">1000</span>) { <span class="hljs-keyword">return</span>; }
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">result</span>: <span class="hljs-title">ParsedEdit</span>[] = [];
+    <span class="hljs-keyword">let</span> replacementSize = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> entry <span class="hljs-keyword">of</span> raw) {
+        <span class="hljs-keyword">if</span> (!<span class="hljs-title">object</span>(entry) || <span class="hljs-title">Object</span>.<span class="hljs-title">keys</span>(entry).<span class="hljs-title">some</span>(<span class="hljs-params">key</span><span class="hljs-function"> =&gt;</span> key !== <span class="hljs-string">'range'</span> &amp;&amp; key !== <span class="hljs-string">'newText'</span>)
+            || <span class="hljs-keyword">typeof</span> entry.<span class="hljs-property">newText</span> !== <span class="hljs-string">'string'</span>) { <span class="hljs-keyword">return</span>; }
+        replacementSize += entry.<span class="hljs-property">newText</span>.<span class="hljs-property">length</span>;
+        <span class="hljs-keyword">if</span> (replacementSize &gt; <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>) { <span class="hljs-keyword">return</span>; }
+        <span class="hljs-keyword">const</span> mapped = <span class="hljs-title">mappedRange</span>(entry.<span class="hljs-property">range</span>, context);
+        <span class="hljs-keyword">if</span> (!mapped) { <span class="hljs-keyword">return</span>; }
+        mapped.<span class="hljs-property">newText</span> = entry.<span class="hljs-property">newText</span>;
+        result.<span class="hljs-title">push</span>(mapped);
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-title">safeOrder</span>(result);
+}
+</code></pre>
+
+</div>
+</div><p>Overlaps make application order significant. Sorting is safe only after retaining
+all edits. Edits sharing a start are rejected, including insertion/replacement
+pairs, because their server ordering cannot be represented by WorkspaceEdit.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0061006300740069006f006e0020006f007600650072006c00610070-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d0061006300740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-0061006300740069006f006e0020006f007600650072006c00610070"></span><a class="literate-tag-name" href="#f-0061006300740069006f006e0020006f007600650072006c00610070" data-literate-target="f-0061006300740069006f006e0020006f007600650072006c00610070" aria-label="Definition of action overlap">&lt;&lt;action overlap&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">safeOrder</span>(<span class="hljs-params">values: ParsedEdit[]</span>): <span class="hljs-title">ParsedEdit</span>[] | <span class="hljs-literal">undefined</span> {
+    values.<span class="hljs-title">sort</span>(<span class="hljs-function">(</span><span class="hljs-params">a, b</span><span class="hljs-function">) =&gt;</span> a.<span class="hljs-property">start</span> - b.<span class="hljs-property">start</span> || a.<span class="hljs-property">end</span> - b.<span class="hljs-property">end</span>);
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = <span class="hljs-number">1</span>; index &lt; values.<span class="hljs-property">length</span>; index++) {
+        <span class="hljs-keyword">const</span> previous = values[index - <span class="hljs-number">1</span>], current = values[index];
+        <span class="hljs-keyword">if</span> (current.<span class="hljs-property">start</span> &lt; previous.<span class="hljs-property">end</span> || current.<span class="hljs-property">start</span> === previous.<span class="hljs-property">start</span>) { <span class="hljs-keyword">return</span>; }
+    }
+    <span class="hljs-keyword">return</span> values;
+}
+</code></pre>
+
+</div>
+</div><p>Action diagnostics are optional metadata, not authority to widen an edit. We
+retain a bounded, link-free subset only when the complete supplied list is valid
+and maps through this same occurrence. Related information, code-description
+links, data and unknown extension fields reject diagnostic preservation; the edit
+may still be offered safely without that metadata.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0061006300740069006f006e00200064006900610067006e006f00730074006900630073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d0061006300740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-0061006300740069006f006e00200064006900610067006e006f00730074006900630073"></span><a class="literate-tag-name" href="#f-0061006300740069006f006e00200064006900610067006e006f00730074006900630073" data-literate-target="f-0061006300740069006f006e00200064006900610067006e006f00730074006900630073" aria-label="Definition of action diagnostics">&lt;&lt;action diagnostics&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">diagnostics</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">unknown</span><span class="hljs-params">, context: LanguageCodeActionContext</span>): vscode.<span class="hljs-property">Diagnostic</span>[] | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">if</span> (value === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> []; }
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(value) || value.<span class="hljs-property">length</span> &gt; <span class="hljs-number">100</span>) { <span class="hljs-keyword">return</span>; }
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">result</span>: vscode.<span class="hljs-property">Diagnostic</span>[] = [];
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> raw <span class="hljs-keyword">of</span> value) {
+        <span class="hljs-keyword">if</span> (!<span class="hljs-title">object</span>(raw) || <span class="hljs-title">Object</span>.<span class="hljs-title">keys</span>(raw).<span class="hljs-title">some</span>(<span class="hljs-params">key</span><span class="hljs-function"> =&gt;</span> ![<span class="hljs-string">'range'</span>, <span class="hljs-string">'message'</span>, <span class="hljs-string">'severity'</span>, <span class="hljs-string">'code'</span>, <span class="hljs-string">'source'</span>, <span class="hljs-string">'tags'</span>].<span class="hljs-title">includes</span>(key))
+            || <span class="hljs-keyword">typeof</span> raw.<span class="hljs-property">message</span> !== <span class="hljs-string">'string'</span> || raw.<span class="hljs-property">message</span>.<span class="hljs-property">length</span> &gt; <span class="hljs-number">8192</span>
+            || (raw.<span class="hljs-property">source</span> !== <span class="hljs-literal">undefined</span> &amp;&amp; (<span class="hljs-keyword">typeof</span> raw.<span class="hljs-property">source</span> !== <span class="hljs-string">'string'</span> || raw.<span class="hljs-property">source</span>.<span class="hljs-property">length</span> &gt; <span class="hljs-number">256</span>))
+            || (raw.<span class="hljs-property">code</span> !== <span class="hljs-literal">undefined</span> &amp;&amp; <span class="hljs-keyword">typeof</span> raw.<span class="hljs-property">code</span> !== <span class="hljs-string">'string'</span> &amp;&amp; !<span class="hljs-title">Number</span>.<span class="hljs-title">isSafeInteger</span>(raw.<span class="hljs-property">code</span>))
+            || (raw.<span class="hljs-property">code</span> !== <span class="hljs-literal">undefined</span> &amp;&amp; <span class="hljs-title">String</span>(raw.<span class="hljs-property">code</span>).<span class="hljs-property">length</span> &gt; <span class="hljs-number">256</span>)) { <span class="hljs-keyword">return</span>; }
+        <span class="hljs-keyword">const</span> mapped = <span class="hljs-title">mappedRange</span>(raw.<span class="hljs-property">range</span>, context);
+        <span class="hljs-keyword">if</span> (!mapped) { <span class="hljs-keyword">return</span>; }
+        <span class="hljs-keyword">const</span> severity = raw.<span class="hljs-property">severity</span> === <span class="hljs-literal">undefined</span> ? vscode.<span class="hljs-property">DiagnosticSeverity</span>.<span class="hljs-property">Error</span>
+            : <span class="hljs-title">integer</span>(raw.<span class="hljs-property">severity</span>) &amp;&amp; raw.<span class="hljs-property">severity</span> &gt;= <span class="hljs-number">1</span> &amp;&amp; raw.<span class="hljs-property">severity</span> &lt;= <span class="hljs-number">4</span> ? raw.<span class="hljs-property">severity</span> - <span class="hljs-number">1</span> : <span class="hljs-literal">undefined</span>;
+        <span class="hljs-keyword">if</span> (severity === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span>; }
+        <span class="hljs-keyword">const</span> diagnostic = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">Diagnostic</span>(mapped.<span class="hljs-property">range</span>, raw.<span class="hljs-property">message</span>, severity);
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> raw.<span class="hljs-property">source</span> === <span class="hljs-string">'string'</span> &amp;&amp; raw.<span class="hljs-property">source</span>.<span class="hljs-property">length</span> &lt;= <span class="hljs-number">256</span>) { diagnostic.<span class="hljs-property">source</span> = raw.<span class="hljs-property">source</span>; }
+        <span class="hljs-keyword">if</span> ((<span class="hljs-keyword">typeof</span> raw.<span class="hljs-property">code</span> === <span class="hljs-string">'string'</span> || <span class="hljs-keyword">typeof</span> raw.<span class="hljs-property">code</span> === <span class="hljs-string">'number'</span>) &amp;&amp; <span class="hljs-title">String</span>(raw.<span class="hljs-property">code</span>).<span class="hljs-property">length</span> &lt;= <span class="hljs-number">256</span>) { diagnostic.<span class="hljs-property">code</span> = raw.<span class="hljs-property">code</span>; }
+        <span class="hljs-keyword">if</span> (raw.<span class="hljs-property">tags</span> !== <span class="hljs-literal">undefined</span>) {
+            <span class="hljs-keyword">if</span> (!<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(raw.<span class="hljs-property">tags</span>) || raw.<span class="hljs-property">tags</span>.<span class="hljs-title">some</span>(<span class="hljs-params">tag</span><span class="hljs-function"> =&gt;</span> tag !== <span class="hljs-number">1</span> &amp;&amp; tag !== <span class="hljs-number">2</span>)) { <span class="hljs-keyword">return</span>; }
+            diagnostic.<span class="hljs-property">tags</span> = raw.<span class="hljs-property">tags</span> <span class="hljs-keyword">as</span> vscode.<span class="hljs-property">DiagnosticTag</span>[];
+        }
+        result.<span class="hljs-title">push</span>(diagnostic);
+    }
+    <span class="hljs-keyword">return</span> result;
+}
+</code></pre>
+
+</div>
+</div><p>Commands and disabled actions are never surfaced. Titles and advertised quick-fix
+or refactor kinds are bounded plain strings. A valid preference hint is retained;
+unsupported optional fields are ignored only when they cannot execute or navigate.
+A malformed diagnostic list drops diagnostics rather than discarding a safe edit.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0061006300740069006f006e00200063006f006e00760065007200730069006f006e-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d0061006300740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-0061006300740069006f006e00200063006f006e00760065007200730069006f006e"></span><a class="literate-tag-name" href="#f-0061006300740069006f006e00200063006f006e00760065007200730069006f006e" data-literate-target="f-0061006300740069006f006e00200063006f006e00760065007200730069006f006e" aria-label="Definition of action conversion">&lt;&lt;action conversion&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">action</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">unknown</span><span class="hljs-params">, context: LanguageCodeActionContext</span>): vscode.<span class="hljs-property">CodeAction</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">object</span>(value) || <span class="hljs-string">'command'</span> <span class="hljs-keyword">in</span> value || <span class="hljs-string">'disabled'</span> <span class="hljs-keyword">in</span> value
+        || <span class="hljs-keyword">typeof</span> value.<span class="hljs-property">title</span> !== <span class="hljs-string">'string'</span> || !value.<span class="hljs-property">title</span>.<span class="hljs-property">length</span> || value.<span class="hljs-property">title</span>.<span class="hljs-property">length</span> &gt; <span class="hljs-number">4096</span>
+        || (value.<span class="hljs-property">kind</span> !== <span class="hljs-literal">undefined</span> &amp;&amp; (<span class="hljs-keyword">typeof</span> value.<span class="hljs-property">kind</span> !== <span class="hljs-string">'string'</span> || value.<span class="hljs-property">kind</span>.<span class="hljs-property">length</span> &gt; <span class="hljs-number">256</span>
+            || !<span class="hljs-regexp">/^(?:quickfix|refactor)(?:</span><span class="hljs-regexp">\.</span><span class="hljs-regexp">[</span><span class="hljs-regexp">\w</span><span class="hljs-regexp">-]</span><span class="hljs-regexp">+)*$/</span>.<span class="hljs-title">test</span>(value.<span class="hljs-property">kind</span>)))
+        || (value.<span class="hljs-property">isPreferred</span> !== <span class="hljs-literal">undefined</span> &amp;&amp; <span class="hljs-keyword">typeof</span> value.<span class="hljs-property">isPreferred</span> !== <span class="hljs-string">'boolean'</span>)) { <span class="hljs-keyword">return</span>; }
+    <span class="hljs-keyword">const</span> converted = <span class="hljs-title">edits</span>(value.<span class="hljs-property">edit</span>, context);
+    <span class="hljs-keyword">if</span> (!converted) { <span class="hljs-keyword">return</span>; }
+    <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">CodeAction</span>(value.<span class="hljs-property">title</span>,
+        <span class="hljs-keyword">typeof</span> value.<span class="hljs-property">kind</span> === <span class="hljs-string">'string'</span> ? vscode.<span class="hljs-property">CodeActionKind</span>.<span class="hljs-property">Empty</span>.<span class="hljs-title">append</span>(value.<span class="hljs-property">kind</span>) : <span class="hljs-literal">undefined</span>);
+    <span class="hljs-keyword">const</span> workspace = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">WorkspaceEdit</span>();
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> edit <span class="hljs-keyword">of</span> converted) { workspace.<span class="hljs-title">replace</span>(context.<span class="hljs-property">document</span>.<span class="hljs-property">uri</span>, edit.<span class="hljs-property">range</span>, edit.<span class="hljs-property">newText</span>); }
+    result.<span class="hljs-property">edit</span> = workspace;
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> value.<span class="hljs-property">isPreferred</span> === <span class="hljs-string">'boolean'</span>) { result.<span class="hljs-property">isPreferred</span> = value.<span class="hljs-property">isPreferred</span>; }
+    <span class="hljs-keyword">if</span> (value.<span class="hljs-property">diagnostics</span> !== <span class="hljs-literal">undefined</span>) {
+        <span class="hljs-keyword">const</span> attached = <span class="hljs-title">diagnostics</span>(value.<span class="hljs-property">diagnostics</span>, context);
+        <span class="hljs-keyword">if</span> (attached) { result.<span class="hljs-property">diagnostics</span> = attached; }
+    }
+    <span class="hljs-keyword">return</span> result;
+}
+</code></pre>
+
+</div>
+</div><p>The top-level response may be null or an array. Bare Commands and malformed entries
+reject the whole response: silently filtering a mutating reply could change the
+server's intended action set. A traversal cap likewise rejects the whole reply.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0061006300740069006f006e0020007200650070006c006900650073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d0061006300740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-0061006300740069006f006e0020007200650070006c006900650073"></span><a class="literate-tag-name" href="#f-0061006300740069006f006e0020007200650070006c006900650073" data-literate-target="f-0061006300740069006f006e0020007200650070006c006900650073" aria-label="Definition of action replies">&lt;&lt;action replies&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">mapLanguageCodeActions</span>(<span class="hljs-params">reply: </span><span class="hljs-built_in">unknown</span><span class="hljs-params">, context: LanguageCodeActionContext</span>): vscode.<span class="hljs-property">CodeAction</span>[] {
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">fresh</span>(context) || reply === <span class="hljs-literal">null</span> || reply === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> []; }
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(reply) || reply.<span class="hljs-property">length</span> &gt; <span class="hljs-number">1000</span>) { <span class="hljs-keyword">return</span> []; }
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">result</span>: vscode.<span class="hljs-property">CodeAction</span>[] = [];
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> value <span class="hljs-keyword">of</span> reply) {
+        <span class="hljs-keyword">const</span> converted = <span class="hljs-title">action</span>(value, context);
+        <span class="hljs-keyword">if</span> (!converted) { <span class="hljs-keyword">return</span> []; }
+        result.<span class="hljs-title">push</span>(converted);
+    }
+    <span class="hljs-keyword">return</span> result;
+}
+</code></pre>
+
+</div>
+</div><script type="application/json" class="literate-exploration-data">{"version":1,"parts":{},"families":{},"unavailable":"Exploration payload exceeds the one MiB limit."}</script><script>(
+// Closure-free: standalone HTML embeds this source without the module wrapper.
+function initializePublicationExploration(document) {
+    const view = document.defaultView;
+    if (!view || document.__literateExploration) { return; }
+    document.__literateExploration = true;
+    const limits = { payload: 1048576, layers: 8, bytes: 262144, panels: 200, parts: 200, segments: 4096 };
+    const roots = new Map();
+    const controls = new Map();
+    const panels = new Map();
+    const encoder = new view.TextEncoder();
+    const own = (object, key) => object && Object.prototype.hasOwnProperty.call(object, key) ? object[key] : undefined;
+    const record = value => value && typeof value === 'object' && !Array.isArray(value);
+    const identifier = value => typeof value === 'string' && value.length <= 4096 && /^[A-Za-z0-9_-]+$/.test(value);
+    const connected = node => !!node && document.documentElement.contains(node);
+    let usedBytes = 0, serial = 0, focused;
+    const element = (tag, text) => {
+        const node = document.createElement(tag);
+        if (text !== undefined) { node.textContent = text; }
+        return node;
+    };
+    function inPanel(node) {
+        for (let parent = node; parent; parent = parent.parentNode) { if (panels.has(parent)) { return true; } }
+        return false;
+    }
+    function safeHref(href, target, baseline = false) {
+        if (typeof href !== 'string' || href.length > 4096 || /[\s\u0000-\u001f\u007f\\]/.test(href)) { return undefined; }
+        if (identifier(target) && href === '#' + target) { return href; }
+        if (identifier(target) && href.endsWith('#' + target)) {
+            const path = href.slice(0, -target.length - 1);
+            if (path.startsWith('./') && path.endsWith('.html') && path.slice(2).split('/').every(
+                part => /^(?:[A-Za-z0-9_~.!'()*-]|%[0-9a-fA-F]{2})+$/.test(part))) { return href; }
+        }
+        if (/^vscode(?:-insiders)?:\/\/jesterking\.literate\/navigate\/[a-f0-9]{48}\/[a-f0-9]{48}(?:\?[^#]*)?$/.test(href)) { return href; }
+        // HTTPS transport shapes belong to the host. Never authorize one from JSON alone.
+        if (baseline && /^https:\/\//.test(href)) {
+            try {
+                const url = new view.URL(href);
+                if (url.protocol === 'https:' && url.hostname && !url.username && !url.password) { return href; }
+            } catch (_) { /* Invalid URLs remain plain text. */ }
+        }
+        return undefined;
+    }
+    function linkFor(context, model, target) {
+        if (context.links.has(target)) { return context.links.get(target); }
+        return safeHref(own(model.families, target)?.href, target);
+    }
+    function focusWithin(control) {
+        const active = document.activeElement;
+        if (control.button === active || control.panel?.contains(active)) { return true; }
+        return focused?.top === control && (!active || active === document.body || !connected(active));
+    }
+    function close(control) {
+        if (!control.panel) { return; }
+        for (const child of [...control.children]) { destroy(child); }
+        const cost = panels.get(control.panel)?.cost;
+        if (cost !== undefined) { usedBytes -= cost; panels.delete(control.panel); }
+        control.panel.remove(); control.panel = undefined;
+        control.button.setAttribute('aria-expanded', 'false');
+        control.button.removeAttribute('aria-controls');
+        control.note.textContent = '';
+    }
+    function destroy(control) {
+        close(control);
+        controls.delete(control.use);
+        control.parent?.children.delete(control);
+        control.context.controls.delete(control.use);
+        control.button.remove(); control.note.remove();
+    }
+    function restore(request) {
+        if (!request) { return; }
+        const replacement = controls.get(request.use) || [...controls.values()].find(control =>
+            !control.parent && control.target === request.target);
+        const anchor = [request.use.querySelector('a'), request.context.root.querySelector('a'),
+            ...document.querySelectorAll('a')].find(node => connected(node) && node.getAttribute('href'));
+        const destination = replacement?.button || anchor;
+        focused = undefined;
+        if (destination) { destination.focus(); }
+    }
+    // Account for serialized text/attributes without constructing candidate DOM or expanded strings.
+    function escapedCost(text) {
+        if (typeof text !== 'string' || text.length > limits.bytes) { return Infinity; }
+        let cost = encoder.encode(text).length;
+        for (const character of text) {
+            if (character === '&') { cost += 4; }
+            else if (character === '<' || character === '>') { cost += 3; }
+            else if (character === '"' || character === "'") { cost += 5; }
+        }
+        return cost;
+    }
+    function plan(control) {
+        const { model, target, path, context } = control;
+        const family = own(model.families, target);
+        if (model.unavailable) { return { reason: 'Exploration data is unavailable.' }; }
+        if (!identifier(target) || !record(family) || typeof family.name !== 'string' || family.name.length > 1024 || !Array.isArray(family.parts)) {
+            return { reason: 'Fragment is unavailable in this snapshot.' };
+        }
+        if (path.includes(target)) { return { reason: 'Cycle: this fragment is already open on this path.' }; }
+        if (path.length >= limits.layers) { return { reason: 'Exploration is limited to eight layers.' }; }
+        if (panels.size >= limits.panels) { return { reason: 'Exploration panel limit reached; collapse a panel first.' }; }
+        const failure = { reason: 'Exploration DOM budget or contribution limit reached. No code was truncated.' };
+        if (family.parts.length > limits.parts) { return failure; }
+        const parts = [], seen = new Set();
+        let cost = 512 + escapedCost(family.name), count = 0;
+        for (const id of family.parts) {
+            if (!identifier(id) || seen.has(id)) { return failure; }
+            seen.add(id);
+            const segments = own(model.parts, id);
+            if (!Array.isArray(segments) || (count += segments.length) > limits.segments) { return failure; }
+            cost += 96;
+            const entries = [];
+            for (const segment of segments) {
+                if (!record(segment) || typeof segment.text !== 'string') { return failure; }
+                const reference = segment.reference === true;
+                const destination = segment.target === undefined ? '' : segment.target;
+                if (reference && destination !== '' && !identifier(destination)) { return failure; }
+                const href = reference ? linkFor(context, model, destination) : undefined;
+                cost += 96 + escapedCost(segment.text);
+                if (reference) {
+                    cost += 1024 + escapedCost(segment.text.slice(0, 512)) + escapedCost(destination) * 2;
+                    if (href) { cost += escapedCost(href); }
+                }
+                if (cost + usedBytes > limits.bytes) { return failure; }
+                entries.push({ text: segment.text, reference, target: destination, href });
+            }
+            if (cost + usedBytes > limits.bytes) { return failure; }
+            parts.push(entries);
+        }
+        return cost + usedBytes <= limits.bytes ? { name: family.name, parts, cost } : failure;
+    }
+    function open(control) {
+        const accepted = plan(control);
+        if (accepted.reason) { control.note.textContent = accepted.reason + ' Definition links remain available.'; return; }
+        const candidate = element('span');
+        candidate.style.display = 'block';
+        candidate.setAttribute('role', 'group');
+        candidate.setAttribute('aria-label', 'Unexpanded fragment ' + accepted.name);
+        candidate.append(element('span', 'Unexpanded fragment — plain text; explore references separately.\n'));
+        for (const entries of accepted.parts) {
+            const code = element('span'); code.style.whiteSpace = 'pre-wrap';
+            for (const entry of entries) {
+                const text = element(entry.href ? 'a' : 'span', entry.text);
+                if (entry.href) { text.setAttribute('href', entry.href); text.setAttribute('data-literate-target', entry.target); }
+                code.append(text);
+                if (entry.reference) {
+                    text.setAttribute('data-literate-explore', entry.target);
+                    enhance(text, control.context, [...control.path, control.target], control);
+                }
+            }
+            candidate.append(code);
+        }
+        do { candidate.id = 'literate-exploration-' + (++serial); } while (document.getElementById(candidate.id));
+        // Diagnostic metadata is never read back for ownership or accounting.
+        candidate.setAttribute('data-literate-panel-bytes', String(accepted.cost));
+        usedBytes += accepted.cost;
+        panels.set(candidate, { cost: accepted.cost, owner: control });
+        control.panel = candidate;
+        control.note.textContent = ''; control.note.after(candidate);
+        control.button.setAttribute('aria-controls', candidate.id);
+        control.button.setAttribute('aria-expanded', 'true');
+    }
+    function signature(use) {
+        const anchor = use.matches('a') ? use : use.querySelector('a');
+        return [use.getAttribute('data-literate-explore'), use.textContent.slice(0, 512), anchor,
+            anchor?.getAttribute('href'), anchor?.getAttribute('data-literate-target')];
+    }
+    function enhance(use, context, path = [], parent) {
+        const identity = signature(use);
+        const button = element('button', 'Explore fragment'); button.type = 'button';
+        button.setAttribute('aria-label', 'Explore ' + identity[1]);
+        button.setAttribute('aria-expanded', 'false');
+        const note = element('span'); note.setAttribute('role', 'status');
+        use.after(button, note);
+        const control = { use, context, model: context.model, identity, target: identity[0], path,
+            button, note, parent, children: new Set(), panel: undefined };
+        controls.set(use, control);
+        if (parent) { parent.children.add(control); } else { context.controls.set(use, control); }
+        button.addEventListener('click', () => {
+            scan();
+            if (controls.get(use) !== control) { return; }
+            if (control.panel) {
+                if (focusWithin(control)) { button.focus(); }
+                close(control);
+            } else { open(control); }
+        });
+        return control;
+    }
+    function readModel(source) {
+        try {
+            if (source.length > limits.payload || encoder.encode(source).length > limits.payload) { throw new Error('payload limit'); }
+            const model = JSON.parse(source);
+            if (!record(model) || model.version !== 1 || !record(model.parts) || !record(model.families)) { throw new Error('invalid model'); }
+            return model;
+        } catch (_) { return { unavailable: true }; }
+    }
+    function baselineLinks(root) {
+        const links = new Map();
+        for (const anchor of root.querySelectorAll('a')) {
+            if (inPanel(anchor)) { continue; }
+            const target = anchor.getAttribute('data-literate-target');
+            if (!identifier(target)) { continue; }
+            const href = safeHref(anchor.getAttribute('href'), target, true);
+            links.set(target, links.has(target) && links.get(target) !== href ? undefined : href);
+        }
+        return links;
+    }
+    function scan() {
+        let request;
+        const retire = control => {
+            if (focusWithin(control)) { request = control; }
+            destroy(control);
+        };
+        const live = new Set(document.querySelectorAll('.literate-document'));
+        for (const [root, context] of roots) {
+            if (!live.has(root)) {
+                for (const control of [...context.controls.values()]) { retire(control); }
+                roots.delete(root);
+            }
+        }
+        for (const root of live) {
+            const payload = root.querySelector('script.literate-exploration-data[type="application/json"]');
+            let context = roots.get(root);
+            if (!payload) {
+                if (context) { for (const control of [...context.controls.values()]) { retire(control); } roots.delete(root); }
+                continue;
+            }
+            const source = payload.textContent;
+            const links = baselineLinks(root);
+            if (!context) {
+                context = { root, payload, source, links, model: readModel(source), controls: new Map() };
+                roots.set(root, context);
+            } else {
+                const changed = context.payload !== payload || context.source !== source;
+                const relink = links.size !== context.links.size || [...links].some(([key, value]) =>
+                                    !context.links.has(key) || context.links.get(key) !== value);
+                if (changed || relink) { for (const control of [...context.controls.values()]) { retire(control); } }
+                if (changed) { context.model = readModel(source); }
+                Object.assign(context, { payload, source, links });
+            }
+            const uses = new Set([...root.querySelectorAll('[data-literate-explore]')].filter(use => !inPanel(use)));
+            for (const [use, control] of [...context.controls]) {
+                const identity = signature(use);
+                if (!uses.has(use) || control.button.previousSibling !== use || control.note.previousSibling !== control.button
+                    || identity.some((value, index) => value !== control.identity[index])) { retire(control); }
+            }
+            for (const use of uses) { if (!controls.has(use)) { enhance(use, context); } }
+        }
+        for (const control of [...controls.values()]) {
+            if (!control.parent || controls.get(control.use) !== control) { continue; }
+            const identity = signature(control.use);
+            if (!connected(control.use) || control.button.previousSibling !== control.use
+                || identity.some((value, index) => value !== control.identity[index])) {
+                let top = control;
+                while (top.parent) { top = top.parent; }
+                if (focusWithin(top)) { request = top; }
+                close(top);
+            }
+        }
+        for (const [panel, { owner }] of [...panels]) {
+            if (!connected(panel)) {
+                let top = owner;
+                while (top.parent) { top = top.parent; }
+                if (focusWithin(top)) { request = top; }
+                close(owner);
+            }
+        }
+        restore(request);
+    }
+    document.addEventListener('focusin', event => {
+        focused = undefined;
+        for (const control of controls.values()) {
+            if (!control.parent && (control.button === event.target || control.panel?.contains(event.target))) {
+                focused = { top: control }; break;
+            }
+        }
+    });
+    scan();
+    document.addEventListener('DOMContentLoaded', scan);
+    view.addEventListener('vscode.markdown.updateContent', scan);
+    new view.MutationObserver(scan).observe(document.documentElement, {
+        childList: true, characterData: true, subtree: true, attributes: true,
+        attributeFilter: ['data-literate-explore', 'data-literate-target', 'href', 'type', 'class']
+    });
+}
+)(document);</script></div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>
