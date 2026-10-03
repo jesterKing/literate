@@ -276,19 +276,29 @@ or Puppeteer browser downloader/launcher dependency. The VSIX ships the runtime
 files, not the metadata or `node_modules`; local external tools/fonts are still
 required. The acceptance closure check is not a complete transitive license audit.
 
-Package the extension with:
+Bump the manifest version with one of:
 
 ```sh
-yarn package:vsix
+yarn version:bump patch
+yarn version:bump minor
+yarn version:bump major
+yarn version:bump 0.16.0
 ```
 
-The script pins VSCE 4 and passes `--no-dependencies` because the extension's
-runtime dependencies are already bundled by `vscode:prepublish`. Without that
-flag, VSCE detects `yarn.lock` and invokes the Yarn Classic command
-`yarn list --prod --json`, which Yarn 4 does not implement. The direct equivalent
-is `yarn dlx @vscode/vsce@4.0.0 package --no-dependencies --out out/literate-0.15.0.vsix`;
-if VSCE is installed locally, `yarn vsce package --no-dependencies` also avoids the
-incompatible dependency scan.
+Yarn validates semantic versions and refuses accidental downgrades. Review the
+result and author the matching `CHANGELOG.md` release notes; the command does not
+invent release documentation, create a tag, commit, package, or publish.
+`package.json` is the extension version source of truth; Yarn's lockfile uses its
+normal `0.0.0-use.local` workspace placeholder and needs no manual version edit.
+
+Package the extension with `yarn package:vsix`. The script reads the current name
+and version from `package.json`, so version `0.16.0` automatically produces
+`out/literate-0.16.0.vsix`. It pins VSCE 4 and passes `--no-dependencies` because
+the extension's runtime dependencies are already bundled by `vscode:prepublish`.
+Without that flag, VSCE detects `yarn.lock` and invokes the Yarn Classic command
+`yarn list --prod --json`, which Yarn 4 does not implement. If VSCE is installed
+locally, `yarn vsce package --no-dependencies` also avoids the incompatible scan,
+but its output location is not managed by the project helper.
 
 The VSIX excludes Yarn state/configuration, plans, fonts and `node_modules`. After
 any repackage, rerun acceptance and retain the new evidence path/hash rather than
