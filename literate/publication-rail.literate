@@ -218,7 +218,7 @@ or rule protrusion, including overlong words and list labels. Link whatsits have
 no advancing width. Fingerprint shaped content, font identity and resolved pages
 as well as dimensions; equal heights alone are not convergence.
 
-```ts : <<publication rail box audit>>=
+```ts : <<begin auditing an annotation rail box>>=
 local function audit(box)
   local trace, fonts, failure = {}, {}, nil
   local function visit(parent,x,depth)
@@ -244,6 +244,13 @@ local function audit(box)
           failure=string.format("horizontal protrusion (glyph U+%04X at %.3f..%.3f mm; width %.3f mm)",
             n.char,left/mm,(left+n.width)/mm,box.width/mm)
         end
+```
+
+Glyphs provide both visible extents and font identity. The same walk must then
+follow nested lists and account for the actual width contributed by rules, glue,
+kerns, and surviving discretionary replacements.
+
+```ts : <<follow nested rail nodes and resolved widths>>=
       elseif kind=="hlist" or kind=="vlist" then
         visit(n,at,depth+1)
       elseif kind=="rule" and n.width>0 then
@@ -274,6 +281,12 @@ local function audit(box)
   visit(box,0,0)
   return digest(table.concat(trace,"|")),failure
 end
+```
+
+The completed trace becomes part of the box fingerprint together with semantic
+identity, dimensions, page, macro content, and reference-resolution state.
+
+```ts : <<record an audited annotation box>>=
 function R.box(index,number,macro,resolved,page)
   local d=R.defs[index]
   local b=tex.box[number]

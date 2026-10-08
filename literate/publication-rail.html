@@ -341,7 +341,7 @@ or rule protrusion, including overlong words and list labels. Link whatsits have
 no advancing width. Fingerprint shaped content, font identity and resolved pages
 as well as dimensions; equal heights alone are not convergence.</p>
 <div class="codefragment">
-<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020007200610069006c00200062006f0078002000610075006400690074-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200062006f0078002000610075006400690074"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c00200062006f0078002000610075006400690074" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200062006f0078002000610075006400690074" aria-label="Definition of publication rail box audit">&lt;&lt;publication rail box audit&gt;&gt;=</a></div>
+<div class="fragmentname" id="c-0062006500670069006e0020006100750064006900740069006e006700200061006e00200061006e006e006f0074006100740069006f006e0020007200610069006c00200062006f0078-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-0062006500670069006e0020006100750064006900740069006e006700200061006e00200061006e006e006f0074006100740069006f006e0020007200610069006c00200062006f0078"></span><a class="literate-tag-name" href="#f-0062006500670069006e0020006100750064006900740069006e006700200061006e00200061006e006e006f0074006100740069006f006e0020007200610069006c00200062006f0078" data-literate-target="f-0062006500670069006e0020006100750064006900740069006e006700200061006e00200061006e006e006f0074006100740069006f006e0020007200610069006c00200062006f0078" aria-label="Definition of begin auditing an annotation rail box">&lt;&lt;begin auditing an annotation rail box&gt;&gt;=</a></div>
 <div class="code">
 <pre><code>local <span class="hljs-keyword">function</span> <span class="hljs-title">audit</span>(<span class="hljs-params">box</span>)
   local trace, fonts, failure = {}, {}, nil
@@ -368,7 +368,16 @@ as well as dimensions; equal heights alone are not convergence.</p>
           failure=<span class="hljs-built_in">string</span>.<span class="hljs-title">format</span>(<span class="hljs-string">&quot;horizontal protrusion (glyph U+%04X at %.3f..%.3f mm; width %.3f mm)&quot;</span>,
             n.<span class="hljs-property">char</span>,left/mm,(left+n.<span class="hljs-property">width</span>)/mm,box.<span class="hljs-property">width</span>/mm)
         end
-      elseif kind==<span class="hljs-string">&quot;hlist&quot;</span> or kind==<span class="hljs-string">&quot;vlist&quot;</span> then
+</code></pre>
+
+</div>
+</div><p>Glyphs provide both visible extents and font identity. The same walk must then
+follow nested lists and account for the actual width contributed by rules, glue,
+kerns, and surviving discretionary replacements.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0066006f006c006c006f00770020006e006500730074006500640020007200610069006c0020006e006f00640065007300200061006e00640020007200650073006f006c0076006500640020007700690064007400680073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-0066006f006c006c006f00770020006e006500730074006500640020007200610069006c0020006e006f00640065007300200061006e00640020007200650073006f006c0076006500640020007700690064007400680073"></span><a class="literate-tag-name" href="#f-0066006f006c006c006f00770020006e006500730074006500640020007200610069006c0020006e006f00640065007300200061006e00640020007200650073006f006c0076006500640020007700690064007400680073" data-literate-target="f-0066006f006c006c006f00770020006e006500730074006500640020007200610069006c0020006e006f00640065007300200061006e00640020007200650073006f006c0076006500640020007700690064007400680073" aria-label="Definition of follow nested rail nodes and resolved widths">&lt;&lt;follow nested rail nodes and resolved widths&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>      elseif kind==<span class="hljs-string">&quot;hlist&quot;</span> or kind==<span class="hljs-string">&quot;vlist&quot;</span> then
         <span class="hljs-title">visit</span>(n,at,depth+<span class="hljs-number">1</span>)
       elseif kind==<span class="hljs-string">&quot;rule&quot;</span> and n.<span class="hljs-property">width</span>&gt;<span class="hljs-number">0</span> then
         <span class="hljs-keyword">if</span> at &lt; -<span class="hljs-number">1</span> or at+n.<span class="hljs-property">width</span> &gt; box.<span class="hljs-property">width</span>+<span class="hljs-number">1</span> then failure=<span class="hljs-string">&quot;horizontal rule protrusion&quot;</span> end
@@ -398,7 +407,15 @@ as well as dimensions; equal heights alone are not convergence.</p>
   <span class="hljs-title">visit</span>(box,<span class="hljs-number">0</span>,<span class="hljs-number">0</span>)
   <span class="hljs-keyword">return</span> <span class="hljs-title">digest</span>(table.<span class="hljs-title">concat</span>(trace,<span class="hljs-string">&quot;|&quot;</span>)),failure
 end
-<span class="hljs-keyword">function</span> R.<span class="hljs-title">box</span>(index,<span class="hljs-built_in">number</span>,macro,resolved,page)
+</code></pre>
+
+</div>
+</div><p>The completed trace becomes part of the box fingerprint together with semantic
+identity, dimensions, page, macro content, and reference-resolution state.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007200650063006f0072006400200061006e0020006100750064006900740065006400200061006e006e006f0074006100740069006f006e00200062006f0078-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007200650063006f0072006400200061006e0020006100750064006900740065006400200061006e006e006f0074006100740069006f006e00200062006f0078"></span><a class="literate-tag-name" href="#f-007200650063006f0072006400200061006e0020006100750064006900740065006400200061006e006e006f0074006100740069006f006e00200062006f0078" data-literate-target="f-007200650063006f0072006400200061006e0020006100750064006900740065006400200061006e006e006f0074006100740069006f006e00200062006f0078" aria-label="Definition of record an audited annotation box">&lt;&lt;record an audited annotation box&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> R.<span class="hljs-title">box</span>(index,<span class="hljs-built_in">number</span>,macro,resolved,page)
   local d=R.<span class="hljs-property">defs</span>[index]
   local b=tex.<span class="hljs-property">box</span>[<span class="hljs-built_in">number</span>]
   local shape,problem=<span class="hljs-title">audit</span>(b)

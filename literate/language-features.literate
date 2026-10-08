@@ -198,7 +198,7 @@ function actionContext(document: vscode.TextDocument, hit: SourceProjectionPosit
     });
 ```
 
-```ts : <<language feature code action input continuation 1>>=
+```ts : <<finish the code action request context>>=
     const only = context.only?.value;
     if (only !== undefined && !/^[\w.-]{1,256}$/.test(only)) { return; }
     return { range: mapped, context: { diagnostics, ...(only === undefined ? {} : { only: [only] }), triggerKind: 1 } };
@@ -389,7 +389,7 @@ function signature(reply: unknown): vscode.SignatureHelp | undefined {
     }
 ```
 
-```ts : <<language feature hover result continuation 1>>=
+```ts : <<finish signature help validation>>=
     result.activeSignature = boundedIndex(reply.activeSignature, result.signatures.length);
     result.activeParameter = result.signatures[result.activeSignature].activeParameter
         ?? boundedIndex(reply.activeParameter, result.signatures[result.activeSignature].parameters.length);
@@ -511,7 +511,7 @@ revision, with at most 100 retained lines. No automatic restart loop is possible
     }
 ```
 
-```ts : <<language feature diagnostics continuation 1>>=
+```ts : <<report language service failures>>=
     const report = (message: string): void => {
         if (disposed) { return; }
         if (lines >= 100) { output.clear(); lines = 0; }
@@ -743,7 +743,7 @@ Markdown-wide trigger registrations are needed.
             if (method === 'codeAction' && !action) { return undefined; }
 ```
 
-```ts : <<language feature snapshot continuation 1>>=
+```ts : <<select or start the language session>>=
             const id = language(hit.file.language), config = configured[id];
             if (!config) { return undefined; }
             sessionKey = JSON.stringify([folder.uri.toString(), id]);
@@ -805,7 +805,7 @@ an initial punctuation edit. Mapping is established before startup or UI work.
             }, controller.signal);
 ```
 
-```ts : <<language feature dispatch continuation 1>>=
+```ts : <<map the language server reply>>=
             if (!fresh()) { return undefined; }
             const view = { document, position: cursor, hit };
             if (method === 'hover') { return hover(view, reply); }
@@ -1026,7 +1026,7 @@ The parent also owns the machine/restricted manifest schema and activation wirin
     }));
 ```
 
-```ts : <<language feature providers continuation 1>>=
+```ts : <<register navigation and interactive providers>>=
     context.subscriptions.push(vscode.languages.registerDefinitionProvider(selector, {
         provideDefinition: (d, p, t) => request(d, p, t, 'definition') as Promise<vscode.Location[] | undefined>
     }), vscode.languages.registerTypeDefinitionProvider(selector, {
@@ -1053,7 +1053,7 @@ The parent also owns the machine/restricted manifest schema and activation wirin
 ```
 
 
-```ts : <<language feature providers continuation 2>>=
+```ts : <<finish completion provider registration>>=
             if (completionContext.triggerKind !== vscode.CompletionTriggerKind.Invoke
                 && completionContext.triggerKind !== vscode.CompletionTriggerKind.TriggerForIncompleteCompletions) { return undefined; }
             return request(document, cursor, token, 'completion', undefined, {

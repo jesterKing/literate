@@ -30,7 +30,7 @@ information are not copied, even though relatedInformation support is advertised
 one output or stopping one session does not erase another session’s problems.
 
 
-```ts : <<diagnostics part 1>>=
+```ts : <<diagnostic controller contracts>>=
 import * as vscode from 'vscode';
 import * as path from 'node:path';
 import type { LanguageClient, LanguageDocument } from './language-client';
@@ -57,7 +57,7 @@ interface Session {
 }
 ```
 
-```ts : <<diagnostics part 2>>=
+```ts : <<begin diagnostic synchronization>>=
 
 export class LanguageDiagnostics {
     private readonly collection = vscode.languages.createDiagnosticCollection('literate-language');
@@ -84,7 +84,7 @@ export class LanguageDiagnostics {
         this.invalidate(key);
 ```
 
-```ts : <<diagnostics part 3>>=
+```ts : <<capture synchronized diagnostic ownership>>=
         const snapshot = documents.map(document => ({ ...document }));
         context = { root: context.root, documents: context.documents.map(document => ({ ...document })),
             files: context.files.map(file => ({ ...file, mappings: file.mappings.map(mapping => ({ ...mapping })) })) };
@@ -111,7 +111,7 @@ export class LanguageDiagnostics {
         for (const [uri, report] of cache?.reports || []) {
 ```
 
-```ts : <<diagnostics part 4>>=
+```ts : <<accept staged push diagnostics>>=
             if (report.version !== client.documentVersion(uri)) { cache!.reports.delete(uri); }
             else if (session.versions.get(uri) === report.version) { this.accept(session, uri, report.items, false); }
         }
@@ -138,7 +138,7 @@ export class LanguageDiagnostics {
             return;
 ```
 
-```ts : <<diagnostics part 5>>=
+```ts : <<schedule bounded pull diagnostics>>=
         }
         const version = session.versions.get(value.uri);
         if (version === undefined || version !== session.client.documentVersion(value.uri)
@@ -165,7 +165,7 @@ export class LanguageDiagnostics {
                         && reply.kind === 'full' && Array.isArray(reply.items)) { this.accept(session, uri, reply.items); }
 ```
 
-```ts : <<diagnostics part 6>>=
+```ts : <<begin mapping a diagnostic report>>=
                 } catch {
                     if (this.current(key, session)) { this.log('Language diagnostics request failed; waiting for the next sync or refresh.'); }
                     break;
@@ -192,7 +192,7 @@ export class LanguageDiagnostics {
             if (!locations.length) { unmapped++; }
 ```
 
-```ts : <<diagnostics part 7>>=
+```ts : <<publish safely mapped diagnostics>>=
             for (const location of locations) {
                 const severity = typeof item.severity === 'number' && Number.isInteger(item.severity)
                     && item.severity >= 1 && item.severity <= 4 ? item.severity - 1 : vscode.DiagnosticSeverity.Error;
@@ -219,7 +219,7 @@ export class LanguageDiagnostics {
     private remember(session: Session, uri: string, items: unknown[]): void {
 ```
 
-```ts : <<diagnostics part 8>>=
+```ts : <<sanitize a diagnostic report for reuse>>=
         const version = session.versions.get(uri);
         const document = session.documents.find(document => document.uri === uri);
         if (version === undefined || !document) { return; }
@@ -246,7 +246,7 @@ export class LanguageDiagnostics {
         }
 ```
 
-```ts : <<diagnostics part 9>>=
+```ts : <<bound retained diagnostic reports>>=
         let cache = this.caches.get(session.client);
         if (!cache) {
             cache = { reports: new Map(), unsubscribe: () => {} };
@@ -273,7 +273,7 @@ export class LanguageDiagnostics {
         this.caches.delete(client);
 ```
 
-```ts : <<diagnostics part 10>>=
+```ts : <<publish merged diagnostic collections>>=
         cache?.unsubscribe(); cache?.reports.clear();
     }
 
@@ -300,7 +300,7 @@ export class LanguageDiagnostics {
         try { this.report(message); } catch { /* Reporting cannot interrupt lifecycle cleanup. */ }
 ```
 
-```ts : <<diagnostics part 11>>=
+```ts : <<invalidate diagnostic sessions>>=
     }
     public invalidate(key?: string): void {
         for (const [name, session] of this.sessions) {

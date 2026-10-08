@@ -12,7 +12,7 @@ import { generatedFromBook } from './authoritative-book';
 
 const root = path.resolve(__dirname, '../../..');
 const chapter = fs.readFileSync(path.join(root, 'literate/language-features.literate'), 'utf8');
-const chunks = [...chapter.matchAll(/```ts : <<language feature [^>]+>>=\n([\s\S]*?)\n```/g)].map(match => match[1]);
+const chunks = [...chapter.matchAll(/```ts : <<[^>]+>>=\n([\s\S]*?)\n```/g)].map(match => match[1]);
 const source = chunks.join('\n') + '\n';
 const fence = (body: string, header = 'ts: <<main.*>>= main.ts $') => '```' + header + '\n' + body + '\n```\n';
 class Position {
