@@ -197,3 +197,70 @@ automatic behavior, diagnostics, and provider registration from
 <<language feature providers continuation 1>>
 <<language feature providers continuation 2>>
 ```
+
+## Assemble the semantic core
+
+The engine and editor share a pure model of fragment occurrences and safe rename
+plans. Its complete module gathers the contracts, scanners, source mappings, and
+validation developed in [Pure fragment symbols](symbols.html).
+
+```ts : <<assemble pure fragment symbols.*>>= ./src/symbols.ts $
+<<symbol contracts>>
+<<symbol document validation>>
+<<symbol occurrence construction>>
+<<symbol fence collection>>
+<<symbol inline scanner>>
+<<symbol inline code scanner>>
+<<symbol prose mapping>>
+<<symbol table cell splitting>>
+<<symbol table mapping>>
+<<symbol table mentions>>
+<<symbol document collection>>
+<<symbol collection entry point>>
+<<symbol rename validation>>
+<<symbol rename preview>>
+<<symbol rename safety>>
+<<symbol rename planning>>
+```
+
+The headless engine combines its contracts, parsing rules, deterministic ordering,
+templates, generation phases, and language projection input from
+[The headless generation engine](engine.html).
+
+```ts : <<assemble the headless generation engine.*>>= ./src/engine.ts $
+<<engine interfaces and dependencies>>
+<<engine publication identity>>
+<<engine path and source validation>>
+<<engine shared fragment scanning>>
+<<engine shared header parsing>>
+<<engine document ordering>>
+<<engine template dependency discovery>>
+<<engine project theme resolution>>
+<<engine literal template substitution>>
+<<engine default HTML template>>
+<<engine generation orchestration>>
+<<engine language collection>>
+```
+
+Safe persistence is a separate protocol. The module assembled below follows the
+contracts, preparation, installation, rollback, and cleanup developed in
+[Output transactions](output_transactions.html).
+
+```typescript: <<assemble safe output transactions.*>>= src/output-transactions.ts $
+<<transaction contracts>>
+<<transaction directory error>>
+<<transaction error>>
+<<transaction state>>
+<<transaction parents>>
+<<transaction normalize>>
+<<transaction preflight>>
+<<transaction reserve>>
+<<transaction create directory>>
+<<transaction prepare>>
+<<transaction install>>
+<<transaction restore rename>>
+<<transaction undo output>>
+<<transaction rollback>>
+<<transaction cleanup>>
+<<transaction commit>>
+```
