@@ -1,0 +1,176 @@
+# Diagnostics over changing projections
+
+A hover answers a question asked at one moment. A diagnostic may arrive later,
+without a cursor and sometimes without a request that the editor can directly see.
+Meanwhile the author may add prose, edit a fragment, change a template, or close a
+session. Keeping a warning on screen is therefore not only a mapping problem; it is
+an ownership and freshness problem.
+
+Literate gives generated-language problems their own editor collection. They do not
+replace diagnostics about fragment syntax or project generation. The collection is
+assembled from active language sessions, and each session retains independent
+reports for the projected outputs it owns.
+
+## A numbered diagnostic needs three matching identities
+
+A warning remains trustworthy only if it came from the same running tool, describes
+the same generated draft, and still belongs to the source the author is viewing.
+In protocol terms, a numbered report is provably current only when three forms of
+identity still agree:
+
+1. **Session identity:** it came from the same client process that owns the current
+   synchronized documents.
+2. **Wire identity:** it describes the monotonically increasing document revision
+   currently associated with that projected URI.
+3. **Snapshot freshness:** the captured source, templates, workspace, trust, and
+   diagnostic setting still satisfy the session's freshness check.
+
+A matching number from a replacement process is not enough. Neither is a live
+process whose source snapshot has been invalidated. These conditions prevent an old
+answer from acquiring authority merely because some later state looks similar.
+
+```mermaid
+flowchart TD
+    Report[Incoming diagnostic report] --> Session{Current client session?}
+    Session -->|No| Drop[Omit report]
+    Session -->|Yes| Revision{Current projected document revision?}
+    Revision -->|No| Drop
+    Revision -->|Yes| Fresh{Captured inputs still fresh?}
+    Fresh -->|No| Drop
+    Fresh -->|Yes| Map[Map generated ranges]
+    Map --> Publish[Publish owned source problems]
+```
+
+The arrows describe the provable path for a report carrying a document revision,
+not protocol traffic. Mapping happens only after identity and freshness are
+established. An unversioned push report cannot pass the revision proof; its weaker,
+best-effort handling is described below.
+
+## Pull reports take precedence over push reports
+
+Servers deliver diagnostics in two broad ways. A push-capable server sends a
+notification when it chooses. A pull-capable server lets the client request a report
+for a document. When pull diagnostics are advertised, Literate uses them and ignores
+push reports for that session.
+
+Pull requests run asynchronously after synchronization. Refresh notifications
+coalesce into one bounded, sequential pass rather than starting overlapping cycles.
+There is no polling loop and no automatic retry storm. Literate requests complete
+reports without presenting a previous result identifier. A complete report replaces
+that output's owned problems; other report forms and related-document payloads do
+not widen ownership.
+
+The pull operation carries cancellation and freshness state. Invalidation, session
+replacement, or disposal aborts pending requests. A late completion is checked again
+before it can publish anything.
+
+## Push reports expose an unavoidable ambiguity
+
+Literate subscribes to push notifications before synchronizing documents, because a
+fast server may report immediately after seeing an open or change message. A push
+that includes the exact current wire revision can be staged during synchronization
+and considered once synchronization finishes.
+
+A push without a document revision cannot be correlated as strongly. During
+synchronization it is ignored. After synchronization, it is accepted only while the
+session is fresh, idle, and owns the URI. Even then freshness is **best effort**: the
+protocol provides no evidence that a late unnumbered report describes the newest
+text rather than an earlier text.
+
+```mermaid
+sequenceDiagram
+    participant Owner as Diagnostics owner
+    participant Server
+    participant Problems as Problems collection
+
+    Owner->>Server: Synchronize projected document at revision r
+    Server-->>Owner: Numbered report for r
+    Owner->>Owner: Confirm session, r, and snapshot freshness
+    Owner->>Problems: Publish mapped ranges
+    Owner->>Server: Synchronize changed text at revision r plus one
+    Server-->>Owner: Late report for r
+    Owner->>Owner: Reject mismatched report
+```
+
+This sequence shows the provable case. If the late report carried no revision, the
+last rejection could not be justified from protocol data alone. Literate documents
+that limitation instead of pretending that a timestamp or arrival order proves
+causality.
+
+## Invalidation clears first
+
+When source input becomes stale, visible language problems are cleared immediately
+and pending diagnostic work is aborted. The editor must not continue showing a
+warning against text that no longer owns it while a new snapshot is being captured.
+
+An identical snapshot is different. If projected documents, mappings, and wire
+revisions are unchanged, the diagnostics owner updates its freshness callback
+without clearing visible problems, repeating synchronization, or cancelling an
+active pull. This avoids flicker and unnecessary work when an event changes no
+semantic input.
+
+Disabling language diagnostics for a resource also clears that session's problems.
+Interactive services may still synchronize projections for their own requests; the
+setting controls diagnostic ownership, not every use of the language server.
+
+## Cached reports survive only unchanged projected text
+
+A prose-only edit can shift a fragment down several source lines without changing
+the generated output. The server need not receive new projected text, so its wire
+revision remains unchanged. A previously accepted report may still describe the
+right generated range, but its old source location must be recalculated.
+
+Literate keeps a bounded sanitized cache keyed by client identity, generated URI,
+and wire revision. After a new source snapshot is captured, a cached report is
+reused only if that same client still gives the URI the same revision. The raw
+generated range is then mapped through the new projection, moving the visible
+problem to the fragment's new source line.
+
+If generated text changes, synchronization advances the wire revision and the cache
+is discarded. Returning later to identical text does not revive an older report,
+because wire revisions do not repeat. Stopping a client purges its cache even when
+no active source session remains.
+
+The cache stores only bounded, sanitized ranges and metadata. It does not retain a
+whole discarded source snapshot, server-private data, related locations, or
+executable links.
+
+## Diagnostic ranges may split at seams
+
+A compiler error can cover an expression assembled from several fragments. Unlike a
+navigation command, a diagnostic can usefully highlight every literal source
+intersection. Literate therefore splits a generated range at projection seams and
+returns bounded, deduplicated source ranges.
+
+This still does not authorize invention:
+
+- template-wrapper-only ranges are omitted;
+- inserted indentation and reference markers receive no source range;
+- intervening prose is never enclosed to make two fragments look contiguous;
+- repeated expansions and repeated template slots that map to the same source range
+  are deduplicated;
+- malformed or out-of-bounds ranges are omitted rather than clamped.
+
+The mapper may retain bounded message text, severity, code, source label, and the
+standard unnecessary or deprecated tags. Related information and code-description
+links are not copied. An unsafe auxiliary location must not smuggle navigation or
+command behavior into the Problems collection.
+
+## Reports keep independent ownership
+
+Several outputs or sessions may report the same source problem. The diagnostics
+controller merges active reports by source URI and diagnostic identity, so duplicates appear once.
+Clearing one output report does not erase an equal problem still owned by another
+report. Stopping one session likewise leaves problems independently owned by other
+live sessions.
+
+Counts, serialized cache size, reports per client, clients with caches, mapped ranges,
+and source-file publication all have bounds. Excess server data is omitted or an
+oversized cache entry is refused; limits do not turn a partial mutating operation
+into success because diagnostics are observational. Lifecycle cleanup releases all
+reports, cache subscriptions, and pending pulls.
+
+Persistent diagnostics show why freshness cannot be one boolean checked only when
+work starts. It is a continuing relationship among snapshot, synchronized document,
+process, and reply. The next chapter applies an even stricter proof to replies that
+propose changing literate source.

@@ -1,0 +1,197 @@
+# Coordinating language features in the editor
+
+Projection, transport, reply mapping, diagnostics, and safe actions each have a
+clear local contract. The editor still needs one coordinator to make those contracts
+hold together while documents, focus, settings, processes, and background work
+change over time.
+
+The coordinator does not create a second semantic model. It asks the editor-side
+repository for a captured disk-and-buffer snapshot, projects that snapshot through
+the pure engine, and routes requests through the session and mapping boundaries from
+the preceding chapters. Its main responsibility is temporal: only work belonging to
+the current editor situation may become visible.
+
+## Eligibility is checked before expensive work
+
+Providers are registered for local Markdown documents whose paths end in
+`.literate`. Runtime guards then require an open document in its owning local
+workspace folder, workspace trust, and a configured canonical language server for
+the projected output.
+
+Executable configuration comes only from inspected global settings. Fence aliases
+may normalize a fragment's language label, but aliases are not accepted as server
+configuration keys. This keeps executable authority outside the workspace while
+still letting familiar fence labels select a canonical language.
+
+A cheap single-buffer parse answers one early question: is the cursor inside the
+body of a named fragment rather than prose, a fence line, a fragment reference, or
+an unfinished reference marker? This local check can enable prompt cancellation of
+a pending automatic request. It does not prove that a projection exists. Every real
+request still captures and validates the complete project.
+
+## One foreground operation owns the asynchronous path
+
+Interactive operations share a serialization gate. A request moves through snapshot
+capture, projection, session initialization, capability checking, synchronization,
+protocol request, reply validation, and mapping as one owned operation. The waiting
+queue is bounded, and foreground work takes precedence over background diagnostics.
+
+```mermaid
+sequenceDiagram
+    participant Provider as Editor provider
+    participant Gate as Foreground gate
+    participant Repo as Project repository
+    participant Projector
+    participant Session
+    participant Mapper
+
+    Provider->>Gate: Request with cancellation and editor revision
+    Gate->>Repo: Capture disk and open-buffer snapshot
+    Repo-->>Gate: Documents and templates
+    Gate->>Projector: Build complete projections
+    Projector-->>Gate: Files, mappings, or diagnostics
+    Gate->>Session: Initialize and synchronize language family
+    Gate->>Session: Capability-gated request
+    Session-->>Gate: Untrusted reply
+    Gate->>Mapper: Validate against captured occurrence
+    Mapper-->>Provider: Fresh mapped result or no result
+```
+
+Each return to the gate is an asynchronous boundary. After every such boundary the
+coordinator rechecks cancellation, document revision, source-input revision,
+workspace membership, trust, configuration, and any automatic-typing candidate.
+The diagram's final “no result” is normal defensive behavior, not necessarily an
+error.
+
+The captured snapshot must include the exact text of every open local literate
+buffer. If a buffer and snapshot disagree, the request is abandoned and old
+language diagnostics for that folder are cleared. Source templates are captured as
+inputs too, including unsaved template buffers supplied by the repository.
+
+## Sessions are shared without sharing failures
+
+A session key combines workspace folder and canonical language. Requests in that
+scope reuse one process. JavaScript and TypeScript family outputs are synchronized
+together; an unrelated configured language receives its own session and document
+set.
+
+A stopped or failed session clears its diagnostic ownership and remains disabled.
+The coordinator reports one bounded, categorized message rather than repeatedly
+launching the same broken process. Language-server configuration changes and the
+restart command reset sessions, snapshots, diagnostic ownership, and reported-failure
+state.
+
+Messages in the language-server output channel avoid source text, configuration
+values, raw protocol payloads, and raw failures. They identify safe categories such
+as a missing executable, permission failure, timeout, unsupported synchronization,
+position-encoding disagreement, invalid protocol data, or a projection problem.
+The channel itself retains only a bounded recent history.
+
+## Automatic completion keeps only the latest insertion
+
+Automatic behavior should feel like editing code, not like enabling suggestions for
+all Markdown. Literate observes a single-character insertion in the focused editor,
+with one empty selection, and checks that the resulting cursor remains in a local
+named-fragment body. Replacements, multiline insertions, multi-character paste,
+undo or redo, and multiple cursors do not start automatic work. The editor API cannot
+distinguish a one-character paste from typing, so either can qualify.
+
+The candidate waits for a short debounce. Further eligible typing replaces it; a
+busy initialization or hover retains only the newest candidate rather than building
+a request queue. Identifier characters can request completion. Punctuation does so
+only when the selected server advertises it as a completion trigger. Parenthesis-like
+characters may instead request signature help when that server's capability selects
+them, using a small conservative default when it omits an explicit trigger list.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Pending: eligible one-character insertion
+    Pending --> Pending: newer eligible insertion replaces candidate
+    Pending --> Cancelled: cursor, editor, focus, non-eligible input, source, or setting changes
+    Pending --> Requesting: debounce ends and gate is free
+    Requesting --> Cancelled: freshness or cancellation fails
+    Requesting --> Cached: nonempty validated result
+    Cached --> Idle: matching editor provider consumes once
+    Cancelled --> Idle
+```
+
+The state diagram intentionally combines completion and signature prefetch because
+they share the same freshness machinery. A cached result is consumed once by the
+normal editor provider; it is not a second source of truth.
+
+Escape cancellation is enabled as soon as the local fragment-body check succeeds,
+before snapshot capture or server startup. It cancels only pending automatic work.
+Once the normal suggestion interface owns the interaction, its ordinary Escape
+behavior remains untouched. Selection, active editor, focus, trust, document, input,
+or configuration changes clear stale candidates.
+
+Automatic triggering is independently configurable per resource. Manual provider
+invocation continues to use the same projection and reply guards.
+
+## Signature triggers belong to their selected server
+
+The coordinator starts with a small conservative trigger set and learns bounded
+trigger and retrigger characters from initialized servers. Provider registration may
+contain the union needed by the editor API, but that union is not routing authority.
+Before requesting help, Literate asks whether the server selected by the current
+projection actually advertised the character.
+
+A retrigger-only character requires an existing signature-help interaction. A
+character learned from another language session cannot steal a completion request in
+the current one. This distinction matters in a shared Markdown document where
+several fragment languages may coexist.
+
+## Background diagnostics use a different freshness clock
+
+Diagnostics should update even when the editor window is not focused. Opening or
+editing an eligible document schedules one latest background candidate per workspace
+folder after its own debounce. Background work captures the project, projects it,
+starts only configured output-language sessions, and synchronizes their documents
+through the diagnostics owner.
+
+Focus and selection changes invalidate interactive requests but do not by themselves
+make a diagnostic snapshot stale. Source or template changes do. Keeping separate
+editor-interaction and source-input revisions prevents moving the cursor from erasing
+valid Problems while still stopping a hover intended for an old position.
+
+Background work never competes indefinitely with typing. It starts only while the
+shared gate is free and yields when a foreground candidate or waiter appears. It
+performs synchronization and lets the diagnostics controller own later push or pull
+reports; it does not issue hover or completion requests.
+
+## Invalidation follows semantic inputs
+
+Changes to a `.literate` file or a captured template invalidate source freshness,
+clear language diagnostics, cancel pending work, and schedule new background capture
+where appropriate. Workspace-folder, trust, and language-server configuration
+changes reset broader session state.
+
+During snapshot capture, filesystem events are recorded under a bound. Once template
+paths are known, a change to one of those paths invalidates the capture. Events for
+generated source, publication output, or transaction staging files do not by
+themselves cancel a cold request; those paths are results, not captured language
+inputs. A newer editor edit or cursor move still invalidates the request normally.
+
+This distinction prevents ordinary generation activity from continually cancelling
+language intelligence while ensuring that a newly discovered template cannot change
+under an in-flight projection unnoticed.
+
+## Providers share the pipeline, not unchecked replies
+
+Hover, completion, signature help, navigation, diagnostics, and explicit safe actions
+all reuse snapshot capture, projection, session selection, synchronization, and
+freshness checks. Their reply validators remain separate because each feature has a
+different safe result shape.
+
+Existing fragment-oriented editor features are also separate. A fragment reference
+inside Markdown is answered by the fragment model, while a symbol inside projected
+program text is answered by the configured language server. The local body guard and
+projection mapping keep those contexts from competing.
+
+Across the complete coordinator, no language request saves a document, generates an
+output, or directly applies a workspace change. The editor receives bounded display
+data, navigation locations, completion insertions, diagnostics, or a validated
+action for the user to choose. That closes the language-intelligence part of the
+book: assembled code can use ordinary language tools while the literate source
+remains authoritative.

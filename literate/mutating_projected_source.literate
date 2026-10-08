@@ -1,0 +1,149 @@
+# Mutating projected source safely
+
+A read-only answer can be omitted when its mapping is uncertain. A proposed source
+change needs a stronger guarantee: every accepted edit must mean the same thing in
+the literate source as it meant in the projected file.
+
+Literate exposes only explicitly requested, edit-only actions from the language
+server. An action that declares a kind must belong to the quick-fix or refactoring
+families; the protocol also permits an otherwise safe action to omit its kind. The server proposes an edit; Literate validates and maps
+the complete proposal; the editor presents the resulting action; and the user
+decides whether to apply it. The language-service adapter never applies the change
+by itself.
+
+## One safe edit is not enough
+
+A workspace edit is a set. If a server proposes three coordinated replacements and
+only two map safely, applying the two would create a fourth program that neither the
+server nor the author intended. Literate therefore treats the entire action as one
+atomic validation unit.
+
+```mermaid
+flowchart TD
+    Reply[Server action reply] --> Explicit{Explicit user invocation?}
+    Explicit -->|No| Reject[Offer no action]
+    Explicit -->|Yes| Fresh{Exact source snapshot still current?}
+    Fresh -->|No| Reject
+    Fresh -->|Yes| Shape{Supported edit-only shape?}
+    Shape -->|No| Reject
+    Shape -->|Yes| Complete{Every edit maps through one safe occurrence?}
+    Complete -->|No| Reject
+    Complete -->|Yes| Order{Non-overlapping deterministic order?}
+    Order -->|No| Reject
+    Order -->|Yes| Offer[Offer mapped editor action]
+```
+
+Every rejection arrow discards the whole action, not merely the questionable edit.
+The diagram omits optional display metadata because metadata never widens edit
+authority.
+
+## Freshness is checked again at reply time
+
+The request records the open source document, its editor revision, the source path,
+the projected file, the exact mapping occurrence, and the generated URI sent to the
+server. When a reply arrives, Literate verifies all of them again.
+
+The document must still be open at the same revision. The mapping object must still
+belong to the projected file. Its source and generated intervals must be valid,
+equal in length, and within their respective texts. Most importantly, the captured
+source text and generated text for that interval must still contain identical
+UTF-16 code-unit sequences.
+
+This text equality is stronger than trusting positions alone. A stale interval of
+the same length could otherwise pass numerical bounds while containing different
+code.
+
+Only an explicit editor invocation reaches this path. Automatically requested
+actions are rejected before snapshot capture, so background activity cannot turn a
+server suggestion into a source-changing option.
+
+## Mutation is confined to one projection segment
+
+Every returned text edit must map through the exact occurrence used for the request.
+It cannot cross into an adjacent mapping, even when that mapping comes from the same
+source document. It cannot touch wrapper text, inserted indentation, a reference
+seam, or another generated occurrence.
+
+The selected source interval must also have exactly one matching occurrence in the
+projected file used for the request. If that same interval appears twice there,
+changing the single source interval would alter both generated occurrences, while
+the server's edit may describe only one. Literate rejects that ambiguity.
+
+```mermaid
+flowchart LR
+    Source[One editable source interval] --> A[Generated occurrence A]
+    Source --> B[Generated occurrence B]
+    Server[Server proposes change to A] --> Proof{Exactly one matching occurrence in requested file?}
+    A --> Proof
+    B --> Proof
+    Proof -->|No| Reject[Reject the action]
+```
+
+The diagram shows why text equality is insufficient: both occurrences may contain
+the same text but have different generated roles. The implemented uniqueness proof
+is scoped to the projected file that received the request. It does not claim global
+uniqueness across every projected output.
+
+This narrow segment rule also explains why mutation is stricter than diagnostic
+mapping. Diagnostics may split a range across several honest source intersections.
+An edit is not split, because doing so could change its semantics.
+
+## Only one plain edit form crosses the boundary
+
+The protocol permits many kinds of workspace change. Literate accepts only the
+plain `changes` form with exactly one entry, and that entry must name the generated
+URI used for the request. Its value must be a nonempty bounded list of ordinary text
+edits.
+
+The following forms fail closed:
+
+- changes to another generated or physical file;
+- document-change records and file operations;
+- annotated edits or snippet-shaped edits;
+- commands, disabled actions, or actions requiring later resolution;
+- empty, oversized, malformed, or partly mappable edit sets;
+- declared action kinds outside quick fixes and refactorings.
+
+Replacement text may be ordinary multiline text, but the aggregate replacement size
+is bounded. The number of actions and edits is bounded as well. Exceeding a limit
+rejects the proposal rather than truncating it.
+
+This boundary intentionally excludes useful-looking behavior such as a local
+completion accompanied by an import change. Safety is determined by the complete
+shape, not by whether the first edit appears harmless.
+
+## Overlap makes order part of meaning
+
+Two edits overlap when applying one changes the coordinates or source bytes expected
+by the other. Even two zero-width insertions at the same position have an order that
+may affect the result. A replacement and insertion sharing a start have the same
+problem.
+
+Literate first retains and maps the complete edit set, then sorts it by source start
+and end. It rejects overlaps and any pair sharing a start. Only after those checks
+can the editor's workspace-edit representation preserve the server's intended set
+without relying on an implicit application order.
+
+## Optional metadata has no edit authority
+
+An action may carry diagnostics explaining why it was offered. Literate keeps only
+a bounded portable subset when the complete diagnostic list is valid and maps
+through the same occurrence. Message, severity, code, source label, and standard
+tags can be retained. Links, related locations, private data, and unknown extension
+fields are not.
+
+Malformed diagnostic metadata does not make an otherwise safe edit unsafe. In that
+case Literate offers the action without the metadata. By contrast, a malformed edit
+or executable command rejects the whole action because it changes what the action
+could do.
+
+At the top level, the server reply must be an array of valid actions. A bare command
+or one malformed action causes the complete reply to be rejected. Silently filtering
+a mutating reply could change the set or ordering that the server intended to
+present.
+
+Safe mutation over projections is therefore a proof obligation, not a convenience:
+current source, exact occurrence, complete edit set, supported shape, and
+unambiguous order must all agree. Chapter 23 places that proof inside the wider
+editor coordinator that schedules snapshots, sessions, automatic requests, and
+background diagnostics.

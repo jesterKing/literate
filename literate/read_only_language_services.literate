@@ -1,0 +1,161 @@
+# Read-only language services
+
+Once a server understands the projected program, the editor can ask ordinary
+programming questions inside a fragment: What does this name mean? What could be
+inserted here? Which parameter comes next? Where is this symbol declared or used?
+
+These questions are read-only in the architectural sense. Their answers may display
+text, offer an insertion at the cursor, or navigate to a location, but the server is
+not given authority to execute a command or apply a workspace-wide change. Even a
+completion item is reduced to one carefully bounded replacement in the source
+occurrence that initiated the request.
+
+The supported question families are hover information, completion, signature help,
+definition, type definition, implementation, and references. Each family is enabled
+only when the initialized server advertises the corresponding capability.
+
+## Every request keeps its occurrence
+
+A request begins with the captured literate document and cursor. Projection finds a
+literal mapping and chooses its first deterministic generated occurrence. The owner
+synchronizes the relevant projected documents, sends the request at the generated
+UTF-16 position, and retains the exact mapping object used to get there.
+
+```mermaid
+sequenceDiagram
+    participant Source as Literate source
+    participant Projection
+    participant Server
+    participant Guard as Reply validator
+
+    Source->>Projection: Cursor in literal fragment text
+    Projection->>Projection: Select one generated occurrence
+    Projection->>Server: Request at generated UTF-16 position
+    Server-->>Guard: Untrusted reply
+    Guard->>Guard: Check shape, bounds, occurrence, freshness
+    Guard-->>Source: Safe display, insertion, or location
+```
+
+The return path is intentionally narrower than the outward path. The server sees a
+complete projected file, but a reply can affect only information justified by the
+captured mapping and the feature's policy. The diagram omits session startup and
+queueing, which Chapter 19 and Chapter 23 treat separately.
+
+After every asynchronous boundary, Literate checks that the document revision,
+project inputs, workspace, trust, configuration, and request cancellation still
+match. A valid reply to an obsolete question is still obsolete and is discarded.
+
+## Hover text is display data, not authority
+
+A hover reply may contain plain text, Markdown, or a language-marked code block.
+Literate bounds that content and constructs untrusted Markdown with embedded HTML
+disabled. A link or markup sequence therefore does not acquire command authority
+merely because a server returned it.
+
+If the server supplies an explicit hover range, the complete range must map through
+the original occurrence, remain on the cursor's source line, and contain the cursor.
+An absent range uses the current source word. A malformed or unsafe explicit range
+causes the hover to be omitted rather than widened to a nearby word.
+
+This distinction preserves meaning. Hover contents can still be useful without an
+invented source span, but once a server claims a precise span, presenting a different
+one would misrepresent its answer.
+
+## Completion is a controlled local insertion
+
+A completion list can contain plain text or snippets. Literate accepts bounded
+labels, documentation, details, sorting metadata, standard item kinds, and a narrow
+set of list defaults. Unknown defaults are rejected when they could alter insertion
+semantics.
+
+The replacement range must satisfy all of these conditions:
+
+- it belongs to the exact mapping used for the request;
+- it lies on the cursor's source line;
+- it contains the cursor;
+- an insert-and-replace pair shares one start and has a contained insertion range;
+- its coordinates fit both projected and source text in UTF-16.
+
+Without an explicit edit, Literate replaces the current identifier-like source word,
+not the entire expression before the cursor. After punctuation, or when no safe word
+exists, the result becomes a zero-width insertion at the cursor.
+
+Commands and auxiliary edits are not retained. This excludes a completion that
+would insert one name locally while silently changing imports or another file. A
+snippet still uses the editor's normal snippet interpreter, but its tab stops do not
+grant access to additional source ranges.
+
+Some servers resolve a selected completion later to add expensive information.
+Literate keeps the already validated insertion fixed. Resolution may add only
+bounded documentation and detail; it cannot replace the text, range, label, or
+attach executable behavior. If the source or session is no longer fresh, resolution
+adds nothing.
+
+## Signature help validates labels independently
+
+Signature help displays callable forms and their parameters. A parameter may name a
+substring of the signature label or provide a pair of UTF-16 offsets into that
+label. Literate checks that names occur and offset pairs are ordered and within the
+label before constructing editor objects.
+
+Active signature and parameter indexes are also bounded. An out-of-range selection
+falls back to the first valid entry rather than indexing arbitrary data. Documentation
+passes through the same untrusted Markdown boundary used by hovers and completions.
+
+Server-advertised trigger and retrigger characters influence when the coordinator
+asks for signature help, but they do not weaken reply validation. Chapter 23 explains
+how those characters are learned without turning all Markdown typing into language
+requests.
+
+## Navigation has two kinds of destination
+
+A navigation reply may point into a projected output or into an ordinary local file,
+such as a library declaration.
+
+A known projected output must map back to captured literate source. Wrapper text,
+inserted indentation, fragment markers, and other unmapped generated ranges yield no
+location. A valid ordinary local `file:` URI may remain a direct destination after
+its structure and range are checked. The mapper does not open that file or perform
+filesystem I/O to verify its contents.
+
+```mermaid
+flowchart TD
+    Reply[Server location] --> URI{Safe absolute local file URI?}
+    URI -->|No| Omit[Omit location]
+    URI -->|Yes| Known{Known projected output?}
+    Known -->|Yes| Mapped{Range intersects captured literal source?}
+    Mapped -->|Yes| Source[Return literate source location]
+    Mapped -->|No| Omit
+    Known -->|No| Local[Return validated local-file location]
+```
+
+The arrows show validation decisions. The direct local-file path is not a mapping
+fallback for known outputs: once a URI identifies a projected file, missing mapping
+evidence causes omission.
+
+Only absolute local file URIs without authorities, queries, fragments, encoded
+control characters, or path ambiguities are accepted. Location links must provide a
+valid enclosing target range; a preferred selection must itself be valid and remain
+inside that target.
+
+## Seams are handled without invented source
+
+A navigation range can cross several generated segments. Literate selects the first
+literal intersection in generated order and extends it only while generated and
+source offsets remain contiguous. It does not create one source range that encloses
+intervening prose, fragment declarations, or reference markers.
+
+The only allowed source gap is the carriage-return unit omitted when a source line
+ending is normalized. This special case preserves one logical newline without
+pretending that unrelated text is contiguous.
+
+Repeated locations are deduplicated, and reply traversal is bounded. A repeated
+fragment or repeated template slot may send several generated locations back to the
+same source interval; the editor presents that source location once. Distinct source
+occurrences that happen to contain equal text remain distinct.
+
+Read-only services can safely prefer omission because their purpose is guidance.
+The user loses one answer rather than being sent to a fabricated location or given
+an unsafe replacement. Diagnostics require broader, persistent ownership, so the
+next chapter adds time, caching, and the editor's Problems collection to the mapping
+problem.

@@ -1,0 +1,167 @@
+# Owning a language-server session
+
+A language server is an independent program. Once started, it has a process, open
+documents, pending requests, timers, input and output streams, and its own idea of
+the workspace. Treating it as a stateless function would hide the hardest part of
+the integration: deciding who owns all of that state and when it must stop being
+trusted.
+
+Literate owns the process directly. A session belongs to one local workspace folder
+and one canonical programming-language identity. It starts on demand, receives
+projected source through standard input and output, and remains alive for later
+requests. A JavaScript- or TypeScript-family session receives all projected outputs
+in that family so imports between them can be understood together. The session is
+still keyed by the selected canonical language; other language identities remain
+separate.
+
+The extension does not borrow another extension's private process, install a server,
+or discover an executable from project files. Executable configuration is read from
+global user settings. The command must be an absolute path, arguments must be plain
+strings, and the process is launched directly without a shell.
+
+## Starting a server is a trust decision
+
+A configured server is ordinary executable code with the access of the extension
+host. Projection protects generated files from being written, but it does not
+sandbox the server. The server can still read workspace files such as imported
+libraries and project configuration.
+
+For that reason Literate starts sessions only for trusted, local, file-backed
+workspace folders and open local `.literate` documents interpreted as Markdown.
+Remote extension hosts, non-file documents, and untrusted workspaces do not cross
+this boundary. The restriction is checked again around asynchronous work because
+trust, folder membership, and document state can change while a process is starting.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Absent
+    Absent --> Initializing: eligible request or background sync
+    Initializing --> Ready: handshake and capabilities accepted
+    Initializing --> Failed: startup or protocol failure
+    Ready --> Ready: synchronize and request
+    Ready --> Failed: transport or protocol failure
+    Ready --> Stopping: reset or disposal
+    Stopping --> Absent: process ended
+    Failed --> Absent: explicit reset
+```
+
+The arrows describe ownership transitions, not every protocol message. The key
+feature is the terminal `Failed` state. A broken session does not enter an automatic
+restart loop; it remains unavailable until configuration changes or the user asks
+Literate to restart its language servers.
+
+## The handshake establishes a shared language
+
+Initialization tells the server which workspace the session represents and which
+client capabilities Literate is prepared to honor. Literate advertises a deliberately
+small surface: document synchronization, hover, completion, signature help,
+navigation, diagnostics, and constrained code actions.
+
+The handshake also fixes the position encoding. Literate offers UTF-16 and rejects a
+server that explicitly chooses another encoding. This is a semantic requirement,
+not a preference: all projection ranges, editor positions, and protocol positions
+must count columns in the same units.
+
+Concurrent callers share one initialization attempt. They do not race to launch
+duplicate processes. A caller may cancel its own wait without cancelling the shared
+handshake needed by another operation.
+
+## Real URIs, virtual contents
+
+The server sees each projection at the `file:` URI where its generated output would
+normally live. This gives imports and project configuration realistic context. The
+text associated with that URI comes from the captured projection, however, whether
+or not a file exists there and whether or not a saved generated file is current.
+
+```mermaid
+sequenceDiagram
+    participant Editor
+    participant Owner as Literate session owner
+    participant Server as Language server
+    participant Disk
+
+    Editor->>Owner: Captured project snapshot
+    Owner->>Owner: Build projections in memory
+    Owner->>Server: Open or change intended output URIs
+    Server->>Disk: Read physical imports and project configuration as needed
+    Owner->>Server: Request at a projected position
+    Server-->>Owner: Reply in generated-file coordinates
+    Owner-->>Editor: Validated mapped result
+```
+
+The server-to-disk arrow is important: the configured process remains a trusted
+workspace program. The absence of an owner-to-disk generation arrow is equally
+important. Synchronizing projected documents does not save source and does not
+materialize generated outputs.
+
+## Synchronization is a complete document-set decision
+
+The session owner supplies the complete current set of projected documents for that
+language. New documents are opened, changed documents are updated, removed documents
+are closed, and unchanged text sends no notification. A change of language identity
+closes and reopens the URI rather than pretending that only its text changed.
+
+Each changed URI receives a monotonically increasing wire revision. Reopening a URI
+does not reuse an earlier number. This makes later diagnostics correlatable with the
+specific text the server saw.
+
+Projected documents require a server that supports opening and closing documents
+and accepts full document text. If a server advertises incremental changes, Literate
+still sends one replacement covering the complete previous text. The replacement
+range is measured in UTF-16, including the correct width of the final line. This
+keeps synchronization simple while remaining valid for both full-text and
+incremental servers.
+
+The whole document set is validated before notifications are sent. Duplicate URIs,
+unsupported synchronization, excessive document counts, or excessive serialized
+input fail explicitly. They do not leave a silently truncated project context.
+
+## The protocol is an untrusted byte stream
+
+Language Server Protocol messages are JSON values framed by byte lengths. A character
+count cannot safely stand in for a byte count because UTF-8 uses different numbers
+of bytes for different characters. Literate therefore parses headers and bodies as
+bytes, validates the declared length, decodes complete bodies strictly, and only
+then examines JSON.
+
+Incoming headers, message bodies, queued output, pending requests, listeners, and
+the synchronized document set all have fixed limits. Requests have deadlines.
+Initialization has its own longer deadline. These bounds prevent a stalled or
+hostile process from retaining unlimited memory or keeping an editor operation alive
+forever.
+
+Cancellation has two stages. If work is cancelled before a request is sent, no
+protocol request is created. If it is already on the wire, the local promise is
+rejected and one cancellation notification is sent to the server. A response that
+arrives later no longer owns a pending request and cannot revive the cancelled work.
+
+## Server requests are answered narrowly
+
+A language server can send requests back to its client. Literate answers only the
+small set needed by this integration: configured settings, the owning workspace
+folder, and diagnostic refresh. A request asking the client to apply a workspace
+edit is refused. Unknown methods receive an unsupported-method response rather than
+being interpreted dynamically.
+
+This is part of the read boundary. The transport carries server data, but it does
+not turn arbitrary server messages into editor commands, filesystem operations, or
+new protocol registrations. Responses are still validated by the feature adapter
+before they become editor objects.
+
+## Failure has one cleanup path
+
+Malformed framing, invalid protocol envelopes, a closed stream, process exit, or an
+unrecoverable write failure stops the session. Pending requests are rejected,
+document revisions and buffered input are cleared, listeners are released, streams
+are destroyed, and the child process is terminated if necessary. Stop observers run
+once, after document state has been cleared.
+
+Normal disposal first offers the server a bounded cooperative shutdown, then sends
+its exit notification, and finally forces termination if the process does not end.
+Repeated disposal calls share the same shutdown rather than racing several cleanup
+sequences.
+
+Owning this lifecycle gives the rest of the editor a stable promise: a request uses
+one initialized process and one synchronized document set, or it produces no result.
+The next chapter follows the safe, read-only answers that can cross back from that
+session into a literate document.

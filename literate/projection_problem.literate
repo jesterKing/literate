@@ -1,0 +1,172 @@
+# The projection problem
+
+A literate-program author edits pieces of code inside an explanation. A programming-
+language tool expects complete source files. Both views are legitimate, but they do
+not have the same shape.
+
+A fragment may be defined far from the output that uses it. One fragment may be
+inserted several times. A reference may add indentation. A source template may wrap
+the assembled program in text that does not appear in any fragment. If a language
+server reports that a name occupies a certain range in the assembled file, the
+editor must decide whether that range corresponds to text the author can actually
+see and edit.
+
+Literate solves this with a **projection**: an in-memory assembled source file plus
+records that connect unchanged pieces of that file to their exact origins in the
+book. A projection is not an approximate preview and not a saved generated file. It
+uses the same fragment order, expansion rules, escaping, templates, and validation
+policy as generation, while retaining provenance that ordinary generated source
+would lose.
+
+```mermaid
+flowchart TD
+    Snapshot[Captured literate project] --> Validate[Validate the complete fragment graph]
+    Validate --> Expand[Assemble every source output in memory]
+    Expand --> Wrap[Apply source templates]
+    Wrap --> Projection[Projected files and literal mappings]
+    Projection --> Server[Language server]
+    Server --> Reply[Generated-file ranges]
+    Reply --> Map[Map safe ranges back to the book]
+```
+
+The downward arrows show a request moving from the book toward the language server;
+the final arrows show a reply returning through the same captured projection. The
+diagram omits editor scheduling and protocol details. Its important point is that
+mapping is not a later search through similar text. It is evidence collected while
+the source is assembled.
+
+## Projection must agree with generation
+
+A language server is useful only if it sees the program that generation would
+produce from the same snapshot. Literate therefore projects all source outputs as
+one atomic operation. A missing fragment, cycle, invalid reference operator, missing
+template, destination conflict, or exceeded expansion bound prevents every projected
+file from being returned.
+
+Validation includes fragment families that no output currently reaches. This may
+seem stricter than a request at one cursor needs, but it preserves one project
+meaning. Interactive language service must not quietly accept a graph that normal
+generation rejects.
+
+Projection also bounds intermediate work. Repeated references can make a small graph
+expand into a very large amount of text, and a template can contain the code slot
+more than once. Literate counts copied text, mapping segments, and nesting while it
+works. Crossing a limit reports failure rather than returning a partial projection.
+A partial file could look plausible to a server while representing no valid program.
+
+## A mapping records unchanged literal text
+
+Each mapping joins one contiguous source interval to one equal-length generated
+interval. If a source interval begins at `s` and its generated occurrence begins at
+`g`, a position `p` inside that interval maps to
+`g + (p - s)`. The subtraction measures how far the position lies from the start of
+the source interval; adding the same distance to `g` finds the corresponding place
+in generated text.
+
+That simple arithmetic is trustworthy only for text copied without alteration.
+Literate consequently leaves several kinds of text unmapped:
+
+- prose and Markdown structure;
+- fence headers and fragment reference markers;
+- indentation inserted at a reference site;
+- a slash removed while interpreting an escaped fragment opener;
+- source-template text surrounding a code slot;
+- any synthetic spacing created while Markdown interprets a container or tab.
+
+The policy is deliberately conservative. An unmapped character does not mean that
+the character is unimportant to the generated program. It means that Literate
+cannot point to an equal, directly editable character in the captured source.
+
+```mermaid
+flowchart LR
+    A[Literal source text] -->|equal text| B[Mapped generated segment]
+    C[Reference marker] -->|expands to other text| D[No mapping]
+    E[Inserted indentation] -->|created during assembly| F[No mapping]
+    G[Template wrapper] -->|not fragment source| H[No mapping]
+```
+
+These arrows classify provenance, not control flow. The diagram intentionally omits
+line and offset arithmetic. What matters is the safety rule: only unchanged literal
+text receives a reversible connection.
+
+## Lines are not as simple as they look
+
+Markdown presents fence contents in a normalized form, while the editor still works
+with the original document. A source may use a line feed, a carriage return followed
+by a line feed, or a carriage return alone. Projected files normalize line endings,
+but mappings retain offsets into the original text.
+
+Literate handles literal content line by line. Newline pieces receive their own
+mapping evidence, so a two-unit source line ending is never misrepresented as a
+one-unit equal-length range. Empty lines and the end of an unfinished fence may
+retain zero-width cursor anchors. Those anchors allow insertion at a real source
+position without pretending that an absent character was copied.
+
+Markdown containers create another subtle case. A quotation or list may consume
+some leading indentation, including part of a tab. Literate maps only the unchanged
+suffix that still appears literally in both representations. It does not map
+virtual spaces invented by Markdown normalization.
+
+## UTF-16 is a coordinate agreement
+
+People often describe a position as a line and a character. Tools still need to
+agree on what “character” means. JavaScript strings, VS Code, and the configured
+language-server connection use UTF-16 code units. Literate therefore measures both
+absolute offsets and line columns in UTF-16.
+
+Most familiar characters occupy one code unit. Some symbols, including many emoji,
+occupy two. In the text `😀name`, the `n` begins at UTF-16 column two even though a
+reader sees one symbol before it. Counting visible symbols or Unicode code points
+would move every later range on that line to the wrong place.
+
+UTF-16 is not claimed to be the best measure of what a person sees. It is the shared
+coordinate system at this boundary. A server that selects another position encoding
+cannot safely participate, because a numerically valid range could identify the
+wrong source text.
+
+## One source interval may have several occurrences
+
+A fragment reference can insert the same source text more than once. A template can
+also contain several code slots. Each insertion receives a distinct mapping object,
+even when the source interval and generated bytes are identical.
+
+A request beginning in literate source chooses the first matching occurrence in
+deterministic output and expansion order. That exact occurrence then travels with
+the request. A returning range is accepted only if it lies inside the same mapping
+object in the same projected file. Equal text elsewhere is not enough, and a newly
+constructed copy of the mapping record is not treated as the original occurrence.
+
+```mermaid
+flowchart TD
+    Source[One source interval] --> First[First generated occurrence]
+    Source --> Second[Second generated occurrence]
+    Cursor[Cursor in source] --> First
+    First --> Reply[Reply bound to first occurrence]
+    Reply --> Check{Still inside that occurrence?}
+    Check -->|Yes| SourceRange[Return the source range]
+    Check -->|No| Omit[Return no mapped range]
+```
+
+The arrows from the source show reuse; the cursor arrow shows deterministic request
+selection. This model is sufficient for services that only observe code: duplicate
+answers can be deduplicated, and an unsafe range can be omitted. A proposed edit is
+more dangerous because changing one source interval affects its other expansions.
+That stricter boundary is the subject of Chapter 22.
+
+## Seams stop reverse mapping
+
+A server range may cross from literal text into inserted indentation, through a
+fragment boundary, or into a template wrapper. Literate does not widen the range to
+nearby source and does not search for matching words. Reverse mapping through one
+request occurrence succeeds only inside that occurrence's literal segment.
+
+Some read-only results can still keep their useful content when an optional range is
+unsafe. Diagnostics follow a different rule: a large generated range may be split
+into its separate mapped intersections, so each highlighted source range remains
+honest. Navigation normally selects one deterministic contiguous source sequence.
+The following chapters explain these policies in their own contexts.
+
+A projection therefore carries two products together: complete source for the
+language server and limited proof about where that source came from. The next
+chapter adds the long-lived process that consumes those projected files without
+requiring them to be written to disk.
