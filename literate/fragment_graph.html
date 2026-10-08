@@ -187,7 +187,28 @@ stateDiagram-v2
     Invalid --&gt; [*]
     Complete --&gt; [*]
 </pre>
-<h2>Bounds protect the explanation and the machine</h2>
+<p><code>engine resolve suspended dependency</code> distinguishes the four possible states of an
+edge.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0065006e00670069006e00650020007200650073006f006c00760065002000730075007300700065006e00640065006400200064006500700065006e00640065006e00630079-006c0069007400650072006100740065002f0066007200610067006d0065006e0074005f00670072006100700068002e006c0069007400650072006100740065-1"><span id="f-0065006e00670069006e00650020007200650073006f006c00760065002000730075007300700065006e00640065006400200064006500700065006e00640065006e00630079"></span><a class="literate-tag-name" href="#f-0065006e00670069006e00650020007200650073006f006c00760065002000730075007300700065006e00640065006400200064006500700065006e00640065006e00630079" data-literate-target="f-0065006e00670069006e00650020007200650073006f006c00760065002000730075007300700065006e00640065006400200064006500700065006e00640065006e00630079" aria-label="Definition of engine resolve suspended dependency">&lt;&lt;engine resolve suspended dependency&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> { name, modifier, at } = frame.<span class="hljs-property">step</span>.<span class="hljs-property">value</span>;
+<span class="hljs-keyword">if</span> (modifier) { <span class="hljs-title">report</span>(at, <span class="hljs-string">`Invalid definition operator on reference: </span><span class="hljs-subst">${name}</span><span class="hljs-string">`</span>); }
+<span class="hljs-keyword">if</span> (expanded.<span class="hljs-title">has</span>(name)) {
+    frame.<span class="hljs-property">step</span> = frame.<span class="hljs-property">expansion</span>.<span class="hljs-title">next</span>(expanded.<span class="hljs-title">get</span>(name)!);
+} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (!fragments.<span class="hljs-title">has</span>(name)) {
+    <span class="hljs-title">report</span>(at, <span class="hljs-string">`Missing fragment: </span><span class="hljs-subst">${name}</span><span class="hljs-string">`</span>, <span class="hljs-string">'missing-fragment'</span>);
+    frame.<span class="hljs-property">step</span> = frame.<span class="hljs-property">expansion</span>.<span class="hljs-title">next</span>(<span class="hljs-string">''</span>);
+} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (active.<span class="hljs-title">has</span>(name)) {
+    <span class="hljs-title">report</span>(at, <span class="hljs-string">`Fragment cycle: </span><span class="hljs-subst">${frames.map(value =&gt; value.name).concat(name).join(</span><span class="hljs-string">' -&gt; '</span><span class="hljs-subst">)}</span><span class="hljs-string">`</span>);
+    frame.<span class="hljs-property">step</span> = frame.<span class="hljs-property">expansion</span>.<span class="hljs-title">next</span>(<span class="hljs-string">''</span>);
+} <span class="hljs-keyword">else</span> {
+    <span class="hljs-title">push</span>(name);
+}
+</code></pre>
+
+</div>
+</div><h2>Bounds protect the explanation and the machine</h2>
 <p>A valid graph can still be impractically deep or expansive. Literate places limits
 on nesting, fragment segments, and intermediate text. Crossing a limit rejects the
 plan rather than truncating the program.</p>

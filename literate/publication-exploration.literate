@@ -339,25 +339,7 @@ The plan rejects unavailable families, cycles, excessive depth and exhausted
 panel capacity before traversing contributions. It returns either a complete
 bounded plan or a refusal; no partial code view is accepted.
 
-```js : <<exploration browser plan>>=
-function plan(control) {
-    const { model, target, path, context } = control;
-    const family = own(model.families, target);
-    if (model.unavailable) { return { reason: 'Exploration data is unavailable.' }; }
-    if (!identifier(target) || !record(family) || typeof family.name !== 'string' || family.name.length > 1024 || !Array.isArray(family.parts)) {
-        return { reason: 'Fragment is unavailable in this snapshot.' };
-    }
-    if (path.includes(target)) { return { reason: 'Cycle: this fragment is already open on this path.' }; }
-    if (path.length >= limits.layers) { return { reason: 'Exploration is limited to eight layers.' }; }
-    if (panels.size >= limits.panels) { return { reason: 'Exploration panel limit reached; collapse a panel first.' }; }
-    const failure = { reason: 'Exploration DOM budget or contribution limit reached. No code was truncated.' };
-    if (family.parts.length > limits.parts) { return failure; }
-    const parts = [], seen = new Set();
-    let cost = 512 + escapedCost(family.name), count = 0;
-    <<exploration browser plan parts>>
-    return cost + usedBytes <= limits.bytes ? { name: family.name, parts, cost } : failure;
-}
-```
+Panel planning is presented in [Exploring the fragment graph](exploring_fragment_graph.html).
 
 Contribution IDs must be valid and unique. The traversal bounds the total
 segment count and reserves per-part overhead, checking the shared byte budget

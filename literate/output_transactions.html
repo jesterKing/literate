@@ -533,37 +533,8 @@ keep their signal handlers active during restoration and cleanup.</p>
 irreversible and cannot honestly be reported as a rolled-back transaction. No
 cancellation check runs after the commit point; a late signal cannot undo already
 published output or interrupt its cleanup.</p>
-<div class="codefragment">
-<div class="fragmentname" id="c-007400720061006e00730061006300740069006f006e00200063006f006d006d00690074-006c0069007400650072006100740065002f006f00750074007000750074005f007400720061006e00730061006300740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-007400720061006e00730061006300740069006f006e00200063006f006d006d00690074"></span><a class="literate-tag-name" href="#f-007400720061006e00730061006300740069006f006e00200063006f006d006d00690074" data-literate-target="f-007400720061006e00730061006300740069006f006e00200063006f006d006d00690074" aria-label="Definition of transaction commit">&lt;&lt;transaction commit&gt;&gt;=</a></div>
-<div class="code">
-<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">commitOutputs</span>(<span class="hljs-params">files: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> TransactionFile[], io: TransactionIO,
-    checkCancelled?: </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">string</span>[]&gt; {
-    <span class="hljs-keyword">const</span> state = <span class="hljs-keyword">await</span> <span class="hljs-title">preflight</span>(files, io, checkCancelled);
-    <span class="hljs-keyword">try</span> {
-        <span class="hljs-keyword">await</span> <span class="hljs-title">prepareOutputs</span>(state, io);
-        checkCancelled?.();
-        <span class="hljs-keyword">await</span> <span class="hljs-title">installOutputs</span>(state, io);
-        checkCancelled?.();
-    } <span class="hljs-keyword">catch</span> (error) {
-        <span class="hljs-keyword">let</span> failures = <span class="hljs-keyword">await</span> <span class="hljs-title">rollbackOutputs</span>(state, io);
-        <span class="hljs-keyword">if</span> (!failures.<span class="hljs-property">length</span>) { failures = <span class="hljs-keyword">await</span> <span class="hljs-title">cleanupTransaction</span>(state, io, <span class="hljs-literal">true</span>); }
-        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">OutputTransactionError</span>(failures.<span class="hljs-property">length</span> ? <span class="hljs-string">'rollback_failed'</span> : <span class="hljs-string">'rolled_back'</span>, <span class="hljs-literal">false</span>,
-            [...<span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>([state.<span class="hljs-property">active</span>, ...failures.<span class="hljs-title">map</span>(<span class="hljs-params">failure</span><span class="hljs-function"> =&gt;</span> failure.<span class="hljs-property">path</span>)])],
-            failures.<span class="hljs-property">length</span> ? [...state.<span class="hljs-property">owned</span>, ...state.<span class="hljs-property">parents</span>] : [], error,
-            failures.<span class="hljs-title">map</span>(<span class="hljs-params">failure</span><span class="hljs-function"> =&gt;</span> <span class="hljs-string">`</span><span class="hljs-subst">${failure.path}</span><span class="hljs-string">: </span><span class="hljs-subst">${</span><span class="hljs-built_in">String</span><span class="hljs-subst">(failure.error)}</span><span class="hljs-string">`</span>));
-    }
-    <span class="hljs-keyword">const</span> failures = <span class="hljs-keyword">await</span> <span class="hljs-title">cleanupTransaction</span>(state, io, <span class="hljs-literal">false</span>);
-    <span class="hljs-keyword">if</span> (failures.<span class="hljs-property">length</span>) {
-        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">OutputTransactionError</span>(<span class="hljs-string">'cleanup_failed'</span>, <span class="hljs-literal">true</span>, failures.<span class="hljs-title">map</span>(<span class="hljs-params">failure</span><span class="hljs-function"> =&gt;</span> failure.<span class="hljs-property">path</span>),
-            state.<span class="hljs-property">owned</span>, failures[<span class="hljs-number">0</span>].<span class="hljs-property">error</span>, failures.<span class="hljs-title">map</span>(<span class="hljs-params">failure</span><span class="hljs-function"> =&gt;</span> <span class="hljs-string">`</span><span class="hljs-subst">${failure.path}</span><span class="hljs-string">: </span><span class="hljs-subst">${</span><span class="hljs-built_in">String</span><span class="hljs-subst">(failure.error)}</span><span class="hljs-string">`</span>),
-            state.<span class="hljs-property">outputs</span>.<span class="hljs-title">map</span>(<span class="hljs-params">output</span><span class="hljs-function"> =&gt;</span> output.<span class="hljs-property">path</span>));
-    }
-    <span class="hljs-keyword">return</span> state.<span class="hljs-property">outputs</span>.<span class="hljs-title">map</span>(<span class="hljs-params">output</span><span class="hljs-function"> =&gt;</span> output.<span class="hljs-property">path</span>);
-}
-</code></pre>
-
+<p>The transaction coordinator is presented in <a href="changing_files_safely.html">Changing files safely</a>.</p>
 </div>
-</div></div>
 <script type="module">
   import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
   mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});

@@ -154,6 +154,17 @@ Temporary material is removed on success and failure. Cleanup is part of the
 verification result: a verifier that leaves unexplained executable material behind
 has not completed all of its promised work.
 
+`self-host compare output set` states fixed-point equality directly.
+
+```typescript: <<self-host compare output set>>=
+for (const file of files) {
+    if (!actual.has(file.path)) { throw new Error(`Missing regenerated output: ${file.path}`); }
+    if (actual.get(file.path) !== file.content) { throw new Error(`Regenerated content mismatch: ${file.path}`); }
+    actual.delete(file.path);
+}
+if (actual.size) { throw new Error(`Unexpected regenerated output: ${[...actual.keys()].sort()[0]}`); }
+```
+
 ## What the fixed point proves
 
 A successful check provides strong, specific evidence:

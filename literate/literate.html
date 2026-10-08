@@ -1808,7 +1808,7 @@ fences proceed to the delegation and fragment-decoration path.</p>
       <span class="hljs-keyword">const</span> line = token.<span class="hljs-property">map</span> ? <span class="hljs-string">` data-line=&quot;</span><span class="hljs-subst">${token.map[</span><span class="hljs-number">0</span><span class="hljs-subst">]}</span><span class="hljs-string">&quot;`</span> : <span class="hljs-string">''</span>;
       <span class="hljs-keyword">return</span> <span class="hljs-string">`&lt;pre class=&quot;literate-mermaid source-line&quot;</span><span class="hljs-subst">${line}</span><span class="hljs-string">&gt;</span><span class="hljs-subst">${md.utils.escapeHtml(token.content)}</span><span class="hljs-string">&lt;/pre&gt;</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>;
     }
-    <span data-literate-explore="f-00640065006c0065006700610074006500200070007200650076006900650077002000660065006e006300650073"><a class="literate-tag-name" href="#f-00640065006c0065006700610074006500200070007200650076006900650077002000660065006e006300650073" data-literate-target="f-00640065006c0065006700610074006500200070007200650076006900650077002000660065006e006300650073" aria-label="Definition of delegate preview fences">&lt;&lt;delegate preview fences&gt;&gt;</a></span>
+    <span data-literate-explore="f-00640065006c0065006700610074006500200070007200650076006900650077002000660065006e006300650073"><a class="literate-tag-name" href="./previewing_the_explanation.html#f-00640065006c0065006700610074006500200070007200650076006900650077002000660065006e006300650073" data-literate-target="f-00640065006c0065006700610074006500200070007200650076006900650077002000660065006e006300650073" aria-label="Definition of delegate preview fences">&lt;&lt;delegate preview fences&gt;&gt;</a></span>
   };
 }
 </code></pre>
@@ -1819,37 +1819,8 @@ fences proceed to the delegation and fragment-decoration path.</p>
 opening delimiters (<code>\&lt;&lt;</code>) on a shallow token copy, leaving parser state intact.
 A named Mermaid fragment is code, not a diagram: its fallback bypasses both
 third-party fence rules and highlighters that might otherwise render Mermaid.</p>
-<div class="codefragment">
-<div class="fragmentname" id="c-00640065006c0065006700610074006500200070007200650076006900650077002000660065006e006300650073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-1"><span id="f-00640065006c0065006700610074006500200070007200650076006900650077002000660065006e006300650073"></span><a class="literate-tag-name" href="#f-00640065006c0065006700610074006500200070007200650076006900650077002000660065006e006300650073" data-literate-target="f-00640065006c0065006700610074006500200070007200650076006900650077002000660065006e006300650073" aria-label="Definition of delegate preview fences">&lt;&lt;delegate preview fences&gt;&gt;=</a></div>
-<div class="code">
-<pre><code><span class="hljs-keyword">const</span> header = <span class="hljs-title">parseFragmentHeader</span>(token.<span class="hljs-property">info</span>);
-<span class="hljs-keyword">if</span> (!header) {
-  <span class="hljs-keyword">return</span> originalFence ? <span class="hljs-title">originalFence</span>(tokens, idx, options, env, slf)
-    : slf.<span class="hljs-title">renderToken</span>(tokens, idx, options);
-}
-<span class="hljs-keyword">const</span> previewToken = <span class="hljs-title">Object</span>.<span class="hljs-title">assign</span>(<span class="hljs-title">Object</span>.<span class="hljs-title">create</span>(<span class="hljs-title">Object</span>.<span class="hljs-title">getPrototypeOf</span>(token)), token);
-previewToken.<span class="hljs-property">content</span> = token.<span class="hljs-property">content</span>.<span class="hljs-title">replace</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\\</span><span class="hljs-regexp">&lt;&lt;/g</span>, <span class="hljs-string">'&lt;&lt;'</span>);
-previewToken.<span class="hljs-property">info</span> = header.<span class="hljs-property">language</span>;
-<span class="hljs-keyword">const</span> model = env.<span class="hljs-property">literatePublication</span> <span class="hljs-keyword">as</span> <span class="hljs-title">ReturnType</span>&lt;<span class="hljs-keyword">typeof</span> parseProject&gt;[<span class="hljs-string">'publication'</span>] | <span class="hljs-literal">undefined</span>;
-<span class="hljs-keyword">const</span> lookup = model &amp;&amp; <span class="hljs-title">screenIndex</span>(model);
-<span class="hljs-keyword">const</span> candidate = lookup?.<span class="hljs-property">lines</span>.<span class="hljs-title">get</span>(env.<span class="hljs-property">literatePath</span>)?.<span class="hljs-title">get</span>(token.<span class="hljs-property">map</span>?.[<span class="hljs-number">0</span>] ?? -<span class="hljs-number">1</span>);
-<span class="hljs-keyword">const</span> part = candidate &amp;&amp; candidate.<span class="hljs-property">content</span> === token.<span class="hljs-property">content</span>
-  &amp;&amp; candidate.<span class="hljs-property">kind</span> === (header.<span class="hljs-property">append</span> ? <span class="hljs-string">'append'</span> : <span class="hljs-string">'definition'</span>)
-  &amp;&amp; lookup?.<span class="hljs-property">families</span>.<span class="hljs-title">get</span>(candidate.<span class="hljs-property">fragmentTarget</span>)?.<span class="hljs-property">name</span> === header.<span class="hljs-property">name</span> &amp;&amp; candidate.<span class="hljs-property">language</span> === header.<span class="hljs-property">language</span>
-  &amp;&amp; env.<span class="hljs-property">literateTokens</span>?.[candidate.<span class="hljs-property">tokenIndex</span>]?.<span class="hljs-property">info</span> === token.<span class="hljs-property">info</span> ? candidate : <span class="hljs-literal">undefined</span>;
-<span class="hljs-keyword">const</span> semantic = part &amp;&amp; model ? <span class="hljs-title">renderScreenCode</span>(part, model, <span class="hljs-string">'preview'</span>, env.<span class="hljs-property">literateDestination</span>) : <span class="hljs-literal">undefined</span>;
-<span class="hljs-keyword">const</span> fenceOptions = semantic !== <span class="hljs-literal">undefined</span> ? { ...options, <span class="hljs-attr">highlight</span>: <span class="hljs-function">() =&gt;</span> semantic } : options;
-<span class="hljs-keyword">const</span> previewTokens = tokens.<span class="hljs-title">slice</span>();
-previewTokens[idx] = previewToken;
-<span class="hljs-keyword">const</span> rendered = header.<span class="hljs-property">language</span> === <span class="hljs-string">'mermaid'</span>
-  ? <span class="hljs-string">`&lt;pre&gt;&lt;code class=&quot;language-mermaid&quot;&gt;</span><span class="hljs-subst">${semantic ?? md.utils.escapeHtml(previewToken.content)}</span><span class="hljs-string">&lt;/code&gt;&lt;/pre&gt;</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>
-  : originalFence ? <span class="hljs-title">originalFence</span>(previewTokens, idx, fenceOptions, env, slf)
-    : <span class="hljs-string">`&lt;pre&gt;&lt;code&gt;</span><span class="hljs-subst">${semantic ?? md.utils.escapeHtml(previewToken.content)}</span><span class="hljs-string">&lt;/code&gt;&lt;/pre&gt;</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>;
-<span data-literate-explore="f-006400650063006f00720061007400650020007000720065007600690065007700200066007200610067006d0065006e00740073"><a class="literate-tag-name" href="#f-006400650063006f00720061007400650020007000720065007600690065007700200066007200610067006d0065006e00740073" data-literate-target="f-006400650063006f00720061007400650020007000720065007600690065007700200066007200610067006d0065006e00740073" aria-label="Definition of decorate preview fragments">&lt;&lt;decorate preview fragments&gt;&gt;</a></span>
-</code></pre>
-
-</div>
-</div><p>Fragment labels and output filenames are text, not HTML. Escape them before
+<p>Fence delegation is presented in <a href="previewing_the_explanation.html">Previewing the explanation</a>.</p>
+<p>Fragment labels and output filenames are text, not HTML. Escape them before
 wrapping the code. Accepted contributions use shared semantic links and syntax
 spans; stale or unaccepted tokens remain escaped code without invented targets.
 Matching includes the complete authored header, not just its name and language:

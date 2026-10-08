@@ -63,6 +63,31 @@ fragment family.
 A structural edit must therefore preserve either the relevant document order or
 the generated result. Deterministic checks make any unintended consequence visible.
 
+`engine document ordering` turns that policy into a stable rank.
+
+```ts : <<engine document ordering>>=
+/** Index first, then linked documents, then remaining paths sorted; preserves input objects. */
+export function orderSourceDocuments(documents: SourceDocument[]): SourceDocument[] {
+    const paths = new Map<string, number>();
+    for (const document of documents) {
+        const diagnostic = sourceNulDiagnostic(document);
+        if (diagnostic) { throw new Error(`${diagnostic.path}: ${diagnostic.message}`); }
+    }
+    const canonical = (document: SourceDocument): string => safeRelativePath(document.path) ?? document.path;
+    paths.set('index.literate', 0);
+    const index = documents.find(document => canonical(document) === 'index.literate');
+    if (index) {
+        <<engine index link ranks>>
+    }
+    return [...documents].sort((a, b) => {
+        const left = canonical(a), right = canonical(b);
+        const rank = (paths.get(left) ?? paths.size) - (paths.get(right) ?? paths.size);
+        return rank || (left < right ? -1 : left > right ? 1 : 0);
+    });
+}
+
+```
+
 ## Discover dependencies before loading them
 
 Templates are named by settings and output roots. An adapter needs those names

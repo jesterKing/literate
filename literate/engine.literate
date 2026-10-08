@@ -361,28 +361,7 @@ new array containing the original objects and preserves all input documents.
 Generation, rather than this helper, owns duplicate and invalid-path checks.
 The standalone helper throws an ordinary `Error` for NUL-containing source.
 
-```ts : <<engine document ordering>>=
-/** Index first, then linked documents, then remaining paths sorted; preserves input objects. */
-export function orderSourceDocuments(documents: SourceDocument[]): SourceDocument[] {
-    const paths = new Map<string, number>();
-    for (const document of documents) {
-        const diagnostic = sourceNulDiagnostic(document);
-        if (diagnostic) { throw new Error(`${diagnostic.path}: ${diagnostic.message}`); }
-    }
-    const canonical = (document: SourceDocument): string => safeRelativePath(document.path) ?? document.path;
-    paths.set('index.literate', 0);
-    const index = documents.find(document => canonical(document) === 'index.literate');
-    if (index) {
-        <<engine index link ranks>>
-    }
-    return [...documents].sort((a, b) => {
-        const left = canonical(a), right = canonical(b);
-        const rank = (paths.get(left) ?? paths.size) - (paths.get(right) ?? paths.size);
-        return rank || (left < right ? -1 : left > right ? 1 : 0);
-    });
-}
-
-```
+The ordering algorithm is presented in [The project snapshot](project_snapshot.html).
 
 Link encounter order assigns ranks without replacing an earlier rank. Decoding
 and normalization must succeed before a link can influence ordering; unrelated
@@ -1068,20 +1047,7 @@ exactly as before. Invalid path syntax never reaches the hook.
 
 The source-only collector uses this same reservation policy.
 
-```ts : <<engine generation collection policy reservation>>=
-reserve(path, location) {
-    const key = pathKey(path);
-    if (inputKeys.has(key)) { report(location, `Output collides with input: ${path}`); }
-    if (outputs.has(key)) { report(location, `Duplicate output path: ${path}`); }
-    for (const input of inputKeys) {
-        if (ancestorConflict(key, input)) { report(location, `Output/input ancestor conflict: ${path} and ${input}`); }
-    }
-    for (const output of outputs) {
-        if (ancestorConflict(key, output)) { report(location, `Output ancestor conflict: ${path} and ${output}`); }
-    }
-    outputs.add(key);
-}
-```
+Destination reservation is presented in [Planning a complete generation](complete_generation_plan.html).
 
 Generation consumes the shared result, then runs the unchanged expansion and
 emission phases. Its renderer uses the collector's Markdown-it instance and
@@ -1188,21 +1154,7 @@ or push a child. Missing names and active-path cycles resume the same generator
 so later occurrences still receive diagnostics. An operator is diagnosed before
 choosing any of those paths, preserving encounter order.
 
-```ts : <<engine resolve suspended dependency>>=
-const { name, modifier, at } = frame.step.value;
-if (modifier) { report(at, `Invalid definition operator on reference: ${name}`); }
-if (expanded.has(name)) {
-    frame.step = frame.expansion.next(expanded.get(name)!);
-} else if (!fragments.has(name)) {
-    report(at, `Missing fragment: ${name}`, 'missing-fragment');
-    frame.step = frame.expansion.next('');
-} else if (active.has(name)) {
-    report(at, `Fragment cycle: ${frames.map(value => value.name).concat(name).join(' -> ')}`);
-    frame.step = frame.expansion.next('');
-} else {
-    push(name);
-}
-```
+Dependency resolution is presented in [The fragment graph](fragment_graph.html).
 
 ### Emit sources and render documentation only after validation
 

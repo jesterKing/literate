@@ -140,6 +140,35 @@ Cancellation follows the same rule. Before commitment it can trigger rollback.
 After commitment it cannot promise to undo already published files, so no new
 cancellation checkpoint interrupts cleanup.
 
+`transaction commit` keeps the truthful outcome visible in one bounded routine.
+
+```typescript: <<transaction commit>>=
+export async function commitOutputs(files: readonly TransactionFile[], io: TransactionIO,
+    checkCancelled?: () => void): Promise<string[]> {
+    const state = await preflight(files, io, checkCancelled);
+    try {
+        await prepareOutputs(state, io);
+        checkCancelled?.();
+        await installOutputs(state, io);
+        checkCancelled?.();
+    } catch (error) {
+        let failures = await rollbackOutputs(state, io);
+        if (!failures.length) { failures = await cleanupTransaction(state, io, true); }
+        throw new OutputTransactionError(failures.length ? 'rollback_failed' : 'rolled_back', false,
+            [...new Set([state.active, ...failures.map(failure => failure.path)])],
+            failures.length ? [...state.owned, ...state.parents] : [], error,
+            failures.map(failure => `${failure.path}: ${String(failure.error)}`));
+    }
+    const failures = await cleanupTransaction(state, io, false);
+    if (failures.length) {
+        throw new OutputTransactionError('cleanup_failed', true, failures.map(failure => failure.path),
+            state.owned, failures[0].error, failures.map(failure => `${failure.path}: ${String(failure.error)}`),
+            state.outputs.map(output => output.path));
+    }
+    return state.outputs.map(output => output.path);
+}
+```
+
 ## Rollback reasons from observed state
 
 When preparation or installation fails, rollback visits changed outputs in reverse

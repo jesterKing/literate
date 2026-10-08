@@ -221,29 +221,8 @@ references. Filename and settings text are never scanned. The opening marker
 anchors header positions even when a language or filename repeats the name.
 Body mapping matches engine inspection: Markdown removes prefixes and may expand
 part of a tab, but the suffix beginning at a tag remains unchanged.</p>
-<div class="codefragment">
-<div class="fragmentname" id="c-00730079006d0062006f006c002000660065006e0063006500200063006f006c006c0065006300740069006f006e-006c0069007400650072006100740065002f00730079006d0062006f006c0073002e006c0069007400650072006100740065-1"><span id="f-00730079006d0062006f006c002000660065006e0063006500200063006f006c006c0065006300740069006f006e"></span><a class="literate-tag-name" href="#f-00730079006d0062006f006c002000660065006e0063006500200063006f006c006c0065006300740069006f006e" data-literate-target="f-00730079006d0062006f006c002000660065006e0063006500200063006f006c006c0065006300740069006f006e" aria-label="Definition of symbol fence collection">&lt;&lt;symbol fence collection&gt;&gt;=</a></div>
-<div class="code">
-<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">fenceOccurrences</span>(<span class="hljs-params">token: Token, path: </span><span class="hljs-built_in">string</span><span class="hljs-params">, lines: </span><span class="hljs-built_in">string</span><span class="hljs-params">[]</span>): <span class="hljs-title">FragmentOccurrence</span>[] {
-    <span class="hljs-keyword">const</span> header = <span class="hljs-title">parseFragmentHeader</span>(token.<span class="hljs-property">info</span>);
-    <span class="hljs-keyword">if</span> (!header || !token.<span class="hljs-property">map</span>) { <span class="hljs-keyword">return</span> []; }
-    <span class="hljs-keyword">const</span> line = token.<span class="hljs-property">map</span>[<span class="hljs-number">0</span>];
-    <span class="hljs-keyword">const</span> infoStart = lines[line].<span class="hljs-title">indexOf</span>(token.<span class="hljs-property">markup</span>) + token.<span class="hljs-property">markup</span>.<span class="hljs-property">length</span>;
-    <span class="hljs-keyword">const</span> tag = { <span class="hljs-attr">name</span>: header.<span class="hljs-property">name</span>, <span class="hljs-attr">start</span>: header.<span class="hljs-property">tagStart</span>, <span class="hljs-attr">end</span>: header.<span class="hljs-property">tagEnd</span> };
-    <span class="hljs-keyword">const</span> result = [<span class="hljs-title">occurrence</span>(tag, path, line, infoStart, header.<span class="hljs-property">append</span> ? <span class="hljs-string">'append'</span> : <span class="hljs-string">'definition'</span>)];
-    token.<span class="hljs-property">content</span>.<span class="hljs-title">split</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>).<span class="hljs-title">forEach</span>(<span class="hljs-function">(</span><span class="hljs-params">body, index</span><span class="hljs-function">) =&gt;</span> {
-        <span class="hljs-keyword">const</span> sourceLine = line + <span class="hljs-number">1</span> + index;
-        <span class="hljs-keyword">const</span> offset = (lines[sourceLine] || <span class="hljs-string">''</span>).<span class="hljs-property">length</span> - body.<span class="hljs-property">length</span>;
-        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> reference <span class="hljs-keyword">of</span> <span class="hljs-title">scanFragmentTags</span>(body)) {
-            result.<span class="hljs-title">push</span>(<span class="hljs-title">occurrence</span>(reference, path, sourceLine, offset, <span class="hljs-string">'reference'</span>));
-        }
-    });
-    <span class="hljs-keyword">return</span> result;
-}
-</code></pre>
-
-</div>
-</div><h2>Prose mentions use inline parsing, not rendered text</h2>
+<p>Fence symbol collection is presented in <a href="fragments_as_editor_symbols.html">Fragments as editor symbols</a>.</p>
+<h2>Prose mentions use inline parsing, not rendered text</h2>
 <p>A small inline rule records source offsets before Markdown decoding. Default
 escape handling consumes escaped openers before this rule sees them. Markdown's
 link parser skips destinations and titles, but parses labels normally. Bare
@@ -513,25 +492,8 @@ separators. Recollect the preview and require the entire ordered occurrence
 sequence to survive, including unrelated symbols. Only the old name may change;
 paths, lines and kinds must match. Columns may shift as names grow or shrink.
 This is a syntax-preservation check, not a blanket punctuation ban.</p>
-<div class="codefragment">
-<div class="fragmentname" id="c-00730079006d0062006f006c002000720065006e0061006d00650020007300610066006500740079-006c0069007400650072006100740065002f00730079006d0062006f006c0073002e006c0069007400650072006100740065-1"><span id="f-00730079006d0062006f006c002000720065006e0061006d00650020007300610066006500740079"></span><a class="literate-tag-name" href="#f-00730079006d0062006f006c002000720065006e0061006d00650020007300610066006500740079" data-literate-target="f-00730079006d0062006f006c002000720065006e0061006d00650020007300610066006500740079" aria-label="Definition of symbol rename safety">&lt;&lt;symbol rename safety&gt;&gt;=</a></div>
-<div class="code">
-<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">validateRenameSyntax</span>(<span class="hljs-params">documents: SourceDocument[], edits: FragmentRenameEdit[],
-    occurrences: FragmentOccurrence[], oldName: </span><span class="hljs-built_in">string</span><span class="hljs-params">, newName: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span> {
-    <span class="hljs-keyword">const</span> actual = <span class="hljs-title">collectFragmentOccurrences</span>(<span class="hljs-title">previewRename</span>(documents, edits));
-    <span class="hljs-keyword">const</span> unchanged = actual.<span class="hljs-property">length</span> === occurrences.<span class="hljs-property">length</span> &amp;&amp; occurrences.<span class="hljs-title">every</span>(<span class="hljs-function">(</span><span class="hljs-params">before, index</span><span class="hljs-function">) =&gt;</span> {
-        <span class="hljs-keyword">const</span> after = actual[index];
-        <span class="hljs-keyword">return</span> after.<span class="hljs-property">path</span> === before.<span class="hljs-property">path</span> &amp;&amp; after.<span class="hljs-property">line</span> === before.<span class="hljs-property">line</span> &amp;&amp; after.<span class="hljs-property">kind</span> === before.<span class="hljs-property">kind</span> &amp;&amp;
-            after.<span class="hljs-property">name</span> === (before.<span class="hljs-property">name</span> === oldName ? newName : before.<span class="hljs-property">name</span>);
-    });
-    <span class="hljs-keyword">if</span> (!unchanged) {
-        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Unsafe fragment rename: Markdown syntax changes the fragment occurrence sequence'</span>);
-    }
-}
-</code></pre>
-
-</div>
-</div><p>A no-op still validates documents, names and the unique base definition. Edits
+<p>Rename safety is presented in <a href="fragments_as_editor_symbols.html">Fragments as editor symbols</a>.</p>
+<p>A no-op still validates documents, names and the unique base definition. Edits
 are returned in source order for adapters to apply atomically (or in reverse
 position order when manipulating strings). No replacement-string evaluation is
 performed: <code>newText</code> is always the literal requested name.</p>

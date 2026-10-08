@@ -80,6 +80,25 @@ stateDiagram-v2
     Complete --> [*]
 ```
 
+`engine resolve suspended dependency` distinguishes the four possible states of an
+edge.
+
+```ts : <<engine resolve suspended dependency>>=
+const { name, modifier, at } = frame.step.value;
+if (modifier) { report(at, `Invalid definition operator on reference: ${name}`); }
+if (expanded.has(name)) {
+    frame.step = frame.expansion.next(expanded.get(name)!);
+} else if (!fragments.has(name)) {
+    report(at, `Missing fragment: ${name}`, 'missing-fragment');
+    frame.step = frame.expansion.next('');
+} else if (active.has(name)) {
+    report(at, `Fragment cycle: ${frames.map(value => value.name).concat(name).join(' -> ')}`);
+    frame.step = frame.expansion.next('');
+} else {
+    push(name);
+}
+```
+
 ## Bounds protect the explanation and the machine
 
 A valid graph can still be impractically deep or expansive. Literate places limits

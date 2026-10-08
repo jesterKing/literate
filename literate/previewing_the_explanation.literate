@@ -91,6 +91,36 @@ fence is a book diagram. This distinction prevents an implementation contributio
 from being executed as preview markup merely because its generated language happens
 to name the diagram syntax.
 
+`delegate preview fences` preserves the host renderer and decorates only an exact
+current contribution.
+
+```ts : <<delegate preview fences>>=
+const header = parseFragmentHeader(token.info);
+if (!header) {
+  return originalFence ? originalFence(tokens, idx, options, env, slf)
+    : slf.renderToken(tokens, idx, options);
+}
+const previewToken = Object.assign(Object.create(Object.getPrototypeOf(token)), token);
+previewToken.content = token.content.replace(/\\\<</g, '\<<');
+previewToken.info = header.language;
+const model = env.literatePublication as ReturnType<typeof parseProject>['publication'] | undefined;
+const lookup = model && screenIndex(model);
+const candidate = lookup?.lines.get(env.literatePath)?.get(token.map?.[0] ?? -1);
+const part = candidate && candidate.content === token.content
+  && candidate.kind === (header.append ? 'append' : 'definition')
+  && lookup?.families.get(candidate.fragmentTarget)?.name === header.name && candidate.language === header.language
+  && env.literateTokens?.[candidate.tokenIndex]?.info === token.info ? candidate : undefined;
+const semantic = part && model ? renderScreenCode(part, model, 'preview', env.literateDestination) : undefined;
+const fenceOptions = semantic !== undefined ? { ...options, highlight: () => semantic } : options;
+const previewTokens = tokens.slice();
+previewTokens[idx] = previewToken;
+const rendered = header.language === 'mermaid'
+  ? `<pre><code class="language-mermaid">${semantic ?? md.utils.escapeHtml(previewToken.content)}</code></pre>\n`
+  : originalFence ? originalFence(previewTokens, idx, fenceOptions, env, slf)
+    : `<pre><code>${semantic ?? md.utils.escapeHtml(previewToken.content)}</code></pre>\n`;
+<<decorate preview fragments>>
+```
+
 ## Screen rendering is shared across preview and publication
 
 The preview does not rediscover fragment references by scanning rendered HTML. The

@@ -100,24 +100,7 @@ anchors header positions even when a language or filename repeats the name.
 Body mapping matches engine inspection: Markdown removes prefixes and may expand
 part of a tab, but the suffix beginning at a tag remains unchanged.
 
-```ts : <<symbol fence collection>>=
-function fenceOccurrences(token: Token, path: string, lines: string[]): FragmentOccurrence[] {
-    const header = parseFragmentHeader(token.info);
-    if (!header || !token.map) { return []; }
-    const line = token.map[0];
-    const infoStart = lines[line].indexOf(token.markup) + token.markup.length;
-    const tag = { name: header.name, start: header.tagStart, end: header.tagEnd };
-    const result = [occurrence(tag, path, line, infoStart, header.append ? 'append' : 'definition')];
-    token.content.split('\n').forEach((body, index) => {
-        const sourceLine = line + 1 + index;
-        const offset = (lines[sourceLine] || '').length - body.length;
-        for (const reference of scanFragmentTags(body)) {
-            result.push(occurrence(reference, path, sourceLine, offset, 'reference'));
-        }
-    });
-    return result;
-}
-```
+Fence symbol collection is presented in [Fragments as editor symbols](fragments_as_editor_symbols.html).
 
 ## Prose mentions use inline parsing, not rendered text
 
@@ -372,20 +355,7 @@ sequence to survive, including unrelated symbols. Only the old name may change;
 paths, lines and kinds must match. Columns may shift as names grow or shrink.
 This is a syntax-preservation check, not a blanket punctuation ban.
 
-```ts : <<symbol rename safety>>=
-function validateRenameSyntax(documents: SourceDocument[], edits: FragmentRenameEdit[],
-    occurrences: FragmentOccurrence[], oldName: string, newName: string): void {
-    const actual = collectFragmentOccurrences(previewRename(documents, edits));
-    const unchanged = actual.length === occurrences.length && occurrences.every((before, index) => {
-        const after = actual[index];
-        return after.path === before.path && after.line === before.line && after.kind === before.kind &&
-            after.name === (before.name === oldName ? newName : before.name);
-    });
-    if (!unchanged) {
-        throw new Error('Unsafe fragment rename: Markdown syntax changes the fragment occurrence sequence');
-    }
-}
-```
+Rename safety is presented in [Fragments as editor symbols](fragments_as_editor_symbols.html).
 
 A no-op still validates documents, names and the unique base definition. Edits
 are returned in source order for adapters to apply atomically (or in reverse

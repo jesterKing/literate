@@ -177,7 +177,27 @@ because it is checked out on another.</p>
 <p>The plan records normalized relative destinations and complete content. It does not
 open those destinations or infer that an apparently missing path is safe. The host
 performs filesystem-specific preflight later.</p>
-<h2>Bounds reject rather than truncate</h2>
+<p><code>engine generation collection policy reservation</code> makes those portable collisions
+explicit.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0065006e00670069006e0065002000670065006e00650072006100740069006f006e00200063006f006c006c0065006300740069006f006e00200070006f006c0069006300790020007200650073006500720076006100740069006f006e-006c0069007400650072006100740065002f0063006f006d0070006c006500740065005f00670065006e00650072006100740069006f006e005f0070006c0061006e002e006c0069007400650072006100740065-1"><span id="f-0065006e00670069006e0065002000670065006e00650072006100740069006f006e00200063006f006c006c0065006300740069006f006e00200070006f006c0069006300790020007200650073006500720076006100740069006f006e"></span><a class="literate-tag-name" href="#f-0065006e00670069006e0065002000670065006e00650072006100740069006f006e00200063006f006c006c0065006300740069006f006e00200070006f006c0069006300790020007200650073006500720076006100740069006f006e" data-literate-target="f-0065006e00670069006e0065002000670065006e00650072006100740069006f006e00200063006f006c006c0065006300740069006f006e00200070006f006c0069006300790020007200650073006500720076006100740069006f006e" aria-label="Definition of engine generation collection policy reservation">&lt;&lt;engine generation collection policy reservation&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-title">reserve</span>(<span class="hljs-params">path, location</span>) {
+    <span class="hljs-keyword">const</span> key = <span class="hljs-title">pathKey</span>(path);
+    <span class="hljs-keyword">if</span> (inputKeys.<span class="hljs-title">has</span>(key)) { <span class="hljs-title">report</span>(location, <span class="hljs-string">`Output collides with input: </span><span class="hljs-subst">${path}</span><span class="hljs-string">`</span>); }
+    <span class="hljs-keyword">if</span> (outputs.<span class="hljs-title">has</span>(key)) { <span class="hljs-title">report</span>(location, <span class="hljs-string">`Duplicate output path: </span><span class="hljs-subst">${path}</span><span class="hljs-string">`</span>); }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> input <span class="hljs-keyword">of</span> inputKeys) {
+        <span class="hljs-keyword">if</span> (<span class="hljs-title">ancestorConflict</span>(key, input)) { <span class="hljs-title">report</span>(location, <span class="hljs-string">`Output/input ancestor conflict: </span><span class="hljs-subst">${path}</span><span class="hljs-string"> and </span><span class="hljs-subst">${input}</span><span class="hljs-string">`</span>); }
+    }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> output <span class="hljs-keyword">of</span> outputs) {
+        <span class="hljs-keyword">if</span> (<span class="hljs-title">ancestorConflict</span>(key, output)) { <span class="hljs-title">report</span>(location, <span class="hljs-string">`Output ancestor conflict: </span><span class="hljs-subst">${path}</span><span class="hljs-string"> and </span><span class="hljs-subst">${output}</span><span class="hljs-string">`</span>); }
+    }
+    outputs.<span class="hljs-title">add</span>(key);
+}
+</code></pre>
+
+</div>
+</div><h2>Bounds reject rather than truncate</h2>
 <p>Expansion has limits on nesting, segments, and intermediate text. HTML and
 publication paths have their own limits. When a limit is crossed, generation
 reports the problem and returns no files.</p>

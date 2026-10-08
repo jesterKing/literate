@@ -74,6 +74,24 @@ The plan records normalized relative destinations and complete content. It does 
 open those destinations or infer that an apparently missing path is safe. The host
 performs filesystem-specific preflight later.
 
+`engine generation collection policy reservation` makes those portable collisions
+explicit.
+
+```ts : <<engine generation collection policy reservation>>=
+reserve(path, location) {
+    const key = pathKey(path);
+    if (inputKeys.has(key)) { report(location, `Output collides with input: ${path}`); }
+    if (outputs.has(key)) { report(location, `Duplicate output path: ${path}`); }
+    for (const input of inputKeys) {
+        if (ancestorConflict(key, input)) { report(location, `Output/input ancestor conflict: ${path} and ${input}`); }
+    }
+    for (const output of outputs) {
+        if (ancestorConflict(key, output)) { report(location, `Output ancestor conflict: ${path} and ${output}`); }
+    }
+    outputs.add(key);
+}
+```
+
 ## Bounds reject rather than truncate
 
 Expansion has limits on nesting, segments, and intermediate text. HTML and

@@ -104,6 +104,28 @@ that unresolved references are still retained. A missing family is invalid for
 generation but remains exactly the symbol an author may want to define with a quick
 fix.
 
+`symbol fence collection` joins accepted declarations with references found only
+inside their bodies.
+
+```ts : <<symbol fence collection>>=
+function fenceOccurrences(token: Token, path: string, lines: string[]): FragmentOccurrence[] {
+    const header = parseFragmentHeader(token.info);
+    if (!header || !token.map) { return []; }
+    const line = token.map[0];
+    const infoStart = lines[line].indexOf(token.markup) + token.markup.length;
+    const tag = { name: header.name, start: header.tagStart, end: header.tagEnd };
+    const result = [occurrence(tag, path, line, infoStart, header.append ? 'append' : 'definition')];
+    token.content.split('\n').forEach((body, index) => {
+        const sourceLine = line + 1 + index;
+        const offset = (lines[sourceLine] || '').length - body.length;
+        for (const reference of scanFragmentTags(body)) {
+            result.push(occurrence(reference, path, sourceLine, offset, 'reference'));
+        }
+    });
+    return result;
+}
+```
+
 ## Completion lowers recall without taking over Markdown
 
 When an author has begun a fragment tag but not finished its name, completion offers
@@ -175,6 +197,23 @@ path. Cancellation likewise returns no partial set.
 This validation does not promise that an arbitrary new name is desirable prose. It
 proves the narrower property an editor refactoring can establish mechanically: the
 recognized symbol structure remains intact.
+
+`symbol rename safety` reparses edited copies before any workspace edit exists.
+
+```ts : <<symbol rename safety>>=
+function validateRenameSyntax(documents: SourceDocument[], edits: FragmentRenameEdit[],
+    occurrences: FragmentOccurrence[], oldName: string, newName: string): void {
+    const actual = collectFragmentOccurrences(previewRename(documents, edits));
+    const unchanged = actual.length === occurrences.length && occurrences.every((before, index) => {
+        const after = actual[index];
+        return after.path === before.path && after.line === before.line && after.kind === before.kind &&
+            after.name === (before.name === oldName ? newName : before.name);
+    });
+    if (!unchanged) {
+        throw new Error('Unsafe fragment rename: Markdown syntax changes the fragment occurrence sequence');
+    }
+}
+```
 
 ## Fixes start from current evidence
 

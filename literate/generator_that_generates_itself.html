@@ -240,7 +240,20 @@ exact path and byte identity.</p>
 <p>Temporary material is removed on success and failure. Cleanup is part of the
 verification result: a verifier that leaves unexplained executable material behind
 has not completed all of its promised work.</p>
-<h2>What the fixed point proves</h2>
+<p><code>self-host compare output set</code> states fixed-point equality directly.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00730065006c0066002d0068006f0073007400200063006f006d00700061007200650020006f007500740070007500740020007300650074-006c0069007400650072006100740065002f00670065006e0065007200610074006f0072005f0074006800610074005f00670065006e006500720061007400650073005f0069007400730065006c0066002e006c0069007400650072006100740065-1"><span id="f-00730065006c0066002d0068006f0073007400200063006f006d00700061007200650020006f007500740070007500740020007300650074"></span><a class="literate-tag-name" href="#f-00730065006c0066002d0068006f0073007400200063006f006d00700061007200650020006f007500740070007500740020007300650074" data-literate-target="f-00730065006c0066002d0068006f0073007400200063006f006d00700061007200650020006f007500740070007500740020007300650074" aria-label="Definition of self-host compare output set">&lt;&lt;self-host compare output set&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> files) {
+    <span class="hljs-keyword">if</span> (!actual.<span class="hljs-title">has</span>(file.<span class="hljs-property">path</span>)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Missing regenerated output: </span><span class="hljs-subst">${file.path}</span><span class="hljs-string">`</span>); }
+    <span class="hljs-keyword">if</span> (actual.<span class="hljs-title">get</span>(file.<span class="hljs-property">path</span>) !== file.<span class="hljs-property">content</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Regenerated content mismatch: </span><span class="hljs-subst">${file.path}</span><span class="hljs-string">`</span>); }
+    actual.<span class="hljs-title">delete</span>(file.<span class="hljs-property">path</span>);
+}
+<span class="hljs-keyword">if</span> (actual.<span class="hljs-property">size</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Unexpected regenerated output: </span><span class="hljs-subst">${[...actual.keys()].sort()[</span><span class="hljs-number">0</span><span class="hljs-subst">]}</span><span class="hljs-string">`</span>); }
+</code></pre>
+
+</div>
+</div><h2>What the fixed point proves</h2>
 <p>A successful check provides strong, specific evidence:</p>
 <ul>
 <li>fresh generated sources satisfy the project's type constraints together with the

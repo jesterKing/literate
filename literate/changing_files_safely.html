@@ -238,7 +238,38 @@ honestly turn a committed batch back into an uncommitted one. The result must sa
 <p>Cancellation follows the same rule. Before commitment it can trigger rollback.
 After commitment it cannot promise to undo already published files, so no new
 cancellation checkpoint interrupts cleanup.</p>
-<h2>Rollback reasons from observed state</h2>
+<p><code>transaction commit</code> keeps the truthful outcome visible in one bounded routine.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007400720061006e00730061006300740069006f006e00200063006f006d006d00690074-006c0069007400650072006100740065002f006300680061006e00670069006e0067005f00660069006c00650073005f0073006100660065006c0079002e006c0069007400650072006100740065-1"><span id="f-007400720061006e00730061006300740069006f006e00200063006f006d006d00690074"></span><a class="literate-tag-name" href="#f-007400720061006e00730061006300740069006f006e00200063006f006d006d00690074" data-literate-target="f-007400720061006e00730061006300740069006f006e00200063006f006d006d00690074" aria-label="Definition of transaction commit">&lt;&lt;transaction commit&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">commitOutputs</span>(<span class="hljs-params">files: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> TransactionFile[], io: TransactionIO,
+    checkCancelled?: </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">string</span>[]&gt; {
+    <span class="hljs-keyword">const</span> state = <span class="hljs-keyword">await</span> <span class="hljs-title">preflight</span>(files, io, checkCancelled);
+    <span class="hljs-keyword">try</span> {
+        <span class="hljs-keyword">await</span> <span class="hljs-title">prepareOutputs</span>(state, io);
+        checkCancelled?.();
+        <span class="hljs-keyword">await</span> <span class="hljs-title">installOutputs</span>(state, io);
+        checkCancelled?.();
+    } <span class="hljs-keyword">catch</span> (error) {
+        <span class="hljs-keyword">let</span> failures = <span class="hljs-keyword">await</span> <span class="hljs-title">rollbackOutputs</span>(state, io);
+        <span class="hljs-keyword">if</span> (!failures.<span class="hljs-property">length</span>) { failures = <span class="hljs-keyword">await</span> <span class="hljs-title">cleanupTransaction</span>(state, io, <span class="hljs-literal">true</span>); }
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">OutputTransactionError</span>(failures.<span class="hljs-property">length</span> ? <span class="hljs-string">'rollback_failed'</span> : <span class="hljs-string">'rolled_back'</span>, <span class="hljs-literal">false</span>,
+            [...<span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>([state.<span class="hljs-property">active</span>, ...failures.<span class="hljs-title">map</span>(<span class="hljs-params">failure</span><span class="hljs-function"> =&gt;</span> failure.<span class="hljs-property">path</span>)])],
+            failures.<span class="hljs-property">length</span> ? [...state.<span class="hljs-property">owned</span>, ...state.<span class="hljs-property">parents</span>] : [], error,
+            failures.<span class="hljs-title">map</span>(<span class="hljs-params">failure</span><span class="hljs-function"> =&gt;</span> <span class="hljs-string">`</span><span class="hljs-subst">${failure.path}</span><span class="hljs-string">: </span><span class="hljs-subst">${</span><span class="hljs-built_in">String</span><span class="hljs-subst">(failure.error)}</span><span class="hljs-string">`</span>));
+    }
+    <span class="hljs-keyword">const</span> failures = <span class="hljs-keyword">await</span> <span class="hljs-title">cleanupTransaction</span>(state, io, <span class="hljs-literal">false</span>);
+    <span class="hljs-keyword">if</span> (failures.<span class="hljs-property">length</span>) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">OutputTransactionError</span>(<span class="hljs-string">'cleanup_failed'</span>, <span class="hljs-literal">true</span>, failures.<span class="hljs-title">map</span>(<span class="hljs-params">failure</span><span class="hljs-function"> =&gt;</span> failure.<span class="hljs-property">path</span>),
+            state.<span class="hljs-property">owned</span>, failures[<span class="hljs-number">0</span>].<span class="hljs-property">error</span>, failures.<span class="hljs-title">map</span>(<span class="hljs-params">failure</span><span class="hljs-function"> =&gt;</span> <span class="hljs-string">`</span><span class="hljs-subst">${failure.path}</span><span class="hljs-string">: </span><span class="hljs-subst">${</span><span class="hljs-built_in">String</span><span class="hljs-subst">(failure.error)}</span><span class="hljs-string">`</span>),
+            state.<span class="hljs-property">outputs</span>.<span class="hljs-title">map</span>(<span class="hljs-params">output</span><span class="hljs-function"> =&gt;</span> output.<span class="hljs-property">path</span>));
+    }
+    <span class="hljs-keyword">return</span> state.<span class="hljs-property">outputs</span>.<span class="hljs-title">map</span>(<span class="hljs-params">output</span><span class="hljs-function"> =&gt;</span> output.<span class="hljs-property">path</span>);
+}
+</code></pre>
+
+</div>
+</div><h2>Rollback reasons from observed state</h2>
 <p>When preparation or installation fails, rollback visits changed outputs in reverse
 order. Reverse order unwinds dependencies introduced by the forward sequence and
 reduces the number of mixed states that recovery must consider.</p>

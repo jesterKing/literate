@@ -1600,32 +1600,7 @@ opening delimiters (`\<<`) on a shallow token copy, leaving parser state intact.
 A named Mermaid fragment is code, not a diagram: its fallback bypasses both
 third-party fence rules and highlighters that might otherwise render Mermaid.
 
-```ts : <<delegate preview fences>>=
-const header = parseFragmentHeader(token.info);
-if (!header) {
-  return originalFence ? originalFence(tokens, idx, options, env, slf)
-    : slf.renderToken(tokens, idx, options);
-}
-const previewToken = Object.assign(Object.create(Object.getPrototypeOf(token)), token);
-previewToken.content = token.content.replace(/\\\<</g, '\<<');
-previewToken.info = header.language;
-const model = env.literatePublication as ReturnType<typeof parseProject>['publication'] | undefined;
-const lookup = model && screenIndex(model);
-const candidate = lookup?.lines.get(env.literatePath)?.get(token.map?.[0] ?? -1);
-const part = candidate && candidate.content === token.content
-  && candidate.kind === (header.append ? 'append' : 'definition')
-  && lookup?.families.get(candidate.fragmentTarget)?.name === header.name && candidate.language === header.language
-  && env.literateTokens?.[candidate.tokenIndex]?.info === token.info ? candidate : undefined;
-const semantic = part && model ? renderScreenCode(part, model, 'preview', env.literateDestination) : undefined;
-const fenceOptions = semantic !== undefined ? { ...options, highlight: () => semantic } : options;
-const previewTokens = tokens.slice();
-previewTokens[idx] = previewToken;
-const rendered = header.language === 'mermaid'
-  ? `<pre><code class="language-mermaid">${semantic ?? md.utils.escapeHtml(previewToken.content)}</code></pre>\n`
-  : originalFence ? originalFence(previewTokens, idx, fenceOptions, env, slf)
-    : `<pre><code>${semantic ?? md.utils.escapeHtml(previewToken.content)}</code></pre>\n`;
-<<decorate preview fragments>>
-```
+Fence delegation is presented in [Previewing the explanation](previewing_the_explanation.html).
 
 Fragment labels and output filenames are text, not HTML. Escape them before
 wrapping the code. Accepted contributions use shared semantic links and syntax
