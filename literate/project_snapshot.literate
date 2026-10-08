@@ -1,0 +1,111 @@
+# The project snapshot
+
+A generator can be deterministic only when its input is clear. For Literate, that
+input is not one file and not “whatever happens to be on disk.” It is a captured
+project snapshot: an ordered collection of documents, the templates they name, and
+the settings that govern the interpretation.
+
+The snapshot is the semantic unit shared by generation, publication, inspection,
+and language projection. Each host has a different way to capture it, but once
+captured the engine receives explicit text rather than hidden filesystem state.
+
+```mermaid
+flowchart TD
+    Sources[Discovered literate paths] --> Capture[Capture one project snapshot]
+    Buffers[Open editor buffers] --> Capture
+    Disk[Saved files and templates] --> Capture
+    Capture --> Documents[Ordered source documents]
+    Capture --> Templates[Named template text]
+    Capture --> Settings[Root project settings]
+    Documents --> Engine[Pure project engine]
+    Templates --> Engine
+    Settings --> Engine
+```
+
+The arrows into the snapshot represent acquisition. The arrows out represent
+explicit values passed to pure code. The engine does not reach back into the host
+to ask whether a file has changed halfway through a calculation.
+
+## One path, one captured text
+
+Every document has a workspace-relative path and its complete text. Paths are
+normalized before they become project identities. Absolute paths, attempts to
+escape the workspace, control characters, and non-portable collisions are rejected.
+
+The command-line adapter normally captures saved files. The editor can prefer an
+open buffer, including unsaved changes, over the same path on disk. This difference
+belongs to the host. The engine sees the resulting document in the same form.
+
+```mermaid
+flowchart TD
+    Path[One literate path] --> Open{Open in the editor?}
+    Open -->|Yes| Buffer[Use captured buffer text]
+    Open -->|No| Saved[Use saved file text]
+    Buffer --> Snapshot[One document in the snapshot]
+    Saved --> Snapshot
+```
+
+A snapshot must not combine both texts or switch between them during one operation.
+If the buffer changes, the host captures a new snapshot and starts new work.
+
+## Document order is part of meaning
+
+Fragment contributions are ordered, so documents require one deterministic order.
+The root `index.literate` comes first. Documents linked from it follow in link
+order, and remaining documents follow in normalized path order. Repeated links do
+not insert a document twice.
+
+This policy gives an author control over narrative order without turning unlinked
+chapters into missing input. It also means index order is more than a table of
+contents: moving a chapter can change the order of contributions to a shared
+fragment family.
+
+A structural edit must therefore preserve either the relevant document order or
+the generated result. Deterministic checks make any unintended consequence visible.
+
+## Discover dependencies before loading them
+
+Templates are named by settings and output roots. An adapter needs those names
+before it can capture their text, so dependency discovery is deliberately smaller
+than generation. It parses only enough structure to return normalized template
+paths; it does not expand fragments or pretend that missing template text is valid.
+
+```mermaid
+sequenceDiagram
+    participant Host
+    participant Engine as Dependency discovery
+    participant Store as Disk or open buffers
+
+    Host->>Engine: Captured literate documents
+    Engine-->>Host: Required template paths
+    Host->>Store: Read each required template
+    Store-->>Host: Captured template text
+    Host->>Engine: Complete documents and templates
+```
+
+The host remains responsible for acquisition. The engine remains responsible for
+meaning and diagnostics.
+
+## Settings belong to the root
+
+Project-wide settings come from the normalized root document. A similarly named
+chapter elsewhere cannot silently take authority. Individual output roots may name
+a source template, but they do not redefine unrelated project settings.
+
+Keeping settings in the snapshot prevents global mutable state from leaking between
+workspace folders or consecutive commands. Two projects interpreted at the same
+time may select different themes or templates without affecting one another.
+
+## Freshness belongs to the caller
+
+A snapshot is a value, not a subscription. The pure engine does not watch files or
+cancel itself. An editor or asynchronous adapter records the versions and inputs
+used to capture the snapshot, then discards a result if those inputs are no longer
+current.
+
+This separation becomes especially important for language servers and publication,
+where work may continue after another edit. Later chapters will return to freshness
+as a boundary around asynchronous results.
+
+The next chapter treats the snapshot's fragment declarations and references as a
+graph. That graph supplies the structure needed for validation and expansion.

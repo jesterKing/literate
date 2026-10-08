@@ -1,0 +1,111 @@
+# Parsing without side effects
+
+Parsing answers what a project says before any host decides what to do with it.
+Literate keeps this stage free of filesystem writes, editor APIs, browser launches,
+and external processes. Explicit source documents go in; a parsed project and
+source-position diagnostics come out.
+
+This boundary matters because several consumers need the same interpretation:
+normal generation, inspection, screen publication, print publication, fragment
+navigation, and generated-language projection.
+
+```mermaid
+flowchart TD
+    Snapshot[Captured project snapshot] --> Parse[Parse once]
+    Parse --> Model[Parsed project]
+    Model --> Inspect[Inspection]
+    Model --> Generate[Generation]
+    Model --> Screen[Screen rendering]
+    Model --> Print[Print publication]
+    Model --> Project[Language projection]
+```
+
+The arrows represent consumers of one model, not independent parsers. A consumer
+may apply stricter policy, but it should not quietly reinterpret fragment syntax.
+
+## Markdown remains a document language
+
+A `.literate` file is ordinary Markdown with a narrow fragment convention added to
+code-fence headers. Markdown-it determines block structure, nested containers,
+inline code, links, tables, and fence boundaries. Literate examines the resulting
+tokens rather than maintaining a competing Markdown parser.
+
+This has two consequences. First, fragment declarations obey real Markdown fence
+rules, including nesting and unclosed fences. Second, ordinary code blocks and
+inline examples remain document content unless their headers deliberately declare
+a fragment.
+
+The parser retains the actual token stream for each accepted document. Publication
+can then preserve lists, quotations, headings, and other containers without trying
+to reconstruct them from rendered HTML.
+
+## A parsed project serves several levels of detail
+
+The parsed result contains related but distinct views:
+
+- **Diagnostics** identify invalid source declarations and locations.
+- **Inspection** lists documents, templates, definitions, appends, and references.
+- **Publication data** records ordered contributions and stable logical targets.
+- **Document blocks** preserve the relationship between Markdown and contribution
+  fences.
+
+A diagnostic does not make every observation useless. Inspection may still show
+where a malformed or duplicate declaration was found. Publication and generation,
+however, must respect the diagnostics that gate their own outputs.
+
+## Source locations survive normalization
+
+Markdown normalizes line endings and fence contents for convenient processing.
+Editor diagnostics still need positions in the original source. Literate therefore
+retains source paths, zero-based lines, and UTF-16 columns alongside normalized
+content.
+
+UTF-16 is not chosen as a measure of human-visible characters. It is the coordinate
+system shared by JavaScript strings, VS Code, and the Language Server Protocol.
+For text containing characters represented by two UTF-16 code units, a visual
+column and a protocol column may differ. Naming the coordinate system prevents
+that difference from becoming an accidental off-by-one error.
+
+## Stable identities are independent of presentation
+
+A contribution needs the same logical identity whether it is rendered in HTML,
+linked from an index, or addressed from LaTeX. Literate derives stable targets from
+source identity and encounter order rather than from renderer-generated markup.
+
+```mermaid
+flowchart LR
+    Source[Source path and contribution] --> Identity[Stable logical target]
+    Identity --> HTML[HTML destination]
+    Identity --> Preview[Preview navigation]
+    Identity --> LaTeX[LaTeX label]
+```
+
+Each renderer escapes or encodes that identity for its own medium. The shared model
+does not contain an HTML URL or a LaTeX command.
+
+## Parsing and generation answer different questions
+
+Parsing asks:
+
+> What documents, contributions, references, annotations, and logical identities
+> does this snapshot contain?
+
+Generation asks:
+
+> Is the whole project valid under output policy, and if so, what complete files
+> should exist?
+
+A missing template, an output collision, or an invalid theme can prevent generation
+without changing the fact that a contribution was parsed at a particular source
+location. Keeping these questions separate makes inspection useful and prevents
+publication or editor tools from depending on filesystem mutation.
+
+## Pure does not mean trivial
+
+The parser still enforces important boundaries: safe relative paths, declaration
+grammar, duplicate source identities, normalized order, source-text validity, and
+stable annotations. “Pure” means that its result depends only on explicit inputs
+and that it performs no external effects. It does not mean that validation is weak.
+
+The next chapter adds generation policy to this parsed structure. It shows why
+Literate constructs the complete output plan before returning even one file.

@@ -1,0 +1,110 @@
+# The fragment graph
+
+A project snapshot tells us which text belongs to one interpretation. The fragment
+graph describes how its program pieces depend on one another.
+
+Each fragment family is a node. Each reference is a directed edge from the family
+that contains it to the family it names. Output roots identify the nodes from which
+tangling begins.
+
+For a graph `G = (V, E)`, `V` denotes the fragment families and `E` the references.
+If the project has `|V|` families and `|E|` references, a complete traversal should
+grow in proportion to `|V| + |E|`, apart from the text copied into outputs. In
+plain language: checking one more fragment or one more reference should add a
+bounded amount of graph work.
+
+## Families collect ordered contributions
+
+A family may have a definition followed by append contributions. The family is one
+node even when its source appears in several documents. Each contribution retains
+its own source location, language, and encounter order.
+
+```mermaid
+flowchart TD
+    Family[Fragment family: validate a request]
+    First[Definition in one chapter] --> Family
+    Second[Append contribution in a later chapter] --> Family
+    Third[Append contribution in another document] --> Family
+    Family --> Combined[Ordered fragment content]
+```
+
+This distinction matters for diagnostics and navigation. A generated statement may
+belong to the second contribution even though the family was first defined
+elsewhere.
+
+## Reachability selects output content
+
+Tangling starts at a root and visits every referenced family. A family that is not
+reachable from that root contributes no text to that output. It may still be used
+by another root.
+
+```mermaid
+flowchart TD
+    RootA[Root A] --> Shared[Shared family]
+    RootA --> OnlyA[Family used only by A]
+    RootB[Root B] --> Shared
+    RootB --> OnlyB[Family used only by B]
+```
+
+Shared families make reuse explicit. They also make context important: the same
+source may be expanded more than once, possibly with different surrounding
+indentation. Read-only editor services can select a deterministic occurrence;
+mutating services need stricter rules because one source edit affects every use.
+
+## Missing edges and cycles
+
+A missing reference names no family. A cycle returns to a family already active on
+the current expansion path. Neither problem can be repaired by emitting a partial
+file.
+
+Depth-first traversal makes both failures easy to identify. Keep a set of families
+on the active path. When following an edge:
+
+1. reject it if its target does not exist;
+2. report a cycle if the target is already active;
+3. otherwise visit the target;
+4. remove it from the active path when that visit finishes.
+
+A completed-family cache avoids repeating validation for shared subgraphs. The
+active-path set and completed cache have different meanings: one detects recursion
+on this route, while the other records work already proved valid.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Unseen
+    Unseen --> Active: begin visit
+    Active --> Invalid: missing target or active target
+    Active --> Complete: all children complete
+    Complete --> Complete: reused by another reference
+    Invalid --> [*]
+    Complete --> [*]
+```
+
+## Bounds protect the explanation and the machine
+
+A valid graph can still be impractically deep or expansive. Literate places limits
+on nesting, fragment segments, and intermediate text. Crossing a limit rejects the
+plan rather than truncating the program.
+
+This is a semantic choice. Silent truncation could produce syntactically valid but
+incorrect source, which is more dangerous than a visible failure. A bound must
+therefore be described as part of the accepted project model, not as an optimization
+that may alter results.
+
+## Determinism supports more than generation
+
+Stable graph order underpins:
+
+- reproducible source and HTML;
+- fixed-point self-hosting;
+- fragment definitions and references in the editor;
+- generated-to-source mappings;
+- predictable diagnostics;
+- publication identities and indexes.
+
+Determinism is therefore not merely a convenience for tests. It is the condition
+that lets several tools discuss the same project without inventing separate models.
+
+The graph gives us valid structure, but not yet a complete parsed project. The next
+chapter explains how Literate collects source, Markdown tokens, contributions, and
+publication data without performing generation or filesystem effects.

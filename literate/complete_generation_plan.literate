@@ -1,0 +1,120 @@
+# Planning a complete generation
+
+A parsed project describes accepted structure. Generation adds the policies needed
+to produce source and documentation: dependency validation, template availability,
+output paths, theme selection, expansion limits, destination collisions, source
+tangling, and HTML rendering.
+
+The result is a plan, not a write operation. A host receives either every complete
+file or diagnostics with an empty file list.
+
+## Why partial output is unsafe
+
+Suppose a project produces three source files. The first two can be expanded, but
+the third contains a missing fragment reference. Returning the first two would make
+the filesystem represent no coherent project version. Another tool might compile
+new versions of two modules against an old third module.
+
+Literate therefore treats output planning as one atomic decision:
+
+```text
+files = all planned outputs, if diagnostics is empty
+files = no outputs, otherwise
+```
+
+The equation is intentionally simple. Atomic planning does not claim that a
+filesystem can replace many files at one physical instant. It guarantees that the
+host never receives a knowingly partial semantic plan.
+
+```mermaid
+flowchart TD
+    Parsed[Parsed project] --> Validate[Validate complete graph and policy]
+    Validate --> Source[Expand every source root]
+    Validate --> Docs[Render every document]
+    Source --> Complete{All outputs complete?}
+    Docs --> Complete
+    Complete -->|No| Reject[Diagnostics and an empty file list]
+    Complete -->|Yes| Plan[Complete generation plan]
+```
+
+## Validate before expensive presentation
+
+Generation establishes accepted inputs, roots, and destinations before invoking
+renderers that may perform substantial in-memory work. Publication follows an even
+stricter version of this pattern by validating the complete document before calling
+trusted contribution renderers.
+
+Ordering validation ahead of presentation has two benefits. A late source error
+cannot leave a half-rendered result, and callbacks cannot observe a project that
+will later be rejected for a known structural reason.
+
+## Source expansion remains literal
+
+Tangling recursively replaces references with their target contributions and
+preserves reference-site indentation. Escaped opening delimiters become literal
+text exactly once after expansion. Replacement text is not rescanned as a new
+template or a second fragment language.
+
+A source template receives the complete code at its `[CODE]` marker. An HTML
+template receives rendered content and controlled project metadata at its own
+markers. Both substitutions are literal and single-pass, preventing author text
+from accidentally becoming another instruction to the template mechanism.
+
+## Reserve every destination
+
+Two roots must not silently write the same path. Source outputs must not collide
+with documentation pages, templates, inputs, portable companions, or destinations
+that are equivalent on common case-insensitive filesystems.
+
+Path policy is deliberately portable rather than reflecting only the current host.
+A project accepted on one operating system should not become ambiguous merely
+because it is checked out on another.
+
+The plan records normalized relative destinations and complete content. It does not
+open those destinations or infer that an apparently missing path is safe. The host
+performs filesystem-specific preflight later.
+
+## Bounds reject rather than truncate
+
+Expansion has limits on nesting, segments, and intermediate text. HTML and
+publication paths have their own limits. When a limit is crossed, generation
+reports the problem and returns no files.
+
+If `S` is the accepted segment limit and a proposed expansion requires `S + 1`
+segments, the result is rejection—not an output containing the first `S` segments.
+Truncation would change program meaning while disguising the failure as success.
+
+## Documentation is part of the plan
+
+Generation produces both tangled source and woven HTML. A broken source graph also
+prevents replacing the documentation, because the two products describe one
+snapshot. This does not mean preview must wait for disk generation: the editor can
+render a live captured buffer through a separate screen path.
+
+```mermaid
+flowchart TD
+    Plan[Complete generation plan] --> Sources[Tangled program source]
+    Plan --> Pages[Woven HTML chapters]
+    Plan --> Index[Book index]
+    Sources --> Transaction[Host output transaction]
+    Pages --> Transaction
+    Index --> Transaction
+```
+
+## The host owns commitment
+
+Once a complete plan exists, a host may compare it with disk, report differences,
+or commit changed outputs. The CLI and editor share a transaction protocol but
+supply different filesystem adapters.
+
+Planning before effects creates a reusable architecture:
+
+1. capture explicit inputs;
+2. parse and validate;
+3. construct every output in memory;
+4. return diagnostics or a complete plan;
+5. let the host preflight and commit that plan.
+
+The next part follows this architecture into its hosts, beginning with the simplest
+adapter and ending with the fixed-point check that lets a generated engine verify
+itself.
