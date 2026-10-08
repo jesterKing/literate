@@ -1,0 +1,174 @@
+# Building a publication document
+
+A printed book needs one coherent document, not a sequence of callbacks over pieces
+of Markdown. Before typesetting begins, the publication path must know that every
+chapter can be represented, every fragment reference is valid, every destination is
+unambiguous, and every contribution occupies its authored place.
+
+The central design is to validate the whole document before materializing any
+renderer-specific contribution. This turns publication preparation into a gate:
+either it returns one complete structured document or it returns diagnostics.
+
+```mermaid
+flowchart TD
+    Project[Parsed project] --> Order[Follow authoritative document order]
+    Order --> Validate[Validate graph and every block stream]
+    Validate --> Complete{Everything supported?}
+    Complete -->|No| Reject[Diagnostics; no document]
+    Complete -->|Yes| Materialize[Materialize trusted contribution and asset slots]
+    Materialize --> Document[Complete publication document]
+```
+
+Nothing in this stage opens a process or destination. The single validation gate
+collects many rules, but its consequence is simple: renderer callbacks occur only
+on the accepted branch.
+
+## Preserve the author's order
+
+Document order is semantic. The root comes first, linked chapters follow in root
+link order, and remaining chapters follow by normalized path. Fragment additions
+also follow encounter order, so regrouping content by fragment family would change
+the story and could change the generated program.
+
+Each parsed document is represented as a complete sequence of blocks. A block is
+either a range of the original Markdown token stream or a slot occupied by one
+accepted fragment contribution. These half-open ranges and slots cover every token
+exactly once. Container boundaries remain where the Markdown parser placed them,
+including boundaries for nested lists and block quotations.
+
+This representation solves a subtle problem. A contribution fence can appear inside
+a list item or quotation. Splitting the source into independently parsed strings
+would lose the surrounding container. Retaining the original token stream lets the
+publication document replace only the contribution slot while preserving its true
+structural home.
+
+```mermaid
+flowchart TD
+    Tokens[One document token stream] --> Before[Markdown range]
+    Tokens --> Slot[Contribution slot]
+    Tokens --> After[Markdown range]
+    Before --> Tree[One nested block tree]
+    Slot --> Tree
+    After --> Tree
+```
+
+All three regions contribute to one tree; the ranges are not reparsed separately.
+Additional slots repeat the same partition without gaps or overlap.
+
+## Stable destinations precede links
+
+A link target should identify meaning, not appearance. Family targets derive from
+exact fragment names. Contribution targets add the canonical document path and the
+accepted contribution's local ordinal. Document destinations derive from canonical
+paths, while heading destinations combine a document identity with an allocated
+heading slug.
+
+These identities use separate namespaces. A family, a contribution, a document, a
+heading, a term, and a note therefore cannot collide merely because their visible
+labels happen to match.
+
+The component encoder can be described as follows. For a string with UTF-16 code
+units `u₁` through `uₙ`, encode each unit as four hexadecimal digits and concatenate
+them:
+
+```text
+E(s) = hex₄(u₁) · hex₄(u₂) · … · hex₄(uₙ)
+```
+
+Here `hex₄` means a four-digit hexadecimal representation and `·` means
+concatenation. For example, `E("A") = 0041`, while `E("AB") = 00410042`. The
+encoding preserves case and exact code units. Separators added between encoded
+components cannot occur inside a component, so decoding boundaries are
+unambiguous.
+
+This policy gives deterministic, collision-free targets. It does not claim that all
+identities survive every structural edit. Renaming a fragment changes its family
+identity, and moving a contribution to another chapter changes that contribution's
+identity. Such edits change what the item is in the authored structure.
+
+Heading slugs follow a different concern: readable author links. Visible heading
+text is normalized, lowercased without locale, stripped of punctuation and symbols
+other than hyphens and underscores, and joined with hyphens at whitespace. Duplicate
+slugs are allocated distinct destinations within their document. The enclosing
+document identity prevents equal headings in different chapters from colliding.
+
+## Validate the complete graph
+
+Publication cannot validate only roots that happen to generate source. A book may
+show and index a fragment that no root reaches. Every accepted reference in every
+contribution must therefore be checked, including references in otherwise unused
+families.
+
+Validation rejects missing families, definition operators used where only a
+reference is allowed, and dependency cycles. Cycle detection walks the graph
+without expanding fragment text. An iterative depth-first traversal keeps an active
+set for the current path and a finished set for completed families. An edge into the
+active set identifies a cycle at the reference that closes it.
+
+For `V` fragment families and `E` reference edges, this validation requires work
+proportional to `V + E`. The practical point is more important than the notation:
+an exponentially expanding fragment need not be expanded merely to discover that
+its dependency graph is valid.
+
+## Accept a controlled block language
+
+The publication document is deliberately smaller than arbitrary Markdown plus
+extensions. It admits the structures the print renderer understands, including
+paragraphs, headings, ordinary inline formatting, links, lists, quotations,
+horizontal rules, inline code, ordinary code blocks, accepted fragment
+contributions, annotations, and supported standalone resources.
+
+The ordinary parser disables raw HTML and TeX, so those author spellings remain
+inert text rather than executable output. It also does not recognize pipe-table
+syntax. If an unsupported raw or extension token nevertheless reaches the document
+bridge, the bridge rejects it instead of guessing at a conversion. An inline image
+likewise cannot be moved to a block position by guesswork. These rules protect both
+meaning and safety without claiming support for structures the parser never creates.
+
+Diagnostics use honest locations. When the Markdown parser provides only a block
+line for inline children, the diagnostic points to that enclosing block instead of
+inventing a character offset. Fragment references retain the more precise locations
+already established by the shared scanner.
+
+## Keep placeholders inert during validation
+
+While the document is being checked, accepted contributions and standalone assets
+remain typed placeholders. They are not magic strings inserted into prose, so they
+cannot collide with author text. Containers that hold placeholders remain ordinary
+pending lists, quotations, or divisions.
+
+Only after every document and graph check succeeds are those placeholders replaced.
+The caller supplies trusted functions for contribution and asset presentation. A
+contribution can then become a renderer-controlled block containing syntax spans
+and semantic reference links; an image can become a renderer-controlled figure
+request. Successful validation permits these callbacks; it does not make arbitrary
+callback behavior safe. The caller still owns the trust contract for raw renderer
+output.
+
+## The controlled Pandoc bridge
+
+The implementation represents the completed tree using Pandoc's JSON document
+shapes. This is a bridge, not an appeal to Pandoc as a second parser. Literate keeps
+control of ordering, fragment recognition, reference resolution, annotations,
+assets, and the supported token vocabulary. Pandoc receives already structured
+data and is later used as a trusted prose-to-LaTeX writer.
+
+`preparePandoc` names the in-memory gate. It performs no filesystem access, source
+tangling, template loading, or subprocess execution. Raw inline and block nodes are
+reserved for trusted renderers; the Markdown walker itself never creates them from
+author markup.
+
+The bridge also keeps metadata intentionally narrow. Publication settings and page
+layout are renderer options, not unreviewed document metadata that can alter the
+converter's behavior.
+
+## Complete means complete
+
+A successful result contains one document whose blocks preserve project order and
+container structure. A failed result contains diagnostics and no document. This
+contract lets later stages assume that links, contributions, annotations, and
+resources have already crossed a common semantic gate.
+
+That common gate becomes especially valuable for annotations. Terms and notes need
+identities that mean the same thing in screen links, print page references, and
+indexes. The next chapter develops that shared annotation model.

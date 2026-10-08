@@ -1,0 +1,187 @@
+# Why publication is a separate pipeline
+
+A literate project has one authoritative source, but it does not have only one useful
+presentation. A programmer may need generated source. A reader in the editor may
+need a live preview. A website needs linked HTML. A printed book needs pages,
+fonts, margins, cross-references, and resources that can travel with it.
+
+These products should agree about meaning without pretending that they are the
+same medium. A browser can reveal a fragment on demand; paper cannot. A printed
+note can occupy a margin; a narrow screen may need to place it in the reading flow.
+The publication architecture therefore shares semantics first and chooses
+presentation later.
+
+```mermaid
+flowchart TD
+    Snapshot[Captured literate project] --> Parse[Parse the captured snapshot with shared semantics]
+    Parse --> Meaning[Shared project meaning]
+    Meaning --> Source[Executable source plan]
+    Meaning --> Preview[Live editor preview]
+    Meaning --> Screen[Standalone screen publication]
+    Meaning --> Print[Print publication]
+```
+
+The arrows mean that every consumer begins with the same captured text and parsed
+relationships. They do not mean that one output is converted into another. In
+particular, print is not produced by printing the generated website, and preview is
+not produced by reading generated HTML back from disk. The diagram omits host I/O
+so that the semantic separation remains visible.
+
+## One source does not require one renderer
+
+The ordinary generation pipeline tangles roots into source files and weaves each
+chapter into HTML. Its job is to plan a complete set of project outputs. The live
+preview instead reflects editor buffers, including unsaved text, and must remain
+useful while an author is correcting an incomplete fragment. Print publication
+must reject incomplete structure before invoking expensive converters or external
+tools.
+
+A useful way to state the relationship is:
+
+```text
+presentation = renderer(parsed snapshot, medium policy)
+```
+
+The parsed snapshot supplies meaning. The medium policy supplies choices such as
+link shape, page geometry, note placement, and resource packaging. Neither term can
+replace the other. Rendering directly from Markdown would lose fragment identity;
+rendering every medium through HTML would make HTML layout decisions authoritative
+for print.
+
+The separation also prevents generated files from becoming accidental inputs. A
+publication command reads the captured literate documents. It does not first write
+source or HTML and then publish those artifacts. This matters for unsaved editor
+buffers, for deterministic inspection, and for failure safety.
+
+## The renderer-neutral center
+
+Before discussing browser links or LaTeX commands, the architecture needs a form of
+meaning that belongs to neither. That center records:
+
+- documents in authoritative project order;
+- fragment families in definition order;
+- each accepted definition or addition in encounter order;
+- source locations and authored languages;
+- literal and reference segments within contribution bodies;
+- stable targets for families and individual contributions; and
+- terms, notes, uses, and their resolution outcomes.
+
+It deliberately does not contain HTML elements, TeX commands, filesystem handles,
+or process objects. The print path also retains the parsed Markdown token stream so
+it can build a structured document without reparsing source with a different set of
+rules.
+
+The implementation calls the fragment-oriented part of this center the
+`PublicationModel`. The complete `ParsedProject` places that model beside ordered
+documents, diagnostics, inspection data, and shared annotations. These names arrive
+after the architecture because they are representations of the boundary, not the
+reason for it.
+
+```mermaid
+flowchart TD
+    Parsed[Parsed project]
+    Parsed --> Graph[Fragment families and contributions]
+    Parsed --> Prose[Ordered Markdown blocks]
+    Parsed --> Notes[Terms, notes, and uses]
+    Graph --> ScreenRenderer[Screen renderer]
+    Prose --> PrintBridge[Print document bridge]
+    Notes --> ScreenRenderer
+    Notes --> PrintBridge
+```
+
+Each arrow means “consumes semantic data.” The screen renderer emphasizes links and
+interactive navigation. The print bridge emphasizes a complete block tree and page
+references. The diagram intentionally leaves syntax highlighting and assets out;
+they are later adapters, not additional sources of truth.
+
+## Strict exports and tolerant editing
+
+A useful preview must show the author what exists now, even when a reference is
+missing. It may render the unresolved spelling as text and preserve enough identity
+for diagnostics and navigation to recover after the next edit. This tolerance does
+not authorize a durable export.
+
+Generated publication and print use a stricter rule:
+
+```text
+accepted export = complete validation and complete rendering
+rejected export = diagnostics and no publication plan
+```
+
+The rule is all-or-nothing at the semantic boundary. If a late chapter contains an
+unsupported construct, an earlier contribution renderer must not already have run
+with observable effects. If one fragment reference is missing, the system must not
+publish a book whose index points into an incoherent graph.
+
+Strictness is therefore not hostility to authoring. It is a distinction between a
+working view and a claim of completion.
+
+## Screen publication is not merely preview
+
+The live preview and generated HTML share semantic rendering, but their hosts grant
+different capabilities. A generated page can use relative links and embed a bounded
+exploration client. An editor preview must ask the extension for an authorized
+cross-document destination; it cannot invent a durable editor command URI. A
+pending destination remains plain text until the host resolves it.
+
+Both forms keep logical targets independent of transport. A fragment family has the
+same identity whether its link is a same-page anchor, a relative HTML URL, or an
+opaque editor capability. This is what lets indexes and reference overlays agree
+without coupling the shared model to either host.
+
+## Print publication is a document transformation
+
+Print begins from the same parsed project but builds one ordered document. Prose,
+headings, lists, code contributions, annotations, and standalone resources become a
+controlled document tree. Only after complete validation does a trusted converter
+produce a LaTeX body. A renderer-owned template then supplies page geometry,
+fonts, syntax colors, link commands, and annotation machinery.
+
+This order is important. LaTeX is executable input to a powerful toolchain, so raw
+author text must not become renderer commands. The architecture treats structured
+document data as the boundary and reserves raw output nodes for trusted renderers.
+
+```mermaid
+flowchart TD
+    Meaning[Validated project meaning] --> Document[Controlled publication document]
+    Document --> Body[Trusted conversion to a LaTeX body]
+    Body --> Layout[Renderer-owned book template]
+    Layout --> Plan[TeX and companion resource plan]
+    Plan --> Compiler[Private PDF build]
+    Compiler --> Publish[Transactional final output]
+```
+
+The arrows describe successive reductions in freedom: general literate meaning
+becomes a controlled document, then a layout plan, then compiler inputs. The diagram
+omits optional browser rendering for diagrams; that work produces bounded companion
+bytes before the plan is complete.
+
+## Effects stay at the edges
+
+Parsing, identity construction, annotation resolution, screen indexing, and most
+print transformation are in-memory work. Filesystem reads, browser processes,
+Pandoc, TeX, and destination writes belong to adapters around that work.
+
+Keeping effects at the edges provides several practical guarantees:
+
+1. the editor and command line can share semantics;
+2. validation can finish before expensive callbacks run;
+3. resource reads can be bounded and tested independently;
+4. subprocess cancellation can be owned by the process adapter; and
+5. the previous publication can remain intact until a complete replacement exists.
+
+It also makes limitations honest. External converters are trusted dependencies, a
+private build directory is not a sandbox, and a transaction cannot promise that
+many filesystem paths change at one physical instant. The architecture narrows
+these risks rather than hiding them.
+
+## Why the separation matters
+
+A single renderer would be simpler only by moving complexity into implicit
+coupling. It would force editor URLs into durable documents, browser layout into
+print, or TeX concerns into parsing. Separate pipelines preserve a stronger unity:
+all presentations arise from the same interpreted project and stable identities,
+while each medium remains free to honor its own constraints.
+
+The next chapter follows the print branch at its first decisive step: constructing
+one validated publication document from ordered prose and fragment contributions.

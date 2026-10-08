@@ -1,0 +1,186 @@
+# Publication on screen
+
+A screen publication must remain a readable book before it becomes an interactive
+one. Prose, code, links, annotations, and indexes need useful HTML without requiring
+client-side JavaScript. Interaction may then add exploration, but it must not be the
+only route to a definition.
+
+Generated HTML and the editor preview share semantic rendering. They differ at the
+host boundary: generated pages use durable relative links, while the editor grants
+short-lived navigation capabilities for cross-document movement.
+
+```mermaid
+flowchart TD
+    Model[Shared publication meaning] --> Render[Semantic screen rendering]
+    Render --> HTML[Generated HTML page]
+    Render --> Preview[Editor preview]
+    HTML --> Relative[Relative page links and local anchors]
+    Preview --> Capability[Authorized editor destinations]
+```
+
+The arrows show that link transport is chosen after semantic rendering has selected
+a target. They do not imply that preview reads generated HTML. The diagram omits
+styles and optional exploration so the common rendering boundary is easier to see.
+
+## Logical targets survive different transports
+
+A reference first resolves to a fragment family, contribution, annotation, or use.
+Only then does the screen adapter ask how to reach that target from the current
+document.
+
+Within one page, both screen forms use a local anchor. Across generated pages, the
+adapter calculates a relative path, percent-encodes each path component, changes the
+chapter suffix to HTML, and appends the stable target. A leading `./` keeps a
+filename from being interpreted as a URI scheme.
+
+Across editor previews, the renderer accepts only a destination returned by the
+extension's capability adapter. It does not construct editor command URLs or store
+source line numbers in a public URL. If resolution is pending or unavailable, the
+reference remains text. Logical identity is retained separately from the opaque
+transport so a refreshed capability does not redefine the target.
+
+## Merge syntax with meaning
+
+Syntax highlighting and fragment references describe different aspects of the same
+code. Highlighting says that a range is a keyword, string, or comment. Semantic
+resolution says that a range names another fragment. Neither should discover the
+other by inspecting emitted HTML.
+
+The renderer begins with the full displayed contribution. Escaped opening
+delimiters become literal text, while actual reference spellings remain intact.
+The syntax highlighter returns spans over that display text. The renderer then
+intersects those spans with the already known semantic reference ranges.
+
+```mermaid
+flowchart TD
+    Contribution[Complete contribution text] --> Syntax[Syntax spans]
+    Contribution --> References[Semantic reference ranges]
+    Syntax --> Merge[Monotonic range merge]
+    References --> Merge
+    Merge --> Code[Escaped HTML with semantic links]
+```
+
+The arrows mean that both inputs address the same text coordinates. Syntax does not
+parse fragment names, and references do not infer language tokens. The monotonic
+merge visits ordered ranges without repeatedly rescanning the entire contribution.
+
+The screen policy omits comment-only text from displayed program contributions.
+A fragment reference inside a comment remains semantic content and therefore stays
+navigable even when surrounding comment text is omitted. Unknown languages remain
+plain escaped text rather than failing publication.
+
+## Contributions are navigable units
+
+Every accepted contribution receives its own anchor. The first contribution also
+carries the family anchor. A declaration label links to that family base, and a
+small navigation region can link to the previous, base, and next contributions.
+
+Navigation sits outside the code block. It therefore does not change copied code or
+indentation. The region has an accessible label that names the fragment family, and
+its controls have descriptive names such as “Next contribution of …”. Preview
+anchors retain source mapping for local scroll synchronization.
+
+This presentation keeps the distinction between a family and one of its additions
+visible. A family target answers where the definition begins; a contribution target
+addresses one authored piece.
+
+## Annotations remain ordinary reading content
+
+Term definitions render as identified sections. Notes render as identified asides.
+Their bodies use a closed token vocabulary and preserve paragraphs, lists, emphasis,
+strong emphasis, inline code, links, and line breaks. Unsupported leaf content is
+escaped; unsupported containers cannot introduce active markup.
+
+A resolved term use becomes a link to the shared term target. A missing or ambiguous
+use becomes a span that remains readable and visibly unresolved. Closing tags follow
+the same decision as opening tags, preventing malformed markup when resolution
+fails.
+
+The title of a term is plain text, not HTML. Parser-owned attributes survive only
+where the controlled token requires them, such as a link destination or an ordered
+list start. This keeps annotation rendering from becoming a side door for arbitrary
+attributes.
+
+## Indexes use model data, not rendered text
+
+When annotations exist, one root page receives a term index and a fragment index.
+The term index links to definitions and explicit use occurrences. The fragment
+index links to each family, its accepted contributions, and contributions that
+reference it.
+
+Reverse-reference maps are built once from the immutable publication snapshot.
+Repeated references to the same family within one contribution produce one index
+entry for that contribution. This avoids both visual duplication and repeated
+whole-project scans.
+
+The implementation caches these indexes weakly by snapshot. A new parse produces a
+new snapshot and therefore a new index; closed projects are not retained merely by
+the cache.
+
+## Themes are scoped to the publication
+
+A selected catalogue theme supplies both prose and syntax colors. Generated pages
+place the stylesheet through the HTML template, while preview uses the host's
+integration point. In both cases the rendered book is wrapped in a
+`literate-document` element carrying the selected theme identity.
+
+Annotation and index styles are scoped beneath that wrapper. They inherit the
+active palette and do not modify unrelated editor or page content. Styling is not
+used to communicate identity by color alone: links, headings, borders, labels, and
+structural elements retain meaning without the palette.
+
+## Exploration is an optional layer
+
+Ordinary links answer “take me to the definition.” Exploration answers a different
+question: “show me how this fragment is composed without leaving my place.” A small
+client can add disclosure controls beside semantic reference uses and open nested
+panels containing accepted contributions.
+
+```mermaid
+stateDiagram-v2
+    [*] --> PlainLink
+    PlainLink --> Expanded: reader opens exploration
+    Expanded --> Expanded: reader opens a nested reference
+    Expanded --> PlainLink: reader collapses or content changes
+    PlainLink --> [*]
+```
+
+The states describe enhancement around an existing link. If the client is absent,
+rejected, or removed, the plain link remains. The diagram omits focus details, but
+collapse returns focus to a surviving disclosure or baseline anchor when possible.
+
+The payload stores contribution text and reference targets, not ready-made HTML.
+The browser creates text nodes and controlled elements. Serialized data escapes
+characters that could end a script element. New links are accepted only when they
+match the expected target and an allowed local or host capability shape.
+
+## Bounds protect the page
+
+Exploration has limits on payload bytes, nesting depth, panels, parts, segments, and
+constructed content. Costs are checked before candidate DOM is allocated. Exceeding
+a limit rejects the requested view rather than truncating a fragment into a
+misleading partial expansion.
+
+Ownership is private client state, not editable data attributes. Closing a panel
+releases the costs of all descendants it owns. A document mutation causes the
+client to reconcile controls, retire vanished roots, and remove stale panels.
+
+These limits preserve the baseline publication. The browser client is never allowed
+to make the static book unreadable merely because a project is too large to explore
+interactively.
+
+## Preview and generated HTML remain peers
+
+Generated HTML embeds the bounded data and a self-contained initializer when usable
+references exist. Preview loads the corresponding browser behavior through its
+own packaged client and receives destinations from the editor host. Neither form
+loads remote code.
+
+The two adapters share contribution rendering, annotation rendering, identity
+indexes, syntax merging, and accessibility structure. They do not share authority:
+one may construct relative publication URLs, while the other must use editor-granted
+capabilities.
+
+Screen publication now has a complete path from semantic model to accessible HTML.
+Print begins from the same meaning but must solve different spatial problems:
+physical pages, font roles, code breaking, stable references, and annotation rails.

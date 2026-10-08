@@ -1,0 +1,192 @@
+# Compiling and publishing a PDF
+
+A PDF build invokes powerful external tools and may require several passes. It can
+fail after producing logs, auxiliary files, or even a malformed PDF. None of those
+intermediate states should replace the reader's previous publication.
+
+Literate separates compilation from publication. Compilation works in a private
+directory and returns owned PDF bytes. Publication then compares and commits those
+bytes through the ordinary output transaction.
+
+```mermaid
+flowchart TD
+    Plan[Complete TeX and companion plan] --> Stage[Private build directory]
+    Stage --> Preflight[Check required tools and packages]
+    Preflight --> Build[Run bounded TeX build]
+    Build --> Verify[Verify convergence, rail, and PDF bytes]
+    Verify --> Bytes[Owned PDF bytes]
+    Bytes --> Commit[Transactional destination commit]
+```
+
+The arrows show the only route to the destination. Compiler files cannot bypass
+verification. The diagram omits diagnostic retention; warnings and an optionally
+retained build directory travel beside success or failure without becoming the
+published artifact.
+
+## Validate the plan before staging
+
+Compiler inputs use normalized portable relative paths. Empty components, parent
+steps, absolute paths, drive syntax, control characters, reserved device names,
+and case-folded collisions are rejected. The selected entry must be a TeX file and
+must exist in the plan.
+
+Inside the private directory, the entry receives a fixed compiler basename while
+companions keep their relative locations. The fixed basename reserves the nearby
+compiler-output namespace and prevents an input from colliding with logs,
+auxiliaries, or the final private PDF.
+
+Every staged file is created exclusively with restrictive permissions. The private
+root is unpredictable and accessible only to its owner. Parent/file conflicts fail
+during staging and follow the same cleanup path as later tool failures.
+
+A private directory is containment for outputs, not a sandbox for TeX. TeX can read
+files and execute complex language features. Shell escape is disabled as defense in
+depth, but the compiler still receives trusted renderer output rather than
+untrusted arbitrary TeX.
+
+## Preflight gives actionable failures
+
+Before compiling, the adapter verifies that the build orchestrator, LuaTeX engine,
+package lookup tool, document class, and required packages are available. It does
+not invoke a package manager or download missing software.
+
+The lookup runs with the same engine context used by the build. This catches the
+common case where a package exists for another TeX configuration but is unavailable
+to the selected engine. Font availability remains the font system's responsibility
+because it depends on selected installed families or packaged companions.
+
+Preflight runs inside the private build after staging. If the caller chooses to
+retain failed builds, the exact compiler inputs are therefore available for
+inspection.
+
+## Own the entire process tree
+
+A timeout is useful only if it can stop the work that consumed it. The TeX build
+orchestrator may launch an engine and other descendants, so terminating only the
+direct child could leave compilation running.
+
+On supported systems each invocation receives its own process group. Cancellation,
+timeout, output overflow, and normal leader exit all trigger group cleanup. The
+runner waits for pipe closure, with a short fallback for descriptors inherited by a
+stray descendant. A shell is never involved; commands and arguments are passed as
+literal vectors.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Running
+    Running --> Draining: leader exits
+    Running --> Stopping: timeout, cancellation, or output limit
+    Stopping --> Draining: process group terminated
+    Draining --> Accepted: clean close and valid status
+    Draining --> Rejected: process or stream failure
+    Accepted --> [*]
+    Rejected --> [*]
+```
+
+The state diagram emphasizes that an `exit` event alone is not completion. Output
+pipes and descendants still belong to the invocation. It omits staging cleanup,
+which surrounds the entire state machine.
+
+Combined standard output and error have one aggregate byte limit. The runner counts
+bytes before retaining chunks and continues draining after the limit is crossed.
+Stream errors are failures, not unhandled events or permission to accept a partial
+transcript.
+
+## Bound time, logs, and products
+
+The build has a fixed deadline and a bounded repeat count. The tool is instructed to
+stop on TeX errors, avoid shell escape, and ignore user or project build-control
+files that could alter the invocation.
+
+Logs and the final PDF are read through file descriptors after checking for regular,
+non-link files. The reader confirms file identity and size, then reads at most the
+measured size plus one byte so growth cannot pass unnoticed. A successful process
+without a bounded log or recognizable nonempty PDF header is still a failed build.
+
+These checks do not constitute a full PDF parser. They establish the narrower
+contract needed by publication: the expected compiler output is a bounded regular
+file with the right format signature.
+
+## Multi-pass references must converge
+
+Earlier TeX passes often contain undefined references by design. Only the final log
+can say whether labels and page references converged. The compiler therefore parses
+final warning records, joining wrapped continuation lines without treating arbitrary
+book prose as a warning.
+
+A final unresolved-reference warning, a request for another rerun, or exhaustion of
+the repeat limit rejects the PDF. Ordinary warnings such as missing glyphs and
+overfull boxes are returned to the publisher rather than silently discarded.
+
+Annotated books add another convergence condition. The annotation rail writes a
+bounded stability certificate derived from physical page membership and placement.
+A missing, malformed, pending, or error certificate rejects a rail-enabled build
+before PDF bytes reach the destination transaction.
+
+## Preserve the previous output
+
+Let `O` be the bytes already published and `N` the newly compiled bytes. The desired
+observable rule is:
+
+```text
+failed before commit  ⇒  destination remains O
+successful commit     ⇒  destination becomes N
+```
+
+The private compiler never opens the destination, so staging, preflight, conversion,
+and verification cannot damage `O`. After compilation succeeds, the command reduces
+the complete plan to one final PDF destination and passes it to the shared output
+transaction.
+
+The transaction compares bytes first. Equal bytes remain current and cause no
+write. Changed bytes are staged beside the target, the old file is preserved for
+rollback, and success is reported only after the batch commits. A committed cleanup
+failure is reported honestly as committed; it is not mislabelled as a failed
+replacement.
+
+This is recoverable exception safety, not simultaneous filesystem-wide atomicity.
+Concurrent external writers remain outside the guarantee.
+
+## Cancellation respects the commit boundary
+
+Cancellation is checked during plan creation, staging, preflight, subprocess work,
+file reads, and while rollback remains possible. Once the output transaction has
+committed, a late cancellation cannot make those bytes uncommitted.
+
+For that reason, the command does not perform a new cancellation check after the
+transaction returns. It reports either success or a committed cleanup error. Signal
+listeners remain installed until the coordinator settles so rollback and cleanup
+are not abandoned midway.
+
+## Retained builds transfer ownership
+
+Normally the private directory is removed in a `finally` path after diagnostics and
+PDF bytes have been captured. Cleanup failure is itself visible; success never
+quietly leaves an undisclosed build tree.
+
+An explicit keep-build choice transfers ownership of the directory to the caller on
+success or failure after staging. The result reports that path together with
+warnings. Validation failures before a directory exists naturally have nothing to
+retain.
+
+The returned PDF bytes are copied out of the private stage and remain valid after
+normal cleanup. The caller never publishes by moving the compiler's own output
+path.
+
+## Honest platform and reproducibility limits
+
+Safe process-tree termination is required for the default compiler adapter. A host
+without that capability is rejected before spawning. An alternative runner may be
+injected for testing, but it inherits the obligation to honor timeout, output, and
+completion contracts.
+
+A reproducible source snapshot and stable plan do not by themselves promise
+byte-identical PDF files. TeX installations, fonts, metadata, and external tools can
+affect bytes. When a reproducible-build timestamp is supplied, the environment is
+preserved rather than invented, but the publication contract is semantic success
+and safe replacement, not universal binary reproducibility.
+
+The command-line path now has clear ownership from snapshot to final transaction.
+The final chapter in this part explains why the editor does not run that machinery
+inside its own process and how a bounded external helper preserves trust,
+cancellation, and fresh-buffer semantics.

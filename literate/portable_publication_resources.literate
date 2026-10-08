@@ -1,0 +1,186 @@
+# Portable publication resources
+
+Text alone is easy to move. A book with illustrations, diagrams, and chosen fonts
+is portable only when those resources travel under explicit rules. Copying an
+entire project directory would be simple, but it would also publish unrelated
+files, hide missing licenses, and preserve unsafe author-controlled paths.
+
+Literate instead plans a small companion set. Every resource is declared or found
+through validated document structure, read through a narrow filesystem adapter,
+assigned a safe publication name, and joined to the TeX document before any output
+is committed.
+
+```mermaid
+flowchart TD
+    Book[Validated publication document] --> Discover[Discover requested resources]
+    Manifest[Explicit font manifest] --> Validate[Validate every declared companion]
+    Discover --> Read[Read policy-checked local inputs]
+    Validate --> Read
+    Read --> Name[Assign safe content or role identities]
+    Name --> Plan[Complete resource plan]
+    Plan --> Transaction[Publish TeX and companions together]
+```
+
+The arrows show planning dependencies. They do not mean that discovery copies files
+immediately. The transaction receives only a complete in-memory plan. The diagram
+omits external diagram rendering, which is an optional producer feeding the same
+naming and planning stage.
+
+## Paths are capabilities, not decoration
+
+A resource path grants permission to read a project file, so it is validated before
+filesystem access. Paths are relative to a known root, normalized with portable
+slash rules, and forbidden from escaping through parent traversal. Absolute paths,
+backslashes, drive syntax, control characters, URL schemes, queries, and fragments
+are rejected where local publication inputs are expected.
+
+A standalone Markdown image is resolved relative to its source chapter. URI
+escaping is decoded exactly once, and both encoded and decoded forms are checked.
+This prevents a second decoding layer from changing the apparent path after policy
+has accepted it.
+
+The host verifies every existing path component, rejects symbolic links for project
+resources, and requires regular files. Image and diagram adapters also enforce their
+fixed byte budgets before and after reading. Font and license companions currently
+have path, manifest, presence, and file-kind checks, but no dedicated byte or count
+budget.
+
+## Images remain explicit and bounded
+
+Publication accepts standalone PNG, JPEG, and PDF illustrations. The filename
+extension must agree with a recognizable binary signature. This is a format sanity
+check, not a complete malware or document-validity scan; project resources are
+trusted publication inputs.
+
+Image titles become plain captions, falling back to plain alternative text. Inline
+images, formatted alternatives, remote URLs, raw SVG files, queries, and fragments
+are rejected. A PDF illustration contributes its first page, so an author who needs
+a single figure is responsible for supplying an appropriate file.
+
+Identical image bytes are stored once even when reached through different source
+paths. Every source path remains a protected input, because deduplication must not
+make another alias eligible as an output destination.
+
+## Content-derived names remove author syntax
+
+Companion directories and files use hashes rather than source basenames. A content
+hash makes equal bytes share one companion and prevents spaces, path separators, or
+TeX punctuation from entering the generated reference.
+
+For the bounded image and diagram companions, if the unique byte lengths are `b₁`
+through `bₙ`, the retained resource cost is
+
+```text
+B = b₁ + b₂ + … + bₙ
+```
+
+Publication accepts these companions only while `B` stays within fixed
+implementation budgets. Counting unique bytes reflects actual retained output,
+while a separate request-count bound limits work caused by many aliases. Exceeding
+either bound rejects the plan; no image or diagram is silently omitted. This
+formula does not describe font or license companions, which do not yet have an
+equivalent aggregate budget.
+
+Content-derived names do not prove authenticity and are not a cache lifetime
+promise. They provide deterministic, syntax-safe companion identities for one
+planned publication.
+
+## Diagrams are rendered as optional assets
+
+A Mermaid fence is a request for a vector figure, not ordinary code in the printed
+book. Books without diagrams need no browser. Books with diagrams require an
+explicitly selected, trusted Chromium executable and an isolated renderer process.
+No browser is discovered, installed, or downloaded on the author's behalf.
+
+The only author-controlled payload crossing the worker boundary is bounded diagram
+source plus a catalogue theme. The controller also supplies its private directory
+and the explicitly selected Chromium path. Author frontmatter, directives, raw
+HTML, CSS commands, and interaction commands are rejected. The browser runs fixed
+local code, denies network activity, and validates the resulting SVG before the
+controller accepts it.
+
+```mermaid
+flowchart TD
+    Fence[Mermaid source] --> Policy[Validate bounded source policy]
+    Policy --> Worker[Private browser worker]
+    Worker --> SVG[Validated vector SVG]
+    Worker --> PDF[Validated vector PDF]
+    SVG --> Companions[Resource plan]
+    PDF --> Companions
+```
+
+The PDF is the figure used by LaTeX; the SVG preserves a portable vector companion.
+The arrows represent bytes returned to the planner, not browser writes into the
+project. Identical source strings render once for the selected theme.
+
+The worker owns a private directory, browser profile, and process group. Time,
+source, artifact, total-byte, and log bounds turn a stuck or excessive renderer into
+a failed publication rather than an unbounded background task. Cleanup is part of
+the result: undisclosed leftover profiles are not treated as success.
+
+## Fonts require an explicit manifest
+
+Font discovery is intentionally absent. Scanning a directory or querying installed
+families would make the publication depend on accidental machine state and would
+not explain whether redistribution is allowed.
+
+A manifest is an explicit allowlist. Each family declares regular, bold, italic,
+and bold-italic faces plus at least one license file. Unknown fields are errors so a
+misspelled face or license key cannot disappear silently. Font paths use the same
+portable root-relative policy and name supported font containers.
+
+All manifest entries are validated and all declared files are required to exist,
+including entries not selected by the current book. Only selected families are
+copied. This makes the manifest a coherent declared set while keeping the output
+small.
+
+A face normally names a real font file. Italic faces may explicitly request a
+bounded synthetic slant while still naming the source file. There is no implicit
+font fallback, synthetic weight, arbitrary font-feature string, or attempt to infer
+a missing face.
+
+## License files travel with selected fonts
+
+Every selected family's license files are copied as opaque bytes into the companion
+set. The planner verifies presence; it does not interpret legal terms or decide
+whether redistribution is permitted. That judgment remains with the publisher.
+
+The distinction is important. Requiring a license companion prevents accidental
+omission, while pretending to automate legal interpretation would offer false
+assurance.
+
+Font companion names derive from family and face roles rather than author paths.
+The renderer receives only those safe names and the validated synthetic-slant value,
+if any. A raw project path never enters a font command.
+
+## Validate all destinations before conversion
+
+Document sources, declared templates, image aliases, the font manifest, font files,
+license files, and an explicitly chosen browser are protected inputs. Planned
+outputs are checked against them for equality and ancestry in both directions.
+Existing hard-link identity is checked as well as lexical spelling.
+
+The planner also checks outputs against one another. A destination cannot be both a
+file and a parent directory, and case-folded equivalents are rejected even on a
+case-sensitive host. These checks happen before Pandoc conversion and before an
+output transaction creates directories.
+
+## Portability has a defined boundary
+
+A portable LaTeX publication consists of the TeX document and its planned companion
+directories. Move the containing output directory as a unit. Old companions that no
+longer belong to a newer plan are not deleted automatically; automatic pruning
+could remove files owned by another publication.
+
+The package still depends on a suitable TeX installation. Without a font manifest,
+it also depends on the selected families being installed. Diagram production needs
+the explicitly configured browser, but compiling an already prepared diagram does
+not. No shell escape is required for images or diagrams.
+
+Portability therefore means that declared project resources are copied under safe,
+stable names and referenced relatively. It does not mean that every compiler,
+package, glyph, or legal permission is embedded.
+
+Once the complete TeX and resource plan exists, PDF production can happen in a
+private build. The next chapter follows that plan through external tools while
+preserving the previous published output until a replacement is fully accepted.

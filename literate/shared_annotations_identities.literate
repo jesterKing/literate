@@ -1,0 +1,181 @@
+# Shared annotations and identities
+
+Long explanations sometimes need information that should be available without
+breaking the main argument. A reusable term may need a precise definition. A note
+may add context that belongs beside the discussion rather than inside its sentence.
+Screen and print present these additions differently, but they must agree about
+which definition or note a reference names.
+
+Literate therefore treats annotations as meaning before presentation. It collects
+terms, notes, and uses into one renderer-neutral model. Screen renderers turn that
+model into links, sections, asides, and indexes. Print turns the same identities into
+page references, margin material, and indexes.
+
+```mermaid
+flowchart TD
+    Source[Prose and annotation fences] --> Collect[Collect definitions, notes, and uses]
+    Collect --> Resolve[Resolve keys to stable targets]
+    Resolve --> Model[Shared annotation model]
+    Model --> Screen[Screen links and indexes]
+    Model --> Print[Page references and annotation rail]
+```
+
+The arrows mean that both media consume the same resolution result. They do not
+mean that one presentation is translated into the other. The diagram omits styling
+because appearance must not determine identity.
+
+## Two kinds of annotation
+
+A term has an author-chosen key, a display title, and a Markdown body. Its key lets
+prose refer to the definition through a `term:` link. A note has a Markdown body but
+no reusable key; its numbered occurrence is the reference point.
+
+Both are fenced prose blocks rather than code fragments. They never contribute to a
+generated source root. Their bodies remain in the book's semantic stream and are
+parsed by a deliberately small annotation language.
+
+A term declaration uses the shape `TERM key "Display title"`. Keys are
+case-sensitive, begin with an ASCII letter, and continue with a restricted set of
+letters, digits, and punctuation. The title is a JSON string, which gives escaping
+one existing grammar instead of inventing another. A note uses the header `NOTE`
+without arguments. Exact uppercase words reserve these forms; similar language
+labels remain ordinary fences.
+
+## Parse bodies once, then restrict them
+
+Annotation bodies support paragraphs, ordered and unordered lists, emphasis,
+strong emphasis, inline code, ordinary links, text, and line breaks. Headings,
+block quotations, tables, images, raw HTML, code blocks, nested annotations, and
+diagrams are rejected.
+
+The parser is allowed to recognize disallowed structures so it can diagnose them.
+Recognition is not authorization. This distinction is important for raw HTML: the
+collector must see it in order to reject it, while renderers must never pass a
+rejected body through unsanitized.
+
+Uses inside accepted body prose are collected just like uses in ordinary prose.
+Inline code, fenced code, and image alternatives are not term uses. The model keeps
+token and child indexes for occurrences because the Markdown parser does not
+provide exact source columns for every inline child. Locations remain honest rather
+than pretending to precision the parser does not possess.
+
+## Identity is not a visible label
+
+Visible text is a poor identifier. Titles can be edited, repeated, translated, or
+styled. Line numbers also move whenever prose is inserted. Shared destinations are
+therefore generated in distinct namespaces from controlled semantic components.
+
+The same fixed-width component encoding used by publication targets applies here:
+
+```text
+encoded component = concatenation of four hexadecimal digits per UTF-16 code unit
+```
+
+A unique term target derives from its key. This makes ordinary prose edits and a
+move between chapters irrelevant to the term's identity. A note target derives
+from its canonical source path and fence location, because a note has no author key.
+Its displayed number derives from encounter order and is not its identity.
+
+```mermaid
+flowchart TD
+    TermKey[Term key] --> TermTarget[Stable term target]
+    NotePlace[Document path and fence location] --> NoteTarget[Note target]
+    BookOrder[Encounter order] --> NoteNumber[Displayed note number]
+```
+
+The arrows mean “determines.” The separation between note target and note number is
+the point: renumbering a note for presentation does not redefine how its source
+occurrence was identified. The diagram omits namespace prefixes, which are
+mechanical collision protection.
+
+## Collect before resolving
+
+Forward references are normal in a book, so a use cannot be resolved when first
+encountered. Collection proceeds in two passes:
+
+1. gather every valid term, note, and `term:` use in document order;
+2. group terms by key, diagnose duplicates, and resolve every use.
+
+A key with one definition resolves. A key with no definition is missing. A key with
+more than one definition is ambiguous. Ambiguity does not select the first term and
+thereby make document order an accidental tie-breaker.
+
+Duplicate term definitions still need distinct targets so a preview can show and
+navigate to each diagnosed declaration. Location-qualified targets provide that
+uniqueness. Only a term whose key is unique receives the shorter key-derived target.
+Uses inside the term's own body are updated together when that identity is finalized.
+
+Percent encoding in a `term:` destination is decoded exactly once. Malformed
+encoding and keys outside the accepted grammar do not become lookup strings. A
+failed lookup returns no target; it never echoes the author-provided destination as
+if validation had succeeded.
+
+## Occurrences have identities too
+
+A definition target answers “where is this term defined?” An occurrence target
+answers “which use is this index entry referring to?” These questions require
+separate identities.
+
+Each use records its owner and its token position within that owner. For ordinary
+prose the owner is the document path. For annotation-body prose the owner is the
+annotation target. Screen rendering derives a use anchor from this information, so
+multiple equal labels remain independently addressable.
+
+This is also why indexes do not search rendered text. Text search would confuse two
+uses with the same label, miss formatting boundaries, and disagree between screen
+and print. Explicit occurrence data preserves encounter order and exact semantic
+membership.
+
+## One meaning, different presentations
+
+On screen, a term definition becomes an identified section and a note becomes an
+identified aside. A resolved use becomes a link. A missing, ambiguous, or not-yet
+available destination remains readable text with unresolved styling rather than a
+misdirected link.
+
+In print, a term definition remains in the prose. A resolved use links to it and can
+show a page reference. Notes become numbered markers whose bodies are placed by the
+annotation rail. Annotation bodies pass through the same controlled document
+conversion as ordinary prose rather than being flattened into unformatted strings.
+
+Only annotated books receive term and fragment indexes. The screen index links to
+semantic targets and individual occurrences. The print index links to definition
+and contribution pages. Neither index guesses targets from labels or scans final
+markup.
+
+```mermaid
+flowchart TD
+    Identity[Shared semantic target] --> Anchor[Screen anchor]
+    Identity --> Capability[Editor navigation capability]
+    Identity --> Label[Print destination and page reference]
+    Anchor --> Index[Screen index]
+    Label --> PrintIndex[Print index]
+```
+
+The arrows show adaptations of one identity. An editor capability is transport, not
+a replacement identity. The diagram omits URLs and TeX syntax because those are
+escaping concerns at later boundaries.
+
+## Strict export, useful preview
+
+Annotation diagnostics join project diagnostics. A durable export must not publish
+an unresolved term, duplicate key, invalid header, or unsupported body. The editor
+can still retain diagnosed annotation objects so the author sees the nearby prose
+and can correct it.
+
+This difference follows the publication principle established earlier: a preview
+can be tolerant about incomplete work, while an export is a claim that references
+are complete.
+
+## Stability has limits
+
+Generated identities are deterministic, but they are not universal permanent IDs.
+Changing a term key intentionally changes its identity. Moving a note changes its
+source-derived target. Editing earlier structure can change token positions used by
+occurrence anchors. Stable here means independent of presentation and unrelated
+prose changes within the stated components—not immune to edits that redefine those
+components.
+
+With shared identities established, the screen pipeline can focus on presentation:
+how to merge syntax and semantic links, navigate between chapters, expose indexes,
+and add optional exploration without making JavaScript a requirement for reading.

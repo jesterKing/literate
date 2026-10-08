@@ -1,0 +1,198 @@
+# Typesetting the book
+
+A print renderer turns a validated publication document into a physical layout.
+This is more than changing HTML tags into LaTeX commands. Pages have finite
+geometry, code must remain legible, links need stable destinations, and annotations
+must find space without colliding with the body.
+
+The architecture first builds a controlled document, then asks a trusted converter
+for a LaTeX body, and finally surrounds that body with a renderer-owned book
+template. Author text never becomes template control data.
+
+```mermaid
+flowchart TD
+    Document[Validated publication document] --> Transform[Renderer-controlled transformations]
+    Transform --> Convert[Trusted prose-to-LaTeX conversion]
+    Convert --> Template[Book template and layout policy]
+    Template --> TeX[Complete TeX document]
+```
+
+The arrows show increasing commitment to print. Structured prose remains data until
+the conversion step; geometry and font commands enter only in the template. The
+diagram omits compilation, which belongs to the next stage and must not influence
+document meaning.
+
+## Geometry begins with a readable body
+
+Paper size and margins define the ordinary text rectangle. For page width `W`, left
+margin `L`, right margin `R`, and an annotation reserve `A`, the usable body width is
+
+```text
+W_body = W - L - R - A
+```
+
+For an unannotated book, `A` is zero. When the annotation rail is present, the
+reserve includes both rail width and the gap separating it from prose. On a page
+210 mm wide, 20 mm left and right margins plus a 30 mm rail reserve leave a 140 mm
+body: `210 - 20 - 20 - 30 = 140`. Height is similarly
+`H_body = H - T - B`, using top and bottom margins.
+
+The renderer validates margins and requires a minimum body in both dimensions.
+This catches combinations that are individually plausible but collectively leave
+no readable page. Geometry validation occurs before conversion because no prose
+transformation can repair an impossible rectangle.
+
+The rail reserve is added to the physical right margin rather than taken silently
+from the promised body width. Body protrusion is disabled for annotated books so
+optical margin behavior cannot enter the clear gap.
+
+## Font roles express purpose
+
+The template distinguishes body, heading, code, fragment-label, and note families.
+A project setting resolves each role, and a caller may provide validated overrides.
+The note role is resolved explicitly rather than accidentally following every later
+body-font override.
+
+Code ligatures are a policy choice. They may improve the appearance of some fonts,
+but can also make literal character sequences harder to inspect. The renderer
+therefore treats the choice as a checked boolean and can disable contextual
+substitutions without accepting arbitrary font feature strings.
+
+Portable font companions, when present, provide explicit regular, bold, italic, and
+bold-italic faces. Without companions, family names select installed fonts. In both
+modes, author text cannot inject paths or font options through a family name.
+
+## Headings and references share semantic targets
+
+Document, heading, fragment, contribution, term, note, and use identities already
+exist before typesetting. The LaTeX renderer encodes them again into a private label
+namespace. This second encoding ensures that even a manually constructed model
+cannot place TeX syntax inside a command argument.
+
+Visible fragment names are escaped independently from destinations. Long names gain
+discretionary break opportunities between characters, allowing line wrapping
+without changing the semantic name or destination. Names that exceed the renderer's
+explicit bound fail instead of being silently abbreviated.
+
+References use the family target, while individual contribution destinations remain
+available for navigation and indexes. The visible fragment spelling stays intact;
+the printed link and page reference are presentation around that spelling, not a
+replacement for it.
+
+## Code needs full context
+
+Syntax highlighting works best when a highlighter sees a complete contribution.
+Highlighting each literal segment separately would lose language context around
+fragment references. The renderer therefore highlights the full display text and
+then overlays semantic reference ranges, just as screen rendering does.
+
+```mermaid
+flowchart TD
+    Code[Complete displayed contribution] --> Highlight[Syntax spans]
+    Code --> Meaning[Reference spans]
+    Highlight --> Overlay[Print span overlay]
+    Meaning --> Overlay
+    Overlay --> LaTeX[Escaped styled code and links]
+```
+
+The arrows indicate two coordinate systems over the same UTF-16 text. Neither pass
+parses the other's output. The diagram omits ordinary inline code, which follows a
+simpler escaping path.
+
+The renderer owns all raw LaTeX used for code boxes, colors, fonts, and links.
+Literal source text is escaped. Unsupported control characters are rejected. The
+trusted document converter has syntax highlighting disabled so there is only one
+highlighting policy.
+
+## The converter is narrow and trusted
+
+Pandoc receives the already validated document tree and returns a LaTeX body. It is
+not allowed to choose the standalone template, run filters, load external includes,
+or add a second syntax highlighter. Trusted raw nodes inserted by the renderer must
+be preserved; raw author markup never reaches this boundary.
+
+The implementation expresses this stage through `renderLatex`, which calls the
+controlled document bridge and an injected converter. A converter failure, invalid
+return value, or template failure becomes a diagnostic, and no partial LaTeX result
+is returned.
+
+This boundary is intentionally injectable. The pure renderer can be tested with a
+controlled converter, while the command-line adapter separately owns the real
+Pandoc process and its time and output bounds.
+
+## Annotations require page-time knowledge
+
+A term definition stays in the prose. A term use can link back to that definition
+and display its page. A note use becomes a numbered marker whose body belongs in the
+outer rail. Unlike ordinary links, rail placement depends on the physical page and
+the vertical position produced by TeX.
+
+```mermaid
+sequenceDiagram
+    participant Body as Typeset body
+    participant Marks as Late page marks
+    participant Rail as Annotation rail
+    participant Ship as Page shipout
+
+    Body->>Marks: Record term uses and note positions
+    Marks->>Rail: Supply physical-page membership and coordinates
+    Rail->>Rail: Place ordered entries without overlap
+    Rail->>Ship: Release a stable page
+```
+
+The sequence emphasizes that logical source order alone cannot determine physical
+placement. Late page nodes report where material actually landed. The diagram omits
+auxiliary-file details; the important requirement is that the final build certifies
+stable placement.
+
+Within a page, the rail preserves one ordered stream of term uses and notes. It
+tries to place each entry near its recorded position; forward and reverse packing
+may move entries up or down to avoid overlap and keep the complete stream inside
+the page. If the page cannot accommodate the required material, the build must fail
+or rerun rather than quietly overlap or discard an annotation.
+
+Annotation bodies are converted through the same trusted prose writer. They are not
+flattened to plain text. Bounds on declaration count, individual controlled values,
+and aggregate content keep repeated conversion and rail construction finite.
+
+## Indexes summarize identities
+
+Annotated books receive a term index and a fragment index. Term entries point to
+prose definitions. Fragment entries list the pages of the family's accepted
+contributions. Index generation consumes explicit model order and targets; it does
+not scan the LaTeX body for labels.
+
+Indexes are appended only after the main body transformation has succeeded. They do
+not replay term-use markers or annotation bodies, which could otherwise distort the
+rail or duplicate definitions.
+
+## Images are page-aware blocks
+
+A supported standalone image becomes a non-floating block. The renderer measures
+its escaped caption at the current line width, subtracts the caption and spacing
+from the full text-block height, and fits the graphic within that maximum height and
+the current width while preserving aspect ratio. TeX moves the indivisible block to
+a later page when the current page has insufficient remaining space.
+
+This matters inside lists and quotations, where the current line width can be
+narrower than the page body. A caption that leaves no useful height is an explicit
+error. The block may move intact to the next page rather than splitting image from
+caption.
+
+The renderer receives only a safe companion path from the resource planner. It does
+not resolve author filesystem paths or invoke conversion tools.
+
+## A controlled template, not a custom execution surface
+
+The final template owns the document class, packages, geometry, font declarations,
+colors, heading behavior, code environment, image macro, links, and optional rail.
+Only validated layout, palette, font, and companion-path values enter it.
+
+This does not make TeX a sandbox. The generated document is trusted compiler input.
+The safety property is narrower: arbitrary author Markdown is represented through a
+controlled tree and escaped text rather than copied into raw TeX commands.
+
+The result of this chapter is a complete in-memory TeX document and its known
+companion requirements. The next chapter explains how images, diagrams, fonts, and
+licenses become portable resources without giving author paths authority over the
+publication layout.
