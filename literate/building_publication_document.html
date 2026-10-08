@@ -250,7 +250,37 @@ author markup.</p>
 <p>The bridge also keeps metadata intentionally narrow. Publication settings and page
 layout are renderer options, not unreviewed document metadata that can alter the
 converter's behavior.</p>
-<h2>Complete means complete</h2>
+<p><code>publication Pandoc preparation</code> keeps validation ahead of trusted materialization.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500061006e0064006f00630020007000720065007000610072006100740069006f006e-006c0069007400650072006100740065002f006200750069006c00640069006e0067005f007000750062006c00690063006100740069006f006e005f0064006f00630075006d0065006e0074002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e002000500061006e0064006f00630020007000720065007000610072006100740069006f006e"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500061006e0064006f00630020007000720065007000610072006100740069006f006e" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500061006e0064006f00630020007000720065007000610072006100740069006f006e" aria-label="Definition of publication Pandoc preparation">&lt;&lt;publication Pandoc preparation&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">preparePandoc</span>(<span class="hljs-params">
+    project: ParsedProject, renderContribution: </span><span class="hljs-params">(part: PublicationContribution)</span><span class="hljs-params"> =&gt; PandocBlock[],
+    renderAsset?: AssetRenderer
+</span>): <span class="hljs-title">PandocPreparationResult</span> {
+    <span class="hljs-keyword">const</span> diagnostics = project.<span class="hljs-property">diagnostics</span>.<span class="hljs-title">map</span>(<span class="hljs-params">diagnostic</span><span class="hljs-function"> =&gt;</span> ({ ...diagnostic }));
+    <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { diagnostics }; }
+    diagnostics.<span class="hljs-title">push</span>(...project.<span class="hljs-property">annotations</span>.<span class="hljs-property">diagnostics</span>.<span class="hljs-title">map</span>(<span class="hljs-params">diagnostic</span><span class="hljs-function"> =&gt;</span> ({ ...diagnostic })));
+    <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { diagnostics }; }
+    <span class="hljs-title">validateReferences</span>(project, diagnostics);
+    <span class="hljs-keyword">const</span> targets = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>(project.<span class="hljs-property">documents</span>.<span class="hljs-title">map</span>(<span class="hljs-params">document</span><span class="hljs-function"> =&gt;</span> [<span class="hljs-variable">document</span>.<span class="hljs-property">path</span>, <span class="hljs-title">headingDestinations</span>(<span class="hljs-variable">document</span>)]));
+    <span class="hljs-keyword">const</span> parts = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>(project.<span class="hljs-property">publication</span>.<span class="hljs-property">contributions</span>.<span class="hljs-title">map</span>(<span class="hljs-params">part</span><span class="hljs-function"> =&gt;</span> [part.<span class="hljs-property">target</span>, part]));
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">pending</span>: <span class="hljs-title">PendingBlock</span>[] = project.<span class="hljs-property">documents</span>.<span class="hljs-title">map</span>(<span class="hljs-params">document</span><span class="hljs-function"> =&gt;</span> {
+        <span class="hljs-keyword">const</span> contributions = <span class="hljs-title">contributionIndex</span>(<span class="hljs-variable">document</span>, parts, diagnostics);
+        <span class="hljs-keyword">const</span> body = <span class="hljs-title">readBlocks</span>({ <span class="hljs-variable">document</span>, <span class="hljs-attr">index</span>: <span class="hljs-number">0</span>, contributions, targets, diagnostics,
+            <span class="hljs-attr">annotations</span>: project.<span class="hljs-property">annotations</span>, <span class="hljs-attr">assets</span>: !!renderAsset });
+        <span class="hljs-keyword">return</span> { <span class="hljs-attr">t</span>: <span class="hljs-string">'Div'</span>, <span class="hljs-attr">c</span>: [[targets.<span class="hljs-title">get</span>(<span class="hljs-variable">document</span>.<span class="hljs-property">path</span>)!.<span class="hljs-property">id</span>, [], []], body] };
+    });
+    <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { diagnostics }; }
+    <span class="hljs-keyword">const</span> blocks = <span class="hljs-title">materialize</span>(pending, renderContribution, diagnostics, renderAsset);
+    <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { diagnostics }; }
+
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">document</span>: { <span class="hljs-string">'pandoc-api-version'</span>: [<span class="hljs-number">1</span>, <span class="hljs-number">23</span>, <span class="hljs-number">1</span>], <span class="hljs-attr">meta</span>: {}, blocks }, diagnostics };
+}
+</code></pre>
+
+</div>
+</div><h2>Complete means complete</h2>
 <p>A successful result contains one document whose blocks preserve project order and
 container structure. A failed result contains diagnostics and no document. This
 contract lets later stages assume that links, contributions, annotations, and

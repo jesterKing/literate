@@ -132,18 +132,7 @@ Generated diagrams and local images share the same content-addressed namespace.
 The addition step bounds all retained companion bytes and emits each path once.
 SVG is accepted only from the trusted diagram adapter, never as a local image.
 
-```ts : <<publication asset addition>>=
-const add = (content: Uint8Array, extension: string): string => {
-    const companion = `${directory}/${hash(content)}.${extension}`;
-    if (!files.has(companion)) {
-        total += content.length;
-        if (total > 128 * 1024 * 1024) { throw new Error('Publication images exceed 128 MiB'); }
-        files.add(companion);
-        plan.files.push({ path: posix.join(posix.dirname(output), companion), content });
-    }
-    return companion;
-};
-```
+Content-derived companion naming is presented in [Portable publication resources](portable_publication_resources.html).
 
 Local files are validated before the optional renderer is invoked. The browser
 adapter returns both vector formats, but only the PDF enters the LaTeX body.

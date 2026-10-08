@@ -430,31 +430,7 @@ Every pending slot owns its timeout and abort listener until settlement.
 
 Validate the document set before notifying the server.
 
-```ts : <<language client sync>>=
-    public async sync(documents: LanguageDocument[]): Promise<void> {
-        await this.initialize();
-        if (this.closing || this.stopped) { throw this.stopped || new Error('Language client disposed'); }
-        const sync = this.capabilities.textDocumentSync;
-        const kind = typeof sync === 'number' ? sync : object(sync) ? sync.change : 0;
-        if (documents.length && kind !== 1 && kind !== 2) { throw new Error('Language server document synchronization unsupported'); }
-        const openClose = typeof sync === 'number' || (object(sync) && sync.openClose === true);
-        if (documents.length && !openClose) { throw new Error('Language server open/close synchronization required for projections'); }
-        const next = new Map(documents.map(doc => [doc.uri, { ...doc }]));
-        let bytes = 0;
-        for (const doc of next.values()) { bytes += Buffer.byteLength(JSON.stringify(doc), 'utf8'); }
-        if (documents.length > 1024 || next.size !== documents.length || bytes > limit / 2) {
-            throw new Error('LSP document set limit exceeded or duplicate URI');
-        }
-        for (const [uri, old] of this.documents) {
-            if (!next.has(uri) || next.get(uri)!.languageId !== old.languageId) {
-                this.documents.delete(uri);
-                if (openClose) { this.send({ method: 'textDocument/didClose', params: { textDocument: { uri } } }); }
-            }
-        }
-        for (const doc of next.values()) { this.updateDocument(doc, kind, openClose); }
-    }
-
-```
+Complete-set synchronization is presented in [Owning a language-server session](owning_language_server_session.html).
 
 Incremental servers receive a single full-range replacement.
 

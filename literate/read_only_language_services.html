@@ -250,7 +250,34 @@ The user loses one answer rather than being sent to a fabricated location or giv
 an unsafe replacement. Diagnostics require broader, persistent ownership, so the
 next chapter adds time, caching, and the editor's Problems collection to the mapping
 problem.</p>
+<p><code>navigation intersections</code> walks mapped segments monotonically and stops when
+continuity cannot be proved.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006e0061007600690067006100740069006f006e00200069006e00740065007200730065006300740069006f006e0073-006c0069007400650072006100740065002f0072006500610064005f006f006e006c0079005f006c0061006e00670075006100670065005f00730065007200760069006300650073002e006c0069007400650072006100740065-1"><span id="f-006e0061007600690067006100740069006f006e00200069006e00740065007200730065006300740069006f006e0073"></span><a class="literate-tag-name" href="#f-006e0061007600690067006100740069006f006e00200069006e00740065007200730065006300740069006f006e0073" data-literate-target="f-006e0061007600690067006100740069006f006e00200069006e00740065007200730065006300740069006f006e0073" aria-label="Definition of navigation intersections">&lt;&lt;navigation intersections&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">mapped</span>(<span class="hljs-params">file: LanguageProjection, bounds: [</span><span class="hljs-built_in">number</span><span class="hljs-params">, </span><span class="hljs-built_in">number</span><span class="hljs-params">], state: Prepared, limit: </span><span class="hljs-built_in">number</span>): vscode.<span class="hljs-property">Location</span>[] {
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">result</span>: vscode.<span class="hljs-property">Location</span>[] = [], seen = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
+    <span class="hljs-keyword">let</span> <span class="hljs-attr">pending</span>: <span class="hljs-title">Intersection</span> | <span class="hljs-literal">undefined</span>;
+    <span class="hljs-keyword">const</span> flush = (): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+        <span class="hljs-keyword">if</span> (!pending) { <span class="hljs-keyword">return</span>; }
+        <span class="hljs-keyword">const</span> value = <span class="hljs-title">location</span>(pending), id = <span class="hljs-title">key</span>(value);
+        <span class="hljs-keyword">if</span> (!seen.<span class="hljs-title">has</span>(id)) { seen.<span class="hljs-title">add</span>(id); result.<span class="hljs-title">push</span>(value); }
+    };
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> mapping <span class="hljs-keyword">of</span> file.<span class="hljs-property">mappings</span>) {
+        <span class="hljs-keyword">const</span> next = <span class="hljs-title">intersection</span>(file, mapping, bounds[<span class="hljs-number">0</span>], bounds[<span class="hljs-number">1</span>], state);
+        <span class="hljs-keyword">if</span> (!next) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">if</span> (pending &amp;&amp; <span class="hljs-title">connected</span>(pending, next)) { pending.<span class="hljs-property">end</span> = next.<span class="hljs-property">end</span>; pending.<span class="hljs-property">to</span> = next.<span class="hljs-property">to</span>; <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-title">flush</span>();
+        <span class="hljs-keyword">if</span> (result.<span class="hljs-property">length</span> &gt;= limit) { <span class="hljs-keyword">return</span> result; }
+        pending = next;
+    }
+    <span class="hljs-title">flush</span>();
+    <span class="hljs-keyword">return</span> result;
+}
+</code></pre>
+
 </div>
+</div></div>
 <script type="module">
   import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
   mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});

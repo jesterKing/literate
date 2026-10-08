@@ -129,6 +129,20 @@ or configuration changes clear stale candidates.
 Automatic triggering is independently configurable per resource. Manual provider
 invocation continues to use the same projection and reply guards.
 
+`language feature automatic freshness` expresses the temporal proof for one
+candidate.
+
+```ts : <<language feature automatic freshness>>=
+    function current(edit: Edit): boolean {
+        const editor = vscode.window.activeTextEditor;
+        return !disposed && candidate === edit && epoch === edit.revision
+            && vscode.window.state.focused && editor === edit.editor && editor.document === edit.document
+            && edit.document.version === edit.version && enabled(edit.document)
+            && editor.selections.length === 1 && editor.selection.isEmpty
+            && editor.selection.active.isEqual(edit.cursor);
+    }
+```
+
 ## Signature triggers belong to their selected server
 
 The coordinator starts with a small conservative trigger set and learns bounded

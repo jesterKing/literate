@@ -310,25 +310,4 @@ zero-length reverse ranges support completion insertions. Callers convert LSP
 line/character pairs using the corresponding original/generated string, preserving
 UTF-16 rather than counting Unicode code points.
 
-```ts : <<projection position helpers>>=
-export function mapSourcePosition(files: LanguageProjection[], sourcePath: string, offset: number): SourceProjectionPosition | undefined {
-    if (!Number.isInteger(offset) || offset < 0) { return undefined; }
-    const path = safeRelativePath(sourcePath);
-    for (const file of files) {
-        for (const mapping of file.mappings) {
-            if (mapping.sourcePath === path && offset >= mapping.sourceStart
-                && (offset < mapping.sourceEnd || (offset === mapping.sourceEnd && mapping.endCursor))) {
-                return { file, offset: mapping.generatedStart + offset - mapping.sourceStart, mapping };
-            }
-        }
-    }
-    return undefined;
-}
-
-export function mapGeneratedRange(file: LanguageProjection, start: number, end: number, mapping: ProjectionMapping): { start: number; end: number } | undefined {
-    if (!file.mappings.includes(mapping) || !Number.isInteger(start) || !Number.isInteger(end)
-        || start > end || start < mapping.generatedStart || end > mapping.generatedEnd
-        || (start === end && start === mapping.generatedEnd && !mapping.endCursor)) { return undefined; }
-    return { start: mapping.sourceStart + start - mapping.generatedStart, end: mapping.sourceStart + end - mapping.generatedStart };
-}
-```
+Position mapping is presented in [The projection problem](projection_problem.html).

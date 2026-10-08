@@ -151,28 +151,8 @@ Cross-document preview links use only the extension's capability adapter. Pendin
 or failed resolutions stay text: native line-link fallback can create divergent
 fragment-qualified documents in the host. Logical identity remains in
 <code>data-literate-target</code>, independent of the opaque session URL.</p>
-<div class="codefragment">
-<div class="fragmentname" id="c-00730063007200650065006e002000720065006c00610074006900760065002000640065007300740069006e006100740069006f006e0073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1"><span id="f-00730063007200650065006e002000720065006c00610074006900760065002000640065007300740069006e006100740069006f006e0073"></span><a class="literate-tag-name" href="#f-00730063007200650065006e002000720065006c00610074006900760065002000640065007300740069006e006100740069006f006e0073" data-literate-target="f-00730063007200650065006e002000720065006c00610074006900760065002000640065007300740069006e006100740069006f006e0073" aria-label="Definition of screen relative destinations">&lt;&lt;screen relative destinations&gt;&gt;=</a></div>
-<div class="code">
-<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">screenHref</span>(<span class="hljs-keyword">from</span><span class="hljs-params">: </span><span class="hljs-built_in">string</span><span class="hljs-params">, to: </span><span class="hljs-built_in">string</span><span class="hljs-params">, target: </span><span class="hljs-built_in">string</span><span class="hljs-params">, format: ScreenFormat,
-    previewDestination?: PreviewDestination</span>): <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span> {
-    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">from</span> === to) { <span class="hljs-keyword">return</span> <span class="hljs-string">'#'</span> + target; }
-    <span class="hljs-keyword">if</span> (format === <span class="hljs-string">'preview'</span>) { <span class="hljs-keyword">return</span> previewDestination?.(target); }
-    <span class="hljs-keyword">const</span> base = <span class="hljs-keyword">from</span>.<span class="hljs-title">split</span>(<span class="hljs-string">'/'</span>); base.<span class="hljs-title">pop</span>();
-    <span class="hljs-keyword">const</span> destination = to.<span class="hljs-title">split</span>(<span class="hljs-string">'/'</span>);
-    <span class="hljs-keyword">while</span> (base.<span class="hljs-property">length</span> &amp;&amp; base[<span class="hljs-number">0</span>] === destination[<span class="hljs-number">0</span>]) { base.<span class="hljs-title">shift</span>(); destination.<span class="hljs-title">shift</span>(); }
-    <span class="hljs-keyword">const</span> relative = [...base.<span class="hljs-title">map</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-string">'..'</span>), ...destination];
-    <span class="hljs-keyword">if</span> (format === <span class="hljs-string">'html'</span>) { relative[relative.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>] = relative[relative.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>].<span class="hljs-title">replace</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\.</span><span class="hljs-regexp">literate$/</span>, <span class="hljs-string">'.html'</span>); }
-    <span class="hljs-keyword">return</span> <span class="hljs-string">'./'</span> + relative.<span class="hljs-title">map</span>(<span class="hljs-built_in">encodeURIComponent</span>).<span class="hljs-title">join</span>(<span class="hljs-string">'/'</span>) + <span class="hljs-string">'#'</span> + target;
-}
-<span class="hljs-keyword">function</span> <span class="hljs-title">screenLink</span>(<span class="hljs-params">href: </span><span class="hljs-built_in">string</span><span class="hljs-params"> | </span><span class="hljs-literal">undefined</span><span class="hljs-params">, label: </span><span class="hljs-built_in">string</span><span class="hljs-params">, text: </span><span class="hljs-built_in">string</span><span class="hljs-params">, target: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span> {
-    <span class="hljs-keyword">if</span> (href === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> escapeHtml(text); }
-    <span class="hljs-keyword">return</span> <span class="hljs-string">`&lt;a class=&quot;literate-tag-name&quot; href=&quot;</span><span class="hljs-subst">${escapeHtml(href)}</span><span class="hljs-string">&quot; data-literate-target=&quot;</span><span class="hljs-subst">${target}</span><span class="hljs-string">&quot; aria-label=&quot;</span><span class="hljs-subst">${escapeHtml(label)}</span><span class="hljs-string">&quot;&gt;</span><span class="hljs-subst">${escapeHtml(text)}</span><span class="hljs-string">&lt;/a&gt;`</span>;
-}
-</code></pre>
-
-</div>
-</div><p>Syntax is intersected with semantic spans, never used to discover them. Hiding
+<p>Screen destination adaptation is presented in <a href="publication_on_screen.html">Publication on screen</a>.</p>
+<p>Syntax is intersected with semantic spans, never used to discover them. Hiding
 comment-only syntax retains the existing screen policy, but references inside
 comments remain navigable. Unknown languages stay plain; the publication adapter
 checks the pinned emitter's shape and exact text reconstruction.</p>

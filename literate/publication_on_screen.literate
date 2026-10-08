@@ -39,6 +39,26 @@ source line numbers in a public URL. If resolution is pending or unavailable, th
 reference remains text. Logical identity is retained separately from the opaque
 transport so a refreshed capability does not redefine the target.
 
+`screen relative destinations` adapts one logical target to each screen host.
+
+```ts : <<screen relative destinations>>=
+export function screenHref(from: string, to: string, target: string, format: ScreenFormat,
+    previewDestination?: PreviewDestination): string | undefined {
+    if (from === to) { return '#' + target; }
+    if (format === 'preview') { return previewDestination?.(target); }
+    const base = from.split('/'); base.pop();
+    const destination = to.split('/');
+    while (base.length && base[0] === destination[0]) { base.shift(); destination.shift(); }
+    const relative = [...base.map(() => '..'), ...destination];
+    if (format === 'html') { relative[relative.length - 1] = relative[relative.length - 1].replace(/\.literate$/, '.html'); }
+    return './' + relative.map(encodeURIComponent).join('/') + '#' + target;
+}
+function screenLink(href: string | undefined, label: string, text: string, target: string): string {
+    if (href === undefined) { return escapeHtml(text); }
+    return `<a class="literate-tag-name" href="${escapeHtml(href)}" data-literate-target="${target}" aria-label="${escapeHtml(label)}">${escapeHtml(text)}</a>`;
+}
+```
+
 ## Merge syntax with meaning
 
 Syntax highlighting and fragment references describe different aspects of the same

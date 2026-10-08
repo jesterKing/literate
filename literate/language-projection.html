@@ -447,33 +447,8 @@ are rejected. Endpoint cursors are allowed at text ends, not at reference starts
 zero-length reverse ranges support completion insertions. Callers convert LSP
 line/character pairs using the corresponding original/generated string, preserving
 UTF-16 rather than counting Unicode code points.</p>
-<div class="codefragment">
-<div class="fragmentname" id="c-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073"></span><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073" data-literate-target="f-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073" aria-label="Definition of projection position helpers">&lt;&lt;projection position helpers&gt;&gt;=</a></div>
-<div class="code">
-<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">mapSourcePosition</span>(<span class="hljs-params">files: LanguageProjection[], sourcePath: </span><span class="hljs-built_in">string</span><span class="hljs-params">, offset: </span><span class="hljs-built_in">number</span>): <span class="hljs-title">SourceProjectionPosition</span> | <span class="hljs-literal">undefined</span> {
-    <span class="hljs-keyword">if</span> (!<span class="hljs-title">Number</span>.<span class="hljs-title">isInteger</span>(offset) || offset &lt; <span class="hljs-number">0</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
-    <span class="hljs-keyword">const</span> path = <span class="hljs-title">safeRelativePath</span>(sourcePath);
-    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> files) {
-        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> mapping <span class="hljs-keyword">of</span> file.<span class="hljs-property">mappings</span>) {
-            <span class="hljs-keyword">if</span> (mapping.<span class="hljs-property">sourcePath</span> === path &amp;&amp; offset &gt;= mapping.<span class="hljs-property">sourceStart</span>
-                &amp;&amp; (offset &lt; mapping.<span class="hljs-property">sourceEnd</span> || (offset === mapping.<span class="hljs-property">sourceEnd</span> &amp;&amp; mapping.<span class="hljs-property">endCursor</span>))) {
-                <span class="hljs-keyword">return</span> { file, <span class="hljs-attr">offset</span>: mapping.<span class="hljs-property">generatedStart</span> + offset - mapping.<span class="hljs-property">sourceStart</span>, mapping };
-            }
-        }
-    }
-    <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
-}
-
-<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">mapGeneratedRange</span>(<span class="hljs-params">file: LanguageProjection, start: </span><span class="hljs-built_in">number</span><span class="hljs-params">, end: </span><span class="hljs-built_in">number</span><span class="hljs-params">, mapping: ProjectionMapping</span>): { <span class="hljs-attr">start</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">end</span>: <span class="hljs-built_in">number</span> } | <span class="hljs-literal">undefined</span> {
-    <span class="hljs-keyword">if</span> (!file.<span class="hljs-property">mappings</span>.<span class="hljs-title">includes</span>(mapping) || !<span class="hljs-title">Number</span>.<span class="hljs-title">isInteger</span>(start) || !<span class="hljs-title">Number</span>.<span class="hljs-title">isInteger</span>(end)
-        || start &gt; end || start &lt; mapping.<span class="hljs-property">generatedStart</span> || end &gt; mapping.<span class="hljs-property">generatedEnd</span>
-        || (start === end &amp;&amp; start === mapping.<span class="hljs-property">generatedEnd</span> &amp;&amp; !mapping.<span class="hljs-property">endCursor</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
-    <span class="hljs-keyword">return</span> { <span class="hljs-attr">start</span>: mapping.<span class="hljs-property">sourceStart</span> + start - mapping.<span class="hljs-property">generatedStart</span>, <span class="hljs-attr">end</span>: mapping.<span class="hljs-property">sourceStart</span> + end - mapping.<span class="hljs-property">generatedStart</span> };
-}
-</code></pre>
-
-</div>
-</div><script type="application/json" class="literate-exploration-data">{"version":1,"parts":{},"families":{},"unavailable":"Exploration payload exceeds the one MiB limit."}</script><script>(
+<p>Position mapping is presented in <a href="projection_problem.html">The projection problem</a>.</p>
+<script type="application/json" class="literate-exploration-data">{"version":1,"parts":{},"families":{},"unavailable":"Exploration payload exceeds the one MiB limit."}</script><script>(
 // Closure-free: standalone HTML embeds this source without the module wrapper.
 function initializePublicationExploration(document) {
     const view = document.defaultView;

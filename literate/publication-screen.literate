@@ -30,23 +30,7 @@ or failed resolutions stay text: native line-link fallback can create divergent
 fragment-qualified documents in the host. Logical identity remains in
 `data-literate-target`, independent of the opaque session URL.
 
-```ts : <<screen relative destinations>>=
-export function screenHref(from: string, to: string, target: string, format: ScreenFormat,
-    previewDestination?: PreviewDestination): string | undefined {
-    if (from === to) { return '#' + target; }
-    if (format === 'preview') { return previewDestination?.(target); }
-    const base = from.split('/'); base.pop();
-    const destination = to.split('/');
-    while (base.length && base[0] === destination[0]) { base.shift(); destination.shift(); }
-    const relative = [...base.map(() => '..'), ...destination];
-    if (format === 'html') { relative[relative.length - 1] = relative[relative.length - 1].replace(/\.literate$/, '.html'); }
-    return './' + relative.map(encodeURIComponent).join('/') + '#' + target;
-}
-function screenLink(href: string | undefined, label: string, text: string, target: string): string {
-    if (href === undefined) { return escapeHtml(text); }
-    return `<a class="literate-tag-name" href="${escapeHtml(href)}" data-literate-target="${target}" aria-label="${escapeHtml(label)}">${escapeHtml(text)}</a>`;
-}
-```
+Screen destination adaptation is presented in [Publication on screen](publication_on_screen.html).
 
 Syntax is intersected with semantic spans, never used to discover them. Hiding
 comment-only syntax retains the existing screen policy, but references inside

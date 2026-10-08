@@ -317,32 +317,8 @@ only its contiguous source sequence. A contained LocationLink selection therefor
 maps exactly; a cross-seam selection deterministically stops at the first seam.
 Diagnostics may split across seams, with at most 100 unique mapped ranges.
 Zero-width ranges require a mapped character or an explicitly allowed end cursor.</p>
+<p>Seam-safe range mapping is presented in <a href="read_only_language_services.html">Read-only language services</a>.</p>
 <div class="codefragment">
-<div class="fragmentname" id="c-006e0061007600690067006100740069006f006e00200069006e00740065007200730065006300740069006f006e0073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d006e0061007600690067006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006e0061007600690067006100740069006f006e00200069006e00740065007200730065006300740069006f006e0073"></span><a class="literate-tag-name" href="#f-006e0061007600690067006100740069006f006e00200069006e00740065007200730065006300740069006f006e0073" data-literate-target="f-006e0061007600690067006100740069006f006e00200069006e00740065007200730065006300740069006f006e0073" aria-label="Definition of navigation intersections">&lt;&lt;navigation intersections&gt;&gt;=</a></div>
-<div class="code">
-<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">mapped</span>(<span class="hljs-params">file: LanguageProjection, bounds: [</span><span class="hljs-built_in">number</span><span class="hljs-params">, </span><span class="hljs-built_in">number</span><span class="hljs-params">], state: Prepared, limit: </span><span class="hljs-built_in">number</span>): vscode.<span class="hljs-property">Location</span>[] {
-    <span class="hljs-keyword">const</span> <span class="hljs-attr">result</span>: vscode.<span class="hljs-property">Location</span>[] = [], seen = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
-    <span class="hljs-keyword">let</span> <span class="hljs-attr">pending</span>: <span class="hljs-title">Intersection</span> | <span class="hljs-literal">undefined</span>;
-    <span class="hljs-keyword">const</span> flush = (): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
-        <span class="hljs-keyword">if</span> (!pending) { <span class="hljs-keyword">return</span>; }
-        <span class="hljs-keyword">const</span> value = <span class="hljs-title">location</span>(pending), id = <span class="hljs-title">key</span>(value);
-        <span class="hljs-keyword">if</span> (!seen.<span class="hljs-title">has</span>(id)) { seen.<span class="hljs-title">add</span>(id); result.<span class="hljs-title">push</span>(value); }
-    };
-    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> mapping <span class="hljs-keyword">of</span> file.<span class="hljs-property">mappings</span>) {
-        <span class="hljs-keyword">const</span> next = <span class="hljs-title">intersection</span>(file, mapping, bounds[<span class="hljs-number">0</span>], bounds[<span class="hljs-number">1</span>], state);
-        <span class="hljs-keyword">if</span> (!next) { <span class="hljs-keyword">continue</span>; }
-        <span class="hljs-keyword">if</span> (pending &amp;&amp; <span class="hljs-title">connected</span>(pending, next)) { pending.<span class="hljs-property">end</span> = next.<span class="hljs-property">end</span>; pending.<span class="hljs-property">to</span> = next.<span class="hljs-property">to</span>; <span class="hljs-keyword">continue</span>; }
-        <span class="hljs-title">flush</span>();
-        <span class="hljs-keyword">if</span> (result.<span class="hljs-property">length</span> &gt;= limit) { <span class="hljs-keyword">return</span> result; }
-        pending = next;
-    }
-    <span class="hljs-title">flush</span>();
-    <span class="hljs-keyword">return</span> result;
-}
-</code></pre>
-
-</div>
-</div><div class="codefragment">
 <div class="fragmentname" id="c-006e0061007600690067006100740069006f006e0020006d006100700070006500640020006c006f0063006100740069006f006e0073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d006e0061007600690067006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006e0061007600690067006100740069006f006e0020006d006100700070006500640020006c006f0063006100740069006f006e0073"></span><a class="literate-tag-name" href="#f-006e0061007600690067006100740069006f006e0020006d006100700070006500640020006c006f0063006100740069006f006e0073" data-literate-target="f-006e0061007600690067006100740069006f006e0020006d006100700070006500640020006c006f0063006100740069006f006e0073" aria-label="Definition of navigation mapped locations">&lt;&lt;navigation mapped locations&gt;&gt;=</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">mapRange</span>(<span class="hljs-params">uri: vscode.Uri, value: Span, state: Prepared, limit: </span><span class="hljs-built_in">number</span>): vscode.<span class="hljs-property">Location</span>[] {

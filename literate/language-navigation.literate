@@ -181,27 +181,7 @@ maps exactly; a cross-seam selection deterministically stops at the first seam.
 Diagnostics may split across seams, with at most 100 unique mapped ranges.
 Zero-width ranges require a mapped character or an explicitly allowed end cursor.
 
-```ts : <<navigation intersections>>=
-function mapped(file: LanguageProjection, bounds: [number, number], state: Prepared, limit: number): vscode.Location[] {
-    const result: vscode.Location[] = [], seen = new Set<string>();
-    let pending: Intersection | undefined;
-    const flush = (): void => {
-        if (!pending) { return; }
-        const value = location(pending), id = key(value);
-        if (!seen.has(id)) { seen.add(id); result.push(value); }
-    };
-    for (const mapping of file.mappings) {
-        const next = intersection(file, mapping, bounds[0], bounds[1], state);
-        if (!next) { continue; }
-        if (pending && connected(pending, next)) { pending.end = next.end; pending.to = next.to; continue; }
-        flush();
-        if (result.length >= limit) { return result; }
-        pending = next;
-    }
-    flush();
-    return result;
-}
-```
+Seam-safe range mapping is presented in [Read-only language services](read_only_language_services.html).
 
 ```ts : <<navigation mapped locations>>=
 function mapRange(uri: vscode.Uri, value: Span, state: Prepared, limit: number): vscode.Location[] {

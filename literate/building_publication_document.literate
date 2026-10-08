@@ -162,6 +162,34 @@ The bridge also keeps metadata intentionally narrow. Publication settings and pa
 layout are renderer options, not unreviewed document metadata that can alter the
 converter's behavior.
 
+`publication Pandoc preparation` keeps validation ahead of trusted materialization.
+
+```ts : <<publication Pandoc preparation>>=
+export function preparePandoc(
+    project: ParsedProject, renderContribution: (part: PublicationContribution) => PandocBlock[],
+    renderAsset?: AssetRenderer
+): PandocPreparationResult {
+    const diagnostics = project.diagnostics.map(diagnostic => ({ ...diagnostic }));
+    if (diagnostics.length) { return { diagnostics }; }
+    diagnostics.push(...project.annotations.diagnostics.map(diagnostic => ({ ...diagnostic })));
+    if (diagnostics.length) { return { diagnostics }; }
+    validateReferences(project, diagnostics);
+    const targets = new Map(project.documents.map(document => [document.path, headingDestinations(document)]));
+    const parts = new Map(project.publication.contributions.map(part => [part.target, part]));
+    const pending: PendingBlock[] = project.documents.map(document => {
+        const contributions = contributionIndex(document, parts, diagnostics);
+        const body = readBlocks({ document, index: 0, contributions, targets, diagnostics,
+            annotations: project.annotations, assets: !!renderAsset });
+        return { t: 'Div', c: [[targets.get(document.path)!.id, [], []], body] };
+    });
+    if (diagnostics.length) { return { diagnostics }; }
+    const blocks = materialize(pending, renderContribution, diagnostics, renderAsset);
+    if (diagnostics.length) { return { diagnostics }; }
+// eslint-disable-next-line @typescript-eslint/naming-convention -- Pandoc's wire-format key.
+    return { document: { 'pandoc-api-version': [1, 23, 1], meta: {}, blocks }, diagnostics };
+}
+```
+
 ## Complete means complete
 
 A successful result contains one document whose blocks preserve project order and

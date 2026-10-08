@@ -85,6 +85,22 @@ Content-derived names do not prove authenticity and are not a cache lifetime
 promise. They provide deterministic, syntax-safe companion identities for one
 planned publication.
 
+`publication asset addition` gives retained bytes a deterministic, syntax-safe
+identity.
+
+```ts : <<publication asset addition>>=
+const add = (content: Uint8Array, extension: string): string => {
+    const companion = `${directory}/${hash(content)}.${extension}`;
+    if (!files.has(companion)) {
+        total += content.length;
+        if (total > 128 * 1024 * 1024) { throw new Error('Publication images exceed 128 MiB'); }
+        files.add(companion);
+        plan.files.push({ path: posix.join(posix.dirname(output), companion), content });
+    }
+    return companion;
+};
+```
+
 ## Diagrams are rendered as optional assets
 
 A Mermaid fence is a request for a vector figure, not ordinary code in the printed

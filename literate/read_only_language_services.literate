@@ -159,3 +159,28 @@ The user loses one answer rather than being sent to a fabricated location or giv
 an unsafe replacement. Diagnostics require broader, persistent ownership, so the
 next chapter adds time, caching, and the editor's Problems collection to the mapping
 problem.
+
+`navigation intersections` walks mapped segments monotonically and stops when
+continuity cannot be proved.
+
+```ts : <<navigation intersections>>=
+function mapped(file: LanguageProjection, bounds: [number, number], state: Prepared, limit: number): vscode.Location[] {
+    const result: vscode.Location[] = [], seen = new Set<string>();
+    let pending: Intersection | undefined;
+    const flush = (): void => {
+        if (!pending) { return; }
+        const value = location(pending), id = key(value);
+        if (!seen.has(id)) { seen.add(id); result.push(value); }
+    };
+    for (const mapping of file.mappings) {
+        const next = intersection(file, mapping, bounds[0], bounds[1], state);
+        if (!next) { continue; }
+        if (pending && connected(pending, next)) { pending.end = next.end; pending.to = next.to; continue; }
+        flush();
+        if (result.length >= limit) { return result; }
+        pending = next;
+    }
+    flush();
+    return result;
+}
+```

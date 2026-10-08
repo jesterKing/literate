@@ -751,31 +751,7 @@ are copied, not mutated. Graph validation never calls the contribution renderer;
 token validation still runs across all documents when graph errors are found,
 so callers receive both graph and content diagnostics in deterministic order.
 
-```ts : <<publication Pandoc preparation>>=
-export function preparePandoc(
-    project: ParsedProject, renderContribution: (part: PublicationContribution) => PandocBlock[],
-    renderAsset?: AssetRenderer
-): PandocPreparationResult {
-    const diagnostics = project.diagnostics.map(diagnostic => ({ ...diagnostic }));
-    if (diagnostics.length) { return { diagnostics }; }
-    diagnostics.push(...project.annotations.diagnostics.map(diagnostic => ({ ...diagnostic })));
-    if (diagnostics.length) { return { diagnostics }; }
-    validateReferences(project, diagnostics);
-    const targets = new Map(project.documents.map(document => [document.path, headingDestinations(document)]));
-    const parts = new Map(project.publication.contributions.map(part => [part.target, part]));
-    const pending: PendingBlock[] = project.documents.map(document => {
-        const contributions = contributionIndex(document, parts, diagnostics);
-        const body = readBlocks({ document, index: 0, contributions, targets, diagnostics,
-            annotations: project.annotations, assets: !!renderAsset });
-        return { t: 'Div', c: [[targets.get(document.path)!.id, [], []], body] };
-    });
-    if (diagnostics.length) { return { diagnostics }; }
-    const blocks = materialize(pending, renderContribution, diagnostics, renderAsset);
-    if (diagnostics.length) { return { diagnostics }; }
-// eslint-disable-next-line @typescript-eslint/naming-convention -- Pandoc's wire-format key.
-    return { document: { 'pandoc-api-version': [1, 23, 1], meta: {}, blocks }, diagnostics };
-}
-```
+Whole-document preparation is presented in [Building a publication document](building_publication_document.html).
 
 The intended cases are deliberately narrow: nested prose and contributions,
 ordinary code, stable document-to-document links, and exact semantic callback

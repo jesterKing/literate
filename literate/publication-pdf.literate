@@ -420,25 +420,7 @@ rc discovery; the literal repeat limit cannot be influenced by an entry basename
 A 180-second build deadline and five repeats bound runaway reruns. No `-f` option
 can turn a failed pass into apparent success, and shell escape stays disabled.
 
-```ts : <<publication PDF build>>=
-async function buildPdf(runner: PdfProcessRunner, cwd: string,
-    env: NodeJS.ProcessEnv, check: () => void): Promise<PdfCompilation> {
-    const result = await runner(requestFor('latexmk', [
-        '-norc', '-lualatex', '-interaction=nonstopmode', '-halt-on-error',
-        '-file-line-error', '-no-shell-escape', '-e', '$max_repeat = 5;', 'book.tex'
-    ], cwd, env, buildTimeoutMs));
-    if (result.code !== 0) { throw new Error(`latexmk failed (exit ${result.code}).\n${result.output}`); }
-    const log = (await readBoundedFile(path.join(cwd, 'book.log'), maximumLogBytes, check)).toString('utf8');
-    checkConvergence(log, result.output);
-    await checkRailCertificate(cwd, check);
-    const pdf = await readBoundedFile(path.join(cwd, 'book.pdf'), maximumPdfBytes, check);
-    check();
-    if (pdf.length < 8 || !/^%PDF-[12]\.[0-9]/.test(pdf.subarray(0, 8).toString('ascii'))) {
-        throw new Error('LuaLaTeX did not produce a valid PDF header in book.pdf');
-    }
-    return { pdf, warnings: logWarnings(log) };
-}
-```
+Final PDF acceptance is presented in [Compiling and publishing a PDF](compiling_publishing_pdf.html).
 
 The factory stages before preflight so retained failures are inspectable. Every
 error becomes the exported error type. The success value owns its PDF bytes and

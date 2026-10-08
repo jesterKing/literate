@@ -66,33 +66,7 @@ must have one generated occurrence: editing repeated expansion would amplify one
 server edit into several generated changes. Equal lengths and exact captured bytes
 also reject malformed mappings and stale source snapshots.
 
-```ts : <<action snapshot>>=
-function fresh(context: LanguageCodeActionContext): boolean {
-    const { document, file, mapping } = context;
-    return context.triggerKind === vscode.CodeActionTriggerKind.Invoke
-        && integer(context.requestVersion) && document.version === context.requestVersion && !document.isClosed
-        && context.sourcePath === mapping.sourcePath && file.mappings.includes(mapping)
-        && file.mappings.filter(value => value.sourcePath === mapping.sourcePath
-            && value.sourceStart === mapping.sourceStart && value.sourceEnd === mapping.sourceEnd).length === 1
-        && [mapping.sourceStart, mapping.sourceEnd, mapping.generatedStart, mapping.generatedEnd].every(integer)
-        && mapping.sourceStart <= mapping.sourceEnd && mapping.generatedStart <= mapping.generatedEnd
-        && mapping.sourceEnd <= document.getText().length && mapping.generatedEnd <= file.content.length
-        && mapping.sourceEnd - mapping.sourceStart === mapping.generatedEnd - mapping.generatedStart
-        && document.getText().slice(mapping.sourceStart, mapping.sourceEnd)
-            === file.content.slice(mapping.generatedStart, mapping.generatedEnd)
-        && context.generatedUri.scheme === 'file' && !context.generatedUri.authority;
-}
-function mappedRange(value: unknown, context: LanguageCodeActionContext): ParsedEdit | undefined {
-    if (!span(value)) { return; }
-    const start = generatedOffset(context.file.content, value.start);
-    const end = generatedOffset(context.file.content, value.end);
-    if (start === undefined || end === undefined) { return; }
-    const mapped = mapGeneratedRange(context.file, start, end, context.mapping);
-    if (!mapped) { return; }
-    return { start: mapped.start, end: mapped.end,
-        range: new vscode.Range(context.document.positionAt(mapped.start), context.document.positionAt(mapped.end)), newText: '' };
-}
-```
+Mutation freshness is presented in [Mutating projected source safely](mutating_projected_source.html).
 
 Workspace edits have many extensible forms. This boundary recognizes only the
 single `changes` form and exact plain TextEdit records. Thus document changes,

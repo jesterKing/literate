@@ -218,7 +218,32 @@ overfull boxes are returned to the publisher rather than silently discarded.</p>
 bounded stability certificate derived from physical page membership and placement.
 A missing, malformed, pending, or error certificate rejects a rail-enabled build
 before PDF bytes reach the destination transaction.</p>
-<h2>Preserve the previous output</h2>
+<p><code>publication PDF build</code> accepts bytes only after the final log and rail certificate
+agree.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200050004400460020006200750069006c0064-006c0069007400650072006100740065002f0063006f006d00700069006c0069006e0067005f007000750062006c0069007300680069006e0067005f007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200050004400460020006200750069006c0064"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200050004400460020006200750069006c0064" data-literate-target="f-007000750062006c00690063006100740069006f006e00200050004400460020006200750069006c0064" aria-label="Definition of publication PDF build">&lt;&lt;publication PDF build&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">buildPdf</span>(<span class="hljs-params">runner: PdfProcessRunner, cwd: </span><span class="hljs-built_in">string</span><span class="hljs-params">,
+    env: NodeJS.ProcessEnv, check: </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">PdfCompilation</span>&gt; {
+    <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">await</span> <span class="hljs-title">runner</span>(<span class="hljs-title">requestFor</span>(<span class="hljs-string">'latexmk'</span>, [
+        <span class="hljs-string">'-norc'</span>, <span class="hljs-string">'-lualatex'</span>, <span class="hljs-string">'-interaction=nonstopmode'</span>, <span class="hljs-string">'-halt-on-error'</span>,
+        <span class="hljs-string">'-file-line-error'</span>, <span class="hljs-string">'-no-shell-escape'</span>, <span class="hljs-string">'-e'</span>, <span class="hljs-string">'$max_repeat = 5;'</span>, <span class="hljs-string">'book.tex'</span>
+    ], cwd, env, buildTimeoutMs));
+    <span class="hljs-keyword">if</span> (result.<span class="hljs-property">code</span> !== <span class="hljs-number">0</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`latexmk failed (exit </span><span class="hljs-subst">${result.code}</span><span class="hljs-string">).</span><span class="hljs-string">\n</span><span class="hljs-subst">${result.output}</span><span class="hljs-string">`</span>); }
+    <span class="hljs-keyword">const</span> log = (<span class="hljs-keyword">await</span> <span class="hljs-title">readBoundedFile</span>(path.<span class="hljs-title">join</span>(cwd, <span class="hljs-string">'book.log'</span>), maximumLogBytes, check)).<span class="hljs-title">toString</span>(<span class="hljs-string">'utf8'</span>);
+    <span class="hljs-title">checkConvergence</span>(log, result.<span class="hljs-property">output</span>);
+    <span class="hljs-keyword">await</span> <span class="hljs-title">checkRailCertificate</span>(cwd, check);
+    <span class="hljs-keyword">const</span> pdf = <span class="hljs-keyword">await</span> <span class="hljs-title">readBoundedFile</span>(path.<span class="hljs-title">join</span>(cwd, <span class="hljs-string">'book.pdf'</span>), maximumPdfBytes, check);
+    <span class="hljs-title">check</span>();
+    <span class="hljs-keyword">if</span> (pdf.<span class="hljs-property">length</span> &lt; <span class="hljs-number">8</span> || !<span class="hljs-regexp">/^%PDF-</span><span class="hljs-regexp">[12]</span><span class="hljs-regexp">\.</span><span class="hljs-regexp">[0-9]</span><span class="hljs-regexp">/</span>.<span class="hljs-title">test</span>(pdf.<span class="hljs-title">subarray</span>(<span class="hljs-number">0</span>, <span class="hljs-number">8</span>).<span class="hljs-title">toString</span>(<span class="hljs-string">'ascii'</span>))) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'LuaLaTeX did not produce a valid PDF header in book.pdf'</span>);
+    }
+    <span class="hljs-keyword">return</span> { pdf, <span class="hljs-attr">warnings</span>: <span class="hljs-title">logWarnings</span>(log) };
+}
+</code></pre>
+
+</div>
+</div><h2>Preserve the previous output</h2>
 <p>Let <code>O</code> be the bytes already published and <code>N</code> the newly compiled bytes. The desired
 observable rule is:</p>
 <pre><code>failed before commit  ⇒  destination remains O

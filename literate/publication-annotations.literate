@@ -111,25 +111,7 @@ Percent-encoded term destinations are decoded exactly once; malformed encodings
 and invalid keys cannot resolve. Missing and ambiguous links return undefined,
 never the original href. termByTarget likewise returns undefined for unknown IDs.
 
-```ts : <<annotation identities and hrefs>>=
-const keyPattern = /^[A-Za-z][A-Za-z0-9_.:-]{0,99}$/;
-function encode(value: string): string {
-    return value.split('').map(char => char.charCodeAt(0).toString(16).padStart(4, '0')).join('');
-}
-function termKey(href: string): string | undefined {
-    if (!href.startsWith('term:')) { return undefined; }
-    try { return decodeURIComponent(href.slice(5)); } catch { return undefined; }
-}
-export function resolveTermHref(annotations: PublicationAnnotations, href: string): string | undefined {
-    const key = termKey(href);
-    if (key === undefined || !keyPattern.test(key)) { return undefined; }
-    const terms = annotations.terms.filter(term => term.key === key);
-    return terms.length === 1 ? terms[0].target : undefined;
-}
-export function termByTarget(annotations: PublicationAnnotations, target: string): PublicationTerm | undefined {
-    return annotations.terms.find(term => term.target === target);
-}
-```
+Annotation identity is presented in [Shared annotations and identities](shared_annotations_identities.html).
 
 ## Collection before resolution
 

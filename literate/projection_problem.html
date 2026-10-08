@@ -248,7 +248,35 @@ selection. This model is sufficient for services that only observe code: duplica
 answers can be deduplicated, and an unsafe range can be omitted. A proposed edit is
 more dangerous because changing one source interval affects its other expansions.
 That stricter boundary is the subject of Chapter 22.</p>
-<h2>Seams stop reverse mapping</h2>
+<p><code>projection position helpers</code> converts between UTF-16 positions and absolute
+offsets without losing occurrence identity.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073-006c0069007400650072006100740065002f00700072006f006a0065006300740069006f006e005f00700072006f0062006c0065006d002e006c0069007400650072006100740065-1"><span id="f-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073"></span><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073" data-literate-target="f-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073" aria-label="Definition of projection position helpers">&lt;&lt;projection position helpers&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">mapSourcePosition</span>(<span class="hljs-params">files: LanguageProjection[], sourcePath: </span><span class="hljs-built_in">string</span><span class="hljs-params">, offset: </span><span class="hljs-built_in">number</span>): <span class="hljs-title">SourceProjectionPosition</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">Number</span>.<span class="hljs-title">isInteger</span>(offset) || offset &lt; <span class="hljs-number">0</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">const</span> path = <span class="hljs-title">safeRelativePath</span>(sourcePath);
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> file <span class="hljs-keyword">of</span> files) {
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> mapping <span class="hljs-keyword">of</span> file.<span class="hljs-property">mappings</span>) {
+            <span class="hljs-keyword">if</span> (mapping.<span class="hljs-property">sourcePath</span> === path &amp;&amp; offset &gt;= mapping.<span class="hljs-property">sourceStart</span>
+                &amp;&amp; (offset &lt; mapping.<span class="hljs-property">sourceEnd</span> || (offset === mapping.<span class="hljs-property">sourceEnd</span> &amp;&amp; mapping.<span class="hljs-property">endCursor</span>))) {
+                <span class="hljs-keyword">return</span> { file, <span class="hljs-attr">offset</span>: mapping.<span class="hljs-property">generatedStart</span> + offset - mapping.<span class="hljs-property">sourceStart</span>, mapping };
+            }
+        }
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>;
+}
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">mapGeneratedRange</span>(<span class="hljs-params">file: LanguageProjection, start: </span><span class="hljs-built_in">number</span><span class="hljs-params">, end: </span><span class="hljs-built_in">number</span><span class="hljs-params">, mapping: ProjectionMapping</span>): { <span class="hljs-attr">start</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">end</span>: <span class="hljs-built_in">number</span> } | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">if</span> (!file.<span class="hljs-property">mappings</span>.<span class="hljs-title">includes</span>(mapping) || !<span class="hljs-title">Number</span>.<span class="hljs-title">isInteger</span>(start) || !<span class="hljs-title">Number</span>.<span class="hljs-title">isInteger</span>(end)
+        || start &gt; end || start &lt; mapping.<span class="hljs-property">generatedStart</span> || end &gt; mapping.<span class="hljs-property">generatedEnd</span>
+        || (start === end &amp;&amp; start === mapping.<span class="hljs-property">generatedEnd</span> &amp;&amp; !mapping.<span class="hljs-property">endCursor</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">start</span>: mapping.<span class="hljs-property">sourceStart</span> + start - mapping.<span class="hljs-property">generatedStart</span>, <span class="hljs-attr">end</span>: mapping.<span class="hljs-property">sourceStart</span> + end - mapping.<span class="hljs-property">generatedStart</span> };
+}
+</code></pre>
+
+</div>
+</div><h2>Seams stop reverse mapping</h2>
 <p>A server range may cross from literal text into inserted indentation, through a
 fragment boundary, or into a template wrapper. Literate does not widen the range to
 nearby source and does not search for matching words. Reverse mapping through one

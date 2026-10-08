@@ -582,36 +582,8 @@ Failures log a constant message, never callback exceptions or notification paylo
 
 </div>
 </div><p>Validate the document set before notifying the server.</p>
-<div class="codefragment">
-<div class="fragmentname" id="c-006c0061006e0067007500610067006500200063006c00690065006e0074002000730079006e0063-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d0063006c00690065006e0074002e006c0069007400650072006100740065-1"><span id="f-006c0061006e0067007500610067006500200063006c00690065006e0074002000730079006e0063"></span><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200063006c00690065006e0074002000730079006e0063" data-literate-target="f-006c0061006e0067007500610067006500200063006c00690065006e0074002000730079006e0063" aria-label="Definition of language client sync">&lt;&lt;language client sync&gt;&gt;=</a></div>
-<div class="code">
-<pre><code>    <span class="hljs-keyword">public</span> <span class="hljs-keyword">async</span> <span class="hljs-title">sync</span>(<span class="hljs-attr">documents</span>: <span class="hljs-title">LanguageDocument</span>[]): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; {
-        <span class="hljs-keyword">await</span> <span class="hljs-variable">this</span>.<span class="hljs-title">initialize</span>();
-        <span class="hljs-keyword">if</span> (<span class="hljs-variable">this</span>.<span class="hljs-property">closing</span> || <span class="hljs-variable">this</span>.<span class="hljs-property">stopped</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-variable">this</span>.<span class="hljs-property">stopped</span> || <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Language client disposed'</span>); }
-        <span class="hljs-keyword">const</span> sync = <span class="hljs-variable">this</span>.<span class="hljs-property">capabilities</span>.<span class="hljs-property">textDocumentSync</span>;
-        <span class="hljs-keyword">const</span> kind = <span class="hljs-keyword">typeof</span> sync === <span class="hljs-string">'number'</span> ? sync : <span class="hljs-title">object</span>(sync) ? sync.<span class="hljs-property">change</span> : <span class="hljs-number">0</span>;
-        <span class="hljs-keyword">if</span> (documents.<span class="hljs-property">length</span> &amp;&amp; kind !== <span class="hljs-number">1</span> &amp;&amp; kind !== <span class="hljs-number">2</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Language server document synchronization unsupported'</span>); }
-        <span class="hljs-keyword">const</span> openClose = <span class="hljs-keyword">typeof</span> sync === <span class="hljs-string">'number'</span> || (<span class="hljs-title">object</span>(sync) &amp;&amp; sync.<span class="hljs-property">openClose</span> === <span class="hljs-literal">true</span>);
-        <span class="hljs-keyword">if</span> (documents.<span class="hljs-property">length</span> &amp;&amp; !openClose) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Language server open/close synchronization required for projections'</span>); }
-        <span class="hljs-keyword">const</span> next = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>(documents.<span class="hljs-title">map</span>(<span class="hljs-params">doc</span><span class="hljs-function"> =&gt;</span> [doc.<span class="hljs-property">uri</span>, { ...doc }]));
-        <span class="hljs-keyword">let</span> bytes = <span class="hljs-number">0</span>;
-        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> doc <span class="hljs-keyword">of</span> next.<span class="hljs-title">values</span>()) { bytes += <span class="hljs-title">Buffer</span>.<span class="hljs-title">byteLength</span>(<span class="hljs-title">JSON</span>.<span class="hljs-title">stringify</span>(doc), <span class="hljs-string">'utf8'</span>); }
-        <span class="hljs-keyword">if</span> (documents.<span class="hljs-property">length</span> &gt; <span class="hljs-number">1024</span> || next.<span class="hljs-property">size</span> !== documents.<span class="hljs-property">length</span> || bytes &gt; limit / <span class="hljs-number">2</span>) {
-            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'LSP document set limit exceeded or duplicate URI'</span>);
-        }
-        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [uri, old] <span class="hljs-keyword">of</span> <span class="hljs-variable">this</span>.<span class="hljs-property">documents</span>) {
-            <span class="hljs-keyword">if</span> (!next.<span class="hljs-title">has</span>(uri) || next.<span class="hljs-title">get</span>(uri)!.<span class="hljs-property">languageId</span> !== old.<span class="hljs-property">languageId</span>) {
-                <span class="hljs-variable">this</span>.<span class="hljs-property">documents</span>.<span class="hljs-title">delete</span>(uri);
-                <span class="hljs-keyword">if</span> (openClose) { <span class="hljs-variable">this</span>.<span class="hljs-title">send</span>({ <span class="hljs-attr">method</span>: <span class="hljs-string">'textDocument/didClose'</span>, <span class="hljs-attr">params</span>: { <span class="hljs-attr">textDocument</span>: { uri } } }); }
-            }
-        }
-        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> doc <span class="hljs-keyword">of</span> next.<span class="hljs-title">values</span>()) { <span class="hljs-variable">this</span>.<span class="hljs-title">updateDocument</span>(doc, kind, openClose); }
-    }
-
-</code></pre>
-
-</div>
-</div><p>Incremental servers receive a single full-range replacement.</p>
+<p>Complete-set synchronization is presented in <a href="owning_language_server_session.html">Owning a language-server session</a>.</p>
+<p>Incremental servers receive a single full-range replacement.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-006c0061006e0067007500610067006500200063006c00690065006e007400200075007000640061007400650044006f00630075006d0065006e0074-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d0063006c00690065006e0074002e006c0069007400650072006100740065-1"><span id="f-006c0061006e0067007500610067006500200063006c00690065006e007400200075007000640061007400650044006f00630075006d0065006e0074"></span><a class="literate-tag-name" href="#f-006c0061006e0067007500610067006500200063006c00690065006e007400200075007000640061007400650044006f00630075006d0065006e0074" data-literate-target="f-006c0061006e0067007500610067006500200063006c00690065006e007400200075007000640061007400650044006f00630075006d0065006e0074" aria-label="Definition of language client updateDocument">&lt;&lt;language client updateDocument&gt;&gt;=</a></div>
 <div class="code">

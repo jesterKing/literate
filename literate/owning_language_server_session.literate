@@ -116,6 +116,35 @@ The whole document set is validated before notifications are sent. Duplicate URI
 unsupported synchronization, excessive document counts, or excessive serialized
 input fail explicitly. They do not leave a silently truncated project context.
 
+`language client sync` validates the whole document set before sending any
+notification.
+
+```ts : <<language client sync>>=
+    public async sync(documents: LanguageDocument[]): Promise<void> {
+        await this.initialize();
+        if (this.closing || this.stopped) { throw this.stopped || new Error('Language client disposed'); }
+        const sync = this.capabilities.textDocumentSync;
+        const kind = typeof sync === 'number' ? sync : object(sync) ? sync.change : 0;
+        if (documents.length && kind !== 1 && kind !== 2) { throw new Error('Language server document synchronization unsupported'); }
+        const openClose = typeof sync === 'number' || (object(sync) && sync.openClose === true);
+        if (documents.length && !openClose) { throw new Error('Language server open/close synchronization required for projections'); }
+        const next = new Map(documents.map(doc => [doc.uri, { ...doc }]));
+        let bytes = 0;
+        for (const doc of next.values()) { bytes += Buffer.byteLength(JSON.stringify(doc), 'utf8'); }
+        if (documents.length > 1024 || next.size !== documents.length || bytes > limit / 2) {
+            throw new Error('LSP document set limit exceeded or duplicate URI');
+        }
+        for (const [uri, old] of this.documents) {
+            if (!next.has(uri) || next.get(uri)!.languageId !== old.languageId) {
+                this.documents.delete(uri);
+                if (openClose) { this.send({ method: 'textDocument/didClose', params: { textDocument: { uri } } }); }
+            }
+        }
+        for (const doc of next.values()) { this.updateDocument(doc, kind, openClose); }
+    }
+
+```
+
 ## The protocol is an untrusted byte stream
 
 Language Server Protocol messages are JSON values framed by byte lengths. A character

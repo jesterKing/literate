@@ -228,30 +228,8 @@ Numbers are one-based in caller document/fence order. Keys are case-sensitive.
 Percent-encoded term destinations are decoded exactly once; malformed encodings
 and invalid keys cannot resolve. Missing and ambiguous links return undefined,
 never the original href. termByTarget likewise returns undefined for unknown IDs.</p>
-<div class="codefragment">
-<div class="fragmentname" id="c-0061006e006e006f0074006100740069006f006e0020006900640065006e00740069007400690065007300200061006e0064002000680072006500660073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0061006e006e006f0074006100740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-0061006e006e006f0074006100740069006f006e0020006900640065006e00740069007400690065007300200061006e0064002000680072006500660073"></span><a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e0020006900640065006e00740069007400690065007300200061006e0064002000680072006500660073" data-literate-target="f-0061006e006e006f0074006100740069006f006e0020006900640065006e00740069007400690065007300200061006e0064002000680072006500660073" aria-label="Definition of annotation identities and hrefs">&lt;&lt;annotation identities and hrefs&gt;&gt;=</a></div>
-<div class="code">
-<pre><code><span class="hljs-keyword">const</span> keyPattern = <span class="hljs-regexp">/^</span><span class="hljs-regexp">[A-Za-z]</span><span class="hljs-regexp">[A-Za-z0-9_.:-]</span><span class="hljs-regexp">{0,99}$/</span>;
-<span class="hljs-keyword">function</span> <span class="hljs-title">encode</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span> {
-    <span class="hljs-keyword">return</span> value.<span class="hljs-title">split</span>(<span class="hljs-string">''</span>).<span class="hljs-title">map</span>(<span class="hljs-params">char</span><span class="hljs-function"> =&gt;</span> char.<span class="hljs-title">charCodeAt</span>(<span class="hljs-number">0</span>).<span class="hljs-title">toString</span>(<span class="hljs-number">16</span>).<span class="hljs-title">padStart</span>(<span class="hljs-number">4</span>, <span class="hljs-string">'0'</span>)).<span class="hljs-title">join</span>(<span class="hljs-string">''</span>);
-}
-<span class="hljs-keyword">function</span> <span class="hljs-title">termKey</span>(<span class="hljs-params">href: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span> {
-    <span class="hljs-keyword">if</span> (!href.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'term:'</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
-    <span class="hljs-keyword">try</span> { <span class="hljs-keyword">return</span> <span class="hljs-built_in">decodeURIComponent</span>(href.<span class="hljs-title">slice</span>(<span class="hljs-number">5</span>)); } <span class="hljs-keyword">catch</span> { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
-}
-<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">resolveTermHref</span>(<span class="hljs-params">annotations: PublicationAnnotations, href: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span> {
-    <span class="hljs-keyword">const</span> key = <span class="hljs-title">termKey</span>(href);
-    <span class="hljs-keyword">if</span> (key === <span class="hljs-literal">undefined</span> || !keyPattern.<span class="hljs-title">test</span>(key)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
-    <span class="hljs-keyword">const</span> terms = annotations.<span class="hljs-property">terms</span>.<span class="hljs-title">filter</span>(<span class="hljs-params">term</span><span class="hljs-function"> =&gt;</span> term.<span class="hljs-property">key</span> === key);
-    <span class="hljs-keyword">return</span> terms.<span class="hljs-property">length</span> === <span class="hljs-number">1</span> ? terms[<span class="hljs-number">0</span>].<span class="hljs-property">target</span> : <span class="hljs-literal">undefined</span>;
-}
-<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">termByTarget</span>(<span class="hljs-params">annotations: PublicationAnnotations, target: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">PublicationTerm</span> | <span class="hljs-literal">undefined</span> {
-    <span class="hljs-keyword">return</span> annotations.<span class="hljs-property">terms</span>.<span class="hljs-title">find</span>(<span class="hljs-params">term</span><span class="hljs-function"> =&gt;</span> term.<span class="hljs-property">target</span> === target);
-}
-</code></pre>
-
-</div>
-</div><h2>Collection before resolution</h2>
+<p>Annotation identity is presented in <a href="shared_annotations_identities.html">Shared annotations and identities</a>.</p>
+<h2>Collection before resolution</h2>
 <p>Collection is pure with respect to caller tokens. Invalid headers produce no
 annotation; valid headers retain their bodies even when body validation fails.
 Every duplicate definition is diagnosed and all uses of that key are ambiguous.

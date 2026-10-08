@@ -189,38 +189,8 @@ and even adjacent mappings in the same source file.</p>
 must have one generated occurrence: editing repeated expansion would amplify one
 server edit into several generated changes. Equal lengths and exact captured bytes
 also reject malformed mappings and stale source snapshots.</p>
-<div class="codefragment">
-<div class="fragmentname" id="c-0061006300740069006f006e00200073006e0061007000730068006f0074-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d0061006300740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-0061006300740069006f006e00200073006e0061007000730068006f0074"></span><a class="literate-tag-name" href="#f-0061006300740069006f006e00200073006e0061007000730068006f0074" data-literate-target="f-0061006300740069006f006e00200073006e0061007000730068006f0074" aria-label="Definition of action snapshot">&lt;&lt;action snapshot&gt;&gt;=</a></div>
-<div class="code">
-<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">fresh</span>(<span class="hljs-params">context: LanguageCodeActionContext</span>): <span class="hljs-built_in">boolean</span> {
-    <span class="hljs-keyword">const</span> { <span class="hljs-variable">document</span>, file, mapping } = context;
-    <span class="hljs-keyword">return</span> context.<span class="hljs-property">triggerKind</span> === vscode.<span class="hljs-property">CodeActionTriggerKind</span>.<span class="hljs-property">Invoke</span>
-        &amp;&amp; <span class="hljs-title">integer</span>(context.<span class="hljs-property">requestVersion</span>) &amp;&amp; <span class="hljs-variable">document</span>.<span class="hljs-property">version</span> === context.<span class="hljs-property">requestVersion</span> &amp;&amp; !<span class="hljs-variable">document</span>.<span class="hljs-property">isClosed</span>
-        &amp;&amp; context.<span class="hljs-property">sourcePath</span> === mapping.<span class="hljs-property">sourcePath</span> &amp;&amp; file.<span class="hljs-property">mappings</span>.<span class="hljs-title">includes</span>(mapping)
-        &amp;&amp; file.<span class="hljs-property">mappings</span>.<span class="hljs-title">filter</span>(<span class="hljs-params">value</span><span class="hljs-function"> =&gt;</span> value.<span class="hljs-property">sourcePath</span> === mapping.<span class="hljs-property">sourcePath</span>
-            &amp;&amp; value.<span class="hljs-property">sourceStart</span> === mapping.<span class="hljs-property">sourceStart</span> &amp;&amp; value.<span class="hljs-property">sourceEnd</span> === mapping.<span class="hljs-property">sourceEnd</span>).<span class="hljs-property">length</span> === <span class="hljs-number">1</span>
-        &amp;&amp; [mapping.<span class="hljs-property">sourceStart</span>, mapping.<span class="hljs-property">sourceEnd</span>, mapping.<span class="hljs-property">generatedStart</span>, mapping.<span class="hljs-property">generatedEnd</span>].<span class="hljs-title">every</span>(integer)
-        &amp;&amp; mapping.<span class="hljs-property">sourceStart</span> &lt;= mapping.<span class="hljs-property">sourceEnd</span> &amp;&amp; mapping.<span class="hljs-property">generatedStart</span> &lt;= mapping.<span class="hljs-property">generatedEnd</span>
-        &amp;&amp; mapping.<span class="hljs-property">sourceEnd</span> &lt;= <span class="hljs-variable">document</span>.<span class="hljs-title">getText</span>().<span class="hljs-property">length</span> &amp;&amp; mapping.<span class="hljs-property">generatedEnd</span> &lt;= file.<span class="hljs-property">content</span>.<span class="hljs-property">length</span>
-        &amp;&amp; mapping.<span class="hljs-property">sourceEnd</span> - mapping.<span class="hljs-property">sourceStart</span> === mapping.<span class="hljs-property">generatedEnd</span> - mapping.<span class="hljs-property">generatedStart</span>
-        &amp;&amp; <span class="hljs-variable">document</span>.<span class="hljs-title">getText</span>().<span class="hljs-title">slice</span>(mapping.<span class="hljs-property">sourceStart</span>, mapping.<span class="hljs-property">sourceEnd</span>)
-            === file.<span class="hljs-property">content</span>.<span class="hljs-title">slice</span>(mapping.<span class="hljs-property">generatedStart</span>, mapping.<span class="hljs-property">generatedEnd</span>)
-        &amp;&amp; context.<span class="hljs-property">generatedUri</span>.<span class="hljs-property">scheme</span> === <span class="hljs-string">'file'</span> &amp;&amp; !context.<span class="hljs-property">generatedUri</span>.<span class="hljs-property">authority</span>;
-}
-<span class="hljs-keyword">function</span> <span class="hljs-title">mappedRange</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">unknown</span><span class="hljs-params">, context: LanguageCodeActionContext</span>): <span class="hljs-title">ParsedEdit</span> | <span class="hljs-literal">undefined</span> {
-    <span class="hljs-keyword">if</span> (!<span class="hljs-title">span</span>(value)) { <span class="hljs-keyword">return</span>; }
-    <span class="hljs-keyword">const</span> start = <span class="hljs-title">generatedOffset</span>(context.<span class="hljs-property">file</span>.<span class="hljs-property">content</span>, value.<span class="hljs-property">start</span>);
-    <span class="hljs-keyword">const</span> end = <span class="hljs-title">generatedOffset</span>(context.<span class="hljs-property">file</span>.<span class="hljs-property">content</span>, value.<span class="hljs-property">end</span>);
-    <span class="hljs-keyword">if</span> (start === <span class="hljs-literal">undefined</span> || end === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span>; }
-    <span class="hljs-keyword">const</span> mapped = <span class="hljs-title">mapGeneratedRange</span>(context.<span class="hljs-property">file</span>, start, end, context.<span class="hljs-property">mapping</span>);
-    <span class="hljs-keyword">if</span> (!mapped) { <span class="hljs-keyword">return</span>; }
-    <span class="hljs-keyword">return</span> { <span class="hljs-attr">start</span>: mapped.<span class="hljs-property">start</span>, <span class="hljs-attr">end</span>: mapped.<span class="hljs-property">end</span>,
-        <span class="hljs-attr">range</span>: <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">Range</span>(context.<span class="hljs-property">document</span>.<span class="hljs-title">positionAt</span>(mapped.<span class="hljs-property">start</span>), context.<span class="hljs-property">document</span>.<span class="hljs-title">positionAt</span>(mapped.<span class="hljs-property">end</span>)), <span class="hljs-attr">newText</span>: <span class="hljs-string">''</span> };
-}
-</code></pre>
-
-</div>
-</div><p>Workspace edits have many extensible forms. This boundary recognizes only the
+<p>Mutation freshness is presented in <a href="mutating_projected_source.html">Mutating projected source safely</a>.</p>
+<p>Workspace edits have many extensible forms. This boundary recognizes only the
 single <code>changes</code> form and exact plain TextEdit records. Thus document changes,
 resource operations, annotations, snippets and future unknown forms fail closed.
 Every edit must map; there is no partial action or truncation. Resource caps

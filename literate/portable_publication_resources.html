@@ -188,7 +188,25 @@ equivalent aggregate budget.</p>
 <p>Content-derived names do not prove authenticity and are not a cache lifetime
 promise. They provide deterministic, syntax-safe companion identities for one
 planned publication.</p>
-<h2>Diagrams are rendered as optional assets</h2>
+<p><code>publication asset addition</code> gives retained bytes a deterministic, syntax-safe
+identity.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020006100730073006500740020006100640064006900740069006f006e-006c0069007400650072006100740065002f0070006f0072007400610062006c0065005f007000750062006c00690063006100740069006f006e005f007200650073006f00750072006300650073002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020006100730073006500740020006100640064006900740069006f006e"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020006100730073006500740020006100640064006900740069006f006e" data-literate-target="f-007000750062006c00690063006100740069006f006e0020006100730073006500740020006100640064006900740069006f006e" aria-label="Definition of publication asset addition">&lt;&lt;publication asset addition&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> add = (<span class="hljs-attr">content</span>: <span class="hljs-title">Uint8Array</span>, <span class="hljs-attr">extension</span>: <span class="hljs-built_in">string</span>): <span class="hljs-params">string</span><span class="hljs-function"> =&gt;</span> {
+    <span class="hljs-keyword">const</span> companion = <span class="hljs-string">`</span><span class="hljs-subst">${directory}</span><span class="hljs-string">/</span><span class="hljs-subst">${hash(content)}</span><span class="hljs-string">.</span><span class="hljs-subst">${extension}</span><span class="hljs-string">`</span>;
+    <span class="hljs-keyword">if</span> (!files.<span class="hljs-title">has</span>(companion)) {
+        total += content.<span class="hljs-property">length</span>;
+        <span class="hljs-keyword">if</span> (total &gt; <span class="hljs-number">128</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Publication images exceed 128 MiB'</span>); }
+        files.<span class="hljs-title">add</span>(companion);
+        plan.<span class="hljs-property">files</span>.<span class="hljs-title">push</span>({ <span class="hljs-attr">path</span>: posix.<span class="hljs-title">join</span>(posix.<span class="hljs-title">dirname</span>(output), companion), content });
+    }
+    <span class="hljs-keyword">return</span> companion;
+};
+</code></pre>
+
+</div>
+</div><h2>Diagrams are rendered as optional assets</h2>
 <p>A Mermaid fence is a request for a vector figure, not ordinary code in the printed
 book. Books without diagrams need no browser. Books with diagrams require an
 explicitly selected, trusted Chromium executable and an isolated renderer process.

@@ -229,7 +229,23 @@ behavior remains untouched. Selection, active editor, focus, trust, document, in
 or configuration changes clear stale candidates.</p>
 <p>Automatic triggering is independently configurable per resource. Manual provider
 invocation continues to use the same projection and reply guards.</p>
-<h2>Signature triggers belong to their selected server</h2>
+<p><code>language feature automatic freshness</code> expresses the temporal proof for one
+candidate.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006c0061006e00670075006100670065002000660065006100740075007200650020006100750074006f006d0061007400690063002000660072006500730068006e006500730073-006c0069007400650072006100740065002f0063006f006f007200640069006e006100740069006e0067005f006c0061006e00670075006100670065005f00660065006100740075007200650073002e006c0069007400650072006100740065-1"><span id="f-006c0061006e00670075006100670065002000660065006100740075007200650020006100750074006f006d0061007400690063002000660072006500730068006e006500730073"></span><a class="literate-tag-name" href="#f-006c0061006e00670075006100670065002000660065006100740075007200650020006100750074006f006d0061007400690063002000660072006500730068006e006500730073" data-literate-target="f-006c0061006e00670075006100670065002000660065006100740075007200650020006100750074006f006d0061007400690063002000660072006500730068006e006500730073" aria-label="Definition of language feature automatic freshness">&lt;&lt;language feature automatic freshness&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>    <span class="hljs-keyword">function</span> <span class="hljs-title">current</span>(<span class="hljs-params">edit: Edit</span>): <span class="hljs-built_in">boolean</span> {
+        <span class="hljs-keyword">const</span> editor = vscode.<span class="hljs-property">window</span>.<span class="hljs-property">activeTextEditor</span>;
+        <span class="hljs-keyword">return</span> !disposed &amp;&amp; candidate === edit &amp;&amp; epoch === edit.<span class="hljs-property">revision</span>
+            &amp;&amp; vscode.<span class="hljs-property">window</span>.<span class="hljs-property">state</span>.<span class="hljs-property">focused</span> &amp;&amp; editor === edit.<span class="hljs-property">editor</span> &amp;&amp; editor.<span class="hljs-property">document</span> === edit.<span class="hljs-property">document</span>
+            &amp;&amp; edit.<span class="hljs-property">document</span>.<span class="hljs-property">version</span> === edit.<span class="hljs-property">version</span> &amp;&amp; <span class="hljs-title">enabled</span>(edit.<span class="hljs-property">document</span>)
+            &amp;&amp; editor.<span class="hljs-property">selections</span>.<span class="hljs-property">length</span> === <span class="hljs-number">1</span> &amp;&amp; editor.<span class="hljs-property">selection</span>.<span class="hljs-property">isEmpty</span>
+            &amp;&amp; editor.<span class="hljs-property">selection</span>.<span class="hljs-property">active</span>.<span class="hljs-title">isEqual</span>(edit.<span class="hljs-property">cursor</span>);
+    }
+</code></pre>
+
+</div>
+</div><h2>Signature triggers belong to their selected server</h2>
 <p>The coordinator starts with a small conservative trigger set and learns bounded
 trigger and retrigger characters from initialized servers. Provider registration may
 contain the union needed by the editor API, but that union is not routing authority.

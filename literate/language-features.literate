@@ -584,16 +584,7 @@ its completion cannot clear the latest candidate's context or debounce timer.
     setPending(false);
 ```
 
-```ts : <<language feature automatic freshness>>=
-    function current(edit: Edit): boolean {
-        const editor = vscode.window.activeTextEditor;
-        return !disposed && candidate === edit && epoch === edit.revision
-            && vscode.window.state.focused && editor === edit.editor && editor.document === edit.document
-            && edit.document.version === edit.version && enabled(edit.document)
-            && editor.selections.length === 1 && editor.selection.isEmpty
-            && editor.selection.active.isEqual(edit.cursor);
-    }
-```
+Automatic-completion freshness is presented in [Coordinating language features in the editor](coordinating_language_features.html).
 
 Prefetch uses the normal projection and payload validators. Only nonempty valid
 items open suggestions, and the provider consumes exactly one matching cache,

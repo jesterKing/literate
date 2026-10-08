@@ -123,6 +123,29 @@ bounded stability certificate derived from physical page membership and placemen
 A missing, malformed, pending, or error certificate rejects a rail-enabled build
 before PDF bytes reach the destination transaction.
 
+`publication PDF build` accepts bytes only after the final log and rail certificate
+agree.
+
+```ts : <<publication PDF build>>=
+async function buildPdf(runner: PdfProcessRunner, cwd: string,
+    env: NodeJS.ProcessEnv, check: () => void): Promise<PdfCompilation> {
+    const result = await runner(requestFor('latexmk', [
+        '-norc', '-lualatex', '-interaction=nonstopmode', '-halt-on-error',
+        '-file-line-error', '-no-shell-escape', '-e', '$max_repeat = 5;', 'book.tex'
+    ], cwd, env, buildTimeoutMs));
+    if (result.code !== 0) { throw new Error(`latexmk failed (exit ${result.code}).\n${result.output}`); }
+    const log = (await readBoundedFile(path.join(cwd, 'book.log'), maximumLogBytes, check)).toString('utf8');
+    checkConvergence(log, result.output);
+    await checkRailCertificate(cwd, check);
+    const pdf = await readBoundedFile(path.join(cwd, 'book.pdf'), maximumPdfBytes, check);
+    check();
+    if (pdf.length < 8 || !/^%PDF-[12]\.[0-9]/.test(pdf.subarray(0, 8).toString('ascii'))) {
+        throw new Error('LuaLaTeX did not produce a valid PDF header in book.pdf');
+    }
+    return { pdf, warnings: logWarnings(log) };
+}
+```
+
 ## Preserve the previous output
 
 Let `O` be the bytes already published and `N` the newly compiled bytes. The desired

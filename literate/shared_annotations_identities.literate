@@ -88,6 +88,28 @@ the point: renumbering a note for presentation does not redefine how its source
 occurrence was identified. The diagram omits namespace prefixes, which are
 mechanical collision protection.
 
+`annotation identities and hrefs` separates encoded identity from visible wording.
+
+```ts : <<annotation identities and hrefs>>=
+const keyPattern = /^[A-Za-z][A-Za-z0-9_.:-]{0,99}$/;
+function encode(value: string): string {
+    return value.split('').map(char => char.charCodeAt(0).toString(16).padStart(4, '0')).join('');
+}
+function termKey(href: string): string | undefined {
+    if (!href.startsWith('term:')) { return undefined; }
+    try { return decodeURIComponent(href.slice(5)); } catch { return undefined; }
+}
+export function resolveTermHref(annotations: PublicationAnnotations, href: string): string | undefined {
+    const key = termKey(href);
+    if (key === undefined || !keyPattern.test(key)) { return undefined; }
+    const terms = annotations.terms.filter(term => term.key === key);
+    return terms.length === 1 ? terms[0].target : undefined;
+}
+export function termByTarget(annotations: PublicationAnnotations, target: string): PublicationTerm | undefined {
+    return annotations.terms.find(term => term.target === target);
+}
+```
+
 ## Collect before resolving
 
 Forward references are normal in a book, so a use cannot be resolved when first
