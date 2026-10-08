@@ -29,8 +29,8 @@ The generated test roots are:
 
 Their root assembly is recorded in
 [Appendix A — Program assembly maps](assembly.html), and their constituent fragments
-live with the publication policies they verify. Edit those `.literate` chapters and
-regenerate; a direct edit to one of these six files will be overwritten.
+are collected later in this appendix. Edit those named fragments and regenerate; a
+direct edit to one of these six files will be overwritten.
 
 All other test files are ordinary source unless and until a Literate output root says
 otherwise. This includes the remaining headless tests, `src/test/headless/vscode-fixture.ts`,
@@ -342,3 +342,2878 @@ changed surfaces. Test the exact archive intended for publication.
 Report validation in terms of the command actually run and the claim it supports.
 “The headless suite passed,” “the fixed point passed,” “the VSIX was inspected,” and
 “the PDF was reviewed” are complementary statements, not interchangeable ones.
+
+## Generated publication test implementations
+
+The following suites are generated from named fragments just like production
+modules. They live here because they are executable evidence and integration
+mechanics rather than the main conceptual argument. Their assembly roots remain in
+Appendix A.
+
+## Publication settings tests
+
+The contract tests parse real Markdown rather than constructing tokens. They cover
+root normalization, containers, newline maps, and invalid-value retention. Neither
+resolving settings nor testing them requires an installed font.
+
+The helper rejects unexpected parse diagnostics so settings validation is tested
+independently of source validation.
+
+```ts : <<publication settings test setup>>=
+import assert = require('node:assert/strict');
+import { test } from 'node:test';
+import { parseProject } from '../../engine';
+import { preparePandoc } from '../../publication-pandoc';
+import { resolvePublicationSettings } from '../../publication-settings';
+import type { PublicationFonts, PublicationSettingsResult } from '../../publication-settings';
+
+const defaults: PublicationFonts = {
+    body: 'Latin Modern Roman', heading: 'Monofur Nerd Font',
+    code: 'Lilex Nerd Font', fragment: 'Monofur Nerd Font', note: 'Latin Modern Roman'
+};
+const fence = (content: string, info = 'SETTINGS') => '```' + info + '\n' + content + '\n```\n';
+function resolve(text: string, path = 'index.literate'): PublicationSettingsResult {
+    const project = parseProject([{ path, text }]);
+    assert.deepEqual(project.diagnostics, []);
+    return resolvePublicationSettings(project);
+}
+```
+
+Defaults are per-call values, and only the canonical, exact-case root participates.
+A chapter named `index.literate` is still not the root.
+
+```ts : <<publication settings default tests>>=
+test('publication settings defaults and root-only scope', () => {
+    const expected = { fonts: defaults, codeLigatures: true, diagnostics: [] };
+    assert.deepEqual(resolvePublicationSettings(parseProject([])), expected);
+    assert.deepEqual(resolve(''), expected);
+    for (const path of ['chapter.literate', 'chapters/index.literate', 'Index.literate']) {
+        assert.deepEqual(resolve(fence('font-body=Other\nfont-code-ligatures=bad'), path), expected);
+    }
+    const project = parseProject([
+        { path: 'chapter.literate', text: fence('font-body=Chapter\nfont-note=') },
+        { path: './parts/../index.literate', text: fence('font-body=Root') }
+    ]);
+    assert.deepEqual(project.diagnostics, []);
+    assert.equal(resolvePublicationSettings(project).fonts.body, 'Root');
+    assert.deepEqual(resolvePublicationSettings(project).diagnostics, []);
+    const rejected = parseProject([{ path: '.\\index.literate', text: fence('font-body=Wrong') }]);
+    assert.ok(rejected.diagnostics.some(d => d.message === 'Invalid source path'));
+    assert.deepEqual(resolvePublicationSettings(rejected), expected);
+    const changed = resolve('');
+    changed.fonts.body = 'Changed';
+    assert.deepEqual(resolve(''), expected);
+});
+```
+
+Every role accepts trimmed names. Note inheritance is delayed across SETTINGS
+blocks, but an explicit valid note survives subsequent invalid note values.
+
+```ts : <<publication settings default tests>>=+
+test('publication settings select all roles and delay note inheritance', () => {
+    const result = resolve(fence('font-body = Body 2.0\nfont-heading= Heading-Font \n' +
+        'font-code= Code Font \nfont-fragment= Fragment Font\nfont-code-ligatures= off '));
+    assert.deepEqual(result, { fonts: { body: 'Body 2.0', heading: 'Heading-Font',
+        code: 'Code Font', fragment: 'Fragment Font', note: 'Body 2.0' },
+        codeLigatures: false, diagnostics: [] });
+    const inherited = resolve(fence('font-note=\nfont-body=First') + fence('font-body=Last'));
+    assert.equal(inherited.fonts.note, 'Last');
+    assert.equal(inherited.diagnostics.length, 1);
+    const explicit = resolve(fence('font-note=Notes') + fence('font-body=Last\nfont-note=bad/path'));
+    assert.equal(explicit.fonts.note, 'Notes');
+    assert.equal(explicit.diagnostics.length, 1);
+});
+```
+
+Invalid repetitions never erase a valid value or an earlier diagnostic. Valid
+ligature values likewise override only the selected value, not diagnostic history.
+
+```ts : <<publication settings validation tests>>=
+test('publication settings retain every invalid repetition', () => {
+    const result = resolve(fence('font-body=\nfont-body=First\nfont-body=bad/path\n' +
+        'font-body=Last\nfont-body=\\input{x}\nfont-code-ligatures=no\n' +
+        'font-code-ligatures=off\nfont-code-ligatures=ON') +
+        fence('font-code-ligatures=on\nfont-code-ligatures='));
+    assert.equal(result.fonts.body, 'Last');
+    assert.equal(result.fonts.note, 'Last');
+    assert.equal(result.codeLigatures, true);
+    assert.deepEqual(result.diagnostics.map(d => d.line), [1, 3, 5, 6, 8, 12]);
+    assert.ok(result.diagnostics.every(d => d.path === 'index.literate' && d.column === 0));
+    assert.match(result.diagnostics[0].message, /font-body.*simple family name/);
+    assert.match(result.diagnostics[3].message, /font-code-ligatures.*on or off/);
+});
+```
+
+The grammar is deliberately narrower than fontspec input; no TeX escaping or path
+interpretation is attempted. All five family keys share this validation.
+
+```ts : <<publication settings validation tests>>=+
+test('publication settings enforce the simple ASCII family grammar', () => {
+    const invalid = ['', '   ', 'A'.repeat(101), '.Font', '-Font', 'École', 'A_B',
+        'A/B', 'A\\B', 'A{B}', 'A%B', 'A#B', 'A$B', 'A&B', 'A~B', 'A^B', 'A[B]', 'A\tB'];
+    for (const role of ['body', 'heading', 'code', 'fragment', 'note'] as const) {
+        for (const value of invalid) {
+            const result = resolve(fence('font-' + role + '=' + value));
+            assert.equal(result.fonts[role], defaults[role], role + ': ' + value);
+            assert.equal(result.diagnostics.length, 1, role + ': ' + value);
+        }
+        for (const value of ['A', '0', 'A'.repeat(100), 'Family 2.0-Pro']) {
+            const result = resolve(fence('font-' + role + '=  ' + value + '  '));
+            assert.equal(result.fonts[role], value);
+            assert.deepEqual(result.diagnostics, []);
+        }
+    }
+});
+```
+
+Unrelated SETTINGS and non-SETTINGS text are ignored, including differently cased
+keys, ordinary fences and indented code. Container fences remain ordinary settings.
+
+```ts : <<publication settings source tests>>=
+test('publication settings ignore unrelated keys and non-settings text', () => {
+    const text = fence('theme=unknown\nFont-body=\nfont-body-extra=\nfont-note-other=\nauthors=X') +
+        fence('font-body=Wrong', 'settings') + fence('font-body=Wrong', 'text') +
+        'font-body=Wrong\n\n    font-body=Wrong\n';
+    assert.deepEqual(resolve(text), { fonts: defaults, codeLigatures: true, diagnostics: [] });
+});
+
+test('publication settings map zero-based lines across newlines and containers', () => {
+    const lines = ['# Title', '', '> ```SETTINGS', '> font-body=Quoted', '> font-heading=',
+        '> ```', '', '- item', '', '  ```SETTINGS', '  font-code-ligatures=off',
+        '  font-note=bad/path', '  ```'];
+    for (const newline of ['\n', '\r\n', '\r']) {
+        const result = resolve(lines.join(newline));
+        assert.equal(result.fonts.body, 'Quoted');
+        assert.equal(result.fonts.note, 'Quoted');
+        assert.equal(result.codeLigatures, false);
+        assert.deepEqual(result.diagnostics.map(d => [d.line, d.column]), [[4, 0], [11, 0]]);
+    }
+    assert.equal(resolve(fence('font-body=')).diagnostics[0].line, 1);
+});
+```
+
+Source diagnostics remain owned by the parser and the preparation gate. Resolving
+settings neither duplicates nor mutates them, even when a rejected source is NUL-bearing.
+
+```ts : <<publication settings source tests>>=+
+test('publication settings leave source diagnostics to the preparation gate', () => {
+    const project = parseProject([{ path: 'index.literate', text: fence('font-body=A\0B') }]);
+    assert.ok(project.diagnostics.some(d => /NUL/.test(d.message)));
+    const before = JSON.stringify(project);
+    assert.deepEqual(resolvePublicationSettings(project), {
+        fonts: defaults, codeLigatures: true, diagnostics: []
+    });
+    const prepared = preparePandoc(project, () => { throw new Error('must not render'); });
+    assert.equal(prepared.document, undefined);
+    assert.deepEqual(prepared.diagnostics, project.diagnostics);
+    assert.equal(JSON.stringify(project), before);
+});
+```
+
+## Publication document and heading tests
+
+The heading tests stay close to the policy they exercise. Most run without Pandoc;
+the optional real-tool case checks the JSON round trip together with LaTeX escaping
+and destinations. A broader regression suite covers the complete document bridge.
+
+The recursive test walker exposes blocks without changing their nesting in the
+actual document. Production still traverses the complete Markdown token stream.
+
+```ts : <<publication heading test dependencies>>=
+import assert = require('node:assert/strict');
+import { test } from 'node:test';
+import { spawnSync } from 'node:child_process';
+import { generateProject, parseProject, SourceDocument } from '../../engine';
+import { preparePandoc, PandocBlock, PandocDocument } from '../../publication-pandoc';
+import { renderLatex } from '../../publication-latex';
+const source = (text: string, path = 'index.literate'): SourceDocument => ({ path, text });
+const fence = (body: string) => '```ts : \<<piece>>=\n' + body + '\n```\n';
+function blocks(document: PandocDocument): PandocBlock[] {
+    const result: PandocBlock[] = [];
+    function visit(block: PandocBlock): void {
+        result.push(block);
+        if (block.t === 'Div') { block.c[1].forEach(visit); }
+        if (block.t === 'BlockQuote') { block.c.forEach(visit); }
+        if (block.t === 'BulletList') { block.c.forEach(item => item.forEach(visit)); }
+        if (block.t === 'OrderedList') { block.c[1].forEach(item => item.forEach(visit)); }
+    }
+    document.blocks.forEach(visit);
+    return result;
+}
+```
+
+Expected target encodings are derived from the public policy, not by importing a
+private slug function. Every preparation also verifies snapshot immutability.
+
+```ts : <<publication heading test helpers>>=
+function target(slug: string, path = 'index.literate'): string {
+    const hex = (value: string) => value.split('').map(c => c.charCodeAt(0).toString(16).padStart(4, '0')).join('');
+    return 'h-' + hex(path) + '-' + hex(slug);
+}
+function prepare(sources: SourceDocument[]): PandocDocument {
+    const project = parseProject(sources), before = JSON.stringify(project);
+    const result = preparePandoc(project, () => [{ t: 'Para', c: [{ t: 'Str', c: 'CONTRIBUTION' }] }]);
+    assert.deepEqual(result.diagnostics, []);
+    assert.equal(JSON.stringify(project), before);
+    assert.ok(result.document);
+    return result.document;
+}
+function headingIds(document: PandocDocument): string[] {
+    return blocks(document).flatMap(block => block.t === 'Header' ? [block.c[1][0]] : []);
+}
+function destinations(document: PandocDocument): string[] {
+    return blocks(document).flatMap(block => block.t === 'Para' || block.t === 'Plain'
+        ? block.c.flatMap(inline => inline.t === 'Link' ? [inline.c[2][0]] : []) : []);
+}
+```
+
+Titles slug from parsed inline content. This covers entities, escapes, code,
+link labels, nested formatting, Unicode normalization, symbols and empty titles.
+
+```ts : <<publication heading slug tests>>=
+for (const [title, slug] of [
+    ['A *bold **inside*** and `x_y` [Label](https://example.org/ignored)', 'a-bold-inside-and-x_y-label'],
+    ['Café 東京 Ελληνικά', 'café-東京-ελληνικά'], ['Cafe\u0301', 'café'],
+    ['A &amp; B \\*literal\\*', 'a-b-literal'], ['~~Gone~~: A.B/C+D!', 'gone-abcd'],
+    ['  A   B -- C_D  ', 'a-b----c_d'], ['😀 ♥ !!!', 'section'], ['', 'section'],
+    ['__proto__', 'proto'], ['constructor', 'constructor'], ['İ', 'i\u0307'],
+    ['`\\input{BAD}% & $ # ^ ~`', 'inputbad'], ['𝒜 𐐀', '𝒜-𐐨']
+]) {
+    test(`publication heading slug from ${JSON.stringify(title)}`, () => {
+        const document = prepare([source('# ' + title + '\n\n[go](#' + encodeURIComponent(slug) + ')')]);
+        assert.deepEqual(headingIds(document), [target(slug)]);
+        assert.deepEqual(destinations(document), ['#' + target(slug)]);
+        assert.match(headingIds(document)[0], /^h-[0-9a-f]+-[0-9a-f]+$/);
+    });
+}
+```
+
+Lowercasing can create a composable sequence (`J` plus caron), and removing
+punctuation can bring a letter and combining mark together (`A.` plus acute).
+Both composed and decomposed authored fragments must find the final NFC slug.
+
+```ts : <<publication heading slug tests>>=+
+for (const [title, slug] of [['J\u030c', '\u01f0'], ['A.\u0301', '\u00e1']]) {
+    test(`final slug normalization resolves both fragment forms for ${title}`, () => {
+        const links = [slug, slug.normalize('NFD')].map(value =>
+            '[go](#' + encodeURIComponent(value) + ')').join(' ');
+        const document = prepare([source('# ' + title + '\n\n' + links)]);
+        assert.deepEqual(headingIds(document), [target(slug)]);
+        assert.deepEqual(destinations(document), ['#' + target(slug), '#' + target(slug)]);
+        assert.deepEqual(headingIds(prepare([source('# ' + slug)])), headingIds(document));
+    });
+}
+```
+
+Final normalization must also precede duplicate grouping, not merely lookup or
+ID encoding. Canonically equivalent bases share numbered alternatives, and both
+fragment spellings report the same ambiguity when no ordinal is supplied.
+
+```ts : <<publication heading slug tests>>=+
+for (const [title, slug] of [['J\u030c', '\u01f0'], ['A.\u0301', '\u00e1']]) {
+    test(`final slug normalization groups canonical duplicates for ${title}`, () => {
+        const headings = '# ' + title + '\n\n# ' + slug;
+        const links = [slug, slug.normalize('NFD')].flatMap(value => [1, 2].map(ordinal =>
+            '[go](#' + encodeURIComponent(value) + '-' + ordinal + ')')).join(' ');
+        const document = prepare([source(headings + '\n\n' + links)]);
+        const ids = [target(slug + '-1'), target(slug + '-2')];
+        assert.deepEqual(headingIds(document), ids);
+        assert.deepEqual(destinations(document), [...ids, ...ids].map(id => '#' + id));
+        for (const value of [slug, slug.normalize('NFD')]) {
+            const project = parseProject([source(headings + '\n\n[bad](#' + encodeURIComponent(value) + ')')]);
+            const result = preparePandoc(project, () => { throw new Error('must not render'); });
+            assert.equal(result.document, undefined);
+            assert.deepEqual(result.diagnostics.map(d => [d.code, d.line]), [['ambiguous-publication-heading', 4]]);
+            assert.ok(result.diagnostics[0].message.endsWith('use #' + slug + '-1, #' + slug + '-2'));
+        }
+    });
+}
+```
+
+Markdown formatting remains in the Header AST, rather than being replaced with
+the plain slug text. Setext and ATX spellings describe the same heading identity.
+
+```ts : <<publication heading slug tests>>=+
+test('heading formatting survives and setext identities match ATX', () => {
+    const title = '*Strong* and `code` [label](https://example.org)';
+    const atx = prepare([source('# ' + title)]);
+    const setext = prepare([source(title + '\n====')]);
+    assert.deepEqual(headingIds(atx), headingIds(setext));
+    const header = blocks(atx).find(block => block.t === 'Header');
+    assert.ok(header?.t === 'Header');
+    assert.deepEqual(header.c[2].map(inline => inline.t), ['Emph', 'Space', 'Str', 'Space', 'Code', 'Space', 'Link']);
+});
+test('generated HTML has no heading IDs; publication does not change HTML behavior', () => {
+    const result = generateProject([source('# Same\n\n# Same\n\n[go](#same)')]);
+    assert.deepEqual(result.diagnostics, []);
+    const html = result.files.find(file => file.path === 'index.html')!.content;
+    assert.equal((html.match(/<h1>Same<\/h1>/g) ?? []).length, 2);
+    assert.ok(html.includes('href="#same"'));
+});
+```
+
+Natural suffixed names are reserved even when they occur after duplicates.
+Normalization collisions and empty-title fallbacks use the same rule.
+
+```ts : <<publication heading identity tests>>=
+test('duplicates reserve natural suffixes and allocate deterministic unique IDs', () => {
+    const text = '# Foo\n\n## Foo\n\n# Foo-1\n\n# Foo-2\n\n# !!!\n\n# 😀\n\n# section-1\n\n'
+        + '[a](#foo-3) [b](#foo-4) [c](#foo-1) [d](#section-2) [e](#section-3)';
+    const document = prepare([source(text)]);
+    assert.deepEqual(headingIds(document), ['foo-3', 'foo-4', 'foo-1', 'foo-2', 'section-2', 'section-3', 'section-1'].map(s => target(s)));
+    assert.equal(new Set(headingIds(document)).size, 7);
+    assert.deepEqual(destinations(document), ['foo-3', 'foo-4', 'foo-1', 'section-2', 'section-3'].map(s => '#' + target(s)));
+    const unicode = prepare([source('# Café\n\n# Cafe\u0301\n\n[a](#café-1) [b](#cafe%CC%81-2)')]);
+    assert.deepEqual(headingIds(unicode), ['café-1', 'café-2'].map(s => target(s)));
+    assert.deepEqual(destinations(unicode), headingIds(unicode).map(id => '#' + id));
+});
+```
+
+Repeated naturally suffixed titles form their own duplicate group. Reserving
+all bases also protects a literal second-level suffix from that group's ordinals.
+Both ambiguous bases must name exactly the numbered destinations actually emitted.
+
+```ts : <<publication heading identity tests>>=+
+test('repeated Foo and Foo-1 reserve literal Foo-1-1 without target collisions', () => {
+    const headings = '# Foo\n\n# Foo\n\n# Foo-1\n\n# Foo-1\n\n# Foo-1-1';
+    const slugs = ['foo-2', 'foo-3', 'foo-1-2', 'foo-1-3', 'foo-1-1'];
+    const links = slugs.map(slug => '[go](#' + slug + ')').join(' ');
+    const document = prepare([source(headings + '\n\n' + links)]);
+    assert.deepEqual(headingIds(document), slugs.map(slug => target(slug)));
+    assert.equal(new Set(headingIds(document)).size, slugs.length);
+    assert.deepEqual(destinations(document), headingIds(document).map(id => '#' + id));
+    const project = parseProject([source(headings + '\n\n[bad](#foo) [bad](#foo-1)')]);
+    const result = preparePandoc(project, () => { throw new Error('must not render'); });
+    assert.equal(result.document, undefined);
+    assert.deepEqual(result.diagnostics.map(d => [d.code, d.line, d.column]), [
+        ['ambiguous-publication-heading', 10, 0], ['ambiguous-publication-heading', 10, 0]
+    ]);
+    assert.ok(result.diagnostics[0].message.endsWith('use #foo-2, #foo-3'));
+    assert.ok(result.diagnostics[1].message.endsWith('use #foo-1-2, #foo-1-3'));
+});
+```
+
+Document paths, not titles or chapter positions, scope identities. Forward links
+and both existing local extension conventions resolve to the same destination.
+
+```ts : <<publication heading identity tests>>=+
+test('cross-document headings resolve before rendering with safe path aliases', () => {
+    const document = prepare([
+        source('[source](<chapters/a b.literate#same>) [html](chapters/a%20b.html#same)\n\n# Same'),
+        source('[back](../index.html#same) [self](#same)\n\n# Same', 'chapters/a b.literate')
+    ]);
+    const home = target('same'), other = target('same', 'chapters/a b.literate');
+    assert.deepEqual(headingIds(document), [home, other]);
+    assert.deepEqual(destinations(document), ['#' + other, '#' + other, '#' + home, '#' + other]);
+    const shifted = prepare([source('# Unrelated\n\n# Same', 'chapters/a b.literate'), source('\n\n# Same')]);
+    assert.ok(headingIds(shifted).includes(home));
+    assert.ok(headingIds(shifted).includes(other));
+    const reordered = prepare([source('# Same', 'z.literate'), source('# Same', 'a.literate')]);
+    assert.deepEqual(headingIds(reordered), [target('same', 'a.literate'), target('same', 'z.literate')]);
+});
+```
+
+Path and slug punctuation never leaks into target syntax. Percent escapes are
+URL syntax only and decoded once, not interpreted again as separators or code.
+
+```ts : <<publication heading identity tests>>=+
+test('hostile path characters and astral Unicode remain injective safe data', () => {
+    const paths = ['a-b.literate', 'a/b.literate', 'é.literate', '𝒜.literate', 'a%20b.literate', 'a b.literate', 'x{y}&_.literate'];
+    const links = paths.map(path => '[go](<' + encodeURI(path) + '#safe>)').join(' ');
+    const document = prepare([source(links), ...paths.map(path => source('# Safe', path))]);
+    assert.equal(new Set(headingIds(document)).size, paths.length);
+    assert.deepEqual(destinations(document), paths.map(path => '#' + target('safe', path)));
+    headingIds(document).forEach(id => assert.match(id, /^h-[0-9a-f]+-[0-9a-f]+$/));
+});
+```
+
+A heading before and after a contribution must stay inside its original quote
+and list item. Code containing fake headings contributes neither IDs nor aliases.
+
+```ts : <<publication heading container tests>>=
+test('nested headings and contribution slots retain the full container stream', () => {
+    const text = '[before](#nested) [after](#after)\n\n> - ## Nested\n>\n'
+        + '>   ```ts : \<<piece>>=\n>   # not a heading\n>   ```\n>\n>   ### After\n>\n>   tail\n';
+    const document = prepare([source(text)]);
+    assert.deepEqual(headingIds(document), [target('nested'), target('after')]);
+    assert.deepEqual(destinations(document), headingIds(document).map(id => '#' + id));
+    const quote = blocks(document).find(block => block.t === 'BlockQuote');
+    assert.ok(quote?.t === 'BlockQuote');
+    const list = quote.c[0];
+    assert.ok(list.t === 'BulletList');
+    assert.deepEqual(list.c[0].map(block => block.t), ['Header', 'Para', 'Header', 'Para']);
+    assert.deepEqual(list.c[0][1], { t: 'Para', c: [{ t: 'Str', c: 'CONTRIBUTION' }] });
+    assert.deepEqual(headingIds(prepare([source('```text\n# Fake\n```\n\n    # Also fake')])), []);
+});
+```
+
+Failure assertions require no partial document and no contribution callbacks,
+including when the invalid link occurs later than a valid contribution.
+
+```ts : <<publication heading test helpers>>=+
+function reject(text: string, code: string, line = 4): void {
+    const project = parseProject([source(fence('ok') + '\n' + text)]);
+    let calls = 0;
+    const result = preparePandoc(project, () => { calls++; return []; });
+    assert.equal(calls, 0);
+    assert.equal(result.document, undefined);
+    assert.ok(result.diagnostics.some(d => d.code === code && d.path === 'index.literate'
+        && d.line === line && d.column === 0), JSON.stringify(result.diagnostics));
+}
+for (const href of ['#absent', 'index.html#absent', 'index.literate#absent', '#Title', '#caf%25C3%25A9']) {
+    test(`missing heading diagnostic: ${href}`, () => {
+        reject('[bad](' + href + ')\n\n# title\n\n# café', 'missing-publication-heading');
+    });
+}
+```
+
+Distinct diagnostics distinguish absent chapters/headings from unsafe or
+unsupported URL syntax. Inject real tokens for values Markdown-it would otherwise
+escape or refuse to parse as links.
+
+```ts : <<publication heading diagnostic tests>>=
+for (const href of ['#', 'index.html#', '#bad%00', '#bad%0a', '#bad%7f', '#bad%5c', '#%zz',
+    '#a#b', '#a?b', '#a%20b', 'index.html?q=1#title', '../index.html#title',
+    '/index.html#title', '//host/index.html#title', 'index.html%23title', 'index.html%3fq=1#title']) {
+    test(`unsupported heading URL diagnostic: ${href}`, () => {
+        const project = parseProject([source(fence('ok') + '\n[bad](https://example.org)')]);
+        const inline = project.documents[0].tokens.find(token => token.type === 'inline')!;
+        inline.children!.find(token => token.type === 'link_open')!.attrSet('href', href);
+        let calls = 0;
+        const result = preparePandoc(project, () => { calls++; return []; });
+        assert.equal(calls, 0); assert.equal(result.document, undefined);
+        assert.deepEqual(result.diagnostics.map(d => [d.code, d.line, d.column]), [['unsupported-publication-link', 4, 0]]);
+    });
+}
+test('missing included document diagnostics cover whole and heading links', () => {
+    reject('[bad](missing.html)', 'missing-publication-document');
+    reject('[bad](missing.literate#title)', 'missing-publication-document');
+});
+```
+
+The authoring path must reject unsafe local URL syntax too, not only injected
+token attributes. These inputs survive Markdown-it as actual links and must
+reach the publication gate without running an earlier contribution callback.
+
+```ts : <<publication heading diagnostic tests>>=+
+test('authored unsafe heading URLs are rejected before callbacks', () => {
+    for (const href of ['#bad%00', '#bad%0a', '#bad%5c', 'index.html?q=1#title',
+        '../index.html#title', '//host/index.html#title']) {
+        reject('[bad](' + href + ')\n\n# Title', 'unsupported-publication-link');
+    }
+});
+```
+
+Ambiguous bases never silently select the first heading. Even a linked heading
+with an unsupported child still goes through the ordinary inline validator.
+
+```ts : <<publication heading diagnostic tests>>=+
+test('ambiguous bases list allocated alternatives at the source link', () => {
+    const project = parseProject([source('[bad](#foo)\n\n# Foo\n\n# Foo\n\n# Foo-1')]);
+    const result = preparePandoc(project, () => []);
+    assert.equal(result.document, undefined);
+    assert.deepEqual(result.diagnostics.map(d => [d.code, d.line]), [['ambiguous-publication-heading', 0]]);
+    assert.match(result.diagnostics[0].message, /use #foo-2, #foo-3/);
+    reject('[bad](index.html#foo)\n\n# Foo\n\n# Foo', 'ambiguous-publication-heading');
+});
+test('heading indexing does not bypass unsupported inline content or raw attributes', () => {
+    reject('# ![image](asset.png)', 'unsupported-pandoc-token');
+    reject('# [bad](#absent)', 'missing-publication-heading');
+    const project = parseProject([source('# Safe\n\n[go](#safe)')]);
+    project.documents[0].tokens[0].attrSet('id', '\\input{ATTACK}');
+    const result = preparePandoc(project, () => []);
+    assert.deepEqual(result.diagnostics, []);
+    assert.deepEqual(headingIds(result.document!), [target('safe')]);
+});
+```
+
+The LaTeX adapter's existing preparation gate must prevent converter invocation
+on every unresolved heading class. No special raw heading renderer is needed:
+Pandoc owns heading and hyperlink escaping.
+
+```ts : <<publication heading adapter tests>>=
+test('LaTeX adapter gates missing, ambiguous and unsupported heading links before converter', async () => {
+    for (const [text, code] of [
+        ['[go](#absent)', 'missing-publication-heading'],
+        ['[go](#same)\n\n# Same\n\n# Same', 'ambiguous-publication-heading'],
+        ['[go](index.html?q=1#same)', 'unsupported-publication-link']
+    ]) {
+        let calls = 0;
+        const result = await renderLatex(parseProject([source(fence('ok') + '\n' + text)]), {}, async () => {
+            calls++; return 'must not happen';
+        });
+        assert.equal(calls, 0); assert.equal(result.latex, undefined);
+        assert.ok(result.diagnostics.some(d => d.code === code));
+    }
+});
+```
+
+The real writer must preserve IDs, produce internal links to them, and escape
+hostile heading and link-title text. JSON round-trip also catches malformed Pandoc
+attributes that a mock converter could miss.
+
+```ts : <<publication heading adapter tests>>=+
+test('real Pandoc preserves heading destinations, links and escaped inline author data',
+    { skip: process.env.LITERATE_TEST_PANDOC !== '1' }, () => {
+        const document = prepare([
+            source('[next](two.html#café)\n\n# `\\input{HEADING_ATTACK}` & 50% _value_\n\n[me](#inputheading_attack-50-value "\\\\input{TITLE_ATTACK}")'),
+            source('# Café\n\n[back](index.literate#inputheading_attack-50-value)', 'two.literate')
+        ]);
+        for (const format of ['json', 'latex']) {
+            const result = spawnSync('pandoc', ['--from=json', '--to=' + format, '--top-level-division=chapter'], {
+                input: JSON.stringify(document), encoding: 'utf8', timeout: 15000, maxBuffer: 1024 * 1024
+            });
+            assert.ifError(result.error); assert.equal(result.status, 0, result.stderr);
+            if (format === 'json') {
+                assert.deepEqual(JSON.parse(result.stdout).blocks, document.blocks);
+            } else { checkHeadingLatex(result.stdout, document); }
+        }
+    });
+```
+
+These assertions verify destinations and link commands, not merely that IDs
+appear somewhere in output. A separate manual PDF proof can inspect annotations.
+
+```ts : <<publication heading test helpers>>=+
+function checkHeadingLatex(latex: string, document: PandocDocument): void {
+    for (const id of headingIds(document)) {
+        assert.ok(latex.includes('\\label{' + id + '}'), latex);
+        assert.ok(latex.includes('\\hyperref[' + id + ']'), latex);
+    }
+    assert.ok(!latex.includes('\\input{HEADING_ATTACK}'));
+    assert.ok(!latex.includes('\\input{TITLE_ATTACK}'));
+    for (const escaped of ['\\textbackslash', '\\{', '\\}', '\\&', '50\\%']) {
+        assert.ok(latex.includes(escaped), escaped + '\n' + latex);
+    }
+}
+```
+
+## Publication highlighting tests
+
+The contract tests pass their fixtures through the real publication parser so
+escapes and raw UTF-16 offsets have the same meaning as they do in the renderer.
+They also verify that independently generated test output uses normal imports.
+
+Construct delimiters at runtime so the tests themselves do not introduce literate
+fragment dependencies. Each fixture includes one resolved family named `piece`.
+
+```ts : <<publication highlighting test setup>>=
+import assert = require('node:assert/strict');
+import { test } from 'node:test';
+import hljs from 'highlight.js';
+import { parseProject } from '../../engine';
+import { themes, syntaxColor, themeCss } from '../../themes';
+import { renderLatex } from '../../publication-latex';
+import type { PandocBlock } from '../../publication-pandoc';
+import { createHash } from 'node:crypto';
+import { highlightContribution, syntaxStyle } from '../../publication-highlight';
+const tag = (name: string) => '<' + '<' + name + '>>';
+function part(body: string, language = 'javascript') {
+    const fence = (header: string, content: string) => '```' + header + '\n' + content + '\n```\n';
+    const result = parseProject([{ path: 'index.literate', text:
+        fence(language + ': ' + tag('main') + '=', body) + fence(': ' + tag('piece') + '=', 'x') }]);
+    assert.deepEqual(result.diagnostics, []);
+    return result.publication.contributions[0];
+}
+function scopeAt(result: ReturnType<typeof highlightContribution>, marker: string): string {
+    const offset = result.text.indexOf(marker);
+    assert.ok(offset >= 0);
+    return result.spans.find(span => span.start <= offset && offset < span.end)!.scope;
+}
+```
+
+Both positive cases deliberately retain text after a reference inside an open
+lexical construct. The split-block negative controls prove that these fixtures
+actually detect loss of context, rather than merely exercising the API.
+
+```ts : <<publication highlighting context tests>>=
+test('whole-block highlighting preserves comment and template context around references', () => {
+    const cases = [
+        { body: '/* before\n' + tag('piece') + '\nCOMMENT_AFTER\n*/\nconst ready = true;',
+            marker: 'COMMENT_AFTER', scope: 'comment' },
+        { body: 'const message = `before\n' + tag('piece') + '\nTEMPLATE_AFTER ${count + 1}`;',
+            marker: 'TEMPLATE_AFTER', scope: 'string' }
+    ];
+    for (const fixture of cases) {
+        const result = highlightContribution(part(fixture.body));
+        assert.equal(scopeAt(result, fixture.marker), fixture.scope);
+        assert.equal(result.references.length, 1);
+        const suffix = result.text.slice(result.references[0].end);
+        assert.notEqual(scopeAt(highlightContribution(part(suffix)), fixture.marker), fixture.scope);
+        assert.equal(scopeAt(result, 'const'), 'keyword');
+    }
+});
+```
+
+An escaped opener before an emoji and two repeated references tests the new
+coordinate space. Escaped references remain literal even though the displayed
+text now looks like a reference. Raw contribution data must not be mutated.
+
+```ts : <<publication highlighting display tests>>=
+test('literal unescape maps repeated references after emoji in UTF-16', () => {
+    const input = part('\\' + tag('literal') + ' 😀 ' + tag('piece') + '/' + tag('piece'), 'unknown-language');
+    const snapshot = JSON.stringify(input);
+    const result = highlightContribution(input);
+    assert.equal(result.text, tag('literal') + ' 😀 ' + tag('piece') + '/' + tag('piece') + '\n');
+    assert.equal(result.references.length, 2);
+    assert.equal(result.references[0].start, tag('literal').length + 4);
+    for (const ref of result.references) {
+        assert.equal(result.text.slice(ref.start, ref.end), tag('piece'));
+        assert.equal(ref.name, 'piece');
+        assert.ok(ref.target);
+    }
+    assert.deepEqual(result.spans, [{ start: 0, end: result.text.length, scope: '' }]);
+    assert.equal(JSON.stringify(input), snapshot);
+});
+```
+
+Standalone callers receive errors for unsupported graph state rather than a
+visually plausible output with broken links. Plain and empty blocks are explicit.
+
+```ts : <<publication highlighting display tests>>=+
+test('standalone validation rejects missing references, modifiers and invalid segments', () => {
+    assert.throws(() => highlightContribution(part(tag('missing'))), /target is missing/);
+    assert.throws(() => highlightContribution(part(tag('piece') + '=+')), /modifier/);
+    const input = part(tag('piece'));
+    input.content += 'bad';
+    assert.throws(() => highlightContribution(input), /reconstruct/);
+    const invalid = part(tag('piece'));
+    const ref = invalid.segments.find(segment => segment.kind === 'reference')!;
+    if (ref.kind === 'reference') { ref.start++; }
+    assert.throws(() => highlightContribution(invalid), /offsets/);
+    const empty = part('', '');
+    empty.content = ''; empty.segments = [];
+    assert.deepEqual(highlightContribution(empty), { text: '', spans: [], references: [] });
+});
+```
+
+Embedded JavaScript inside HTML exercises real language containers and nested
+substitution nodes. Every emitted range is contiguous and exactly reconstructs
+the display; substitution punctuation must not inherit string coloring.
+
+```ts : <<publication highlighting grammar tests>>=
+test('embedded grammar and nested scopes reconstruct exact display', () => {
+    const result = highlightContribution(part(
+        '<script>const message = `hello ${count + 1}`; function work() { return true; }</script>', 'xml'));
+    let offset = 0;
+    for (const span of result.spans) {
+        assert.equal(span.start, offset);
+        assert.ok(span.end > span.start);
+        offset = span.end;
+    }
+    assert.equal(offset, result.text.length);
+    assert.equal(result.spans.map(span => result.text.slice(span.start, span.end)).join(''), result.text);
+    assert.equal(scopeAt(result, 'const'), 'keyword');
+    assert.equal(scopeAt(result, 'hello'), 'string');
+    assert.equal(scopeAt(result, 'count'), 'subst');
+    assert.equal(scopeAt(result, 'work'), 'title.function');
+    assert.equal(syntaxStyle(scopeAt(result, 'work'), themes[0]).color, themes[0].colors.information);
+});
+```
+
+A synchronous mock isolates the private adapter from highlight.js's own recursive
+HTML emitter. The adapter itself must handle deep trees iteratively, inherit
+through neutral wrappers, reject bad shapes and cycles, and compare characters.
+Every mutation is restored even when an assertion fails.
+
+```ts : <<publication highlighting guard tests>>=
+function withEmitter(root: unknown, run: () => void): void {
+    const original = hljs.highlight;
+    hljs.highlight = (() => ({ _emitter: { rootNode: root } })) as unknown as typeof hljs.highlight;
+    try { run(); } finally { hljs.highlight = original; }
+}
+test('private adapter inherits scopes without recursive traversal', () => {
+    let root: unknown = 'x\n';
+    for (let depth = 0; depth < 20000; depth++) { root = { children: [root] }; }
+    root = { scope: 'comment', children: [{ scope: 'language:javascript', children: [root] }] };
+    withEmitter(root, () => {
+        assert.deepEqual(highlightContribution(part('x')).spans, [{ start: 0, end: 2, scope: 'comment' }]);
+    });
+});
+```
+
+These are hard failures, not plain-text fallbacks. A future library upgrade must
+satisfy the version gate as well as tree and reconstruction requirements.
+
+```ts : <<publication highlighting guard tests>>=+
+test('private adapter guards version, shape, cycles and exact reconstruction', () => {
+    const version = hljs.versionString;
+    hljs.versionString = '99.0.0';
+    try { assert.throws(() => highlightContribution(part('x')), /11\.9\.0/); }
+    finally { hljs.versionString = version; }
+    for (const root of [null, {}, { children: [42] }, { scope: 1, children: [] }]) {
+        withEmitter(root, () => assert.throws(() => highlightContribution(part('x')), /emitter/));
+    }
+    const cycle: { children: unknown[] } = { children: [] };
+    cycle.children.push(cycle);
+    withEmitter(cycle, () => assert.throws(() => highlightContribution(part('x')), /tree/));
+    withEmitter({ children: ['y\n'] }, () => {
+        assert.throws(() => highlightContribution(part('x')), /reconstruct/);
+    });
+});
+```
+
+All seventy palettes are checked without consulting CSS at runtime. The groups
+below are independent expectations for every mapped token family, including
+plain resets and dotted forms; weights do not accidentally make booleans bold.
+
+```ts : <<publication highlighting palette tests>>=
+const groups = {
+    purple: 'keyword selector-tag literal', accent: 'string regexp addition',
+    warning: 'number symbol bullet', information: 'title section built_in type link',
+    cyan: 'attr attribute variable template-variable', muted: 'comment quote',
+    yellow: 'meta doctag', danger: 'deletion name',
+    text: 'subst unknown emphasis strong constructor __proto__ toString params property operator punctuation'
+};
+```
+
+These expectations remain independent of the shared implementation, including
+unmapped highlight.js families and prototype keys.
+
+```ts : <<publication highlighting palette tests>>=+
+test('all 70 palettes retain exact scope colors and publication font policy', () => {
+    assert.equal(themes.length, 70);
+    for (const theme of themes) {
+        for (const [key, scopes] of Object.entries(groups)) {
+            for (const scope of scopes.split(' ')) {
+                const expected = { color: theme.colors[key as keyof typeof theme.colors],
+                    bold: ['keyword', 'variable', 'template-variable', 'strong'].includes(scope),
+                    italic: ['comment', 'quote', 'emphasis'].includes(scope) };
+                assert.match(expected.color, /^#[0-9a-f]{6}$/i);
+                assert.equal(syntaxColor(scope, theme), expected.color);
+                assert.equal(syntaxColor(scope + '.nested', theme), expected.color);
+                assert.deepEqual(syntaxStyle(scope, theme), expected);
+                assert.deepEqual(syntaxStyle(scope + '.nested', theme), expected);
+            }
+        }
+        assert.equal(syntaxColor('', theme), theme.colors.text);
+        assert.deepEqual(syntaxStyle('', theme), { color: theme.colors.text, bold: false, italic: false });
+    }
+});
+```
+
+Screen rules are checked independently of the lookup, including unmapped resets.
+The hash was captured before extraction from all seventy complete stylesheets;
+it pins selector order, whitespace, decorations and all non-syntax styling too.
+
+```ts : <<publication highlighting CSS tests>>=
+test('all screen CSS bytes remain unchanged after scope extraction', () => {
+    const css = themes.map(theme => themeCss(theme)).join('\n');
+    assert.equal(createHash('sha256').update(css).digest('hex'),
+        '51ec8b26a6cd75ce6d62c664370f08dd291ca17168eed60083c6092a74bbbd32');
+});
+function screenStyle(css: string, scope: string): string {
+    let declarations = '';
+    for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const selectors = rule[1].trim().split(', ');
+        if (selectors.includes('.literate-document [class*="hljs-"]') ||
+            selectors.includes('.literate-document .hljs-' + scope)) {
+            declarations += rule[2];
+        }
+    }
+    return declarations;
+}
+```
+
+This small rule reader is test-only, not a runtime CSS parser. It models the flat
+base selectors emitted here, not arbitrary browser cascade or host typography.
+Screen keyword/variable weight inheritance intentionally remains untouched.
+
+```ts : <<publication highlighting CSS tests>>=+
+test('screen scope colors and format-specific decorations cover every palette', () => {
+    for (const theme of themes) {
+        const css = themeCss(theme);
+        for (const [key, scopes] of Object.entries(groups)) {
+            for (const scope of scopes.split(' ')) {
+                const style = screenStyle(css, scope);
+                const colors = [...style.matchAll(/color: var\(--literate-(\w+)\)/g)];
+                assert.equal(colors[colors.length - 1][1], key, scope);
+                assert.equal(style.includes('font-style: italic;'),
+                    ['comment', 'quote', 'emphasis'].includes(scope), scope);
+                assert.equal(style.includes('font-weight: bold;'), scope === 'strong', scope);
+                assert.equal(style.includes('text-decoration: underline;'), scope === 'link', scope);
+            }
+        }
+    }
+});
+```
+
+Inject a complete emitter tree to exercise every scope through the real LaTeX
+renderer, rather than depending on a grammar to emit all possible families.
+Newlines keep identical adjacent styles independently assertable after merging.
+Both dotted and base scopes must produce the approved color/weight/italic macros.
+
+```ts : <<publication highlighting output tests>>=
+function rawStyles(blocks: PandocBlock[]): string {
+    return blocks.map(block => block.t === 'RawBlock' ? block.c[1]
+        : block.t === 'Div' ? rawStyles(block.c[1]) : '').join('\n');
+}
+```
+
+The publication bridge wraps chapters in Divs; retain their trusted raw blocks
+in the test converter just as Pandoc does.
+
+```ts : <<publication highlighting output tests>>=+
+test('LaTeX emits every scope with unchanged typography in all themes', async () => {
+    const scopes = Object.values(groups).flatMap(value => value.split(' '))
+        .flatMap(scope => [scope, scope + '.nested']).concat('');
+    const text = scopes.map((_, index) => 'token' + index + '\n').join('');
+    const input = '```javascript: ' + tag('styles') + '=\n' + text + '```\n';
+    const project = parseProject([{ path: 'index.literate', text: input }]);
+    assert.deepEqual(project.diagnostics, []);
+    const original = hljs.highlight;
+    hljs.highlight = (() => ({ _emitter: { rootNode: { children: scopes.map((scope, index) =>
+        ({ scope, children: ['token' + index + '\n'] })) } } })) as unknown as typeof hljs.highlight;
+    try {
+        for (const theme of themes) {
+            const result = await renderLatex(project, { theme: theme.name }, async document =>
+                rawStyles(document.blocks));
+            assert.deepEqual(result.diagnostics, []);
+            <<publication highlighting macro assertions>>
+        }
+    } finally { hljs.highlight = original; }
+});
+```
+
+Expected macros are derived from independent test groups, not `syntaxStyle`.
+No syntax underline command should appear, even for the link scope.
+
+```ts : <<publication highlighting macro assertions>>=
+scopes.forEach((scope, index) => {
+    const base = scope.split('.')[0];
+    const key = Object.entries(groups).find(([, names]) => names.split(' ').includes(base))?.[0] || 'text';
+    const hex = theme.colors[key as keyof typeof theme.colors].slice(1);
+    const bold = ['keyword', 'variable', 'template-variable', 'strong'].includes(base) ? '\\bfseries' : '';
+    const italic = ['comment', 'quote', 'emphasis'].includes(base) ? '\\itshape' : '';
+    assert.ok(result.latex?.includes(`\\LitStyle{${hex}}{${bold}}{${italic}}{token${index}}`),
+        theme.name + ': ' + scope);
+});
+assert.doesNotMatch(result.latex!, /\\(?:underline|uline)\{/);
+```
+
+## Portable font publication tests
+
+These contract tests require no installed fonts, Pandoc, or TeX. Binary sentinels
+verify byte preservation, while injected adapters exercise selection, collisions,
+rollback, conversion failures, and the renderer boundary.
+
+The tests use binary sentinels that cannot survive a UTF-8 round trip. Family keys are case-sensitive manifest data, not TypeScript naming conventions.
+
+```ts : <<portable font test setup>>=
+/* eslint-disable @typescript-eslint/naming-convention -- Manifest dictionary keys are case-sensitive font family names. */
+import assert = require('node:assert/strict');
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { test } from 'node:test';
+import { createTransactionIO, run } from '../../cli';
+import { checkFontFace, fontFaces, planFonts, PortableFont } from '../../publication-fonts';
+import { parseProject } from '../../engine';
+import { renderLatex } from '../../publication-latex';
+
+const bytes = Buffer.from([0, 255, 254, 128, 13, 10, 1, 0]);
+const source = '```SETTINGS\nfont-body=Example\nfont-heading=Example\nfont-code=Example\nfont-fragment=Example\n```\n# Book\n';
+const entry = () => ({ regular: 'inputs/r.ttf', bold: 'inputs/b.otf', italic: 'inputs/i.ttf',
+    boldItalic: 'inputs/bi.otf', licenses: ['inputs/license.txt'] });
+const manifest = () => ({ version: 1, families: { Example: entry(), Unselected: entry() } });
+function write(root: string, name: string, content: string | Uint8Array): void {
+    fs.mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
+    fs.writeFileSync(path.join(root, name), content);
+}
+```
+
+Each fixture owns a temporary project and distinct face bytes; cleanup runs even on assertion failure.
+
+```ts : <<portable font test fixture>>=
+function fixture(t: { after(callback: () => void): void }): string {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'literate fonts '));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    write(root, 'index.literate', source);
+    write(root, 'config/fonts.json', JSON.stringify(manifest()));
+    for (const [index, file] of [...fontFaces.map(face => entry()[face]), 'inputs/license.txt'].entries()) {
+        write(root, file, Buffer.concat([bytes, Buffer.from([index])]));
+    }
+    return root;
+}
+```
+
+The CLI helper records conversion calls. Tree snapshots retain file contents and mtimes while ignoring directory mtimes, which rollback need not restore.
+
+```ts : <<portable font test helpers>>=
+async function command(root: string, factory = createTransactionIO, output = 'books/book.tex',
+    manifestPath = 'config/fonts.json') {
+    let stdout = '', calls = 0;
+    const code = await run(['latex', root, '--output', output, '--font-manifest', manifestPath, '--json'], {
+        stdout: text => { stdout += text; }, stderr: text => assert.fail(text)
+    }, factory, async () => { calls++; return 'Book body'; });
+    const response = JSON.parse(stdout) as { errors: string[]; outputs: { path: string; status: string }[] };
+    return { code, response, calls };
+}
+function tree(root: string): unknown {
+    return fs.readdirSync(root).sort().map(name => {
+        const file = path.join(root, name), stat = fs.lstatSync(file);
+        return [name, stat.isDirectory() ? null : stat.mtimeMs, stat.isSymbolicLink() ? fs.readlinkSync(file)
+            : stat.isDirectory() ? tree(file) : fs.readFileSync(file).toString('hex')];
+    });
+}
+```
+
+A successful export must contain exactly four selected faces and one license. A repeated export must preserve file mtimes as well as bytes.
+
+```ts : <<portable font test byte preservation>>=
+test('portable CLI preserves binary bytes, emits only selected families and is repeatable', async t => {
+    const root = fixture(t);
+    const first = await command(root);
+    assert.equal(first.code, 0, first.response.errors.join('\n'));
+    assert.equal(first.calls, 1);
+    assert.equal(first.response.outputs.length, 6);
+    const tex = fs.readFileSync(path.join(root, 'books/book.tex'), 'utf8');
+    assert.doesNotMatch(tex, /inputs\/|Example|Unselected|FakeSlant|FakeBold/);
+    const directory = /Path=\{(lit-fonts-[a-f0-9]{64}\/)\}/.exec(tex)![1];
+    for (const [index, face] of fontFaces.entries()) {
+        const option = face === 'regular' ? /\]\{([a-f0-9]{64}\.(?:ttf|otf))\}/ :
+            new RegExp(`${face === 'boldItalic' ? 'BoldItalic' : face === 'bold' ? 'Bold' : 'Italic'}Font=\\{([^}]+)\\}`);
+        const name = directory + option.exec(tex)![1];
+        assert.match(name, /^lit-fonts-[a-f0-9]{64}\/[a-f0-9]{64}\.(ttf|otf)$/);
+        assert.deepEqual(fs.readFileSync(path.join(root, 'books', name)), Buffer.concat([bytes, Buffer.from([index])]));
+    }
+    const license = first.response.outputs.find(file => file.path.endsWith('.license.txt'))!;
+    assert.deepEqual(fs.readFileSync(path.join(root, license.path)), Buffer.concat([bytes, Buffer.from([4])]));
+    const before = tree(root);
+    const second = await command(root);
+    assert.equal(second.code, 0);
+    assert.ok(second.response.outputs.every(file => file.status === 'current'));
+    assert.deepEqual(tree(root), before);
+});
+```
+
+Malformed manifests exercise schema, completeness and root-relative path failures, including unselected inputs.
+
+```ts : <<portable font test invalid schema data>>=
+const invalid: [string, unknown, RegExp][] = [
+    ['version', { ...manifest(), version: 2 }, /version must be 1/],
+    ['array', [], /JSON object/],
+    ['extra top field', { ...manifest(), discovery: true }, /unknown field discovery/],
+    ['missing selected family', { version: 1, families: {} }, /selected family "Example" is missing/],
+    ['missing face', { version: 1, families: { Example: { ...entry(), italic: undefined } } }, /italic.*root-relative/],
+    ['unknown face', { version: 1, families: { Example: { ...entry(), bolditalic: 'inputs/bi.otf' } } }, /unknown field bolditalic/],
+    ['empty licenses', { version: 1, families: { Example: { ...entry(), licenses: [] } } }, /nonempty array/],
+    ['wrong licenses', { version: 1, families: { Example: { ...entry(), licenses: 'inputs/license.txt' } } }, /nonempty array/],
+    ['unsupported format', { version: 1, families: { Example: { ...entry(), regular: 'inputs/r.woff' } } }, /ttf or .otf/],
+    ...['../r.ttf', '/tmp/r.ttf', 'C:\\r.ttf', 'x\u0000.ttf'].map(value =>
+        [`unsafe ${value}`, { version: 1, families: { Example: { ...entry(), regular: value } } }, /root-relative/] as [string, unknown, RegExp]),
+    ['missing unselected input', { version: 1, families: { Example: entry(), Other: { ...entry(), regular: 'absent.ttf' } } }, /absent.ttf.*Missing file/]
+];
+```
+
+Every invalid manifest must fail before conversion and leave the existing book and inputs untouched.
+
+```ts : <<portable font test invalid schema assertions>>=
+for (const [name, value, error] of invalid) {
+    test(`manifest rejects ${name} before conversion or output`, async t => {
+        const root = fixture(t);
+        write(root, 'config/fonts.json', JSON.stringify(value));
+        write(root, 'books/book.tex', 'old');
+        const before = tree(root), result = await command(root);
+        assert.equal(result.code, 1);
+        assert.equal(result.calls, 0);
+        assert.match(result.response.errors.join('\n'), error);
+        assert.deepEqual(tree(root), before);
+    });
+}
+```
+
+Links are rejected at the manifest, face, license and ancestor-directory boundaries.
+
+```ts : <<portable font test input links>>=
+for (const name of ['config/fonts.json', 'inputs/r.ttf', 'inputs/license.txt', 'inputs']) {
+    test(`manifest rejects symlink at ${name}`, async t => {
+        const root = fixture(t), target = path.join(root, name);
+        fs.renameSync(target, target + '-real');
+        fs.symlinkSync(target + '-real', target);
+        const before = tree(root), result = await command(root);
+        assert.equal(result.code, 1);
+        assert.equal(result.calls, 0);
+        assert.match(result.response.errors.join('\n'), /Symbolic link/);
+        assert.deepEqual(tree(root), before);
+    });
+}
+```
+
+Missing paths and directories cannot masquerade as regular font or license files.
+
+```ts : <<portable font test missing inputs>>=
+for (const name of ['config/fonts.json', 'inputs/r.ttf', 'inputs/license.txt']) {
+    for (const kind of ['missing', 'directory']) {
+        test(`manifest rejects ${kind} ${name}`, async t => {
+            const root = fixture(t), target = path.join(root, name);
+            fs.unlinkSync(target);
+            if (kind === 'directory') { fs.mkdirSync(target); }
+            const result = await command(root);
+            assert.equal(result.code, 1);
+            assert.equal(result.calls, 0);
+            assert.match(result.response.errors.join('\n'), /Missing file|not a regular file/);
+        });
+    }
+}
+```
+
+A malformed manifest is actionable when requested, but is never consulted without the flag. Legacy family declarations stay unchanged.
+
+```ts : <<portable font test family mode>>=
+test('invalid JSON is contextual and no flag leaves family mode unchanged', async t => {
+    const root = fixture(t);
+    write(root, 'config/fonts.json', '{broken');
+    const failed = await command(root);
+    assert.match(failed.response.errors.join('\n'), /Font manifest config\/fonts.json: cannot read JSON/);
+    const code = await run(['latex', root, '--output', 'book.tex'], { stdout() {}, stderr: assert.fail },
+        createTransactionIO, async () => 'body');
+    assert.equal(code, 0);
+    assert.match(fs.readFileSync(path.join(root, 'book.tex'), 'utf8'), /\\setmainfont\{Example\}/);
+    assert.ok(!fs.readdirSync(root).some(name => name.startsWith('lit-fonts-')));
+});
+```
+
+Manifest and license inputs cannot become the book output, even through case aliases or ancestor conflicts.
+
+```ts : <<portable font test tex collisions>>=
+test('manifest and selected/unselected license paths cannot collide with tex output', async t => {
+    for (const kind of ['manifest', 'selected', 'unselected', 'case-alias', 'ancestor']) {
+        const root = fixture(t), data = manifest();
+        let manifestPath = 'config/fonts.json';
+        if (kind === 'manifest') { manifestPath = 'books/book.tex'; }
+        else {
+            const name = kind === 'case-alias' ? 'books/BOOK.tex' : kind === 'ancestor' ? 'books/book.tex/license' : 'books/book.tex';
+            data.families[kind === 'selected' ? 'Example' : 'Unselected'].licenses = [name];
+            write(root, name, 'license');
+        }
+        write(root, manifestPath, JSON.stringify(data));
+        const before = tree(root), result = await command(root, createTransactionIO, 'books/book.tex', manifestPath);
+        assert.equal(result.code, 1);
+        assert.equal(result.calls, 0);
+        assert.match(result.response.errors.join('\n'), /conflicts with input/);
+        assert.deepEqual(tree(root), before);
+    }
+});
+```
+
+Companions receive the same protections as the book. Declared inputs include fonts, licenses, manifests, source documents and templates.
+
+```ts : <<portable font test companion collisions>>=
+test('companion outputs protect font, license, manifest, source and template inputs', async t => {
+    for (const kind of ['font', 'license', 'manifest', 'template', 'source']) {
+        const root = fixture(t);
+        const success = await command(root);
+        const target = success.response.outputs.find(file => file.path.endsWith('.ttf'))!.path;
+        const data = manifest();
+        let manifestPath = 'config/fonts.json';
+        if (kind === 'font') { data.families.Unselected.regular = target; }
+        if (kind === 'license') { data.families.Unselected.licenses = [target]; }
+        if (kind === 'manifest') { manifestPath = target; }
+        if (kind === 'template') { write(root, 'index.literate', source + `\n\`\`\`SETTINGS\ntemplate=${target}\n\`\`\`\n`); }
+        if (kind === 'source') {
+            fs.unlinkSync(path.join(root, target));
+            write(root, target + '/hidden.literate', '# Protected');
+        }
+        write(root, manifestPath, JSON.stringify(data));
+        const before = tree(root), failed = await command(root, createTransactionIO, 'books/book.tex', manifestPath);
+        assert.equal(failed.code, 1);
+        assert.equal(failed.calls, 0);
+        assert.match(failed.response.errors.join('\n'), /conflicts with input/);
+        assert.deepEqual(tree(root), before);
+    }
+});
+```
+
+An injected companion-install failure must restore both binary fonts and the previous text document.
+
+```ts : <<portable font test rollback>>=
+test('mixed binary/text transaction rolls back after a companion install fails', async t => {
+    const root = fixture(t);
+    await command(root);
+    write(root, 'inputs/r.ttf', Buffer.from([255, 0, 254, 4]));
+    write(root, 'books/book.tex', 'old tex');
+    const before = tree(root);
+    const failed = await command(root, directory => {
+        const io = createTransactionIO(directory);
+        return { ...io, async rename(from, to) {
+            if (from.endsWith('.stage') && to.endsWith('.ttf')) { throw new Error('injected font install failure'); }
+            return io.rename(from, to);
+        } };
+    });
+    assert.equal(failed.code, 1);
+    assert.match(failed.response.errors.join('\n'), /injected font install failure/);
+    assert.deepEqual(tree(root), before);
+});
+```
+
+Unselected families are validated but never read for copying. Sorting and role deduplication make the plan independent of manifest key order.
+
+```ts : <<portable font test selection>>=
+test('planner reads no unselected family bytes and is stable across key ordering', async () => {
+    const data = manifest();
+    data.families.Unselected.regular = 'private.ttf';
+    const reads: string[] = [];
+    const io = { async requireFile() {}, async read(name: string) {
+        reads.push(name);
+        return name === 'manifest.json' ? Buffer.from(JSON.stringify(data)) : bytes;
+    } };
+    const first = await planFonts('manifest.json', 'books/unsafe % name.tex', ['Example', 'Example'], io);
+    assert.ok(!reads.includes('private.ttf'));
+    assert.ok(first.inputs.includes('private.ttf'));
+    data.families = { Unselected: data.families.Unselected, Example: data.families.Example };
+    assert.deepEqual(await planFonts('manifest.json', 'books/unsafe % name.tex', ['Example'], io), first);
+});
+```
+
+Existing companion symlinks fail preflight before Pandoc rather than redirecting output to an input.
+
+```ts : <<portable font test output links>>=
+test('companion output symlinks fail preflight without invoking conversion', async t => {
+    const root = fixture(t), first = await command(root);
+    const target = path.join(root, first.response.outputs.find(file => file.path.endsWith('.otf'))!.path);
+    fs.unlinkSync(target);
+    fs.symlinkSync(path.join(root, 'inputs/b.otf'), target);
+    const before = tree(root), failed = await command(root);
+    assert.equal(failed.code, 1);
+    assert.equal(failed.calls, 0);
+    assert.match(failed.response.errors.join('\n'), /Symbolic link/);
+    assert.deepEqual(tree(root), before);
+});
+```
+
+Default families and inherited roles share one copy per distinct family; extra manifest families do not grow the distribution.
+
+```ts : <<portable font test default roles>>=
+test('portable planner requires defaults, deduplicates inherited roles and excludes extra families', async () => {
+    const families = Object.fromEntries(['Latin Modern Roman', 'Monofur Nerd Font',
+        'Lilex Nerd Font', 'Unused'].map(name => [name, entry()]));
+    const { resolvePublicationSettings } = await import('../../publication-settings');
+    const selected = Object.values(resolvePublicationSettings(parseProject([{ path: 'index.literate', text: '# Book' }])).fonts);
+    const plan = await planFonts('fonts.json', 'book.tex', selected, {
+        async requireFile() {}, async read(name) {
+            return name === 'fonts.json' ? Buffer.from(JSON.stringify({ version: 1, families })) : bytes;
+        }
+    });
+    assert.deepEqual(Object.keys(plan.fonts), ['Latin Modern Roman', 'Lilex Nerd Font', 'Monofur Nerd Font']);
+    assert.equal(plan.files.length, 15);
+    assert.equal(new Set(plan.files.map(file => file.path)).size, 15);
+});
+```
+
+Source metacharacters remain data. Normalized path aliases still participate in collision checks.
+
+```ts : <<portable font test path data>>=
+test('source path metacharacters remain data and normalized aliases remain protected', async t => {
+    const root = fixture(t), data = manifest();
+    data.families.Example.regular = 'inputs/font {name}% #.ttf';
+    write(root, data.families.Example.regular, bytes);
+    write(root, 'config/fonts.json', JSON.stringify(data));
+    const result = await command(root);
+    assert.equal(result.code, 0, result.response.errors.join('\n'));
+    assert.doesNotMatch(fs.readFileSync(path.join(root, 'books/book.tex'), 'utf8'), /font \{name\}|inputs\//);
+    data.families.Unselected.licenses = ['books/../books/book.tex'];
+    write(root, 'config/fonts.json', JSON.stringify(data));
+    const before = tree(root), failed = await command(root);
+    assert.equal(failed.code, 1);
+    assert.equal(failed.calls, 0);
+    assert.match(failed.response.errors.join('\n'), /conflicts with input/);
+    assert.deepEqual(tree(root), before);
+});
+```
+
+Conversion failure cannot publish a partial companion set.
+
+```ts : <<portable font test conversion failure>>=
+test('converter failure publishes no font companions', async t => {
+    const root = fixture(t), before = tree(root);
+    const code = await run(['latex', root, '--output', 'books/book.tex', '--font-manifest', 'config/fonts.json'],
+        { stdout() {}, stderr() {} }, () => { throw new Error('Transaction must not run'); },
+        async () => { throw new Error('Conversion failed'); });
+    assert.equal(code, 1);
+    assert.deepEqual(tree(root), before);
+});
+```
+
+Programmatic callers cannot inject a raw path through the portable renderer options.
+
+```ts : <<portable font test renderer boundary>>=
+test('renderer rejects manually injected unsafe companion paths without emitting tex', async () => {
+    const result = await renderLatex(parseProject([{ path: 'index.literate', text: source }]), {
+        portableFonts: { Example: { regular: 'evil}\\input{x}.ttf', bold: 'x', italic: 'x', boldItalic: 'x' } }
+    }, async () => 'body');
+    assert.equal(result.latex, undefined);
+    assert.match(result.diagnostics.map(value => value.message).join('\n'), /Invalid or missing portable font/);
+});
+```
+
+### Explicit synthesis regressions
+
+The synthesis contract is exercised through the CLI, the planner and the renderer.
+Malformed objects fail before conversion; hostile programmatic inputs also fail
+without any partial TeX. No installed fonts are needed for these checks.
+
+```ts : <<portable font synthesis tests>>=
+<<portable font synthesis helpers>>
+<<portable font synthesis export test>>
+<<portable font synthesis invalid data>>
+<<portable font synthesis rejection test>>
+<<portable font synthesis path test>>
+<<portable font synthesis planner test>>
+<<portable font synthesis renderer test>>
+<<portable font native family test>>
+<<portable font legacy D2 test>>
+```
+
+One helper replaces exactly one face without weakening the fixture's ordinary
+string-only entries. Another provides realistic safe names at the renderer API.
+
+```ts : <<portable font synthesis helpers>>=
+function faceManifest(value: unknown, face = 'italic'): string {
+    return JSON.stringify({ version: 1, families: { Example: { ...entry(), [face]: value } } });
+}
+const companion = `lit-fonts-${'a'.repeat(64)}/${'b'.repeat(64)}.ttf`;
+const portableEntry = (): PortableFont => ({
+    regular: companion, bold: companion, italic: companion, boldItalic: companion
+});
+```
+
+D2's regular and bold files can explicitly back synthesized italic variants. The
+CLI must preserve their bytes and emit separate bounded face features, never
+FakeBold or source filenames. Unrequested faces remain strict file mappings.
+
+```ts : <<portable font synthesis export test>>=
+test('explicit italic and boldItalic synthesis exports safe per-face features', async t => {
+    const root = fixture(t);
+    write(root, 'config/fonts.json', JSON.stringify({ version: 1, families: { Example: {
+        ...entry(), italic: { file: 'inputs/r.ttf', slant: 0.2 },
+        boldItalic: { file: 'inputs/b.otf', slant: 0.15 }
+    } } }));
+    const result = await command(root);
+    assert.equal(result.code, 0, result.response.errors.join('\n'));
+    const tex = fs.readFileSync(path.join(root, 'books/book.tex'), 'utf8');
+    assert.match(tex, /ItalicFeatures=\{FakeSlant=0\.2\}/);
+    assert.match(tex, /BoldItalicFeatures=\{FakeSlant=0\.15\}/);
+    assert.doesNotMatch(tex, /FakeBold|inputs\//);
+    const directory = /Path=\{([^}]+)\}/.exec(tex)![1];
+    for (const [option, file] of [['ItalicFont', 'inputs/r.ttf'], ['BoldItalicFont', 'inputs/b.otf']]) {
+        const name = new RegExp(`${option}=\\{([^}]+)\\}`).exec(tex)![1];
+        assert.deepEqual(fs.readFileSync(path.join(root, 'books', directory, name)), fs.readFileSync(path.join(root, file)));
+    }
+});
+```
+
+The allowed slant interval is closed, numeric and deliberately narrow. Neither
+JSON strings nor arbitrary feature fields are allowed, even for unselected faces.
+Required file mapping and supported container checks still apply inside objects.
+
+```ts : <<portable font synthesis invalid data>>=
+const invalidSynthesis: [string, string, unknown, RegExp][] = [
+    ...[0, -0.2, 0.009, 0.301, '0.2', null, true, '0.2},RawFeature={evil}'].map(slant =>
+        [`slant ${String(slant)}`, 'italic', { file: 'inputs/r.ttf', slant }, /italic.slant.*0.01 through 0.3/] as [string, string, unknown, RegExp]),
+    ['missing slant', 'italic', { file: 'inputs/r.ttf' }, /italic.slant/],
+    ['missing file', 'italic', { slant: 0.2 }, /italic.file.*root-relative/],
+    ['unsafe file', 'italic', { file: '../escape.ttf', slant: 0.2 }, /italic.file.*root-relative/],
+    ['missing input', 'italic', { file: 'missing.ttf', slant: 0.2 }, /Missing file/],
+    ['wrong container', 'italic', { file: 'font.woff', slant: 0.2 }, /ttf or .otf/],
+    ['extra feature', 'boldItalic', { file: 'inputs/b.otf', slant: 0.2, fakeBold: 1.5 }, /unknown field fakeBold/],
+    ['regular object', 'regular', { file: 'inputs/r.ttf', slant: 0.2 }, /only supported for italic and boldItalic/],
+    ['bold object', 'bold', { file: 'inputs/b.otf', slant: 0.2 }, /only supported for italic and boldItalic/],
+    ['array', 'italic', [], /JSON object/]
+];
+```
+
+These failures preserve a pre-existing output and must not even call the injected
+converter. The ordinary schema tests continue to prove string-only behavior.
+
+```ts : <<portable font synthesis rejection test>>=
+for (const [name, face, value, error] of invalidSynthesis) {
+    test(`explicit synthesis rejects ${name} before conversion`, async t => {
+        const root = fixture(t);
+        write(root, 'config/fonts.json', faceManifest(value, face));
+        write(root, 'books/book.tex', 'previous book');
+        const before = tree(root), failed = await command(root);
+        assert.equal(failed.code, 1);
+        assert.equal(failed.calls, 0);
+        assert.match(failed.response.errors.join('\n'), error);
+        assert.deepEqual(tree(root), before);
+    });
+}
+```
+
+A file inside a synthesis object remains a protected input. Both links and output
+collisions must be rejected rather than hidden by the extra schema layer.
+
+```ts : <<portable font synthesis path test>>=
+test('synthesized face paths reject links and companion collisions', async t => {
+    const root = fixture(t), first = await command(root);
+    const target = first.response.outputs.find(file => file.path.endsWith('.ttf'))!.path;
+    write(root, 'config/fonts.json', faceManifest({ file: target, slant: 0.2 }));
+    const collision = await command(root);
+    assert.equal(collision.calls, 0);
+    assert.match(collision.response.errors.join('\n'), /conflicts with input/);
+    fs.symlinkSync(path.join(root, 'inputs/r.ttf'), path.join(root, 'inputs/link.ttf'));
+    write(root, 'config/fonts.json', faceManifest({ file: 'inputs/link.ttf', slant: 0.2 }));
+    const before = tree(root), linked = await command(root);
+    assert.equal(linked.calls, 0);
+    assert.match(linked.response.errors.join('\n'), /Symbolic link/);
+    assert.deepEqual(tree(root), before);
+});
+```
+
+The planner retains the opt-in slant but replaces its source path. Bounds are
+inclusive, and a single synthesized face does not opt its partner into synthesis.
+Programmatic nonfinite values are checked without JSON's conversion to null.
+
+```ts : <<portable font synthesis planner test>>=
+test('synthesis bounds and selective features survive planning', async () => {
+    for (const slant of [0.01, 0.2, 0.3]) {
+        const plan = await planFonts('fonts.json', 'book.tex', ['Example'], {
+            async requireFile() {}, async read(name) {
+                return name === 'fonts.json' ? Buffer.from(faceManifest({ file: 'inputs/r.ttf', slant })) : bytes;
+            }
+        });
+        assert.deepEqual(plan.fonts.Example.italic, { file: plan.files[2].path, slant });
+        assert.equal(typeof plan.fonts.Example.boldItalic, 'string');
+        assert.ok(plan.inputs.includes('inputs/r.ttf'));
+        const result = await renderLatex(parseProject([{ path: 'index.literate', text: source }]),
+            { portableFonts: plan.fonts }, async () => 'body');
+        assert.match(result.latex!, new RegExp(`ItalicFeatures=\\{FakeSlant=${slant}\\}`));
+        assert.doesNotMatch(result.latex!, /BoldItalicFeatures|FakeBold/);
+    }
+    for (const slant of [NaN, Infinity, -Infinity]) {
+        assert.throws(() => checkFontFace({ file: companion, slant }, 'italic', 'face', String), /finite number/);
+    }
+});
+```
+
+The renderer boundary is independent of the CLI's validation. Forged slants,
+unknown features, unsupported regular synthesis and unsafe object paths all fail
+with diagnostics instead of emitting a partially usable document.
+
+```ts : <<portable font synthesis renderer test>>=
+test('renderer revalidates explicit synthesis from programmatic callers', async () => {
+    const invalid: [string, unknown][] = [
+        ...[NaN, Infinity, -Infinity, 0, 0.31, '0.2'].map(slant => ['italic', { file: companion, slant }] as [string, unknown]),
+        ['italic', { file: companion, slant: 0.2, features: 'evil' }],
+        ['italic', { file: 'evil}\\input{x}.ttf', slant: 0.2 }],
+        ['regular', { file: companion, slant: 0.2 }]
+    ];
+    for (const [face, choice] of invalid) {
+        const font = { ...portableEntry(), [face]: choice } as PortableFont;
+        const result = await renderLatex(parseProject([{ path: 'index.literate', text: source }]),
+            { portableFonts: { Example: font } }, async () => 'body');
+        assert.equal(result.latex, undefined);
+        assert.ok(result.diagnostics.length, `${face}: ${String(choice)}`);
+    }
+});
+```
+
+Lilex and arbitrary normal families must use native styles in family-name mode.
+A lookalike D2 name must not accidentally inherit the narrow legacy exception.
+Ligature policy is independent of italic style selection.
+
+```ts : <<portable font native family test>>=
+test('Lilex and normal family overrides use native italic lookup', async () => {
+    for (const codeFont of ['Lilex Nerd Font', 'Fira Code', 'Other Font', 'D2CodingLigature Nerd Font Propo Extra']) {
+        for (const codeLigatures of [true, false]) {
+            const result = await renderLatex(parseProject([{ path: 'index.literate', text: source }]),
+                { codeFont, codeLigatures }, async () => 'body');
+            assert.deepEqual(result.diagnostics, []);
+            assert.ok(result.latex!.includes(`]{${codeFont}}`));
+            assert.doesNotMatch(result.latex!, /FakeSlant|FakeBold|ItalicFont=/);
+            assert.equal(result.latex!.includes('RawFeature={-calt}'), !codeLigatures);
+        }
+    }
+});
+```
+
+The exact former D2 default retains its family-mode compatibility declaration.
+Even that family must not receive synthesis in portable mode unless its face
+objects request it; string mappings are always authoritative.
+
+```ts : <<portable font legacy D2 test>>=
+test('legacy D2 synthesis is family-specific and never overrides manifest faces', async () => {
+    const codeFont = 'D2CodingLigature Nerd Font Propo';
+    const project = parseProject([{ path: 'index.literate', text: source }]);
+    const familyMode = await renderLatex(project, { codeFont }, async () => 'body');
+    assert.deepEqual(familyMode.diagnostics, []);
+    assert.match(familyMode.latex!, /ItalicFeatures=\{FakeSlant=0\.2\}/);
+    assert.match(familyMode.latex!, /BoldItalicFeatures=\{FakeSlant=0\.2,FakeBold=1\.5\}/);
+    const portableMode = await renderLatex(project, {
+        codeFont, portableFonts: { Example: portableEntry(), [codeFont]: portableEntry() }
+    }, async () => 'body');
+    assert.deepEqual(portableMode.diagnostics, []);
+    assert.doesNotMatch(portableMode.latex!, /FakeSlant|FakeBold/);
+});
+```
+
+## Screen publication and editor integration tests
+
+The tests drive the real engine and activated plugin. The VS Code API is mocked;
+the optional installed-host harness below independently exercises real browser
+input, local scrolling and canonical dirty-document navigation.
+Real Pandoc tests compare LaTeX links with the same logical targets.
+
+
+### A fixture with independent expectations
+
+Use punctuation-distinct families, repeated forward references, an escaped tag,
+an ordinary fence, nested declarations and additions in two chapters. Supplying
+documents out of order exercises chapter ordering rather than input-array order.
+The expected source is written independently, so a renderer that expands fragment
+uses, drops additions or mixes up the two names cannot pass by agreeing with itself.
+
+```ts : <<publication screen imports>>=
+import assert = require('node:assert/strict');
+import { test } from 'node:test';
+import MarkdownIt = require('markdown-it');
+import Token = require('markdown-it/lib/token');
+import hljs from 'highlight.js';
+import type * as vscode from 'vscode';
+import { generateProject, parseProject, PublicationModel, PublicationSegment, ParsedDocumentBlock } from '../../engine';
+import { renderLatex } from '../../publication-latex';
+import { renderScreenCode, renderScreenContribution, screenIndex } from '../../publication-screen';
+import * as highlighter from '../../publication-highlight';
+import { themes, themeCss } from '../../themes';
+import { runPandoc } from '../../cli';
+import { fixture, fence, tick } from './vscode-fixture';
+
+const caller = 'before \<<a/b>> / \<<a-b>> / \<<a/b>> after\n\\\<<literal>>';
+const quoted = (text: string) => text.trimEnd().split('\n').map(line => '> ' + line).join('\n') + '\n';
+```
+
+The prose-shift variant changes token indexes and source lines without changing
+logical identities. Nested fences are rendered in their original containers.
+
+```ts : <<publication screen fixture>>=
+function documents(prefix = '') {
+    return [
+        { path: 'more.literate', text: '# More\n\n' + fence('text: \<<a/b>>=+', 'third') },
+        { path: 'defs.literate', text: '# Definitions\n\n[More](more.html)\n\n'
+            + quoted(fence('text: \<<a/b>>=', 'first'))
+            + fence('text: \<<a-b>>=', 'other') + fence('text: \<<a/b>>=+', 'second') },
+        { path: 'index.literate', text: prefix + '# Book\n\n[Definitions](defs.html)\n\n'
+            + fence('text', '\<<ordinary>>')
+            + fence('text: \<<main.*>>= result.txt $', caller) }
+    ];
+}
+```
+
+Expected declarations are not recovered from the HTML labels or publication model.
+The explicit count and sequence also catch extra/missing fragment wrappers.
+
+```ts : <<publication screen expectations>>=
+const expected = new Map<string, { name: string; kind: string; body: string }[]>([
+    ['index.literate', [{ name: 'main.*', kind: 'definition', body: caller.replace('\\\<<', '\<<') + '\n' }]],
+    ['defs.literate', [
+        { name: 'a/b', kind: 'definition', body: 'first\n' },
+        { name: 'a-b', kind: 'definition', body: 'other\n' },
+        { name: 'a/b', kind: 'append', body: 'second\n' }
+    ]],
+    ['more.literate', [{ name: 'a/b', kind: 'append', body: 'third\n' }]]
+]);
+const escape = new MarkdownIt().utils.escapeHtml;
+function textContent(html: string): string {
+    return html.replace(/<[^>]*>/g, '').replace(/&(lt|gt|amp|quot|#39);/g,
+        (_, entity: string) => ({ lt: '<', gt: '>', amp: '&', quot: '"', '#39': "'" })[entity]!);
+}
+```
+
+Our extractor deliberately understands only these controlled fragment wrappers,
+not arbitrary HTML. We assert wrapper counts as well, so extraction cannot quietly
+skip a malformed block. Ordinals are a test observation, not new persistent IDs.
+
+```ts : <<publication screen observations>>=
+function blocks(html: string) {
+    const found = [...html.matchAll(/<div class="codefragment">\s*<div class="fragmentname(?: code-line)?"[^>]*>([^]*?)<\/div>\s*<div class="code">([^]*?)<\/div>\s*(?:<nav[^]*?<\/nav>\s*)?<\/div>/g)];
+    assert.equal(found.length, (html.match(/class="codefragment"/g) || []).length);
+    return found.map(match => ({ label: textContent(match[1]).trim(), code: match[2] }));
+}
+function references(model: PublicationModel) {
+    return model.contributions.flatMap(part => part.segments.filter(
+            (segment): segment is Extract<PublicationSegment, { kind: 'reference' }> => segment.kind === 'reference'));
+}
+```
+
+### Activate the actual preview hook
+
+Install a real Markdown-it renderer with highlight.js as its host highlighter.
+Observe delegation before the plugin wraps it: source maps and token positions
+must survive, while escaped literal openers are unescaped only in the display
+copy. The grabber environment retains the original tokens for comparison.
+
+```ts : <<publication screen preview>>=
+async function preview(inputs = documents(), f = fixture()) {
+    for (const doc of inputs) { f.workspace.textDocuments.push(f.document(doc.path, doc.text)); }
+    const subscriptions: vscode.Disposable[] = [];
+    const api = await f.extension.activate({ subscriptions } as unknown as vscode.ExtensionContext);
+    const md = new MarkdownIt({ highlight: (code, language) =>
+        hljs.getLanguage(language) ? hljs.highlight(code, { language }).value : '' });
+    const delegated: { index: number; token: Token }[] = [];
+    const original = md.renderer.rules.fence!;
+    md.renderer.rules.fence = (tokens, index, options, env, renderer) => {
+        delegated.push({ index, token: tokens[index] });
+        return original(tokens, index, options, env, renderer);
+    };
+    api.extendMarkdownIt(md);
+    md.core.ruler.push('host_source_map', state => {
+        for (const token of state.tokens) {
+            if (token.map && token.type !== 'inline') {
+                token.attrSet('data-line', String(token.map[0]));
+                token.attrJoin('class', 'code-line');
+            }
+        }
+    });
+    const repository = subscriptions.find(value => value instanceof f.extension.FragmentRepository) as
+        InstanceType<typeof f.extension.FragmentRepository>;
+    for (const doc of inputs.length ? inputs : documents()) {
+        md.render(doc.text, { currentDocument: f.document(doc.path, doc.text).uri });
+    }
+    await tick();
+    await new Promise<void>(resolve => setTimeout(resolve, 5));
+    return { md, delegated, f, repository, dispose: () => subscriptions.forEach(value => value.dispose()) };
+}
+```
+
+### Map emitted blocks to shared targets
+
+Check a screen block against its independently expected family, operator and
+unexpanded body, then join its source token to the publication target. We do not
+invent an anchor on either screen. Actual emitted IDs and resolved links must match those shared destinations.
+
+```ts : <<publication screen mapping checks>>=
+function checkBlocks(html: string, path: string, model: PublicationModel, format: 'html' | 'preview') {
+    const rendered = blocks(html);
+    const wanted = expected.get(path)!;
+    const parts = model.contributions.filter(part => part.definition.path === path);
+    assert.equal(rendered.length, wanted.length);
+    assert.equal(parts.length, wanted.length);
+    return rendered.map((block, index) => {
+        const want = wanted[index], part = parts[index];
+        const family = model.fragments.find(value => value.name === want.name)!;
+        assert.ok(family);
+        assert.equal(part.kind, want.kind);
+        assert.equal(part.fragmentTarget, family.target);
+        assert.ok(family.contributions.includes(part.target));
+        const label = `\<<${want.name}>>=${want.kind === 'append' ? '+' : ''}`;
+        const suffix = want.name === 'main.*' ? (format === 'html' ? ' result.txt $' : ' result.txt') : '';
+        assert.equal(block.label, label + suffix);
+        const code = block.code.match(/<code\b[^>]*>([^]*?)<\/code>/);
+        assert.ok(code);
+        assert.equal(textContent(code[1]), want.body);
+        assert.doesNotMatch(block.code, /onclick=|javascript:/);
+        return part.target;
+    });
+}
+```
+
+The main assertion uses generated HTML files, not direct calls to the fence rule.
+The preview renders the supplied current text, with no repository processing or
+filesystem generation to supply its contents. The source-output oracle also guards
+against accidentally changing tangling while preparing a publication test. Existing
+expansion trims each replacement's terminal newline and uses the whitespace just
+before a reference to indent its continuation lines; the oracle retains that policy.
+
+```ts : <<publication screen integration tests>>=
+for (const prefix of ['', 'Inserted prose.\n\n']) {
+    test(`screen blocks map to publication contributions through real renderers (${prefix ? 'shifted' : 'original'})`, async () => {
+        const inputs = documents(prefix), parsed = parseProject(inputs), generated = generateProject(inputs);
+        assert.deepEqual(parsed.diagnostics, []);
+        assert.deepEqual(generated.diagnostics, []);
+        assert.deepEqual(parsed.documents.map(doc => doc.path), ['index.literate', 'defs.literate', 'more.literate']);
+        assert.equal(generated.files.find(file => file.path === 'result.txt')?.content,
+            'before first\n second\n third / other / first\n second\n third after\n\<<literal>>\n');
+        const p = await preview(inputs);
+        try {
+            <<publication screen document assertions>>
+            <<publication screen reference assertions>>
+        } finally { p.dispose(); }
+    });
+}
+```
+
+The token join checks the parsed contribution block as well as the actual preview
+host call. The fixture includes an ordinary fence before the caller, so an
+implementation that confuses fence ordinals with token indexes fails here.
+
+```ts : <<publication screen document assertions>>=
+for (const doc of parsed.documents) {
+    p.delegated.length = 0;
+    const env = { currentDocument: p.f.document(doc.path, doc.source).uri } as { currentDocument: vscode.Uri; gstate: { tokens: Token[] } };
+    const screen = p.md.render(doc.source, env);
+    const html = generated.files.find(file => file.path === doc.path.replace('.literate', '.html'))!.content;
+    const targets = checkBlocks(html, doc.path, generated.publication, 'html');
+    assert.deepEqual(checkBlocks(screen, doc.path, parsed.publication, 'preview'), targets);
+    const contributions = doc.blocks.filter(
+            (block): block is Extract<ParsedDocumentBlock, { kind: 'contribution' }> => block.kind === 'contribution');
+    assert.deepEqual(contributions.map(block => block.target), targets);
+    for (const block of contributions) {
+        const part = parsed.publication.contributions.find(value => value.target === block.target)!;
+        const call = p.delegated.find(value => value.index === block.tokenIndex)!;
+        assert.ok(call, 'fragment delegated to the host renderer');
+        assert.equal(part.tokenIndex, block.tokenIndex);
+        assert.equal(env.gstate.tokens[block.tokenIndex].content, part.content);
+        assert.equal(call.token.content, part.content.replace(/\\\<</g, '\<<'));
+        assert.deepEqual(call.token.map, doc.tokens[block.tokenIndex].map);
+        assert.equal(call.token.map![0], part.definition.line);
+    }
+    assert.match(html + screen, /\bid="[fc]-/);
+}
+```
+
+A reference resolves to a family, whose first contribution is its definition and
+whose following contributions are additions. Repetition is preserved. A literal
+lookalike and an ordinary fence must never enter this semantic list. Stability is
+checked against the unshifted fixture, separately from screen correspondence.
+
+```ts : <<publication screen reference assertions>>=
+const model = parsed.publication, refs = references(model);
+assert.deepEqual(refs.map(ref => ref.name), ['a/b', 'a-b', 'a/b']);
+for (const ref of refs) {
+    const family = model.fragments.find(value => value.name === ref.name)!;
+    assert.deepEqual(ref.resolution, { kind: 'resolved', target: family.target });
+    const definition = model.contributions.find(part => part.target === family.contributions[0])!;
+    assert.equal(definition.kind, 'definition');
+    assert.equal(definition.definition.path, 'defs.literate');
+}
+assert.notEqual(model.fragments[1].target, model.fragments[2].target);
+assert.deepEqual(model.fragments.find(value => value.name === 'a/b')!.contributions.map(target =>
+    model.contributions.find(part => part.target === target)!.kind), ['definition', 'append', 'append']);
+assert.deepEqual(model.contributions.map(part => part.target),
+    parseProject(documents()).publication.contributions.map(part => part.target));
+```
+
+### Literal examples are not references
+
+Only publication reference spans become anchors. The escaped lookalike remains
+ordinary syntax text, and ordinary fences delegate unchanged.
+
+```ts : <<publication screen literal boundary>>=
+test('only semantic references become links', async () => {
+    const inputs = documents(), generated = generateProject(inputs), p = await preview(inputs);
+    try {
+        const source = inputs.find(doc => doc.path === 'index.literate')!;
+        const outputs = [generated.files.find(file => file.path === 'index.html')!.content,
+            p.md.render(source.text, { currentDocument: p.f.document(source.path, source.text).uri })];
+        for (const html of outputs) {
+            const tags = [...blocks(html)[0].code.matchAll(/<a class="literate-tag-name"[^>]*>([^]*?)<\/a>/g)];
+            assert.deepEqual(tags.map(match => textContent(match[1])),
+                ['\<<a/b>>', '\<<a-b>>', '\<<a/b>>']);
+            assert.ok(html.includes(escape('\<<ordinary>>')));
+            assert.ok(!tags.some(match => match[1].includes('ordinary')));
+            assert.equal((blocks(html)[0].code.match(/<a\b/g) || []).length, 3);
+        }
+        assert.equal(references(generated.publication).length, 3);
+    } finally { p.dispose(); }
+});
+```
+
+### Whole-block highlighting is an independent renderer input
+
+The whole-block highlighter must actually run: keyword and string spans are required,
+not just escaped plain text. HTML-looking literal text stays escaped, comments
+follow the existing screen removal policy, and only the unescaped use enters the
+publication model. No semantic uses are inferred from syntax spans.
+
+```ts : <<publication screen highlighted fixture>>=
+function highlightedDocuments(spaced = true) {
+    const body = 'const s = "\<<a/b>>";\nconst literal = "\\\<<literal>> <a href=x>";\n// quiet comment';
+    return [{ path: 'index.literate', text: fence((spaced ? 'js : ' : 'js: ') + '\<<highlighted>>=', body)
+        + fence('text: \<<a/b>>=', 'value') }];
+}
+```
+
+Check output from both real paths, including the host's delegated language and
+original token content. This is deliberately not a malicious replacement renderer:
+we test the installed highlight.js renderer, and separate semantic tests guard its
+emitter adapter and invalid markup handling. Compact `js:` and spaced `js :`
+headers both delegate normalized `js` on a token copy.
+
+```ts : <<publication screen highlighted test>>=
+for (const spaced of [true, false]) {
+test(`highlighted screen semantic/literal boundary (${spaced ? 'spaced' : 'compact'} header)`, async () => {
+    const inputs = highlightedDocuments(spaced), generated = generateProject(inputs), p = await preview(inputs);
+    try {
+        assert.deepEqual(generated.diagnostics, []);
+        const env = {} as { gstate: { tokens: Token[] } };
+        const screen = p.md.render(inputs[0].text, env);
+        for (const html of [generated.files[0].content, screen]) {
+            const code = blocks(html)[0].code;
+            <<publication screen highlighting assertions>>
+        }
+        assert.deepEqual(references(generated.publication).map(ref => ref.name), ['a/b']);
+        assert.equal(p.delegated[0].token.info, 'js');
+        assert.equal(env.gstate.tokens[0].content, generated.publication.contributions[0].content);
+    } finally { p.dispose(); }
+});
+}
+```
+
+The compact-header branch is an explicit known-bug assertion, not an optional
+highlighting check. Removing highlighting from either supported path, or silently
+changing the compact-header behavior, requires revisiting this boundary.
+
+```ts : <<publication screen highlighting assertions>>=
+assert.match(code, /class="hljs-keyword"/);
+assert.match(code, /class="hljs-string"/);
+assert.doesNotMatch(code, /quiet comment/);
+assert.ok(code.includes(escape('<a href=x>')));
+assert.equal((code.match(/<a\b/g) || []).length, 1);
+const tags = [...code.matchAll(/<a class="literate-tag-name"[^>]*>([^]*?)<\/a>/g)];
+assert.deepEqual(tags.map(match => textContent(match[1])), ['\<<a/b>>']);
+```
+
+### Follow the same targets through real Pandoc
+
+Decode emitted LaTeX destinations rather than recomputing IDs with the production
+encoder. Every family/contribution must have exactly one label; reference macros
+must target precisely the three semantic occurrences, never the escaped lookalike.
+The renderer creates reference commands before highlighting; screen decoration is
+not an input to that process. Pandoc and the CLI adapter are real in this opt-in test.
+
+```ts : <<publication screen latex mapping>>=
+function logicalTarget(encoded: string): string {
+    assert.match(encoded, /^lit-(?:[0-9a-f]{4})+$/);
+    return encoded.slice(4).match(/.{4}/g)!.map(unit => String.fromCharCode(parseInt(unit, 16))).join('');
+}
+```
+
+The normal headless suite still needs no external tools. The full real-Pandoc
+validation enables this check alongside existing process lifecycle tests.
+
+```ts : <<publication screen latex test>>=
+for (const [name, inputs, count] of [['plain', documents(), 3], ['highlighted', highlightedDocuments(), 1]] as const) {
+test(`real Pandoc LaTeX labels and reference macros map ${name} screens to shared targets`,
+    { skip: process.env.LITERATE_TEST_PANDOC !== '1' }, async () => {
+        const parsed = parseProject([...inputs]);
+        const result = await renderLatex(parsed, {}, runPandoc);
+        assert.deepEqual(result.diagnostics, []);
+        assert.ok(result.latex);
+        const labels = [...result.latex.matchAll(/\\label\{(lit-[0-9a-f]+)\}/g)].map(match => logicalTarget(match[1]));
+        const targets = [...parsed.publication.fragments, ...parsed.publication.contributions].map(value => value.target);
+        for (const target of targets) { assert.equal(labels.filter(label => label === target).length, 1, target); }
+        const commands = [...result.latex.matchAll(/\\newcommand\{\\LitReference[A-Z]+\}[^\n]+/g)];
+        assert.equal(commands.length, count);
+        const destinations = commands.map(command => {
+            const link = command[0].match(/\\hyperref\[(lit-[0-9a-f]+)\]/)!;
+            assert.ok(link);
+            assert.ok(command[0].includes(`\\pageref*{${link[1]}}`));
+            return logicalTarget(link[1]);
+        });
+        assert.deepEqual(destinations, references(parsed.publication).map(ref => {
+            assert.equal(ref.resolution.kind, 'resolved');
+            return ref.resolution.kind === 'resolved' ? ref.resolution.target : assert.fail('unresolved');
+        }));
+    });
+}
+```
+
+### Static destinations and accessible navigation
+
+These literal oracles do not call the production encoder. Every emitted local
+and chapter-relative target must occur exactly once in its destination page.
+The same checks cover preview's source-mapped IDs, without any browser script.
+
+```ts : <<screen destination regression>>=
+const familyA = 'f-0061002f0062';
+const baseA = 'c-0061002f0062-0064006500660073002e006c0069007400650072006100740065-1';
+const secondA = 'c-0061002f0062-0064006500660073002e006c0069007400650072006100740065-2';
+const thirdA = 'c-0061002f0062-006d006f00720065002e006c0069007400650072006100740065-1';
+for (const prefix of ['', 'Extra prose.\n\n']) {
+    test(`static screen destinations and keyboard labels (${prefix.length})`, async () => {
+        const inputs = documents(prefix), p = await preview(inputs);
+        try {
+            const generated = generateProject(inputs);
+            for (const format of ['html', 'preview'] as const) {
+                const pages = new Map(inputs.map(doc => [doc.path, format === 'html'
+                    ? generated.files.find(file => file.path === doc.path.replace('.literate', '.html'))!.content
+                    : p.md.render(doc.text, { currentDocument: p.f.document(doc.path, doc.text).uri })]));
+                <<screen assert destinations>>
+            }
+        } finally { p.dispose(); }
+    });
+}
+```
+
+Accessible names identify both direction and family. Definition and reference
+links use the family ID, whereas contribution controls address individual parts.
+The HTML decoder in this fixture only encounters controlled attribute values.
+
+```ts : <<screen assert destinations>>=
+assert.ok(pages.get('defs.literate')!.includes(`href="#${secondA}"`));
+if (format === 'html') {
+    assert.ok(pages.get('index.literate')!.includes(`href="./defs.html#${familyA}"`));
+    assert.ok(pages.get('defs.literate')!.includes(`href="./more.html#${thirdA}"`));
+    assert.ok(pages.get('more.literate')!.includes(`href="./defs.html#${baseA}"`));
+} else {
+    for (const page of pages.values()) { assert.doesNotMatch(page, /#L\d+/); }
+    assert.match(pages.get('index.literate')!, /href="vscode:\/\/jesterking\.literate\/navigate\/[a-f0-9]{48}\/[a-f0-9]{48}\?windowId%3D1"/);
+}
+for (const label of ['Previous', 'Base', 'Next']) {
+    assert.ok([...pages.values()].some(html => html.includes(`aria-label="${label} contribution of a/b"`)));
+}
+<<screen assert link identity>>
+```
+
+Each anchor's logical identity must still exist exactly once at its destination.
+Cross-file preview URLs carry no source line or filename; the logical target
+still identifies exactly one declaration in the accepted model.
+
+```ts : <<screen assert link identity>>=
+for (const [path, html] of pages) {
+    assert.doesNotMatch(html, /onclick=|tabindex="-1"/);
+    for (const link of html.matchAll(/<a class="literate-tag-name" href="([^"]+)" data-literate-target="([^"]+)" aria-label="([^"]+)"/g)) {
+        assert.ok(link[3].length > 4);
+        const [file, locator] = link[1].split('#');
+        const target = link[2];
+        const part = generated.publication.contributions.find(value => value.target === target
+            || generated.publication.fragments.find(family => family.target === target)?.contributions[0] === value.target)!;
+        const destination = format === 'preview' && file ? part.definition.path
+            : file ? file.replace('./', '').replace(/\.html$/, '.literate') : path;
+        assert.equal((pages.get(destination)!.match(new RegExp(`id="${target}"`, 'g')) || []).length, 1);
+        if (format === 'preview' && file) {
+            assert.match(file, /^vscode:\/\/jesterking\.literate\/navigate\//);
+        } else { assert.equal(locator, target); }
+        if (format === 'preview') {
+            assert.match(pages.get(destination)!, new RegExp(`<[^>]*(?:class="[^"]*code-line"[^>]*id="${target}"|id="${target}"[^>]*class="code-line")[^>]*data-line="\\d+"`));
+        }
+    }
+}
+```
+
+Nested paths need navigation relative to the current chapter, not the workspace
+or book root. Reserved URL characters must stay inside the filename. A multiline
+string after a reference proves that syntax was highlighted as one block.
+
+```ts : <<screen navigation regression>>=
+test('nested chapters encode relative filenames and preserve whole-block syntax', async () => {
+    const inputs = [
+        { path: 'index.literate', text: '' },
+        { path: 'nested/use.literate', text: fence('js: \<<main>>=', 'const s = `before\n\<<a/b>>\nafter`;\n\\\<<a/b>>') },
+        { path: 'defs/a #%.literate', text: fence('text: \<<a/b>>=', 'value') }
+    ];
+    const p = await preview(inputs);
+    try {
+        const generated = generateProject(inputs);
+        assert.deepEqual(generated.diagnostics, []);
+        for (const format of ['html', 'preview'] as const) {
+            const html = format === 'html' ? generated.files.find(file => file.path === 'nested/use.html')!.content
+                : p.md.render(inputs[1].text, { currentDocument: p.f.document(inputs[1].path, inputs[1].text).uri });
+            const code = blocks(html)[0].code;
+            if (format === 'html') { assert.ok(code.includes(`href="./../defs/a%20%23%25.html#${familyA}"`)); }
+            else { assert.match(code, /href="vscode:\/\/jesterking\.literate\/navigate\//); }
+            assert.equal((code.match(/<a /g) || []).length, 1);
+            assert.match(code, /class="hljs-string">\nafter`/);
+        }
+    } finally { p.dispose(); }
+});
+```
+
+Cached token arrays model the host's parse/render separation. Other open buffers
+are consulted on every render, even before the repository's debounce runs; an
+empty unsaved definition document removes its links immediately. No render reads
+or writes files, starts generation, or returns a Promise.
+
+```ts : <<screen current buffer regression>>=
+test('cached preview tokens use unsaved project buffers without I/O or generation', async () => {
+    const inputs = documents(), p = await preview(inputs);
+    try {
+        const source = inputs.find(doc => doc.path === 'index.literate')!;
+        const env = { currentDocument: p.f.document(source.path, source.text).uri };
+        const tokens = p.md.parse(source.text, {});
+        const before = JSON.stringify(tokens), reads = p.f.reads.length, writes = p.f.writes.length;
+        const render = () => p.md.renderer.render(tokens, p.md.options, env);
+        assert.match(render(), /href="vscode:\/\/jesterking\.literate\/navigate\//);
+        p.f.open('defs.literate', '');
+        assert.doesNotMatch(blocks(render())[0].code, /<a /);
+        p.f.open('new.literate', fence('text: \<<a/b>>=', 'new unsaved base'));
+        assert.match(render(), /href="vscode:\/\/jesterking\.literate\/navigate\//);
+        assert.equal(JSON.stringify(tokens), before);
+        assert.equal(p.f.reads.length, reads);
+        assert.equal(p.f.writes.length, writes);
+    } finally { p.dispose(); }
+});
+```
+
+The current rendered source wins over a stale open-buffer snapshot. When source
+metadata is genuinely unavailable, only exact accepted fence matches can acquire
+links; a changed token must fall back to literal code rather than old semantics.
+
+```ts : <<screen stale input regression>>=
+test('current rendered source and missing metadata never borrow stale reference spans', async () => {
+    const inputs = documents(), p = await preview(inputs);
+    try {
+        const source = inputs.find(doc => doc.path === 'index.literate')!;
+        const env = { currentDocument: p.f.document(source.path, source.text).uri };
+        const current = source.text.replace('before', 'UNSAVED before');
+        assert.ok(blocks(p.md.render(current, env))[0].code.includes('UNSAVED before'));
+        const tokens = new MarkdownIt().parse(current, {});
+        const fragment = tokens.find(token => token.info.includes('main.*'))!;
+        fragment.content = 'literal changed content\n';
+        const screen = p.md.renderer.render(tokens, p.md.options, env);
+        assert.ok(screen.includes('literal changed content'));
+        assert.doesNotMatch(blocks(screen)[0].code, /<a /);
+    } finally { p.dispose(); }
+});
+```
+
+All palettes keep the existing theme CSS, including visible keyboard focus. The
+semantic renderer changes neither colors nor the surrounding ordinary-fence and
+Mermaid paths (those have dedicated preview regressions).
+
+```ts : <<screen palette regression>>=
+test('semantic links retain every palette and native keyboard focus styling', async () => {
+    const p = await preview([]);
+    try {
+        for (const theme of themes) {
+            const text = fence('SETTINGS', 'theme=' + theme.name) + highlightedDocuments()[0].text;
+            p.f.open('index.literate', text);
+            const html = generateProject([{ path: 'index.literate', text }]).files[0].content;
+            const screen = p.md.render(text, { currentDocument: p.f.document('index.literate', text).uri });
+            for (const output of [html, screen]) {
+                assert.ok(output.includes(`data-literate-theme="${theme.name}"`));
+                assert.ok(blocks(output)[0].code.includes(`href="#${familyA}"`));
+                assert.match(blocks(output)[0].code, /class="hljs-string"/);
+            }
+            assert.match(themeCss(theme), /a:focus-visible \{ outline: 2px solid/);
+        }
+    } finally { p.dispose(); }
+});
+```
+
+Raw source validity survives host normalization; duplicate definitions and orphan
+additions remain visible but never acquire an accepted contribution's anchors.
+
+```ts : <<screen invalid source regression>>=
+test('invalid source and rejected declarations do not invent preview targets', async () => {
+    const p = await preview([]);
+    try {
+        const valid = fence('text: \<<a/b>>=', 'first');
+        const nul = p.md.render(valid + '\u0000');
+        assert.doesNotMatch(nul, /data-literate-target=|id="[fc]-/);
+        const html = p.md.render(valid + fence('text: \<<a/b>>=', '\<<a/b>>')
+            + fence('text: \<<orphan>>=+', '\<<a/b>>'));
+        assert.equal((html.match(/id="f-/g) || []).length, 1);
+        assert.equal((html.match(/id="c-/g) || []).length, 1);
+        assert.doesNotMatch(blocks(html)[1].code + blocks(html)[2].code, /<a /);
+    } finally { p.dispose(); }
+});
+```
+
+When the host provides unfamiliar tokens, even a settings-only header change
+invalidates the old declaration match. Unchanged tokens still resolve normally.
+
+```ts : <<screen header identity regression>>=
+test('uncached tokens require the complete declaration header', async () => {
+    const inputs = documents(), p = await preview(inputs);
+    try {
+        const source = inputs.find(doc => doc.path === 'index.literate')!;
+        const env = { currentDocument: p.f.document(source.path, source.text).uri };
+        const tokens = new MarkdownIt().parse(source.text, {});
+        assert.match(blocks(p.md.renderer.render(tokens, p.md.options, env))[0].code, /<a /);
+        tokens.find(token => token.info.includes('main.*'))!.info += '; invalid-setting';
+        const html = p.md.renderer.render(tokens, p.md.options, env);
+        assert.doesNotMatch(html, /data-literate-target=|id="[fc]-/);
+    } finally { p.dispose(); }
+});
+```
+
+Root settings and semantics come from the same exact rendered source, even if
+an older open document still exists. Empty rendered input must erase that root.
+
+```ts : <<screen root source regression>>=
+test('rendered root source controls theme and empty cached source', async () => {
+    const p = await preview(highlightedDocuments());
+    try {
+        const text = fence('SETTINGS', 'theme=' + themes[0].name) + highlightedDocuments()[0].text;
+        const env = { currentDocument: p.f.document('index.literate', text).uri };
+        const html = p.md.render(text, env);
+        assert.ok(html.includes(`data-literate-theme="${themes[0].name}"`));
+        assert.ok(html.includes(`href="#${familyA}"`));
+        const empty = p.md.parse('', {});
+        assert.doesNotMatch(p.md.renderer.render(empty, p.md.options, env), /codefragment|data-literate-target=/);
+    } finally { p.dispose(); }
+});
+```
+
+A reused Markdown-it instance must resolve relative paths within the workspace of
+`currentDocument`, never the active editor or another root's same-named family.
+
+```ts : <<screen workspace regression>>=
+test('currentDocument isolates workspaces and non-index chapter paths', async () => {
+    const p = await preview(documents());
+    try {
+        const other = p.f.other;
+        p.f.workspace.workspaceFolders.push(other);
+        const source = fence('text: \<<caller>>=', '\<<a/b>>');
+        const doc = p.f.document('nested/chapter.literate', source, other);
+        p.f.workspace.textDocuments.push(doc);
+        assert.doesNotMatch(blocks(p.md.render(source, { currentDocument: doc.uri }))[0].code, /<a /);
+        p.f.workspace.textDocuments.push(p.f.document('base.literate', fence('text: \<<a/b>>=', 'other'), other));
+        p.md.render(source, { currentDocument: doc.uri });
+        await tick(); await tick();
+        const html = p.md.render(source, { currentDocument: doc.uri });
+        assert.match(html, /href="vscode:\/\/jesterking\.literate\/navigate\//);
+        assert.doesNotMatch(html, /href="[^"#]*defs\.literate/);
+    } finally { p.dispose(); }
+});
+```
+
+Preview aliases are checked against explicit host-compatible language expectations.
+The reference splits a string token, so both sides must retain whole-block syntax.
+
+```ts : <<screen alias regression>>=
+for (const [alias, language, body] of [
+    ['jsonc', 'json', '{"value": "before \<<a/b>> after"}'],
+    ['json5', 'json', '{"value": "before \<<a/b>> after"}'],
+    ['tsx', 'jsx', 'const value = "before \<<a/b>> after";'],
+    ['typescriptreact', 'jsx', 'const value = "before \<<a/b>> after";'],
+    ['py3', 'python', 'value = "before \<<a/b>> after"']
+]) {
+    test(`preview semantic highlighting retains host alias ${alias}`, async () => {
+        const text = fence(`${alias} : \<<main>>=`, body) + fence('text: \<<a/b>>=', 'value');
+        const p = await preview([{ path: 'index.literate', text }]);
+        try {
+            const html = blocks(p.md.render(text))[0].code;
+            const expected = hljs.highlight(body, { language, ignoreIllegals: true }).value;
+            assert.match(expected, /hljs-string/);
+            assert.match(html, /hljs-string/);
+            assert.match(html, /class="hljs-string"> after/);
+            assert.equal((html.match(/<a /g) || []).length, 1);
+            assert.equal(textContent(html).trim(), body);
+        } finally { p.dispose(); }
+    });
+}
+```
+
+Operation counts, not wall-clock ratios, guard scaling on slow CI machines.
+A proxy counts actual syntax-leaf reads made by the renderer. Doubling references
+and syntax leaves must only double work; the old per-reference full scan fails.
+
+```ts : <<screen scaling regression>>=
+test('semantic screen merge and snapshot lookups scale linearly', () => {
+    const original = highlighter.highlightContribution;
+    const reads: number[] = [];
+    try {
+        for (const count of [1000, 2000, 4000]) {
+            let visits = 0, leaves = 0;
+            Object.assign(highlighter, { highlightContribution: (...args: Parameters<typeof original>) => {
+                const display = original(...args);
+                leaves = display.spans.length;
+                display.spans = new Proxy(display.spans, { get(target, key, receiver) {
+                    if (typeof key === 'string' && /^\d+$/.test(key)) { visits++; }
+                    return Reflect.get(target, key, receiver);
+                } });
+                return display;
+            } });
+            <<screen scaling assertions>>
+        }
+        assert.ok(reads[1] <= reads[0] * 2.1);
+        assert.ok(reads[2] <= reads[1] * 2.1);
+    } finally { Object.assign(highlighter, { highlightContribution: original }); }
+});
+```
+
+After building the index, poison linear model searches and family ordinal scans.
+Rendering both uses and contribution controls must rely on the cached maps.
+
+```ts : <<screen scaling assertions>>=
+const text = fence('js: \<<main>>=', 'const s = "\<<a/b>>";\n'.repeat(count))
+    + fence('text: \<<a/b>>=', 'base') + fence('text: \<<a/b>>=+', 'addition');
+const model = parseProject([{ path: 'index.literate', text }]).publication;
+const lookup = screenIndex(model), part = model.contributions[0];
+const fail = () => assert.fail('linear model lookup during rendering');
+model.fragments.find = fail;
+model.contributions.find = fail;
+for (const family of model.fragments) { family.contributions.indexOf = fail; }
+const html = renderScreenCode(part, model, 'preview');
+assert.equal((html.match(/<a /g) || []).length, count);
+for (const contribution of model.contributions) {
+    renderScreenContribution(contribution, model, 'preview', 'label', 'code');
+}
+assert.equal(screenIndex(model), lookup);
+assert.ok(visits <= 4 * (leaves + count), `${visits} reads for ${leaves} leaves and ${count} uses`);
+reads.push(visits);
+```
+
+The same capability must resolve a moved declaration after unsaved edits. It must
+select the current canonical buffer without waiting for repository processing.
+
+```ts : <<screen line shift regression>>=
+test('cross-file capabilities select fresh unsaved declarations in the canonical document', async () => {
+    const inputs = documents(), p = await preview(inputs);
+    try {
+        const source = inputs.find(doc => doc.path === 'index.literate')!;
+        const env = { currentDocument: p.f.document(source.path, source.text).uri };
+        const tokens = p.md.parse(source.text, {});
+        const render = () => p.md.renderer.render(tokens, p.md.options, env);
+        const href = render().match(new RegExp(`href="([^"]+)" data-literate-target="${familyA}"`))![1];
+        for (const doc of inputs) { p.f.put(doc.path, doc.text); }
+        await p.f.navigate(href);
+        assert.equal(p.f.opened[0].selection.start.line, 4);
+        const changed = p.f.open('defs.literate', 'New prose\n\n' + inputs.find(doc => doc.path === 'defs.literate')!.text);
+        await p.f.navigate(href);
+        assert.equal(p.f.opened[1].document, changed);
+        assert.equal(p.f.opened[1].selection.start.line, 6);
+        assert.ok(render().includes(`href="${href}" data-literate-target="${familyA}"`));
+    } finally { p.dispose(); }
+});
+```
+
+External changes use existing asynchronous workspace discovery, including remote
+providers. A changed semantic model requests a host refresh; repeated processing
+does not. Deletion removes destinations on the next completed snapshot. Renders
+between filesystem events use the last completed snapshot, not synchronous I/O.
+
+```ts : <<screen snapshot regression>>=
+test('remote discovered snapshots refresh changed destinations without output writes', async () => {
+    const f = fixture('vscode-remote://ssh-remote+host/project');
+    for (const doc of documents()) { f.put(doc.path, doc.text); }
+    const p = await preview([], f);
+    try {
+        const source = documents().find(doc => doc.path === 'index.literate')!;
+        const tokens = p.md.parse(source.text, {});
+        const env = { currentDocument: f.document(source.path, source.text).uri };
+        const render = () => p.md.renderer.render(tokens, p.md.options, env);
+        const writes = f.writes.length, commands = f.executedCommands.length;
+        assert.match(render(), /href="vscode:\/\/jesterking\.literate\/navigate\//);
+        f.put('defs.literate', '');
+        await p.repository.processLiterateFiles(f.folder as unknown as vscode.WorkspaceFolder);
+        assert.doesNotMatch(blocks(render())[0].code, /<a /);
+        assert.equal(f.executedCommands.length, commands + 1);
+        await p.repository.processLiterateFiles(f.folder as unknown as vscode.WorkspaceFolder);
+        assert.equal(f.executedCommands.length, commands + 1);
+        assert.equal(f.writes.length, writes);
+    } finally { p.dispose(); }
+});
+```
+
+### Capability security and asynchronous lifecycle
+
+These tests invoke the registered public URI handler, never an editor-open command
+as a substitute for navigation. Only existing fixture files can be opened. Logical
+family and contribution targets have separate capabilities; no path crosses the URI
+boundary. Helpers warm the actual async resolver before inspecting ready links.
+
+```ts : <<screen capability test helpers>>=
+function capabilityHref(html: string, target = familyA): string {
+    const match = html.match(new RegExp(`href="([^"]+)" data-literate-target="${target}"`));
+    assert.ok(match, 'accepted target has a resolved capability');
+    return match[1];
+}
+async function navigationFixture() {
+    const p = await preview();
+    for (const doc of documents()) { p.f.put(doc.path, doc.text); }
+    const source = documents().find(doc => doc.path === 'index.literate')!;
+    const render = () => p.md.render(source.text, { currentDocument: p.f.document(source.path, source.text).uri });
+    return { ...p, render, href: capabilityHref(render()) };
+}
+```
+
+Unknown tokens, wrong sessions, authorities, schemes, extra path segments and
+fragments are not requests to open a document. Query data is deliberately ignored:
+only VS Code uses it for routing, so appending a filename cannot redirect a token.
+
+```ts : <<screen capability input regression>>=
+test('capability handler accepts no caller-supplied navigation target', async () => {
+    const p = await navigationFixture();
+    try {
+        const raw = p.href.split('?')[0];
+        for (const href of [raw.replace('vscode:', 'command:'), raw.replace('jesterking.literate', 'other.extension'),
+            raw + '/extra', raw + '#L1', raw.replace('/navigate/', '/open/'),
+            raw.replace(/navigate\/[a-f0-9]{48}/, 'navigate/' + '0'.repeat(48)),
+            raw.slice(0, -48) + '0'.repeat(48), 'vscode://jesterking.literate/navigate/../../secret']) {
+            await p.f.navigate(href);
+        }
+        assert.equal(p.f.opened.length, 0);
+        await p.f.navigate(raw + '?file=/other/secret&command=delete');
+        assert.equal(p.f.opened.length, 1);
+        assert.equal(p.f.opened[0].document.uri.toString(), p.f.uri('defs.literate'));
+    } finally { p.dispose(); }
+});
+```
+
+Trust is checked both when minting and when using an old link. Workspace removal
+invalidates capabilities even if the same folder object is later re-added. Local
+anchors remain usable in restricted mode without authorizing file navigation.
+
+```ts : <<screen capability trust regression>>=
+test('untrusted and removed workspaces fail closed without disabling local anchors', async () => {
+    const p = await navigationFixture();
+    try {
+        p.f.workspace.isTrusted = false;
+        assert.doesNotMatch(blocks(p.render())[0].code, /<a /);
+        await p.f.navigate(p.href);
+        const local = highlightedDocuments()[0];
+        assert.ok(p.md.render(local.text, { currentDocument: p.f.document(local.path, local.text).uri }).includes(`href="#${familyA}"`));
+        assert.equal(p.f.opened.length, 0);
+        p.f.workspace.isTrusted = true;
+        p.f.workspace.workspaceFolders = [];
+        p.f.workspaceChanged();
+        p.f.workspace.workspaceFolders = [p.f.folder];
+        await p.f.navigate(p.href);
+        assert.equal(p.f.opened.length, 0);
+    } finally { p.dispose(); }
+});
+```
+
+Fresh discovery and empty-buffer overlays reject a stale rendered destination.
+Path inspection refuses symlinks and directories; a deleted file cannot be revived
+by a still-open dirty editor. None of these failures generate files.
+
+```ts : <<screen capability missing regression>>=
+for (const failure of ['empty', 'deleted', 'symlink', 'directory', 'renamed']) {
+    test(`stale capability fails closed for ${failure} destination`, async () => {
+        const p = await navigationFixture();
+        try {
+            const writes = p.f.writes.length;
+            if (failure === 'empty') { p.f.open('defs.literate', ''); }
+            if (failure === 'deleted') { p.f.disk.delete(p.f.uri('defs.literate')); }
+            if (failure === 'symlink') { p.f.types.set(p.f.uri('defs.literate'), 65); }
+            if (failure === 'directory') { p.f.types.set(p.f.uri('defs.literate'), 2); }
+            if (failure === 'renamed') { p.f.open('defs.literate', fence('text: \<<renamed>>=', 'other')); }
+            await p.f.navigate(p.href);
+            assert.equal(p.f.opened.length, 0);
+            assert.equal(p.f.writes.length, writes);
+        } finally { p.dispose(); }
+    });
+}
+```
+
+Provider awaits must not freeze the selection or its authorization. A line shift
+while opening is overlaid again; loss of trust at the same boundary prevents the
+show operation altogether.
+
+```ts : <<screen capability opening race regression>>=
+test('navigation rechecks buffers and trust after asynchronous document opening', async () => {
+    const p = await navigationFixture();
+    try {
+        p.f.controls.beforeOpen = () => { p.f.open('defs.literate', '\n\n' + documents()[1].text); };
+        await p.f.navigate(p.href);
+        assert.equal(p.f.opened[0].selection.start.line, 6);
+        p.f.controls.beforeOpen = () => { p.f.workspace.isTrusted = false; };
+        await p.f.navigate(p.href);
+        assert.equal(p.f.opened.length, 1);
+    } finally { p.dispose(); }
+});
+```
+
+A deferred resolver proves that synchronous rendering emits no temporary native
+line fallback. Repeated renders share one pending resolution per capability; the
+complete returned URL (including opaque routing query) is cached without
+reconstruction until expiry. Failures do not retry during their cooldown.
+
+```ts : <<screen capability async regression>>=
+test('pending and failed external URLs stay unlinked without refresh loops', async () => {
+    const f = fixture(), waiting: (() => void)[] = [];
+    f.controls.externalUri = uri => new Promise(resolve => waiting.push(() => resolve(f.mock.Uri.parse(uri.toString() + '?opaque%3Dyes&windowId%3D7'))));
+    const p = await preview(documents(), f);
+    try {
+        const source = documents()[2], env = { currentDocument: f.document(source.path, source.text).uri };
+        for (let i = 0; i < 5; i++) { assert.doesNotMatch(blocks(p.md.render(source.text, env))[0].code, /<a |#L\d+/); }
+        for (let i = 0; i < 5; i++) { waiting.splice(0).forEach(resolve => resolve()); await tick(); }
+        await new Promise<void>(resolve => setTimeout(resolve, 5));
+        const ready = p.md.render(source.text, env), count = f.externalUris.length;
+        assert.match(ready, /\?opaque%3Dyes&amp;windowId%3D7/);
+        for (let i = 0; i < 5; i++) { p.md.render(source.text, env); await tick(); }
+        assert.equal(f.externalUris.length, count);
+        f.controls.externalUri = async () => { throw new Error('routing unavailable'); };
+        f.open('fresh.literate', fence('text: \<<fresh>>=', 'value'));
+        const caller = fence('text: \<<main.*>>= result.txt $', '\<<fresh>>');
+        p.md.render(caller, env); await tick();
+        const failedCount = f.externalUris.length, refreshCount = f.executedCommands.length;
+        assert.equal(failedCount, count + 1);
+        for (let i = 0; i < 5; i++) { assert.doesNotMatch(blocks(p.md.render(caller, env))[0].code, /<a /); await tick(); }
+        assert.equal(f.externalUris.length, failedCount);
+        assert.equal(f.executedCommands.length, refreshCount);
+
+    } finally { p.dispose(); }
+});
+```
+
+Disposal invalidates ready and unresolved links; a new activation never recognizes
+an old session. Resolving a disposed session cannot request another refresh.
+
+```ts : <<screen capability disposal regression>>=
+test('capabilities expire on disposal and late resolver completion is inert', async () => {
+    const old = await navigationFixture(), href = old.href;
+    old.dispose();
+    const next = await navigationFixture();
+    try { await next.f.navigate(href); assert.equal(next.f.opened.length, 0); }
+    finally { next.dispose(); }
+    const f = fixture(), waiting: (() => void)[] = [];
+    f.controls.externalUri = uri => new Promise(resolve => waiting.push(() => resolve(uri)));
+    const p = await preview(documents(), f), before = f.executedCommands.length;
+    p.dispose(); waiting.forEach(resolve => resolve()); await tick(); await tick();
+    assert.equal(f.executedCommands.length, before);
+});
+```
+
+A fixed session budget bounds retained capabilities without evicting live entries
+and reminting them on every preview refresh. Saturation leaves additional targets
+as text. The renderer still handles local anchors without spending that budget.
+
+```ts : <<screen capability limit regression>>=
+test('capability budget bounds resolution and retention without remint loops', async () => {
+    const uses = Array.from({ length: 4200 }, (_, i) => `\<<part${i}>>`).join('\n');
+    const definitions = Array.from({ length: 4200 }, (_, i) => fence(`text: \<<part${i}>>=`, 'value')).join('\n');
+    const inputs = [{ path: 'index.literate', text: fence('text: \<<caller>>=', uses) },
+        { path: 'defs.literate', text: definitions }];
+    const p = await preview(inputs);
+    try {
+        await tick();
+        assert.equal(p.f.externalUris.length, 4096);
+        p.md.render(inputs[0].text, { currentDocument: p.f.document(inputs[0].path, inputs[0].text).uri });
+        await tick();
+        assert.equal(p.f.externalUris.length, 4096);
+    } finally { p.dispose(); }
+});
+```
+
+The real host initially renders pending capability destinations as text. Poll the
+public Markdown rendering command for its resolved URL, without injecting or
+rewriting a link in the webview under test.
+
+```js : <<screen host capability polling>>=
+async function hostCapability(document) {
+    for (let attempt = 0; attempt < 50; attempt++) {
+        const html = await vscode.commands.executeCommand('markdown.api.render', document);
+        const href = html.match(/href="([^"]+)" data-literate-target="f-007400610072006700650074"/);
+        if (href) {
+            assert.match(href[1], /^vscode:\/\/jesterking\.literate\/navigate\/[a-f0-9]{48}\/[a-f0-9]{48}/);
+            return href[1].replace(/&amp;/g, '&');
+        }
+        await delay(100);
+    }
+    assert.fail('external capability URL did not resolve');
+}
+```
+
+The same adapter serves code uses, declaration labels and contribution controls.
+Resolve each cross-document control through the registered handler and compare
+against its independently known source line, not merely its displayed href.
+
+```ts : <<screen capability controls regression>>=
+test('cross-document labels and Previous/Base/Next controls select accepted contributions', async () => {
+    const p = await navigationFixture();
+    try {
+        for (const [name, target, line, destination] of [
+            ['defs.literate', thirdA, 2, 'more.literate'],
+            ['more.literate', familyA, 4, 'defs.literate'],
+            ['more.literate', baseA, 4, 'defs.literate'],
+            ['more.literate', secondA, 10, 'defs.literate']
+        ] as const) {
+            const doc = documents().find(value => value.path === name)!;
+            const html = p.md.render(doc.text, { currentDocument: p.f.document(doc.path, doc.text).uri });
+            await p.f.navigate(capabilityHref(html, target));
+            const opened = p.f.opened[p.f.opened.length - 1];
+            assert.equal(opened.document.uri.toString(), p.f.uri(destination));
+            assert.equal(opened.selection.start.line, line);
+        }
+    } finally { p.dispose(); }
+});
+```
+
+Two workspace roots may contain identical families. Capabilities retain their
+owning root regardless of the last preview rendered or the active editor. A
+workspace that starts untrusted never even asks the external resolver for a URL.
+
+```ts : <<screen capability isolation regression>>=
+test('capabilities retain workspace identity and untrusted activation mints none', async () => {
+    const p = await navigationFixture();
+    try {
+        p.f.workspace.workspaceFolders.push(p.f.other);
+        for (const doc of documents()) { p.f.open(doc.path, doc.text, p.f.other); p.f.put(doc.path, doc.text, p.f.other); }
+        const source = documents()[2], env = { currentDocument: p.f.document(source.path, source.text, p.f.other).uri };
+        p.md.render(source.text, env); await tick(); await tick();
+        const href = capabilityHref(p.md.render(source.text, env));
+        assert.notEqual(href, p.href);
+        await p.f.navigate(href); await p.f.navigate(p.href);
+        assert.equal(p.f.opened[0].document.uri.toString(), p.f.uri('defs.literate', p.f.other));
+        assert.equal(p.f.opened[1].document.uri.toString(), p.f.uri('defs.literate'));
+    } finally { p.dispose(); }
+    const f = fixture(); f.workspace.isTrusted = false;
+    const restricted = await preview(documents(), f);
+    try { assert.equal(f.externalUris.length, 0); }
+    finally { restricted.dispose(); }
+});
+```
+
+### Review regressions: membership, discarded buffers and URL renewal
+
+Removing a workspace must invalidate both directions of the capability cache.
+After re-adding exactly the same workspace URI, a new link must work while the old
+capability remains invalid, including after the new entry is fully resolved.
+
+```ts : <<screen capability readd regression>>=
+test('re-added workspace remints working links without reviving removed capabilities', async () => {
+    const p = await navigationFixture();
+    try {
+        p.f.workspace.workspaceFolders = [];
+        p.f.workspaceChanged();
+        p.f.workspace.workspaceFolders = [p.f.folder];
+        assert.doesNotMatch(blocks(p.render())[0].code, /<a /);
+        await tick(); await tick();
+        const href = capabilityHref(p.render());
+        assert.notEqual(href, p.href);
+        await p.f.navigate(p.href);
+        assert.equal(p.f.opened.length, 0);
+        await p.f.navigate(href);
+        assert.equal(p.f.opened.length, 1);
+        assert.equal(p.f.opened[0].document.uri.toString(), p.f.uri('defs.literate'));
+    } finally { p.dispose(); }
+});
+```
+
+An empty dirty buffer can suppress a saved definition, making a later duplicate
+accepted. Discarding that OTHER input during document opening must restore the
+first saved definition in the final model, not retain the empty buffer's overlay.
+Test both removal from the document list and a closed object still in that list.
+
+```ts : <<screen capability discard regression>>=
+for (const retained of [false, true]) {
+    test(`discarding another input while opening cannot preserve a stale target (${retained})`, async () => {
+        const inputs = [{ path: 'index.literate', text: fence('text: \<<caller>>=', '\<<a/b>>') },
+            { path: 'a.literate', text: '' }, { path: 'b.literate', text: fence('text: \<<a/b>>=', 'duplicate') }];
+        const p = await preview(inputs);
+        try {
+            for (const doc of inputs) { p.f.put(doc.path, doc.text); }
+            p.f.put('a.literate', fence('text: \<<a/b>>=', 'saved first definition'));
+            const html = p.md.render(inputs[0].text, { currentDocument: p.f.document('index.literate', inputs[0].text).uri });
+            p.f.controls.beforeOpen = () => {
+                const a = p.f.docs.find(doc => doc.uri.toString() === p.f.uri('a.literate'))!;
+                Object.assign(a, { isClosed: true });
+                if (!retained) { p.f.workspace.textDocuments = p.f.docs.filter(doc => doc !== a); }
+            };
+            await p.f.navigate(capabilityHref(html));
+            assert.equal(p.f.opened.length, 0, 'the no-longer-accepted duplicate must not be shown');
+        } finally { p.dispose(); }
+    });
+}
+```
+
+Use the runtime's virtual clock to test minute-long expiry without real waits. The
+repository's provider mocks use real `setImmediate`, so bounded pumping finishes
+activation before returning. The narrow type cast bridges the timer-test API while
+all calls still exercise the actual runtime timers and activation-owned handler.
+
+```ts : <<screen capability clock fixture>>=
+async function clockedPreview(context: { mock: { timers: unknown } }, f = fixture()) {
+    const timers = context.mock.timers as unknown as {
+        enable(options: { apis: string[] }): void; tick(milliseconds: number): void; runAll(): void; reset(): void;
+    };
+    timers.enable({ apis: ['Date', 'setTimeout'] });
+    let settled = false;
+    const pending = preview(documents(), f).finally(() => { settled = true; });
+    for (let attempt = 0; attempt < 200 && !settled; attempt++) { await tick(); timers.tick(5); }
+    assert.ok(settled, 'activation finishes under the virtual clock');
+    const p = await pending, source = documents()[2];
+    const render = () => p.md.render(source.text, { currentDocument: f.document(source.path, source.text).uri });
+    return { ...p, timers, render };
+}
+```
+
+Successful URL expiry requests one refresh, not another resolution by itself.
+Repeated renders while renewal is pending share each request. The resolver's
+replacement query is preserved exactly, and renewal retains the original token.
+
+```ts : <<screen capability renewal regression>>=
+test('external URLs expire and renew opaquely without reminting or render loops', async context => {
+    const p = await clockedPreview(context), waiting: (() => void)[] = [];
+    try {
+        const old = capabilityHref(p.render()), count = p.f.externalUris.length;
+        const refreshes = p.f.executedCommands.length;
+        p.f.controls.externalUri = uri => new Promise(resolve => waiting.push(() =>
+            resolve(p.f.mock.Uri.parse(uri.toString() + '?opaque%3Drenewed&windowId%3D9'))));
+        p.timers.tick(60_000); p.timers.tick(0);
+        assert.equal(p.f.externalUris.length, count);
+        assert.equal(p.f.executedCommands.length, refreshes + 1);
+        for (let i = 0; i < 5; i++) { assert.doesNotMatch(blocks(p.render())[0].code, /<a |#L\d+/); }
+        for (let i = 0; i < 5; i++) { waiting.splice(0).forEach(resolve => resolve()); await tick(); }
+        p.timers.tick(0);
+        assert.equal(p.f.externalUris.length, count + 2);
+        assert.equal(capabilityHref(p.render()), old.split('?')[0] + '?opaque%3Drenewed&amp;windowId%3D9');
+        const readyRefreshes = p.f.executedCommands.length;
+        for (let i = 0; i < 5; i++) { p.render(); await tick(); p.timers.tick(0); }
+        assert.equal(p.f.externalUris.length, count + 2);
+        assert.equal(p.f.executedCommands.length, readyRefreshes);
+    } finally { p.dispose(); p.timers.reset(); }
+});
+```
+
+A rejected renewal becomes text and cannot refresh itself into a retry loop.
+After the cooldown, a later render can recover using the same capability; no
+failure timer periodically retries hidden or closed previews.
+
+```ts : <<screen capability renewal failure regression>>=
+test('failed URL renewal retries only on demand after its cooldown', async context => {
+    const p = await clockedPreview(context);
+    try {
+        const old = capabilityHref(p.render());
+        p.timers.tick(60_000); p.timers.tick(0);
+        p.f.controls.externalUri = async () => { throw new Error('external route invalidated'); };
+        p.render(); await tick(); p.timers.tick(0);
+        const count = p.f.externalUris.length, refreshes = p.f.executedCommands.length;
+        for (let i = 0; i < 5; i++) { assert.doesNotMatch(blocks(p.render())[0].code, /<a /); await tick(); }
+        p.timers.tick(59_999); p.render(); await tick();
+        assert.equal(p.f.externalUris.length, count);
+        assert.equal(p.f.executedCommands.length, refreshes);
+        p.timers.tick(1);
+        assert.equal(p.f.externalUris.length, count, 'elapsed time alone does not retry failures');
+        p.f.controls.externalUri = async uri => p.f.mock.Uri.parse(uri.toString() + '?recovered%3Dyes');
+        p.render(); await tick(); p.timers.tick(0);
+        assert.equal(p.f.externalUris.length, count + 2);
+        assert.equal(capabilityHref(p.render()), old.split('?')[0] + '?recovered%3Dyes');
+    } finally { p.dispose(); p.timers.reset(); }
+});
+```
+
+Expiry is one-shot for targets not rendered again, and removal/disposal must cancel
+it. A deferred renewal finishing after removal or disposal cannot revive the old
+entry, schedule a timer, or refresh the host.
+
+```ts : <<screen capability renewal lifecycle regression>>=
+for (const action of ['idle', 'remove', 'dispose']) {
+    test(`URL renewal lifecycle remains inert after ${action}`, async context => {
+        const p = await clockedPreview(context), waiting: (() => void)[] = [];
+        try {
+            p.timers.tick(60_000); p.timers.tick(0);
+            if (action !== 'idle') {
+                p.f.controls.externalUri = uri => new Promise(resolve => waiting.push(() => resolve(uri)));
+                p.render();
+                if (action === 'remove') { p.f.workspace.workspaceFolders = []; p.f.workspaceChanged(); }
+                else { p.dispose(); }
+            }
+            const count = p.f.externalUris.length, refreshes = p.f.executedCommands.length;
+            waiting.forEach(resolve => resolve()); await tick();
+            p.timers.tick(600_000); p.timers.tick(0);
+            assert.equal(p.f.externalUris.length, count);
+            assert.equal(p.f.executedCommands.length, refreshes);
+        } finally { p.dispose(); p.timers.reset(); }
+    });
+}
+```
+
+Cancel a still-live expiry timer, not merely an already expired entry. Running all
+remaining fake timers must neither advance time nor refresh after removal/disposal.
+This catches leaked timers even when a disposed callback would otherwise be inert.
+
+```ts : <<screen capability expiry cancellation regression>>=
+for (const action of ['remove', 'dispose']) {
+    test(`live external URL expiry timer is cancelled on ${action}`, async context => {
+        const p = await clockedPreview(context);
+        try {
+            const now = Date.now(), refreshes = p.f.executedCommands.length;
+            if (action === 'remove') { p.f.workspace.workspaceFolders = []; p.f.workspaceChanged(); }
+            else { p.dispose(); }
+            p.timers.runAll();
+            assert.equal(Date.now(), now, 'no expiry timer remains queued');
+            assert.equal(p.f.executedCommands.length, refreshes);
+        } finally { p.dispose(); p.timers.reset(); }
+    });
+}
+```
+
+### Optional installed-host navigation acceptance
+
+The headless suite cannot prove the host resolves a link to the intended position.
+This opt-in harness uses a real Markdown webview and the installed host's link
+handler. Run it only in the isolated `out/m2-host/workspace` fixture with a separate
+profile and Electron debugging on loopback port 9333. No command URI or navigation
+JavaScript is added to Literate; DevTools only drives this acceptance test's input.
+Keyboard checks seed focus on the preceding anchor, then send actual browser
+Tab/Enter key events and inspect native focus, local scrolling and editor position.
+
+
+The test-only DevTools transport matches each response to its request. A request
+timeout prevents an unavailable debug session from hanging the acceptance run.
+
+```js : <<screen host connection>>=
+async function connect(url) {
+    const socket = new WebSocket(url), pending = new Map();
+    let id = 0;
+    await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
+    socket.onmessage = event => {
+        const value = JSON.parse(event.data), entry = pending.get(value.id);
+        if (entry) {
+            pending.delete(value.id); clearTimeout(entry.timer);
+            value.error ? entry.reject(value.error) : entry.resolve(value.result);
+        }
+    };
+    return { close: () => socket.close(), send(method, params = {}, sessionId) {
+        return new Promise((resolve, reject) => {
+            const next = ++id;
+            const timer = setTimeout(() => { pending.delete(next); reject(new Error(method + ' timed out')); }, 5000);
+            pending.set(next, { resolve, reject, timer });
+            socket.send(JSON.stringify({ id: next, method, params, sessionId }));
+        });
+    } };
+}
+```
+
+This function runs only in the test browser. Preparation focuses the preceding
+native anchor, never the link being tested. Observation reads actual focus and
+scroll geometry; it does not manufacture keyboard events or source positions.
+
+```js : <<screen host browser observation>>=
+function observePreviewLink(href, action) {
+    const docs = [document, ...Array.from(document.querySelectorAll('iframe')).map(frame => {
+        try { return frame.contentDocument; } catch { return null; }
+    }).filter(Boolean)];
+    for (const doc of docs) {
+        const links = Array.from(doc.querySelectorAll('a[href]'));
+        const index = links.findIndex(value => value.getAttribute('href') === href);
+        if (index < 0) { continue; }
+        const link = links[index], target = href.startsWith('#') ? doc.getElementById(href.slice(1)) : null;
+        if (action === 'prepare') {
+            if (!links[index - 1]) { throw new Error('keyboard fixture needs a preceding anchor'); }
+            links[index - 1].focus();
+            doc.__m2ClickTrusted = false;
+            doc.addEventListener('click', event => { doc.__m2ClickTrusted = event.isTrusted; }, { once: true, capture: true });
+        }
+        if (action === 'point') { link.scrollIntoView({ block: 'center' }); }
+        const rect = link.getBoundingClientRect();
+        const style = doc.defaultView.getComputedStyle(link);
+        return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2,
+                    focused: doc.activeElement === link, focusVisible: link.matches(':focus-visible'),
+            label: link.getAttribute('aria-label'), tabIndex: link.tabIndex, outline: style.outlineStyle,
+            outlineWidth: style.outlineWidth, hash: doc.defaultView.location.hash,
+            scrollY: doc.defaultView.scrollY, top: target?.getBoundingClientRect().top,
+            height: doc.defaultView.innerHeight, line: target?.getAttribute('data-line'),
+                        trustedClick: doc.__m2ClickTrusted, ready: doc.readyState === 'complete' };
+    }
+    return null;
+}
+```
+
+Evaluate only the test observer in the real webview. A browser exception fails the
+test instead of being mistaken for a link that has not yet appeared.
+
+```js : <<screen host evaluation>>=
+async function observeLink(client, sessionId, href, action = 'inspect') {
+    const result = await client.send('Runtime.evaluate', {
+        expression: `(${observePreviewLink.toString()})(${JSON.stringify(href)}, ${JSON.stringify(action)})`,
+        returnByValue: true
+    }, sessionId);
+    assert.equal(result.exceptionDetails, undefined, JSON.stringify(result.exceptionDetails));
+    return result.result?.value;
+}
+```
+
+Webview startup is asynchronous. Bounded polling checks real browser targets,
+including out-of-process iframes; it does not fabricate a successful link event.
+
+```js : <<screen host link polling>>=
+async function findRenderedLink(client, href, line) {
+    for (let attempt = 0; attempt < 60; attempt++) {
+        const { targetInfos } = await client.send('Target.getTargets');
+        for (const target of targetInfos.filter(value => ['iframe', 'page'].includes(value.type))) {
+            const { sessionId } = await client.send('Target.attachToTarget', { targetId: target.targetId, flatten: true });
+            const value = await observeLink(client, sessionId, href);
+            if (value?.ready && (line === undefined || value.line === String(line))) { return sessionId; }
+            await client.send('Target.detachFromTarget', { sessionId });
+        }
+        await delay(200);
+    }
+    assert.fail('current rendered link/source map was not found in the real webview');
+}
+```
+
+CDP dispatches key input through Chromium rather than calling `click()` for the
+keyboard path. Checking the focused native link before Enter catches broken tab
+order and confirms that the existing visible-focus CSS is active.
+
+```js : <<screen host keyboard input>>=
+async function pressKey(client, sessionId, key, code) {
+    await client.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code: key,
+        windowsVirtualKeyCode: code, nativeVirtualKeyCode: code,
+        ...(key === 'Enter' ? { text: '\r', unmodifiedText: '\r' } : {}) }, sessionId);
+    await client.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key,
+        windowsVirtualKeyCode: code, nativeVirtualKeyCode: code }, sessionId);
+}
+```
+
+One helper tests both local anchors and cross-file source links. Local links must
+bring their mapped declaration into view; cross-file
+links are checked against the real active editor separately.
+
+```js : <<screen host keyboard activation>>=
+async function keyboardLink(client, href, label, line) {
+    const sessionId = await findRenderedLink(client, href, line);
+    try {
+        const before = await observeLink(client, sessionId, href, 'prepare');
+        await pressKey(client, sessionId, 'Tab', 9);
+        const focus = await observeLink(client, sessionId, href);
+        assert.equal(focus.focused, true, 'Tab reaches the intended native anchor');
+        assert.equal(focus.focusVisible, true);
+        assert.equal(focus.tabIndex, 0);
+        assert.equal(focus.label, label);
+        assert.equal(focus.outline, 'solid');
+        assert.ok(parseFloat(focus.outlineWidth) > 0);
+        await pressKey(client, sessionId, 'Enter', 13);
+        assert.equal((await observeLink(client, sessionId, href)).trustedClick, true);
+        const local = line === undefined ? undefined
+            : await assertLocalDestination(client, sessionId, href, line, before.scrollY);
+        return { href, label, tab: true, enter: true, trustedClick: true,
+            focusVisible: true, outline: `${focus.outlineWidth} ${focus.outline}`, local };
+    } finally { await client.send('Target.detachFromTarget', { sessionId }); }
+}
+```
+
+The fixture separates the use from its definition by enough prose to require a
+real scroll. Check the visible destination and updated source map rather than
+assuming Enter worked merely because the link was focused. VS Code's webview
+intercepts local anchors with `scrollIntoView`, without changing the location hash.
+
+```js : <<screen host local assertion>>=
+async function assertLocalDestination(client, sessionId, href, line, beforeScroll) {
+    let after;
+    for (let attempt = 0; attempt < 50; attempt++) {
+        after = await observeLink(client, sessionId, href);
+        if (after.top >= -1 && after.top < after.height && after.scrollY > beforeScroll + 100) { break; }
+        await delay(100);
+    }
+    assert.equal(after.line, String(line));
+    assert.ok(after.top >= -1 && after.top < after.height, JSON.stringify(after));
+    assert.ok(after.scrollY > beforeScroll + 100, 'Enter scrolls to the distant local declaration');
+    return { sourceLine: line, beforeScroll, afterScroll: after.scrollY,
+        targetTop: after.top, viewportHeight: after.height };
+}
+```
+
+Unsaved edits go through the real VS Code workspace edit API. Assert the dirty
+buffer and unchanged disk bytes; subsequent webview checks wait for the updated
+href or source-map line, not a mocked snapshot.
+
+```js : <<screen host unsaved edit>>=
+async function prependUnsaved(document) {
+    const disk = await fs.readFile(document.uri.fsPath, 'utf8');
+    const edit = new vscode.WorkspaceEdit();
+    edit.insert(document.uri, new vscode.Position(0, 0), 'Unsaved prose.\n\n');
+    assert.equal(await vscode.workspace.applyEdit(edit), true);
+    assert.equal(document.isDirty, true);
+    assert.equal(await fs.readFile(document.uri.fsPath, 'utf8'), disk);
+}
+```
+
+Guard the fixture path before writing any test content. Settings are workspace-local
+inside that disposable fixture. Markdown association and link-mode checks never
+alter the user's global preferences. Capabilities work independently of link mode.
+
+```js : <<screen host fixture>>=
+async function prepareHostFixture() {
+    const root = vscode.workspace.workspaceFolders[0].uri;
+    assert.equal(root.fsPath, path.resolve(__dirname, '../../../out/m2-host/workspace'));
+    const fence = (header, body) => '```' + header + '\n' + body + '\n```\n';
+    const baseText = '# Definitions\n\nProse before destination.\n\n' + fence('text: \<<target>>=', 'base');
+    await fs.mkdir(path.join(root.fsPath, 'nested'), { recursive: true });
+    await fs.writeFile(path.join(root.fsPath, 'index.literate'), '[Use](nested/use.html)\n[Base](base.html)\n');
+    const source = fence('jsonc : \<<caller>>=', '{"v":"\<<local>> \<<target>>"}')
+        + 'Spacer paragraph.\n\n'.repeat(60) + fence('text: \<<local>>=', 'local value')
+        + 'Trailing paragraph.\n\n'.repeat(30);
+    const localLine = source.slice(0, source.indexOf('```text: \<<local>>=')).split('\n').length - 1;
+    await fs.writeFile(path.join(root.fsPath, 'nested/use.literate'), source);
+    await fs.writeFile(path.join(root.fsPath, 'base.literate'), baseText);
+    await vscode.workspace.getConfiguration('files').update('associations', { '*.literate': 'markdown' }, vscode.ConfigurationTarget.Workspace);
+    await vscode.workspace.getConfiguration('markdown').update('preview.openMarkdownLinks', 'inEditor', vscode.ConfigurationTarget.Workspace);
+    const doc = await vscode.workspace.openTextDocument(vscode.Uri.joinPath(root, 'nested/use.literate'));
+    const base = await vscode.workspace.openTextDocument(vscode.Uri.joinPath(root, 'base.literate'));
+    return { root, doc, base, localLine };
+}
+```
+
+The assertion after activation checks the real active editor's object identity,
+fragment-free URI, zero-based selection and declaration text. Merely opening a
+second buffer for the same filesystem path must fail this test.
+
+```js : <<screen host execution>>=
+exports.run = async () => {
+    const { root, doc, base, localLine } = await prepareHostFixture();
+    await vscode.extensions.getExtension('jesterking.literate').activate();
+    await vscode.commands.executeCommand('markdown.api.reloadPlugins');
+    const html = await vscode.commands.executeCommand('markdown.api.render', doc);
+    assert.doesNotMatch(html, /#L\d+/);
+    assert.match(html, /hljs-string/);
+    await vscode.window.showTextDocument(doc);
+    await vscode.commands.executeCommand('markdown.showPreview', doc.uri);
+    const version = await (await fetch('http://127.0.0.1:9333/json/version')).json();
+    const client = await connect(version.webSocketDebuggerUrl);
+    try {
+        const href = await hostCapability(doc);
+        const checks = await exerciseHostNavigation(client, doc, base, localLine, href);
+        await fs.writeFile(path.join(root.fsPath, 'navigation-evidence.json'), JSON.stringify({
+            date: '2026-09-27', version: vscode.version, modes: ['inEditor', 'inPreview'], checks, screenReader: false
+        }, null, 2));
+        console.log('M2_HOST_NAVIGATION_PASS', vscode.version, JSON.stringify(checks));
+    } finally { client.close(); }
+};
+```
+
+Exercise the same local logical anchor before and after an unsaved two-line shift.
+Then activate the cross-file use, edit its destination without saving, and activate
+the same capability again. Switching the host's Markdown link preference between
+activations proves that neither native resolver path controls our selection.
+
+```js : <<screen host navigation checks>>=
+async function exerciseHostNavigation(client, doc, base, localLine, href) {
+    const local = '#f-006c006f00630061006c', checks = [];
+    checks.push(await keyboardLink(client, local, 'Definition of local', localLine));
+    await prependUnsaved(doc);
+    assert.match(doc.lineAt(localLine + 2).text, /\<<local>>=/);
+    await vscode.commands.executeCommand('markdown.showPreview', doc.uri);
+    checks.push(await keyboardLink(client, local, 'Definition of local', localLine + 2));
+    checks.push(await keyboardLink(client, href, 'Definition of target'));
+    await assertEditorDestination(base, 4);
+    checks.push({ destination: 'base.literate', zeroBasedLine: 4, canonical: true });
+    await prependUnsaved(base);
+    await vscode.workspace.getConfiguration('markdown').update('preview.openMarkdownLinks', 'inPreview', vscode.ConfigurationTarget.Workspace);
+    await vscode.window.showTextDocument(doc);
+    await vscode.commands.executeCommand('markdown.showPreview', doc.uri);
+    checks.push(await keyboardLink(client, href, 'Definition of target'));
+    await assertEditorDestination(base, 6);
+    checks.push({ destination: 'base.literate', zeroBasedLine: 6, sameDirtyDocument: true });
+
+    <<screen host retained click check>>
+    return checks;
+}
+```
+
+Exercise pointer input as well as keyboard activation. Both must land on the
+current dirty declaration; neither substitutes an editor-open command or synthetic
+DOM click for trusted input through the real webview's link handler.
+
+```js : <<screen host retained click check>>=
+await vscode.window.showTextDocument(doc);
+await vscode.commands.executeCommand('markdown.showPreview', doc.uri);
+const sessionId = await findRenderedLink(client, href);
+try {
+    const point = await observeLink(client, sessionId, href, 'point');
+    await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: point.x, y: point.y, button: 'left', clickCount: 1 }, sessionId);
+    await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: point.x, y: point.y, button: 'left', clickCount: 1 }, sessionId);
+} finally { await client.send('Target.detachFromTarget', { sessionId }); }
+await assertEditorDestination(base, 6);
+checks.push({ click: true, destination: 'base.literate', zeroBasedLine: 6, sameDirtyDocument: true });
+```
+
+Wait for the host's asynchronous navigation only for a bounded period, then make
+ordinary assertions so a wrong document or dropped source position fails.
+
+```js : <<screen host destination assertion>>=
+async function assertEditorDestination(document, line) {
+    const file = document.uri.fsPath;
+    for (let attempt = 0; attempt < 50; attempt++) {
+        const editor = vscode.window.activeTextEditor;
+        if (editor?.document.uri.fsPath === file && editor.selection.active.line === line) {
+                    assert.match(editor.document.lineAt(line).text, /\<<target>>=/, 'selected line is the actual declaration');
+            assert.equal(editor.document, document, 'navigation reuses the canonical TextDocument object');
+            assert.equal(editor.document.uri.fragment, '');
+            assert.equal(vscode.workspace.textDocuments.filter(doc => !doc.isClosed && doc.uri.fsPath === file).length, 1);
+            return;
+                }
+        await delay(100);
+    }
+    assert.equal(vscode.window.activeTextEditor?.document.uri.fsPath, file);
+    assert.equal(vscode.window.activeTextEditor?.selection.active.line, line);
+}
+```
