@@ -1,0 +1,329 @@
+# Appendix F — Publication formats and protocols
+
+This appendix is the lookup route for the data formats that connect Literate's
+publication stages. The conceptual route begins with
+[Why publication is a separate pipeline](separate_publication_pipeline.html),
+continues through
+[Building a publication document](building_publication_document.html), and ends
+with the screen and print renderers described in
+[Publication on screen](publication_on_screen.html) and
+[Typesetting the book](typesetting_the_book.html).
+
+Publication is explicit. Ordinary source generation may produce chapter HTML, but
+it does not invoke Pandoc, a browser, TeX, or the PDF compiler. The `latex` and
+`pdf` commands consume the same parsed project while using a separate publication
+model and output transaction.
+
+## Format inventory
+
+Literate uses several related but distinct publication representations:
+
+- **Generated HTML** is one page per `.literate` document, with semantic fragment
+  and annotation links. It is part of ordinary generation.
+- **Markdown preview** is editor-hosted screen presentation over the current
+  project snapshot. It may use unsaved buffers and does not write generated files.
+- **The publication document** is a renderer-neutral, validated block tree for the
+  complete ordered project.
+- **Pandoc JSON** is the controlled in-memory bridge used to ask Pandoc for a
+  LaTeX body. It is not an author-facing source format.
+- **LaTeX publication** is one renderer-owned document plus any planned image,
+  diagram, font, and license companions.
+- **PDF publication** compiles a private copy of that LaTeX plan and publishes only
+  the accepted PDF destination.
+
+Screen and print share logical fragment and annotation identities, but they do not
+promise identical layout, heading behavior, or interaction. See
+[Shared annotations and identities](shared_annotations_identities.html) and
+[What Literate does not promise](what_literate_does_not_promise.html).
+
+## Controlled Pandoc JSON
+
+[The controlled Pandoc bridge](publication-pandoc.html) constructs Pandoc data
+after the complete project, fragment graph, annotations, links, and supported block
+vocabulary have passed validation. Pandoc does not parse the original Literate
+Markdown and does not decide fragment identity or project order.
+
+The document envelope has this stable internal shape:
+
+```json
+{
+  "pandoc-api-version": [1, 23, 1],
+  "meta": {},
+  "blocks": []
+}
+```
+
+The fixed API tuple is a wire-format compatibility choice. Metadata is deliberately
+empty; page geometry, fonts, palette, and other renderer policy cross typed options
+instead of arbitrary document metadata.
+
+The bridge admits paragraphs, plain blocks, headings, horizontal rules, block
+quotes, ordered and unordered lists, ordinary code blocks, inline emphasis,
+strong emphasis, strikeout, code, links, line breaks, fragment contributions,
+annotations, and supported standalone assets. Any unsupported token type that
+actually reaches the bridge diagnoses the source rather than disappearing or
+passing through as executable markup.
+
+`RawBlock` and `RawInline` are reserved for trusted renderer callbacks. Normal
+parsing leaves HTML and TeX-like author text inert and does not recognize pipe-table
+syntax; none of those spellings becomes raw Pandoc output. Contribution and asset
+callbacks run only after complete validation succeeds. For the gate and its
+all-or-nothing behavior, see
+[Building a publication document](building_publication_document.html).
+
+The production converter receives JSON on standard input and is invoked without a
+shell using these conversion arguments:
+
+```text
+pandoc --from=json --to=latex --top-level-division=chapter --no-highlight
+```
+
+Pandoc returns a LaTeX body, not a standalone document. Literate supplies the
+preamble, syntax presentation, destinations, geometry, fonts, colors, annotation
+rail, and resource references. The Pandoc process is bounded, and an empty body,
+nonzero exit, timeout, stream error, or excessive output fails publication before
+commit.
+
+## Annotation author format
+
+Annotations are authored as exact, case-sensitive fenced-block forms. A term has a
+key and a JSON-quoted display title:
+
+````markdown
+```TERM transaction "Output transaction"
+A transaction publishes related outputs together, or preserves the previous set.
+```
+````
+
+A note has no header arguments:
+
+````markdown
+```NOTE
+This explanation belongs beside this point in the prose.
+```
+````
+
+A term use is an explicit Markdown link:
+
+```markdown
+See the [transaction contract](term:transaction).
+```
+
+The contracts are:
+
+- a term key matches `[A-Za-z][A-Za-z0-9_.:-]{0,99}` and is case-sensitive;
+- the required display title is a JSON string of at most 200 Unicode code points;
+- `NOTE` takes no arguments;
+- term destinations are decoded once and must resolve to exactly one definition;
+- duplicate terms, missing or ambiguous uses, invalid headers, and unsupported
+  bodies block publication;
+- links in headings are rejected because replaying a heading in contents or running
+  matter would replay annotation markers;
+- there is no authored `INDEX` fence: term and fragment indexes are derived from the
+  validated model.
+
+Annotation bodies accept paragraphs, lists, emphasis, strong emphasis, inline code,
+links, and line breaks. They reject headings, quotations, tables, images,
+strikethrough, block code, nested annotation or Mermaid fences, and raw HTML. TERM
+bodies remain in document flow. NOTE bodies become numbered screen asides or
+controlled print-rail entries. The model and resolution rules are explained in
+[Shared annotations and identities](shared_annotations_identities.html); the exact
+parser is in [Shared publication annotations](publication-annotations.html).
+
+## Font settings and manifest format
+
+Root publication settings select five font roles:
+
+```text
+font-body
+font-heading
+font-code
+font-fragment
+font-note
+font-code-ligatures
+```
+
+The family values are trimmed ASCII names from one to one hundred characters,
+beginning with a letter or digit and continuing with letters, digits, spaces, dots,
+or hyphens. They are names, not paths or TeX expressions. `font-code-ligatures` is
+exactly `on` or `off`. Settings are read only from root `index.literate` `SETTINGS`
+fences; the last valid value wins, while every invalid occurrence remains a
+diagnostic. If `font-note` is omitted, it inherits the final body family.
+
+An optional font manifest turns selected families into portable companions. Its
+version is a stable data-format boundary, so it is stated explicitly. Version 1 has
+this shape:
+
+```json
+{
+  "version": 1,
+  "families": {
+    "Example Serif": {
+      "regular": "fonts/serif-regular.otf",
+      "bold": "fonts/serif-bold.otf",
+      "italic": "fonts/serif-italic.otf",
+      "boldItalic": "fonts/serif-bolditalic.otf",
+      "licenses": ["fonts/OFL.txt"]
+    }
+  }
+}
+```
+
+Every family entry requires all four faces and a nonempty `licenses` array. Unknown
+fields are errors. Paths are safe project-root-relative paths, not paths relative to
+the manifest. Font containers are limited to `.ttf` and `.otf`; all declared files
+must exist as regular non-symlink files. Every entry is validated and protected from
+output collisions, although only selected families are copied.
+
+Italic and bold-italic faces may explicitly request bounded synthetic slant:
+
+```json
+{
+  "file": "fonts/example-regular.ttf",
+  "slant": 0.2
+}
+```
+
+Only those two roles accept this object. `slant` must be a finite JSON number from
+`0.01` through `0.3`. There is no implicit fallback, synthetic weight, directory
+scan, font installation, or license interpretation. License bytes travel with the
+selected fonts, but the publisher remains responsible for redistribution rights.
+See [Portable publication resources](portable_publication_resources.html),
+[Publication font settings](publication-settings.html), and
+[Explicit portable font companions](publication-fonts.html).
+
+## Asset metadata and author forms
+
+The renderer-neutral asset record is:
+
+```text
+kind: "image" | "mermaid"
+source: string
+caption: string
+at: { path, line, column }
+```
+
+For an image, `source` is the authored path. Image paths are resolved relative to
+the chapter containing the image, decoded once, and required to remain inside the
+project. A supported image is a standalone Markdown image using PNG, JPEG, or PDF;
+the extension and binary signature must agree. The title becomes the plain caption,
+falling back to plain alternative text. Inline images, formatted alternatives,
+remote URLs, query strings, fragments, raw SVG, symlinks, and unsupported file types
+are rejected.
+
+For a Mermaid asset, `source` is the complete diagram source and the caption is
+empty. A plain Mermaid fence requests a diagram; a named Literate fragment whose
+language is Mermaid remains program code. Diagram publication requires an explicitly
+selected browser and produces validated PDF and SVG companions in a private worker.
+Books without diagrams need no browser.
+
+Companion names are derived from content or role identities rather than source
+basenames. Equal image bytes are retained once, while every source alias remains a
+protected input. TeX, images, diagram products, portable fonts, and license files
+join one output plan and one transaction. Old companions are not pruned
+automatically, so move or distribute the containing export directory as a unit.
+
+## Publication helper request
+
+Editor publication uses a one-request external helper described in
+[Isolating publication from the editor](isolating_publication_editor.html). Standard
+input contains one JSON value and end-of-file terminates the request. The envelope
+has exactly two top-level members:
+
+```json
+{
+  "args": ["latex", "/project/root", "--output", "book.tex", "--json"],
+  "documents": [
+    { "path": "index.literate", "text": "# Book\n" }
+  ]
+}
+```
+
+`args` is an array of strings. Its first item is `latex` or `pdf`; `--json` is
+required; help flags and all other commands are rejected. `documents` is an array of
+`{path, text}` source snapshots. Open file-backed editor buffers take precedence
+when the adapter constructs that array. Binary assets, manifests, fonts, and licenses
+remain policy-checked disk inputs rather than entering the JSON snapshot. Images and
+diagrams have dedicated byte budgets; font and license companions currently do not.
+
+The helper emits no readiness text. Standard output is exactly one CLI response, and
+standard error is treated as bounded diagnostic transport. The request and response
+are independently size-bounded. Cancellation remains latched through the runner and
+output transaction.
+
+## Publication helper response
+
+Successful helper output uses CLI response schema version 1:
+
+```json
+{
+  "schemaVersion": 1,
+  "command": "latex",
+  "ok": true,
+  "root": "/project/root",
+  "diagnostics": [],
+  "errors": [],
+  "outputs": [
+    { "path": "book.tex", "status": "written" }
+  ],
+  "publication": {
+    "warnings": []
+  }
+}
+```
+
+`command` is the requested `latex` or `pdf` command. Output status is one of
+`current`, `missing`, `stale`, or `written`; a successful editor publication requires
+the selected destination to be `written` or `current`. PDF results may additionally
+report `publication.buildDirectory` when private build retention was requested.
+`publication.warnings` contains deduplicated compiler warnings and does not turn a
+successful build into a clean-typography guarantee.
+
+A transport success is not enough. The editor also requires process close, a zero
+exit status, valid JSON, schema version 1, the matching command, `ok: true`, and the
+selected output status. A failure before commit preserves the previous output. A
+cancellation arriving after a validated commit does not turn success into failure.
+The shared machine-readable contract for all commands is documented in
+[Command-line generation](cli.html).
+
+## LaTeX integration contract
+
+Literate owns publication template version 1. This version identifies the emitted
+renderer template; it is not a custom-template extension point. The renderer expects
+Pandoc to provide only a body, uses top-level chapters, and disables Pandoc syntax
+highlighting so Literate can preserve fragment-aware syntax and links.
+
+The template targets LuaLaTeX and uses a one-sided KOMA-Script book with controlled
+font, geometry, color, code, image, link, index, and annotation-rail support. Text is
+escaped as data. Logical destinations are encoded again before entering LaTeX; raw
+fragment names, paths, and annotation keys are never interpolated as commands.
+
+Page choices are `a4`, `a5`, `letter`, and `legal`. Margins are decimal millimetres,
+each from 5 through 50, and must leave at least an 80 × 100 mm body. An annotated
+book reserves a right-hand rail and gap in addition to the author's requested margin,
+so geometry that works for an unannotated book may be rejected for an annotated one.
+
+`latex` writes the TeX document and planned companions but never starts TeX. `pdf`
+stages that same plan privately, preflights the compiler tools and packages, checks
+reference and annotation-rail convergence, validates bounded PDF bytes, and then
+publishes only the requested PDF. The exact safety and cancellation boundary is in
+[Compiling and publishing a PDF](compiling_publishing_pdf.html).
+
+## Failure lookup
+
+- **Publication rejects the document before Pandoc:** check for inline images or token
+  extensions outside the controlled vocabulary. Raw HTML and TeX are normally inert
+  text, and pipe-table syntax is not recognized by the parser.
+- **A term link is inert or publication fails:** check exact key case, duplicate or
+  missing definitions, percent encoding, and whether the use appears in a heading.
+- **A font manifest fails before rendering:** check `version: 1`, exact family names,
+  all four faces, a nonempty license list, safe root-relative paths, and unknown
+  fields.
+- **An image is rejected:** make it a standalone PNG, JPEG, or PDF with a matching
+  signature and a chapter-relative local path.
+- **Mermaid export asks for a browser:** either supply the explicit browser option or
+  remove ordinary Mermaid fences; named Mermaid fragments do not require rendering.
+- **The editor rejects helper success:** require a matching schema, command, output
+  path, and `written` or `current` status, not merely exit code zero.
+- **A PDF succeeds with warnings:** inspect the publication warnings and the actual
+  pages; compilation success does not establish glyph coverage or good typography.

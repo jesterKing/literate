@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Appendix E — Language-server protocol details</h1>
+<p>This appendix records the direct stdio language-server contract used for mapped
+programming-language features. It is a protocol and compatibility reference; the
+reason for projections is developed in <a href="projection_problem.html">The projection problem</a>,
+session ownership in <a href="owning_language_server_session.html">Owning a language-server session</a>,
+and editor scheduling in
+<a href="coordinating_language_features.html">Coordinating language features in the editor</a>.</p>
+<h2>Configuration and session identity</h2>
+<p><code>literate.languageServers</code> is a restricted machine-scoped setting read from global
+user configuration. Workspace values do not select executables. Each entry is keyed
+by a canonical VS Code language ID and has this shape:</p>
+<pre><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;literate.languageServers&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;typescript&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;command&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/absolute/path/to/server&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;args&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;--stdio&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;initializationOptions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span><span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;configuration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span><span class="hljs-punctuation">}</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<p><code>command</code> must be an absolute path. <code>args</code> are literal strings. The two optional
+objects cross the protocol only in their documented roles. Literate launches the
+process directly with no shell expansion and does not install, download, or borrow a
+server from another extension.</p>
+<p>A session belongs to one local workspace folder and one canonical language identity.
+Familiar fence aliases normalize to canonical IDs for selection but are not valid
+configuration aliases. JavaScript and TypeScript family outputs are synchronized
+together for project context; unrelated languages use separate sessions.</p>
+<p>Starting a configured server requires a trusted, local, file-backed workspace and an
+open local <code>.literate</code> document using the Markdown language mode. Remote extension
+hosts, non-file workspaces, closed documents, and untrusted workspaces do not start a
+session. The configured process is trusted code with ordinary workspace access; it is
+not sandboxed by Literate.</p>
+<h2>Projected document model</h2>
+<p>The server sees every relevant generated output at its intended absolute <code>file:</code> URI.
+The text is assembled in memory from the captured literate project and may differ
+from, or exist without, a physical generated file. Requests never save or generate
+those outputs.</p>
+<p>Projection is atomic across the project. Invalid fragment declarations, missing
+references, cycles, destination conflicts, unavailable templates, and expansion
+limits return no projected files. Mappings cover only unchanged literal source text.
+Reference markers, inserted indentation, escaped delimiters, template wrappers, and
+other synthetic text remain unmapped.</p>
+<p>Both editor and protocol coordinates are zero-based UTF-16 line and character values.
+The client offers UTF-16 during initialization and rejects a server that explicitly
+selects another position encoding. See
+<a href="projection_problem.html">The projection problem</a> and
+<a href="language-projection.html">Mapped language sources</a>.</p>
+<h2>JSON-RPC framing</h2>
+<p>Messages use JSON-RPC <code>2.0</code> over standard input and standard output with Language
+Server Protocol framing:</p>
+<pre><code>Content-Length: &lt;UTF-8 byte count&gt;\r\n
+\r\n
+&lt;one complete JSON value encoded as UTF-8&gt;
+</code></pre>
+<p><code>Content-Length</code> counts bytes, not JavaScript characters or Unicode code points. The
+reader accumulates at most one bounded header, requires exactly one decimal
+<code>Content-Length</code>, allocates a body only after validating that length, reads the
+complete body, decodes UTF-8 strictly, parses JSON, and then validates the envelope.</p>
+<p>Outgoing messages are serialized as UTF-8, measured in bytes, prefixed with the same
+framing, and added only when the bounded write queue has capacity. Standard error is
+drained separately and never parsed as protocol data.</p>
+<h2>Envelope validation</h2>
+<p>Every incoming value must be an object with <code>jsonrpc: &quot;2.0&quot;</code>.</p>
+<ul>
+<li>A message with a string <code>method</code> and no <code>id</code> is a notification.</li>
+<li>A message with a string <code>method</code> and a string or numeric <code>id</code> is a server request.</li>
+<li>A response must use the numeric ID of a client request and contain exactly one of
+<code>result</code> or <code>error</code>.</li>
+<li>An error response must contain a numeric <code>code</code> and string <code>message</code>; optional data
+is retained only as protocol error data.</li>
+<li>A response for a request that has already completed or been cancelled has no owner
+and is ignored.</li>
+</ul>
+<p>Malformed framing, invalid UTF-8, invalid JSON, invalid envelopes, stream closure, and
+process exit stop the session. The client rejects pending work, clears synchronized
+document state and input buffers, releases listeners, destroys streams, and terminates
+the process through one cleanup path.</p>
+<h2>Initialization handshake</h2>
+<p>The client sends <code>initialize</code> with:</p>
+<ul>
+<li>the extension-host process ID;</li>
+<li>the owning workspace <code>rootUri</code>;</li>
+<li>one matching workspace-folder record;</li>
+<li>configured <code>initializationOptions</code>;</li>
+<li>the static client capabilities listed below.</li>
+</ul>
+<p>A successful result must contain an object-valued <code>capabilities</code>. If
+<code>positionEncoding</code> is present, it must be <code>utf-16</code>. The client then sends the
+<code>initialized</code> notification and permits synchronization and feature requests.
+Concurrent callers share one initialization attempt.</p>
+<p>Initialization failure is terminal for that session. Literate does not repeatedly
+restart a broken server in the background. Changing language-server configuration or
+running <strong>Literate: Restart Language Servers</strong> clears the failed session so a later
+request can start a new one.</p>
+<h2>Advertised client capabilities</h2>
+<p>The direct client advertises a deliberately narrow static surface.</p>
+<h3>General and workspace capabilities</h3>
+<ul>
+<li><code>general.positionEncodings</code> offers only <code>utf-16</code>.</li>
+<li><code>workspace.configuration</code> and <code>workspace.workspaceFolders</code> are supported.</li>
+<li>Workspace edits advertise no document changes, no resource operations, and abort
+failure handling.</li>
+<li>Diagnostic refresh requests are supported.</li>
+</ul>
+<h3>Text-document capabilities</h3>
+<ul>
+<li>dynamic synchronization registration is disabled;</li>
+<li>code actions advertise literal <code>quickfix</code> and <code>refactor</code> kinds only;</li>
+<li>completion supports snippets, insert/replace ranges, Markdown or plain-text
+documentation, and resolution of only <code>documentation</code> and <code>detail</code>;</li>
+<li>signature help supports request context, Markdown or plain-text documentation, and
+UTF-16 parameter-label offsets;</li>
+<li>definition, type definition, and implementation accept location links;</li>
+<li>references use static registration;</li>
+<li>published diagnostics advertise version, related-information, and standard tag
+awareness, although the mapping layer deliberately omits related information;</li>
+<li>pull diagnostics use static registration without related-document support;</li>
+<li>hover accepts plain text or Markdown.</li>
+</ul>
+<p>Advertising a protocol shape does not mean all returned fields cross into VS Code.
+Feature-specific validators reduce replies to the safe subset described below.</p>
+<h2>Server capabilities required at runtime</h2>
+<p>Initialization results control which requests may be sent.</p>
+<ul>
+<li>Projected documents require text synchronization kind full or incremental. Object
+form must explicitly support open/close; legacy numeric full or incremental kinds
+imply it.</li>
+<li>Hover, completion, signature help, definition, type definition, implementation,
+references, code actions, and diagnostics are requested only when the corresponding
+server capability is present.</li>
+<li>Completion and signature trigger characters are learned from the selected server,
+bounded, and used only for that server's language.</li>
+<li>A completion item is resolved only when the server advertises completion resolution.</li>
+<li>Pull diagnostics take precedence when a diagnostic provider is advertised;
+otherwise versioned or best-effort push diagnostics may be used.</li>
+</ul>
+<p>Dynamic capability registration is not implemented. A server must advertise the
+needed static capabilities during initialization.</p>
+<h2>Document synchronization</h2>
+<p>Before sending notifications, the client validates the complete current document set.
+Duplicate URIs, unsupported synchronization, excessive document count, or excessive
+serialized input reject the synchronization as a whole.</p>
+<p>For each URI:</p>
+<ul>
+<li>a new projected document sends <code>textDocument/didOpen</code> with complete text and a
+monotonically increasing version;</li>
+<li>unchanged language and text send no notification;</li>
+<li>changed text sends <code>textDocument/didChange</code> with complete replacement text;</li>
+<li>an incremental server receives one edit covering the complete previous document in
+UTF-16 coordinates rather than a series of small edits;</li>
+<li>a changed language ID closes and reopens the URI;</li>
+<li>a removed document sends <code>textDocument/didClose</code>.</li>
+</ul>
+<p>Versions increase across changes and reopenings for the lifetime of the session. The
+client updates its local version state before writing notifications so an immediate
+push diagnostic can be compared with the text the server just received.</p>
+<h2>Client-to-server methods</h2>
+<p>The coordinator may use these methods when capabilities and request context permit:</p>
+<ul>
+<li><code>initialize</code>, followed by <code>initialized</code>;</li>
+<li><code>textDocument/didOpen</code>, <code>textDocument/didChange</code>, and <code>textDocument/didClose</code>;</li>
+<li><code>textDocument/hover</code>;</li>
+<li><code>textDocument/completion</code> and <code>completionItem/resolve</code>;</li>
+<li><code>textDocument/signatureHelp</code>;</li>
+<li><code>textDocument/definition</code>, <code>textDocument/typeDefinition</code>,
+<code>textDocument/implementation</code>, and <code>textDocument/references</code>;</li>
+<li>explicitly invoked <code>textDocument/codeAction</code>;</li>
+<li><code>textDocument/diagnostic</code> for pull-capable servers;</li>
+<li><code>$/cancelRequest</code> for a request cancelled after it reaches the wire;</li>
+<li>bounded cooperative <code>shutdown</code>, followed by <code>exit</code> during disposal.</li>
+</ul>
+<p>The generic request transport is not an authorization mechanism. Editor adapters call
+only methods for which they have a feature-specific validator.</p>
+<h2>Server-to-client surface</h2>
+<p>The client accepts these notifications or requests:</p>
+<ul>
+<li><code>textDocument/publishDiagnostics</code> is delivered to the diagnostics controller;</li>
+<li><code>workspace/configuration</code> returns configured own-property sections, trying an exact
+key before dotted traversal and returning <code>null</code> for missing values;</li>
+<li><code>workspace/workspaceFolders</code> returns the one owning workspace folder;</li>
+<li><code>workspace/diagnostic/refresh</code> is acknowledged and schedules a coalesced pull pass;</li>
+<li><code>workspace/applyEdit</code> is answered with <code>applied: false</code> and a read-only reason.</li>
+</ul>
+<p>Unknown server requests receive JSON-RPC method-not-found. They are not converted into
+commands, dynamic registrations, file operations, watchers, or arbitrary editor API
+calls. Notifications reach only explicitly registered method listeners.</p>
+<h2>Read-only reply validation</h2>
+<p>Server replies are untrusted values. Common validation requires bounded object and
+array traversal, finite nonnegative UTF-16 positions, in-range lines and columns,
+current request/session/snapshot identity, and mapping through the exact projection
+occurrence used by the request.</p>
+<p>Feature rules then narrow further:</p>
+<ul>
+<li><strong>Hover:</strong> bounded plain text or untrusted Markdown; an explicit range must map
+completely through the request occurrence, stay on the cursor line, and contain the
+cursor.</li>
+<li><strong>Completion:</strong> commands and auxiliary edits are rejected. Replacement ranges remain
+on the cursor line and within the exact mapping. Snippets are allowed only as local
+insertions. Resolve may add documentation and detail but cannot change insertion
+text, range, label, or behavior.</li>
+<li><strong>Signature help:</strong> signature, parameter, active-index, documentation, and label
+offsets are independently bounded and validated.</li>
+<li><strong>Navigation:</strong> known projected URIs must map back to literate source. A validated
+ordinary local <code>file:</code> URI may remain direct. Unsafe or seam-crossing locations are
+omitted rather than widened or searched by text.</li>
+<li><strong>References:</strong> the request carries the caller's <code>includeDeclaration</code> choice;
+returned locations follow the same navigation validation and deduplication.</li>
+</ul>
+<p>See <a href="read_only_language_services.html">Read-only language services</a>,
+<a href="language-navigation.html">Mapped language locations</a>, and
+<a href="language-features.html">Direct, mapped language features</a>.</p>
+<h2>Diagnostic protocols and freshness</h2>
+<p>The client subscribes to <code>textDocument/publishDiagnostics</code> before synchronization so
+an immediate server report is not missed. Pull-capable sessions instead request
+<code>textDocument/diagnostic</code> and ignore push reports. Refresh requests coalesce into a
+bounded sequential pass; there is no polling loop.</p>
+<p>A versioned diagnostic report is publishable only while three identities agree:</p>
+<ol>
+<li>the current client session owns the report;</li>
+<li>the report version matches that URI's current wire version;</li>
+<li>the captured source, templates, workspace, trust, and diagnostic setting remain
+fresh.</li>
+</ol>
+<p>An unversioned push report cannot prove which projected text produced it. It is
+ignored during synchronization and accepted afterward only while the session is
+fresh, idle, and owns the URI. Even then freshness is best effort.</p>
+<p>Generated ranges may split into separate mapped source intersections. Template-only
+and otherwise unmapped ranges are omitted. Messages, severity, code, source, and
+standard deprecated/unnecessary tags may survive sanitization; related information
+and code-description links do not. Mapped-language problems use a diagnostic
+collection separate from Literate's fragment and generation diagnostics.</p>
+<p>See <a href="diagnostics_over_projections.html">Diagnostics over changing projections</a> and
+<a href="language-diagnostics.html">Mapped language diagnostics</a>.</p>
+<h2>Code-action protocol boundary</h2>
+<p>Language-server code actions are available only on explicit editor invocation. A
+reply must be an array of valid edit-bearing actions; a bare command or malformed
+action rejects the whole reply.</p>
+<p>An accepted action:</p>
+<ul>
+<li>is enabled and contains no executable command;</li>
+<li>has no kind or belongs to the quick-fix or refactoring families;</li>
+<li>uses eager <code>WorkspaceEdit.changes</code>, with exactly one URI equal to the projected URI
+that received the request;</li>
+<li>contains a nonempty bounded list of ordinary text edits;</li>
+<li>maps every edit through the exact current occurrence and source document;</li>
+<li>touches no wrapper, indentation, reference seam, other file, file operation,
+annotation, or snippet edit;</li>
+<li>refers to a source interval with exactly one matching occurrence in the requested
+projected file;</li>
+<li>contains no overlap or pair of edits sharing a start;</li>
+<li>survives reply-time source, mapping, generated-text, and editor-version checks.</li>
+</ul>
+<p>The set is atomic: one unsafe edit rejects the complete action. Literate returns the
+validated action for VS Code to present; it never applies the workspace edit on the
+server's behalf. See <a href="mutating_projected_source.html">Mutating projected source safely</a>
+and <a href="language-actions.html">Safe language code actions</a>.</p>
+<h2>Resource limits and deadlines</h2>
+<p>The direct client enforces these transport and synchronization bounds:</p>
+<ul>
+<li>message body: 8 MiB;</li>
+<li>header: 8 KiB;</li>
+<li>queued output, including framing: bounded to the message limit plus header allowance;</li>
+<li>pending requests: 128;</li>
+<li>initialization waiters: 128;</li>
+<li>listeners: 128;</li>
+<li>ordinary request deadline: five seconds;</li>
+<li>initialization deadline: fifteen seconds;</li>
+<li>synchronized documents: 1024;</li>
+<li>serialized synchronized document data: 4 MiB;</li>
+<li>cooperative shutdown wait: 500 milliseconds, followed by 500 milliseconds for
+<code>exit</code> before forced termination.</li>
+</ul>
+<p>Higher-level feature adapters impose additional item, text, mapping, action, diagnostic,
+queue, and cache limits. Crossing a mutating limit rejects the whole operation.
+Observational services may omit excess unsafe data, but never invent a source range.
+For the broader policy, see
+<a href="resource_bounds_fail_closed.html">Resource bounds and fail-closed behavior</a>.</p>
+<h2>Cancellation and failure</h2>
+<p>Cancellation before send creates no request. Cancellation after send rejects the local
+operation, removes its pending owner, and sends one <code>$/cancelRequest</code>. A late response
+cannot revive the operation.</p>
+<p>Protocol or process failure leaves the session stopped rather than starting a loop.
+Pending work is rejected, diagnostics owned by that session are cleared, and a bounded
+categorized message is written to the Literate language-server output channel. Logs
+do not include source, configuration values, raw protocol payloads, or raw server
+errors.</p>
+<p>Normal disposal shares one shutdown sequence across repeated callers. It first refuses
+new work, attempts bounded <code>shutdown</code>, sends <code>exit</code>, waits briefly, and forcefully
+terminates a process that remains alive.</p>
+<h2>Compatibility requirements and known limits</h2>
+<p>A compatible server must be available as a standalone stdio executable and must:</p>
+<ul>
+<li>complete the initialize/initialized handshake;</li>
+<li>accept real local <code>file:</code> URIs whose text is supplied by open/change notifications;</li>
+<li>support open/close plus full or incremental text synchronization;</li>
+<li>use UTF-16 positions;</li>
+<li>advertise each requested feature statically;</li>
+<li>tolerate complete-text replacement when advertising incremental synchronization;</li>
+<li>operate without relying on another editor extension's private transport.</li>
+</ul>
+<p>The project's exercised configurations include a TypeScript server running in native
+LSP stdio mode, <code>typescript-language-server</code>, and ZLS. The current README records
+installation-specific launch guidance and any tool-specific caveats. Compatibility is
+not inferred merely because a language extension is installed.</p>
+<p>Known limits are intentional:</p>
+<ul>
+<li>remote extension hosts and non-file workspaces are unsupported;</li>
+<li>rename and formatting are not forwarded to language servers;</li>
+<li>server commands, dynamic registrations, general filesystem-watch registration,
+file operations, edit annotations, and cross-file workspace edits are not honored;</li>
+<li>auxiliary completion edits and auto-import changes are rejected;</li>
+<li>wrapper-only diagnostics and navigation locations are omitted;</li>
+<li>read-only requests choose the first deterministic expansion of repeated source;
+mutating actions reject repeated expansion in the requested projected file;</li>
+<li>unversioned push diagnostics have only best-effort freshness;</li>
+<li>physical imports and project configuration remain the configured server's own
+filesystem concern.</li>
+</ul>
+<p>After changing external dependencies or project configuration that a server does not
+observe, restart the session explicitly. After changing literate source or a captured
+template, the coordinator invalidates the old snapshot and synchronizes a fresh
+projection without generating files.</p>
+<h2>Troubleshooting route</h2>
+<ul>
+<li><strong>No session starts:</strong> verify Markdown association, an open local <code>.literate</code> file,
+trusted workspace, canonical language key, global setting scope, absolute executable,
+and literal arguments.</li>
+<li><strong>Initialization stops:</strong> inspect required UTF-16 encoding, static capabilities,
+initialization deadline, executable permission, and protocol framing.</li>
+<li><strong>Imports resolve incorrectly:</strong> remember that projected outputs are virtual overlays
+at real URIs, while physical imports and project configuration are read by the
+server. Keep required nonprojected dependencies available on disk.</li>
+<li><strong>A feature returns nothing:</strong> check server capability, complete project validity,
+projection mapping at the cursor, response shape, exact occurrence confinement,
+cancellation, and snapshot freshness.</li>
+<li><strong>Diagnostics disappear:</strong> source invalidation clears first; then inspect the
+diagnostics setting, pull/push mode, URI ownership, wire version, and report limits.</li>
+<li><strong>A code action is absent:</strong> it must be explicitly invoked and every eager edit must
+map atomically into one current uniquely expanded source occurrence.</li>
+<li><strong>A failed server does not relaunch:</strong> this is deliberate. Correct configuration or
+environment, then run <strong>Literate: Restart Language Servers</strong>.</li>
+</ul>
+</div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

@@ -1,0 +1,295 @@
+# Appendix C — Editor integration details
+
+This appendix maps Literate's host-independent model onto VS Code's extension and
+Markdown APIs. The architectural account is in
+[The editor-side project repository](editor_project_repository.html),
+[Fragments as editor symbols](fragments_as_editor_symbols.html),
+[Previewing the explanation](previewing_the_explanation.html), and
+[Extension activation and public surface](extension_activation_surface.html).
+Here the emphasis is registration, adapter ownership, and the contracts a contributor
+needs when tracing an editor request.
+
+## Declarative and runtime surfaces
+
+The package manifest makes features discoverable before extension code runs. It
+declares the Fragment Explorer view and refresh menu, public commands, configuration
+schemas, the pending-completion keybinding, Markdown-it participation, and the local
+browser scripts used by Markdown preview.
+
+Activation then creates the session-owned objects behind that surface. The exported
+`activate` function is the extension entry point. It returns an `extendMarkdownIt`
+hook, which is the runtime entry point used by the Markdown host.
+
+The manifest contains no imperative activation list because the host can infer
+activation from contributed commands, views, and Markdown support. Command IDs,
+view IDs, and setting keys should be treated as public compatibility boundaries.
+
+## Activation order
+
+Activation follows dependency order rather than chapter or generated-file order:
+
+1. construct the shared `FragmentRepository` and attach it to the extension context;
+2. register publication commands around the repository's serialized publication
+   boundary;
+3. register mapped language features around a source-capture function, not around
+   unrestricted repository internals;
+4. perform an awaited, read-only initial project scan;
+5. create the preview-navigation capability handler;
+6. register fragment authoring commands, the Fragment Explorer, and fragment symbol
+   providers;
+7. return the Markdown-it extension hook.
+
+A failed initial read is contained. Providers and commands still register and can
+report or recover from the current project state. Initial activation never generates
+source or HTML. See [One generator, several hosts](one_generator_several_hosts.html)
+for the host boundary and [Changing files safely](changing_files_safely.html) for the
+separate write transaction.
+
+## The project repository adapter
+
+`FragmentRepository` maintains one coherent editor-side view per workspace folder.
+Its published state includes accepted source snapshots, fragment records, Markdown
+token locations needed by existing commands, preview theme state, generated-output
+ownership, and the diagnostics owned by Literate.
+
+Source capture follows these rules:
+
+- discover all eligible `.literate` paths, including unlinked chapters;
+- apply the same excluded-directory and semantic ordering policies as the CLI;
+- prefer an exact open text buffer over disk, including an empty buffer;
+- include new file-backed buffers that have a stable workspace-relative identity;
+- exclude untitled documents from project membership;
+- discover declared templates through the engine, then capture them with the same
+  open-buffer precedence;
+- treat genuine absence as a missing input, while propagating other acquisition
+  failures rather than constructing a partial snapshot.
+
+Repository work is serialized. Providers request a read-only refresh. Explicit
+processing, accepted source changes, relevant filesystem events, and added workspace
+folders may request generation. Publication joins the queue for capture and lifetime
+coordination but uses its own helper pipeline. Preview rendering is synchronous and
+uses a separate in-memory overlay on the last discovered membership.
+
+The repository translates engine diagnostics into one workspace-scoped
+`DiagnosticCollection`. Replacement is whole-snapshot replacement: repairing a
+project clears obsolete entries, and refreshing one workspace does not clear another.
+
+## `grabber.literate`: the Markdown parser state bridge
+
+[The grabber](grabber.html) is a small but important bridge between Markdown parsing
+and editor adapters. `grabberPlugin` installs a Markdown-it core rule named `grabit`
+before Markdown-it's `normalize` rule. When the parser receives an environment
+object, that rule stores the current parser `StateCore` as `env.gstate`, then returns
+without consuming or rewriting the token stream.
+
+The captured state gives the extension the actual token array, token maps, fence
+contents, and parser environment associated with one document. A `GrabbedState`
+joins that parser state to the document's workspace-relative name and full editor URI.
+The repository parses documents in engine-determined order with this plug-in and
+retains one such record per source.
+
+The bridge is intentionally not a second fragment parser. The engine's inspection
+result decides which declarations were accepted. Later adapter code matches each
+accepted definition location to the corresponding captured fence token by document
+and opening line. This join supplies concrete Markdown token locations to legacy
+commands and views without allowing a token scan to overrule semantic validation.
+
+The same plug-in is installed in the Markdown parser returned by `extendMarkdownIt`.
+That makes host preview token state available to Literate's fence and document
+wrappers while preserving the built-in Markdown pipeline. The contract is narrow:
+
+- capture the parser-owned `StateCore` in `env.gstate`;
+- do not mutate source, normalize it early, render, or generate files;
+- let the next Markdown-it core rule continue;
+- use captured tokens only in combination with current engine-approved identities.
+
+This is why `grabber.literate` is best understood as a Markdown parser state bridge,
+not as the source of fragment semantics.
+
+## Fragment provider registration
+
+Fragment-oriented providers register for the Markdown language because `.literate`
+files use VS Code's built-in Markdown support. Registration is broader than action:
+each adapter locates the current workspace, refreshes read-only state, and declines
+when the cursor is outside a meaningful fragment occurrence.
+
+The registered fragment providers are:
+
+- a `CompletionItemProvider`, triggered by `<`, which offers family names only after
+  an unmatched `<<` before the cursor;
+- a `DefinitionProvider`, which selects the base family definition;
+- a `ReferenceProvider`, which returns semantic references and prose mentions, with
+  declarations controlled by the caller's request;
+- a `HoverProvider`, which presents bounded unexpanded family content;
+- a `RenameProvider`, which previews and reparses a complete project-wide name edit;
+- a `CodeActionProvider`, which offers a current-snapshot fix for a verified missing
+  reference.
+
+The providers use raw UTF-16 editor coordinates. Rename edits only the inner name
+range, leaving chevrons and operators intact. A read-only refresh may inspect unsaved
+buffers but does not write generated output.
+
+Mapped programming-language providers use a narrower document selector: local
+file-backed Markdown documents matching `**/*.literate`. Runtime checks additionally
+require an open document, a trusted local workspace, an accepted named-fragment body,
+a configured canonical language, and a position that maps into an in-memory output.
+Their registrations are listed in
+[Coordinating language features in the editor](coordinating_language_features.html).
+
+## Command registration and effect levels
+
+Activation registers command implementations and places every returned disposable in
+the extension context.
+
+- `literate.process` asks the repository to capture and process workspace projects
+  with write intent. Only a complete valid plan reaches output preflight and commit.
+- `literate.create_fragment_for_tag` edits the active document to define the selected
+  family.
+- `literate.split_fragment` closes the current fence and opens an append below the
+  selected position, preserving the current language and family.
+- `fragmentExplorer.refreshEntry` fires tree invalidation so VS Code requests visible
+  children again; it does not generate files.
+- `literate.restartLanguageServers` resets mapped-language sessions so later requests
+  may create new processes.
+- publication commands begin explicit, trusted export flows and do not run during
+  activation or ordinary preview.
+
+The manifest also declares `literate.cancelAutomaticCompletion`. Its keybinding is
+enabled only while an automatic request is pending and ordinary editor widgets do not
+already own Escape.
+
+## Fragment Explorer adapters
+
+The Explorer contribution uses the public view ID `fragmentExplorer`.
+`FragmentExplorer` owns the view registration, view instance, refresh command, and
+change subscription. `FragmentNodeProvider` implements `TreeDataProvider<FragmentNode>`
+and emits `onDidChangeTreeData` when its cached presentation should be queried again.
+
+Top-level children represent workspace folders and accepted families. Expanding a
+family asks for its direct unexpanded references; selecting a resolved item opens its
+first accepted contribution. Missing targets remain visible without an invented
+location. Child discovery is lazy, so creating the view does not recursively unfold
+the graph.
+
+The tree mirrors graph edges and currently has no active-path cycle marker or global
+expansion budget. The bounded inline browser explorer is a different adapter with a
+different safety contract. See [Exploring the fragment graph](exploring_fragment_graph.html)
+and [Appendix D — Browser programs](appendix_browser_programs.html).
+
+## Markdown preview integration
+
+`extendMarkdownIt` installs three cooperating pieces on the host parser:
+
+1. `grabberPlugin` captures parser state in the environment;
+2. `installPreviewFences` wraps fence rendering;
+3. `installPreviewDocument` wraps complete document rendering with project theme,
+   semantic links, annotations, and optional exploration data.
+
+Fence handling narrows in this order:
+
+- fence headers containing `SETTINGS` currently render nothing in preview, while
+  only an exactly trimmed `SETTINGS` info string is interpreted as project settings;
+- a plain `mermaid` fence becomes an escaped source container for the local browser
+  renderer;
+- an engine-approved named contribution receives stable identity, navigation, and
+  semantic reference decoration only after the current token matches path, line,
+  header, role, language, and content;
+- every other fence delegates to the renderer that was installed before Literate.
+
+A named fragment whose language is Mermaid remains source code; only a plain Mermaid
+fence is a diagram. A stale or malformed declaration remains safely rendered code
+without semantic links.
+
+Preview builds a read-only in-memory project by overlaying open buffers and the exact
+source currently given to the parser on the repository's last discovered membership.
+It does not wait for filesystem discovery and never acquires generation authority.
+See [Previewing the explanation](previewing_the_explanation.html).
+
+## Preview navigation adapter
+
+Cross-document preview links use a temporary opaque capability rather than a command
+URI containing a path and line number. The activation-owned URI handler mints a
+capability only for a trusted current workspace and an accepted logical publication
+target.
+
+When activated, the handler rechecks its scheme and authority, token shape, session
+membership, expiry, workspace identity, trust, current project semantics, and
+canonical path. It then resolves the logical target against fresh source before
+opening and selecting it. The rendered document cannot supply an arbitrary command,
+filename, or stale line as editor authority.
+
+Generated HTML uses ordinary relative chapter links for the same logical identities.
+The screen renderer therefore owns target meaning, while the editor adapter owns the
+privilege of opening a source document.
+
+## Routine VS Code conversions
+
+Host adapters should remain mechanical and fail closed:
+
+- engine zero-based line and UTF-16 column values become `Position` and `Range`;
+- workspace-relative source paths become URIs by joining them to the owning folder,
+  never by accepting an arbitrary URI from rendered or server data;
+- pure occurrence records become `Location`, `CompletionItem`, `Hover`,
+  `WorkspaceEdit`, `CodeAction`, `TreeItem`, or `Diagnostic` values only after their
+  feature-specific checks pass;
+- cancellation tokens are checked before and after asynchronous refreshes;
+- editor document versions are retained whenever a later result could propose an edit;
+- missing or stale evidence returns no provider result rather than a guessed range.
+
+These conversions should not redefine fragment grammar, ordering, graph validity,
+projection, or output policy. Those belong to the engine and pure helper modules.
+
+## Trust and configuration boundaries
+
+Read-only fragment inspection can remain available without starting an executable.
+Capabilities with greater authority are checked where exercised:
+
+- preview-to-editor navigation requires a trusted current workspace and a valid
+  temporary capability;
+- mapped language servers require trusted local file workspaces and restricted global
+  executable configuration;
+- publication requires a trusted local desktop workspace and independently validated
+  process and path settings;
+- generated-file replacement requires a complete plan plus destination preflight and
+  transaction commit.
+
+Workspace Trust is therefore not a substitute for path, protocol, freshness, or
+transaction validation. Each adapter must enforce the narrower boundary attached to
+its own effect.
+
+## Disposal and ownership
+
+Every provider, command, listener, view, diagnostic collection, timer, URI handler,
+server coordinator, and repository enters an explicit owner. Extension-level
+resources are attached to `context.subscriptions`.
+
+Disposal closes input before clearing state: new repository work is refused, timers
+are cancelled, preview capabilities are invalidated, providers and listeners are
+released, diagnostics and bounded caches are cleared, and workspace snapshots are
+dropped. Language sessions have a bounded shutdown sequence. Publication helpers
+receive graceful cancellation, but the editor continues waiting if transaction
+cleanup outlives its deadline rather than risking an abandoned rollback. Cleanup is
+idempotent because normal deactivation and failure paths may meet the same resource.
+
+## Tracing an editor request
+
+For a fragment-name operation, follow this route:
+
+1. provider registration in the activation assembly;
+2. read-only repository refresh;
+3. engine inspection and pure symbol collection;
+4. exact occurrence lookup;
+5. feature-specific conversion to an editor result.
+
+For a Markdown preview problem, follow:
+
+1. the returned `extendMarkdownIt` hook;
+2. `grabber.literate` and `env.gstate`;
+3. the fence and document wrappers;
+4. the repository's synchronous preview overlay;
+5. screen rendering and the relevant browser program.
+
+For mapped programming-language behavior, begin with
+[Coordinating language features in the editor](coordinating_language_features.html),
+then use [Appendix E — Language-server protocol details](appendix_language_server_protocol.html)
+for transport and reply contracts.

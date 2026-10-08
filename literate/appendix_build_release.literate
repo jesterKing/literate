@@ -1,0 +1,264 @@
+# Appendix G — Build, packaging, and release mechanics
+
+This appendix is the operational reference for turning the authoritative book into
+buildable programs and a reviewable extension package. The governing method is in
+[Developing the book and program together](developing_book_and_program.html), while
+safe regeneration and fixed-point reasoning are explained in
+[Changing files safely](changing_files_safely.html) and
+[A generator that generates itself](generator_that_generates_itself.html).
+
+Exact runtime and package-manager requirements live in `package.json`, the lockfile,
+and the contributor documentation. Use those declarations rather than copying a
+tool release from this appendix. The stable build contract is that dependencies are
+installed immutably and project scripts are run through the pinned package manager.
+
+## Authority and bootstrap
+
+Most program modules are generated from `.literate` chapters and checked into
+`src/` so a checkout can bootstrap with ordinary language tools. Make lasting
+changes in the chapter that owns a generated module, then regenerate. Do not patch
+the generated module as a second source of truth.
+
+Tests, package metadata, build scripts, fixtures, styles, templates, licenses, and
+other files not emitted by a Literate root remain ordinary authoritative source.
+The distinction is ownership, not importance. Appendix H lists the test files that
+are exceptions because they are themselves generated.
+
+Bootstrap a checkout with:
+
+```sh
+yarn install --immutable
+yarn build:cli
+```
+
+`build:cli` bundles the checked-in command-line entry without compiling the editor
+extension. The executable is `out/cli-entry.js`:
+
+```sh
+node out/cli-entry.js check
+node out/cli-entry.js generate
+```
+
+`out/cli.js` is a library module, not the direct executable. The `yarn literate`
+wrapper first rebuilds `out/cli-entry.js` and then runs it; use the existing direct
+entry when the invocation itself must avoid build output.
+
+## Runtime entry points
+
+The distributable has several entry points with separate hosts and responsibilities:
+
+- `out/main.js` is the VS Code extension entry named by `package.json`.
+- `out/cli-entry.js` is the development and repository command-line entry. It is a
+  checkout build artifact, not a declared VSIX runtime entry.
+- `out/mermaid-preview.js` is the local Markdown-preview Mermaid client.
+- `out/publication-exploration-preview.js` adds bounded fragment exploration to
+  Markdown preview.
+- `out/publication-helper.cjs` is the external one-request publication helper.
+- `out/publication-mermaid-worker.mjs` owns the publication browser process and
+  temporary rendering state.
+- `out/publication-mermaid-browser.js` is the closed offline browser program loaded
+  by that worker.
+
+The three publication runtime files form a deliberately closed graph. Their adjacent
+`.meta.json` files are build evidence used to reject unresolved non-builtin imports,
+extra chunks, build/self-hosting toolchain leakage, browser download machinery, and
+other forbidden runtime dependencies. Metadata files are not shipped in the VSIX.
+See [Isolating publication from the editor](isolating_publication_editor.html) and
+[Appendix D — Browser programs](appendix_browser_programs.html).
+
+## Build command reference
+
+Use the narrowest command that establishes the claim under review:
+
+- `yarn build:cli` bundles the command-line executable from checked-in sources.
+- `yarn test-compile` type-checks and emits the TypeScript project to `out/`.
+- `yarn compile` first builds the exploration browser artifacts, then compiles the
+  TypeScript project.
+- `yarn build:preview` bundles the Markdown Mermaid preview client.
+- `yarn build:exploration` builds the exploration preview and Node-side browser form.
+- `yarn build:publication` builds all three publication runtime files and their
+  dependency-graph metadata.
+- `yarn build:mermaid-worker` and `yarn build:mermaid-browser` are narrower
+  publication-bundle builds used by other scripts.
+- `yarn esbuild` builds the extension, preview, exploration, and publication bundles
+  with development source maps.
+- `yarn vscode:prepublish` builds the minified shipped runtime set used during VSIX
+  packaging.
+- `yarn watch:preview` watches the generated preview entry; edit its owning chapter
+  and regenerate rather than treating the generated JavaScript as authority.
+
+The ordinary repository loop is:
+
+```sh
+yarn literate generate
+yarn literate check
+yarn test
+yarn esbuild
+```
+
+Generation writes source and HTML only when bytes differ. `check` plans and compares
+without writing. Review both chapter and generated diffs: prose-only edits should not
+change generated program source, while a moved contribution can change source order
+even when its text is unchanged.
+
+## External tool requirements
+
+Core project development requires the runtime and package manager declared by the
+manifest, Corepack, and dependencies installed from the lockfile. It does not require
+a globally installed TypeScript compiler or a published copy of the extension.
+
+Additional features have explicit external requirements:
+
+- LaTeX export requires `pandoc` on `PATH`.
+- PDF compilation additionally requires `latexmk`, `lualatex`, `kpsewhich`, the
+  KOMA-Script book class, and the TeX packages named by the publication template.
+- Mermaid publication requires an explicitly selected installed, sandbox-capable
+  Chromium executable. Books without Mermaid diagrams do not require it.
+- Portable font export reads an explicit project manifest and font/license files;
+  without a manifest, selected families must be available to the TeX environment.
+- Direct mapped-language features require separately installed stdio language
+  servers selected by absolute user-level paths.
+- Real extension-host tests require an installed or test-managed VS Code host and a
+  suitable graphical display.
+
+Literate does not download or install Pandoc, TeX, browsers, fonts, language servers,
+or TeX packages. PDF process-tree ownership and editor publication require the
+supported local process model; the editor publication path rejects remote, web,
+virtual, and unsupported desktop environments. Exact host constraints belong with
+[Compiling and publishing a PDF](compiling_publishing_pdf.html),
+[Isolating publication from the editor](isolating_publication_editor.html), and
+[Owning a language-server session](owning_language_server_session.html).
+
+## Generated-file check and fixed point
+
+Use the non-writing generated-file alias when a build or CI job should assert that
+tracked outputs are current:
+
+```sh
+yarn check:generated
+```
+
+For generator changes, first produce and review the candidate outputs, then verify
+that a fresh engine reproduces the complete plan:
+
+```sh
+yarn literate generate
+yarn check:self
+```
+
+`check:self` requires disk outputs to be current, type-checks fresh generated sources
+through an in-memory overlay, bundles and runs the fresh engine in a child process,
+and compares the complete output path set and exact contents. It executes trusted
+project code and is not a sandbox. It proves a generation fixed point, not editor,
+publication, packaging, or user-interface correctness. Appendix H gives the wider
+verification ladder.
+
+## Version source and bumping
+
+`package.json` is the extension version source of truth. The package-manager lockfile
+uses its workspace placeholder and does not receive a hand-maintained release
+version.
+
+Use one of these forms:
+
+```sh
+yarn version:bump patch
+yarn version:bump minor
+yarn version:bump major
+yarn version:bump <semantic-version>
+```
+
+The script validates semantic version syntax and prevents accidental downgrade. It
+updates version metadata only. It does not write release notes, generate the book,
+run tests, create a commit or tag, package the extension, or publish it. Review the
+result and author the matching `CHANGELOG.md` entry as a separate release decision.
+
+## VSIX packaging
+
+Build the archive with:
+
+```sh
+yarn package:vsix
+```
+
+The packaging helper reads `name` and `version` from `package.json` and writes:
+
+```text
+out/<name>-<version>.vsix
+```
+
+It invokes the package builder with dependency scanning disabled because shipped
+runtime dependencies are already bundled by the prepublish build. This also avoids
+asking the package builder to interpret the repository with a package-manager mode
+it does not support. Packaging runs the manifest's prepublish build; it is not merely
+a zip operation over whatever happens to be in `out/`.
+
+After packaging, inspect the actual archive. At minimum, verify that:
+
+- `extension/out/main.js` and the declared preview scripts are present;
+- exactly the intended publication runtime files are present and match the built
+  bytes;
+- `THIRD_PARTY_NOTICES.md` and the ordinary extension metadata are present;
+- dependency-graph metadata, `node_modules`, source toolchains, tests, and private
+  development material are absent;
+- installing the archive exercises the same entry points that were reviewed.
+
+The opt-in package acceptance harness can validate an already built archive and its
+publication runtime in isolation; see Appendix H.
+
+## Package exclusions
+
+`.vscodeignore` excludes broad development trees and then admits only named runtime
+artifacts from `out/`. In particular, the package excludes:
+
+- editor/test workspace state, plans, project fonts, Yarn state, and `node_modules`;
+- generated TypeScript source, tests, and source maps;
+- `.literate` chapters and generated chapter HTML;
+- build metadata and other `out/` files not explicitly re-included;
+- existing VSIX and PDF artifacts.
+
+The runtime allowlist re-includes the extension bundle, both preview bundles, and the
+three publication runtime files. If a new shipped entry point is introduced, update
+the manifest contribution and package allowlist together, then inspect the resulting
+archive. Do not infer package contents from the build directory alone.
+
+Repository ignore rules are separate from package exclusions. `.gitignore` ignores
+ordinary build directories, installed dependencies, VSIX files, and transient Yarn
+state while allowing repository-managed Yarn plugins, releases, patches, and version
+metadata. A file being ignored by Git does not imply that it is excluded from a VSIX,
+and the converse is also true.
+
+## Marketplace boundary
+
+The extension identity is the `publisher` plus `name` declared in `package.json`.
+This repository defines a VSIX packaging command but no marketplace-publishing
+script. `yarn package:vsix` stops after creating the local archive; it does not upload,
+authenticate, create a release, tag a commit, or alter marketplace state.
+
+Marketplace publication is therefore an explicit release-operator step outside the
+project scripts. Publish the exact reviewed VSIX, not a newly rebuilt implicit
+archive, and retain a traceable source state, archive digest, and acceptance record.
+Credentials must remain outside the repository.
+
+## Release checklist
+
+A release should establish each of these claims separately:
+
+1. The intended `.literate` chapters and ordinary sources are authoritative and
+   reviewed.
+2. Generated source and HTML are current, and any orphaned former output has been
+   considered explicitly.
+3. Generator changes pass the fixed-point check.
+4. The complete automated suite, lint, and relevant focused tests pass.
+5. Extension, preview, exploration, and publication entry points build.
+6. Changed external integrations have representative real-host or real-tool evidence.
+7. The manifest version and `CHANGELOG.md` describe the same release.
+8. Third-party notices and portable-resource license obligations have been reviewed.
+9. The produced VSIX has been inspected and, where relevant, tested as an installed
+   artifact.
+10. Only that reviewed archive is handed to the external marketplace publication
+    step.
+
+A green build cannot decide whether prose is clear, diagrams are legible, or a PDF
+has acceptable typography. Human review remains part of the release contract because
+the book and its publications are primary outputs, not incidental documentation.

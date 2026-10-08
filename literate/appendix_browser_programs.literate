@@ -1,0 +1,256 @@
+# Appendix D — Browser programs
+
+Literate uses small browser programs for interactive screen behavior and an isolated
+browser worker for publication assets. None of these programs defines fragment
+semantics. They consume escaped containers or bounded models prepared by the engine
+and screen renderers.
+
+The conceptual routes are [Previewing the explanation](previewing_the_explanation.html),
+[Exploring the fragment graph](exploring_fragment_graph.html), and
+[Portable publication resources](portable_publication_resources.html). Mechanical
+entry-point assembly is recorded in
+[Appendix A — Program assembly maps](assembly.html).
+
+## Program inventory
+
+### Markdown Mermaid preview
+
+[Browser Mermaid preview](mermaid_preview.html) owns the readable browser entry source
+for the Markdown preview renderer. The build bundles it as a local preview script,
+and the manifest loads that bundle through `markdown.previewScripts`.
+
+Its input is the DOM, not an editor command channel:
+
+- plain Mermaid fences are emitted as escaped `pre.literate-mermaid` containers;
+- the nearest `.literate-document` wrapper supplies the catalogue theme through
+  `data-literate-theme`;
+- source text comes from the container's `textContent`;
+- successful strict SVG replaces the container's inner markup;
+- current failures replace it with text and an alert role, preserving the source.
+
+A named Literate contribution with Mermaid as its programming language is not a
+preview diagram and never receives this container shape.
+
+### Inline fragment exploration
+
+[Optional fragment exploration](publication-exploration.html) owns one browser
+initializer used in two hosts. Generated HTML embeds the self-contained initializer.
+Markdown preview loads the locally bundled preview script declared in the manifest.
+Both call `initializePublicationExploration(document)` and operate on the same inert
+model and DOM attributes.
+
+The client enhances existing semantic links with disclosure buttons. It creates a
+panel only after validating and preflighting the complete requested family. Ordinary
+definition links exist independently and remain usable when scripting, payload
+validation, or panel allocation is unavailable.
+
+### Publication Mermaid browser and worker
+
+[Isolated vector diagrams](publication-mermaid.html) is the Node-side controller for
+static publication diagrams. [A browser that produces assets](publication-mermaid-worker.html)
+owns the child process that launches and connects to an explicitly selected Chromium.
+A separate offline browser bundle installs Mermaid and supported integrations into
+the isolated page.
+
+This path produces vector PDF and SVG companions for print publication. It is not used
+for ordinary generation or editor preview. Books without Mermaid diagrams do not
+need the publication browser path.
+
+## Markdown preview lifecycle
+
+The Mermaid preview initializes its local renderer immediately with automatic generic
+Mermaid scanning disabled. Startup waits for `DOMContentLoaded` only when the body is
+not yet available. It then observes:
+
+- `vscode.markdown.updateContent` on `window`, which signals preview replacement or
+  refresh;
+- changes to `data-literate-theme` beneath the body;
+- the initial document state.
+
+Updates are coalesced into one serial drain. Each diagram records state in a `WeakMap`
+keyed by its actual container. A render attempt captures the current container markup,
+source, and theme. Its result is installed only if the same container is connected,
+still matches the selector, still contains that markup, and still selects that theme.
+Stale asynchronous work is discarded without becoming an error.
+
+Renderer initialization and rendering are serialized because configuration is shared
+browser state. Interactive callback binding is deliberately omitted.
+
+The exploration client similarly initializes once per document. It scans immediately,
+on `DOMContentLoaded`, on `vscode.markdown.updateContent`, and after relevant DOM
+mutations. Reconciliation destroys panels whose root, source use, target, payload, or
+link identity changed. Private maps—not editable DOM attributes—own controls, panels,
+focus restoration, and resource charges.
+
+## Browser data and event contracts
+
+### Mermaid DOM contract
+
+A preview diagram container has the selector `pre.literate-mermaid`. Its text is the
+complete escaped Mermaid source. The project wrapper's `data-literate-theme` names a
+trusted catalogue entry. Browser code does not read arbitrary per-diagram
+configuration from attributes or source.
+
+The only host event used by this client is `vscode.markdown.updateContent`. No source
+text is sent through `postMessage`, and the browser program has no VS Code API object.
+
+### Exploration payload format
+
+Each `.literate-document` may contain one inert script element:
+
+```text
+script.literate-exploration-data[type="application/json"]
+```
+
+Its JSON object has protocol `version: 1` and these members:
+
+- `parts`: an object from stable contribution IDs to ordered segment arrays;
+- `families`: an object from stable family targets to a display name, ordered
+  contribution IDs, and an optional validated destination;
+- `unavailable`: an optional reason indicating that the host refused to serialize a
+  usable payload.
+
+A segment always carries `text`. A reference segment additionally carries
+`reference: true` and may carry a resolved `target`. The serializer escapes
+script-sensitive characters so the JSON remains inert.
+
+The browser validates shape, protocol version, identifiers, strings, arrays, links,
+and complete resource cost before using the model. It creates source text with text
+nodes, never by interpreting segment text as markup.
+
+Baseline anchors and source uses carry logical identity through
+`data-literate-target` and `data-literate-explore`. Disclosure controls and panels are
+browser-owned enhancements; removing the script leaves ordinary links intact.
+
+### Navigation destinations
+
+The exploration browser accepts only destinations justified by the host context:
+
+- a matching fragment in the current document;
+- a validated `./` HTML chapter path ending in the matching fragment;
+- a narrowly shaped native Literate preview capability;
+- an HTTPS destination only when an existing same-target baseline link supplied it.
+
+JSON alone cannot authorize an HTTPS destination or arbitrary editor command. Native
+preview capabilities remain opaque; the editor extension validates their current
+session, trust, workspace, expiry, and semantic target when activated. See
+[Previewing the explanation](previewing_the_explanation.html).
+
+### Publication worker request
+
+The publication controller creates a private directory and writes `request.json` with
+this bounded shape:
+
+```json
+{
+  "sources": ["complete Mermaid source"],
+  "theme": "catalogue-theme-name"
+}
+```
+
+The worker receives the private directory and explicit browser executable as process
+arguments. It validates the request again, renders each unique source in order, and
+writes numeric scratch artifacts as `<index>.pdf` and `<index>.svg`. Binary data never
+travels through standard output. Standard output and error are treated as bounded
+worker diagnostics, not a result protocol.
+
+The parent validates every artifact's regular-file status, size, and file signature
+before returning bytes to publication. Scratch names never come from source paths.
+The complete temporary directory, including browser profile, is removed on every
+completion path.
+
+## Preview Mermaid policy
+
+The Markdown preview owns fixed configuration:
+
+- strict Mermaid security;
+- no automatic scan of generic `.mermaid` elements;
+- no callback installation;
+- no authored directives or YAML frontmatter;
+- no HTML labels;
+- a maximum of 50,000 source characters and 500 edges;
+- a theme selected only from Literate's trusted local catalogue.
+
+The renderer, theme configuration, and integrations are bundled locally; the
+document cannot select a different Mermaid runtime. Unlike static publication, live
+preview does not add its own request interception layer, so it relies on the Markdown
+preview host's resource policy for any URL-like content Mermaid might interpret.
+Syntax or policy failures are shown as text beside the original source and do not stop
+other diagrams.
+
+## Exploration resource limits
+
+The exploration protocol and client enforce the same fixed limits:
+
+- serialized payload: 1 MiB in UTF-8;
+- visible nesting: eight layers;
+- live conservatively accounted panel content: 256 KiB per document;
+- live panels: 200;
+- contributions visited for one panel: 200;
+- segments visited for one panel: 4096.
+
+Payload overflow produces a small unavailable model. Panel overflow, a cycle, an
+excessive path, duplicate contribution identity, invalid link, or malformed segment
+refuses the whole requested panel. Code is never silently truncated. Collapsing or
+retiring a panel recursively releases its descendants and private resource charge.
+
+## Publication browser isolation
+
+Static publication rendering applies stricter policy than the live preview because it
+produces portable artifacts:
+
+- Mermaid directives, frontmatter, authored HTML, authored CSS commands, links, and
+  interactions are rejected before browser launch;
+- each diagram receives a fresh browser context;
+- one fixed in-memory bootstrap document is allowed, while CSP and request
+  interception reject network, file, image, font, frame, form, popup, and subsequent
+  navigation activity;
+- the trusted renderer bundle is injected as code, but source is passed as structured
+  evaluation data rather than interpolated into HTML or JavaScript;
+- the returned SVG is checked for active elements, event handlers, external
+  references, unsafe CSS URLs, invalid geometry, and oversized dimensions before PDF
+  printing;
+- the browser sandbox remains enabled; no weakened fallback is attempted.
+
+The controller bounds unique diagram count, source length, per-format artifact size,
+aggregate artifact bytes, worker lifetime, and worker logs. The worker independently
+bounds page timeouts, browser launch diagnostics, geometry, and each batch result.
+Any failure rejects publication before the final output transaction.
+
+## Browser selection and ownership
+
+Publication never discovers or downloads a browser. The author or user selects an
+absolute executable path through the CLI or restricted editor setting. The controller
+checks that the executable is an accessible regular file before spawning a separate
+worker process without a shell.
+
+The controller owns the worker deadline and process group. The worker owns the
+Chromium child, private profile, fresh browser contexts, and cooperative close. A
+hung or failed browser cannot become a successful partial publication merely because
+one artifact was already written to the private directory.
+
+The exact external runtime prerequisites are maintained in package and contributor
+metadata. The stable contract here is explicit selection, sandbox-capable Chromium,
+no automatic installation, private temporary state, and fail-closed artifact
+validation.
+
+## Failure lookup
+
+- **A plain Mermaid fence remains source:** confirm the preview script is packaged and
+  that the fence info is exactly `mermaid`; named fragment fences intentionally remain
+  code.
+- **A diagram shows an alert:** inspect the preserved source for syntax, directives,
+  frontmatter, size, or edge-limit failures.
+- **A diagram flashes an old result:** current-state checks should reject it; trace the
+  container markup, selected theme, and serial render queue in
+  [Browser Mermaid preview](mermaid_preview.html).
+- **No Explore button appears:** verify an accepted resolved reference, a valid
+  versioned payload, and a live root outside an owned panel.
+- **A panel refuses to open:** the status text distinguishes cycles, depth, panel
+  capacity, unavailable families, and DOM/contribution budgets; the definition link
+  remains the fallback.
+- **A preview link is inert:** destination authority may still be pending, expired,
+  conflicting, untrusted, or invalid for the current workspace.
+- **Publication diagrams fail before output:** inspect source policy, explicit browser
+  selection, worker diagnostics, blocked-resource reports, vector validation, and
+  artifact limits. Previous published output is preserved.

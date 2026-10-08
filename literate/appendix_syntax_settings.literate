@@ -1,0 +1,307 @@
+# Appendix B — Literate syntax and settings reference
+
+This appendix is the lookup route for authored Literate syntax and the settings
+that select host behavior. The language model behind the notation is developed in
+[From explanation to source](from_explanation_to_source.html), while
+[The project snapshot](project_snapshot.html) explains why document order and root
+settings are semantic input rather than presentation details.
+
+## Documents and project order
+
+A project consists of every eligible `.literate` document beneath a workspace root,
+not only the files linked by the index. Documents are interpreted in this order:
+
+1. the normalized root `index.literate`, when present;
+2. documents linked from that index, in link encounter order;
+3. all remaining documents, sorted by normalized workspace-relative path.
+
+An index link ending in `.html` selects the corresponding `.literate` source for
+ordering. Query strings and fragments do not affect that selection, repeated links
+do not insert a document twice, and unlinked chapters remain part of the project.
+Because appends are assembled in project order, changing chapter order can change
+generated source. See [The project snapshot](project_snapshot.html) and
+[The fragment graph](fragment_graph.html).
+
+## Fragment declarations
+
+A named fragment is a fenced Markdown code block whose info string contains a
+language, a colon, a name in double chevrons, and a definition operator. Whitespace
+around the parts is permitted.
+
+````text
+```typescript : <<parse one request>>=
+// fragment body
+```
+````
+
+The language may be omitted by retaining the colon:
+
+````text
+``` : <<language-neutral text>>=
+text
+```
+````
+
+The first accepted declaration defines a fragment family. A second `=` definition
+with the same exact name is a duplicate, not an implicit append. Names are exact and
+case-sensitive; blank names and names containing angle brackets or line breaks are
+invalid.
+
+The opening fence may use any Markdown fence marker accepted by Markdown-it. The
+fragment grammar applies to the complete info string, however, so unrelated trailing
+text is not accepted as a comment.
+
+## Ordered contributions
+
+Use `=+` to append another contribution to a family that has already been defined:
+
+````text
+```typescript : <<parse one request>>=+
+// later contribution
+```
+````
+
+An append must encounter its base definition earlier in project order. It may carry
+its own language label for presentation, but it cannot declare an output path or a
+source template. Contributions are concatenated in deterministic encounter order.
+Their separate source locations are retained for diagnostics, navigation, and
+publication.
+
+For the design consequences of definitions and appends, see
+[Choosing fragments well](choosing_fragments.html) and
+[Fragments as editor symbols](fragments_as_editor_symbols.html).
+
+## References and expansion
+
+Inside an accepted fragment body, a plain tag references another family:
+
+```text
+<<parse one request>>
+```
+
+References may precede their definitions in reading order. Tangling recursively
+replaces each reference with the target family's ordered contributions. A reference
+operator such as `=` or `=+` inside a body is invalid; definition operators belong in
+fence headers.
+
+When a reference appears after indentation on its line, each newline in the expanded
+text receives that indentation. The indentation belongs to the use site, not to the
+referenced family. Missing families, cycles, invalid operators, and expansion-limit
+violations diagnose the project and prevent the complete generation plan.
+
+To emit a literal opening delimiter from fragment code, escape it:
+
+```text
+\<<not a fragment reference>>
+```
+
+The escape prevents reference recognition, and the backslash is removed from the
+generated and rendered code. Escaping is lexical: it applies to the opening chevrons,
+not to a later matching name found by search.
+
+## Output roots
+
+A fragment whose exact name ends in `.*` is an output root. Its initial declaration
+must name a workspace-relative destination followed by whitespace and `$`:
+
+````text
+```typescript : <<assemble the request parser.*>>= src/request-parser.ts $
+<<parse one request>>
+```
+````
+
+Only roots may declare destinations. Paths must remain within the project, satisfy
+the portable path policy, and avoid collisions with source documents, templates,
+HTML pages, other outputs, and ancestor file paths. A root without a destination is
+invalid. Appending to a root uses only the ordinary append form; the destination is
+not repeated.
+
+Generation validates every root and dependency before returning any source or HTML
+file. For expansion and all-or-nothing planning, see
+[Planning a complete generation](complete_generation_plan.html). For the complete
+root inventory, see [Appendix A — Program assembly maps](assembly.html).
+
+## Source templates
+
+A root may select one source template after its destination:
+
+````text
+```typescript : <<assemble the extension.*>>= src/extension.ts $ template=tssrc.template
+<<extension body>>
+```
+````
+
+The template path is workspace-relative and is loaded as declared project input.
+Every original `[CODE]` marker is replaced with the complete tangled source. A
+template without that marker remains valid but inserts no tangled code. Substitution
+is literal and single-pass: inserted code is not scanned again for placeholders.
+Wrapper text outside a `[CODE]` slot has no literate source mapping.
+
+Only one `template` setting is accepted on a fragment declaration. Semicolons delimit
+fragment settings, although `template` is currently the only recognized key. A
+missing explicitly selected template is an error rather than a request to continue
+without the wrapper.
+
+## Root `SETTINGS` fences
+
+Project-wide settings are ordinary fenced blocks whose trimmed info string is exactly
+`SETTINGS`. They are hidden from rendered HTML and preview. Only settings in the
+normalized root `index.literate` have project-wide authority; a chapter-local block
+cannot override them.
+
+````markdown
+```SETTINGS
+theme=rosepine-dawn
+authors=First Author;Second Author
+template=page.template
+```
+````
+
+Settings use one `key=value` pair per line. Key matching is case-sensitive. Unknown
+lines are ignored by the settings consumers rather than becoming a general extension
+mechanism.
+
+### Source and HTML settings
+
+- `template` selects a workspace-relative HTML template. The template receives
+  `[CONTENT]`, `[AUTHORS]`, and `[THEME]` by literal, single-pass substitution.
+  `[CONTENT]` is rendered document content, `[AUTHORS]` is generated author metadata,
+  and `[THEME]` is the complete selected document stylesheet.
+- `authors` is a semicolon-separated author list used to construct HTML author
+  metadata. A later recognized occurrence replaces the earlier value.
+- `theme` selects an exact, case-sensitive name from the built-in catalogue. Omission
+  uses the default catalogue theme. The last valid occurrence wins; every invalid
+  occurrence remains a diagnostic. See [Document themes](themes.html) for names and
+  color behavior.
+
+Legacy HTML templates without `[THEME]` receive the stylesheet beside `[CONTENT]`.
+An explicitly selected but unavailable HTML template is an error; the default page is
+used only when no template was requested.
+
+### Publication font settings
+
+Print publication additionally recognizes these root keys:
+
+- `font-body`
+- `font-heading`
+- `font-code`
+- `font-fragment`
+- `font-note`
+- `font-code-ligatures`, whose value is exactly `on` or `off`
+
+Font-family values are trimmed simple ASCII names: one to one hundred letters,
+digits, spaces, dots, or hyphens, beginning with a letter or digit. They are family
+names, not paths or TeX expressions. The last valid value for a role wins while
+invalid occurrences remain diagnostics. If `font-note` is omitted, notes inherit the
+final body family. Resolving these values does not install, locate, or bundle fonts.
+See [Publication font settings](publication-settings.html) and
+[Portable publication resources](portable_publication_resources.html).
+
+## HTML template placeholders
+
+HTML and source templates share one deliberately small substitution mechanism:
+
+- source templates recognize `[CODE]`;
+- HTML templates recognize `[CONTENT]`, `[AUTHORS]`, and `[THEME]`;
+- matching original placeholders are replaced literally;
+- inserted values are never scanned for more placeholders;
+- unknown placeholders remain unchanged.
+
+This is not a scripting or expression language. Template files are captured project
+inputs and participate in freshness checks in the editor and language-service paths.
+
+## Command-line reference
+
+The headless adapter uses the same parser and generation engine as the extension.
+Every command accepts an optional project root and `--json`; help is available through
+`--help`, `-h`, or `help <command>`.
+
+- `inspect` reports ordered documents, template dependencies, fragment declarations,
+  roots, and references. It does not inspect output destinations.
+- `check` constructs a complete valid plan and reports outputs as current, missing, or
+  stale without writing.
+- `generate` writes only missing or changed planned source and HTML outputs through the
+  output transaction boundary.
+- `self-check` verifies the repository's trusted self-hosting fixed point without
+  generating files; planned outputs must already be current.
+- `latex` requires `--output path.tex` and explicitly exports the publication model to
+  LaTeX without generating source/HTML or compiling a PDF.
+- `pdf` requires `--output path.pdf` and explicitly compiles in a private build
+  directory, publishing only the requested PDF. `--keep-build` retains that private
+  directory for inspection.
+
+`latex` and `pdf` accept paper and margin options, `--font-manifest`, and an explicit
+`--browser` path for Mermaid publication assets. Output paths are relative to the
+selected project root. Consult [Command-line generation](cli.html) for the complete
+flag grammar and structured response schema, and
+[The command-line adapter](command_line_adapter.html) for effect boundaries.
+
+In JSON mode the CLI emits one response object. Its `schemaVersion` is the automation
+compatibility boundary; engine coordinates remain zero-based. Human output presents
+one-based line and column numbers.
+
+## Extension commands
+
+The manifest exposes these stable command identifiers:
+
+- `literate.process` — process every workspace project and commit valid changed
+  generated outputs;
+- `literate.create_fragment_for_tag` — create a family for the tag selected in the
+  active document;
+- `literate.split_fragment` — split a contribution and continue it as an append;
+- `fragmentExplorer.refreshEntry` — refresh the Fragment Explorer view;
+- `literate.restartLanguageServers` — dispose mapped-language sessions so later work
+  starts fresh ones;
+- `literate.exportLatex` and `literate.exportPdf` — begin explicit publication exports;
+- `literate.cancelAutomaticCompletion` — cancel a pending automatic mapped-language
+  request under its context-sensitive keybinding.
+
+Command identifiers are compatibility boundaries for keybindings, tasks, and menus.
+Their registration and effect levels are described in
+[Extension activation and public surface](extension_activation_surface.html).
+
+## Extension settings
+
+### Mapped language services
+
+- `literate.automaticCompletion` is a resource-scoped boolean, enabled by default. It
+  controls automatic suggestions inside mapped fragment code; manual completion is
+  unaffected.
+- `literate.languageDiagnostics` is a resource-scoped boolean, enabled by default. It
+  controls the separate mapped-language diagnostic collection, not Literate's own
+  fragment and generation diagnostics.
+- `literate.languageServers` is a restricted machine-scoped object read from global
+  user settings. Keys are canonical VS Code language IDs. Each value requires an
+  absolute `command` and may contain literal string `args`, object
+  `initializationOptions`, and object `configuration`. No shell expansion occurs,
+  workspace overrides are ignored, and servers are not installed automatically.
+
+See [Owning a language-server session](owning_language_server_session.html) and
+[Appendix E — Language-server protocol details](appendix_language_server_protocol.html).
+
+### Publication tools
+
+- `literate.publication.nodePath` selects the absolute external Node executable used
+  by explicit publication work. Workspace overrides are ignored.
+- `literate.publication.browserPath` optionally selects an installed, sandbox-capable
+  Chromium executable for Mermaid publication. Literate does not download a browser.
+- `literate.publication.fontManifest` selects an optional manifest path relative to
+  the workspace folder. It remains subject to publication path and license checks.
+
+These are restricted machine settings because they influence external process or
+resource boundaries. See [Isolating publication from the editor](isolating_publication_editor.html).
+
+## Common failure lookup
+
+- **A declaration is ignored:** check that the complete fence info string matches the
+  fragment header grammar and that the name is nonempty.
+- **An append is rejected:** its base definition must occur earlier, and the append
+  must not repeat output or template settings.
+- **A root produces no file:** a root name must end in `.*`, declare a nonempty
+  destination terminated by `$`, and belong to a project with no diagnostics.
+- **A tag is copied literally:** it may be escaped, outside an accepted fragment body,
+  or shown in ordinary Markdown rather than used as a reference.
+- **A setting has no effect:** verify exact case, an exact `SETTINGS` info string, and
+  placement in the normalized root `index.literate`.
+- **No files are returned:** generation is intentionally all-or-nothing; inspect every
+  diagnostic, including errors in unreachable families and templates.

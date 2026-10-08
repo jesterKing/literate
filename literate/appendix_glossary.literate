@@ -1,0 +1,365 @@
+# Appendix I — Glossary
+
+This glossary gives plain-language meanings for terms used throughout the book. A
+term's linked chapter provides the fuller model, invariants, and limitations. Syntax
+forms and settings are collected separately in
+[Appendix B — Literate syntax and settings reference](appendix_syntax_settings.html).
+
+## Adapter
+
+Code that connects the shared semantic engine to a particular environment or effect.
+The CLI adapter reads disk and reports to a terminal; the editor adapter reads
+workspace snapshots and uses VS Code APIs. An adapter may write a validated plan, but
+it does not define a second fragment language. See
+[One generator, several hosts](one_generator_several_hosts.html).
+
+## Annotation
+
+Renderer-neutral explanatory material attached to the book. Literate annotations
+include reusable term definitions, explicit term uses, and numbered notes. Screen and
+print render them differently while sharing identity and resolution. See
+[Shared annotations and identities](shared_annotations_identities.html).
+
+## Append
+
+An authored contribution declared with `=+` after a family's base definition. Appends
+join the family in project encounter order. They are not text patched into a generated
+file after tangling; they are ordered source contributions known before expansion.
+See [Choosing fragments well](choosing_fragments.html).
+
+## Assembly map
+
+A mechanical reference showing how root and gathering fragments compose complete
+generated files. It answers “which pieces make this output?” while conceptual
+chapters explain why those pieces exist. See
+[Appendix A — Program assembly maps](assembly.html).
+
+## Bootstrap
+
+Known-working material used to build the generator before a freshly generated version
+exists. In this repository, checked-in generated source and a buildable CLI provide
+the bridge from the authoritative book to a fresh engine. Bootstrap files are useful
+derived artifacts, not a second authority. See
+[A generator that generates itself](generator_that_generates_itself.html).
+
+## Capability
+
+A narrowly scoped authority represented by data that must be validated before use.
+Examples include an opaque preview-navigation URI, an allowed executable path, or a
+resource path confined to a project. Possessing arbitrary text that resembles a
+capability does not grant the authority. See
+[Previewing the explanation](previewing_the_explanation.html).
+
+## Captured input
+
+The exact documents and templates selected for one operation. Capturing turns a
+changing workspace into a stable value that can be parsed, planned, checked for
+freshness, or sent to another process. Later edits do not retroactively change that
+operation. See [The project snapshot](project_snapshot.html).
+
+## Companion
+
+A file that travels beside a LaTeX publication, such as an image, diagram, font, or
+font license. Companions use safe generated names and join the same plan and
+transaction as the TeX document. See
+[Portable publication resources](portable_publication_resources.html).
+
+## Contribution
+
+One authored fenced block belonging to a named fragment family. The first accepted
+contribution is the definition; later accepted `=+` blocks are appends. Contributions
+retain separate source locations even though tangling concatenates them. See
+[The fragment graph](fragment_graph.html).
+
+## Definition
+
+The first accepted `=` declaration of a fragment family. It establishes the exact,
+case-sensitive family name and, for a root, its output destination and optional
+source template. A second base definition of the same name is a duplicate, not an
+append. See [From explanation to source](from_explanation_to_source.html).
+
+## Deterministic
+
+Producing the same semantic result from the same accepted input and policy. In
+Literate this includes document order, contribution order, graph traversal,
+identities, diagnostics, and planned output bytes. Deterministic does not mean that
+identities survive arbitrary edits or that external PDF tools produce identical
+bytes on every machine. See
+[Determinism as a design principle](determinism_design_principle.html).
+
+## Diagnostic
+
+A structured explanation that an input, graph, mapping, resource, or operation is
+invalid or unsupported. Engine diagnostics name a source path and zero-based line and
+column. A diagnostic prevents an all-or-nothing plan where continuing would require
+guessing or publishing partial results.
+
+## Effect
+
+An observable interaction outside pure parsing and planning: reading a filesystem,
+writing an output, spawning a process, registering an editor provider, or opening a
+UI. Literate keeps effects in adapters so the same semantic model can serve several
+hosts. See [Parsing without side effects](parsing_without_effects.html).
+
+## Fail closed
+
+Refusing an operation when its safety or meaning cannot be established. A missing
+mapping, malformed protocol reply, excessive payload, ambiguous term, or partial code
+action produces no invented fallback. Read-only views may omit unsafe data; mutating
+operations reject the complete change. See
+[Resource bounds and fail-closed behavior](resource_bounds_fail_closed.html).
+
+## Family
+
+All ordered contributions with one exact fragment name. References point to the
+family, not to one contribution. Tangling expands the family by concatenating its
+base definition and appends in encounter order. See
+[The fragment graph](fragment_graph.html).
+
+## Fixed point
+
+A state in which a fresh engine built from the generated plan reads the same captured
+book and reproduces exactly the same output path set and contents. A fixed point shows
+self-consistency of generation; it does not prove all application behavior correct.
+See [A generator that generates itself](generator_that_generates_itself.html).
+
+## Fragment
+
+A named unit of authored program text chosen to express one explainable idea. In
+casual prose, “fragment” may refer to the family as a whole; when precision matters,
+a family contains one or more contributions. References let fragments be presented
+in explanatory order and assembled in source order. See
+[Choosing fragments well](choosing_fragments.html).
+
+## Fragment graph
+
+The directed graph whose vertices are fragment families and whose edges are
+references from one family to another. Roots select generated outputs. Missing
+vertices and cycles are graph errors. See [The fragment graph](fragment_graph.html).
+
+## Freshness
+
+Evidence that a result still belongs to the source, templates, settings, workspace,
+session, and request that produced it. Version numbers can prove some forms of
+freshness; unversioned asynchronous reports may only offer best-effort freshness.
+Known stale work is discarded rather than attached to current source. See
+[Diagnostics over changing projections](diagnostics_over_projections.html).
+
+## Generated output
+
+A file described by a complete generation or publication plan. Generated program
+source and HTML are derived from the authoritative book; publication outputs are
+derived through the separate explicit pipeline. Generated files are important review,
+bootstrap, and packaging artifacts, but direct edits do not become authoritative.
+
+## Generation plan
+
+The complete set of validated output paths and contents returned before a host writes
+anything. Planning is all-or-nothing: graph, template, destination, collision, and
+resource errors produce diagnostics and no partial file set. See
+[Planning a complete generation](complete_generation_plan.html).
+
+## Host
+
+The environment that supplies inputs and owns effects around the shared engine.
+Literate's hosts include the command line, VS Code, Markdown preview, browser programs,
+and publication helpers. A host may have narrower trust, filesystem, or process
+capabilities than another host.
+
+## Identity
+
+A stable target derived from semantic data such as an exact fragment name, canonical
+document path, heading slug, term key, or source location. Separate namespaces keep
+families, contributions, documents, headings, terms, and notes from colliding.
+Identity is deterministic under fixed input but may change after a meaningful rename
+or move. See [Building a publication document](building_publication_document.html).
+
+## Inspection
+
+A read-only report of ordered documents, template dependencies, fragment declarations,
+roots, and references. Inspection can retain useful partial structure from an invalid
+project and does not read or preflight generated destinations. See
+[The command-line adapter](command_line_adapter.html).
+
+## Language server
+
+A separate program that provides language intelligence through the Language Server
+Protocol. Literate launches explicitly configured stdio servers for generated-language
+projections and validates their replies before mapping results into fragments. It does
+not borrow another extension's private server or install one automatically. See
+[Owning a language-server session](owning_language_server_session.html).
+
+## Mapping segment
+
+A half-open correspondence between unchanged literal text in a literate contribution
+and one interval in assembled generated text. Inserted indentation, reference markers,
+template wrappers, and other synthetic text have no source mapping. See
+[The projection problem](projection_problem.html).
+
+## Occurrence
+
+One appearance of source text in a generated projection. A reused fragment can have
+several occurrences. Read-only services can select a deterministic occurrence;
+mutating services require a uniquely safe occurrence so one edit is not unexpectedly
+amplified through every expansion. See
+[Mutating projected source safely](mutating_projected_source.html).
+
+## Output root
+
+A fragment family whose name ends in `.*` and whose initial declaration names a
+workspace-relative destination. Expanding a root produces one generated source file,
+possibly through a source template. “Root” may also mean the workspace directory in
+filesystem discussions; the surrounding phrase should make the meaning clear. See
+[From explanation to source](from_explanation_to_source.html).
+
+## Output transaction
+
+The host protocol that compares planned bytes, preflights every destination, stages
+all changed files, preserves originals, installs the batch, rolls back ordinary
+failures, and reports retained recovery material. It offers recoverable exception
+safety, not a crash-durable journal, concurrency lock, or instant filesystem-wide
+atomicity. See [Changing files safely](changing_files_safely.html).
+
+## Pandoc bridge
+
+The controlled conversion boundary from Literate's validated publication model to a
+small Pandoc JSON document and then to a LaTeX body. Pandoc is a trusted prose writer
+inside this boundary, not the parser of Literate source or the owner of fragment
+semantics. See [Building a publication document](building_publication_document.html).
+
+## Plan
+
+A complete proposed result returned before effects. Depending on context, this may be
+a generation plan, resource plan, or publication plan. A plan makes validation and
+review possible before a transaction changes destinations.
+
+## Preview
+
+A screen presentation intended for reading while editing. Markdown preview can use
+current buffers, semantic links, Mermaid rendering, and optional fragment exploration,
+but it does not define generation authority or imply that print publication will have
+the same layout. See [Previewing the explanation](previewing_the_explanation.html).
+
+## Project
+
+The semantic unit formed from every eligible `.literate` document under one root,
+plus declared templates and root settings. The root index controls the beginning of
+document order but does not exclude unlinked chapters. See
+[The project snapshot](project_snapshot.html).
+
+## Projection
+
+An in-memory view of assembled generated-language files presented at their intended
+URIs without requiring those files to be written. A projection includes source
+mappings so validated language-server results can return to authored fragments. See
+[The projection problem](projection_problem.html).
+
+## Protocol
+
+An explicit contract for exchanging data between independently owned components.
+Examples include JSON-RPC framing for language servers, inert browser payloads, the
+publication helper's single JSON request, and versioned CLI responses. A protocol
+includes validation, limits, lifecycle, and failure rules—not only a JSON shape.
+
+## Publication document
+
+The complete renderer-neutral block tree produced after project order, fragment graph,
+links, annotations, and supported Markdown have all been validated. Screen and print
+renderers consume related semantic data, while the Pandoc bridge carries the print
+document toward LaTeX. See
+[Building a publication document](building_publication_document.html).
+
+## Reference
+
+A `<<name>>` use inside an accepted contribution. Tangling replaces it recursively
+with the target family's ordered contributions. Its use-site indentation is applied
+to every expanded line. An escaped opening delimiter is literal text rather than a
+reference. See [From explanation to source](from_explanation_to_source.html).
+
+## Renderer
+
+A component that turns an already understood model into presentation for a medium.
+HTML, editor preview, LaTeX, syntax highlighting, annotation rails, and Mermaid assets
+have renderers. Renderers decide appearance but do not redefine fragment identity or
+project order.
+
+## Root settings
+
+Project-wide options authored in exact `SETTINGS` fences in normalized root
+`index.literate`. Source/HTML settings select template, authors, and theme; print
+publication additionally reads font roles and code-ligature policy. Chapter-local
+settings do not override the root. See
+[Appendix B — Literate syntax and settings reference](appendix_syntax_settings.html).
+
+## Self-hosting
+
+Using Literate to describe and generate Literate's own engine. Self-hosting creates a
+bootstrap obligation: an available generator must understand enough of the book to
+produce its replacement. It is verified by a fixed point rather than assumed from the
+circular description. See
+[A generator that generates itself](generator_that_generates_itself.html).
+
+## Snapshot
+
+An ordered, immutable capture of project inputs for one operation. In the CLI it is
+built from saved disk files. In the editor, eligible open buffers can override disk,
+including empty or newly created file-backed documents. A snapshot is not a live
+workspace view. See [The project snapshot](project_snapshot.html).
+
+## Source mapping
+
+The collection of mapping segments that relates authored fragment text to generated
+projection text. Mappings let diagnostics, navigation, completion ranges, and selected
+edits return to source without searching by text. A missing or seam-crossing mapping
+is omitted rather than guessed.
+
+## Stable target
+
+A collision-safe identifier used for semantic links. Fragment-family targets derive
+from exact names; contribution targets additionally use canonical path and local
+ordinal; document, heading, term, and note targets use their own namespaces. Stable
+means deterministic for the same structure, not permanent across every edit.
+
+## Tangle
+
+To expand roots and named references into generated program source. Tangling follows
+the fragment graph, concatenates contributions in project order, preserves use-site
+indentation, applies source templates, and reports graph errors. In this book,
+“generate” includes tangling plus HTML planning and host-side output handling. See
+[From explanation to source](from_explanation_to_source.html).
+
+## Template
+
+A captured input containing a fixed literal placeholder. Source templates replace
+every original `[CODE]`; HTML templates replace `[CONTENT]`, `[AUTHORS]`, and
+`[THEME]`. Substitution is single-pass, and inserted values are not scanned again.
+Template wrapper text has no authored fragment mapping.
+
+## Term
+
+A named reusable definition authored with a `TERM` fence and referenced only through
+explicit `term:` links. A term definition remains in prose; generated indexes and
+print page lookups point to it rather than relocating its body. See
+[Shared annotations and identities](shared_annotations_identities.html).
+
+## Trust boundary
+
+A point where data or authority must be checked before crossing into a more powerful
+operation. Examples include accepting a language-server reply, selecting an
+executable, resolving an output path, turning author structure into raw LaTeX, or
+committing planned bytes. A trust boundary narrows authority; it is not automatically
+a sandbox.
+
+## Weave
+
+To render the explanatory work for people, traditionally as a document with prose,
+code, and cross-references. Literate's screen weaving appears as generated HTML and
+Markdown preview; print publication uses a separate validated path through Pandoc and
+LaTeX. The implementation often says “render” or “publish” for these concrete forms.
+See [Programs for people and machines](programs_for_people_and_machines.html).
+
+## Workspace root
+
+The directory that bounds one project's discovery, relative paths, templates, inputs,
+and outputs. Paths are validated against this authority. This filesystem meaning is
+distinct from an output-root fragment.

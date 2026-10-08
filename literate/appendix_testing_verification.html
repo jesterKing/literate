@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Appendix H — Testing and verification reference</h1>
+<p>This appendix maps claims to the repository checks that can support them. The
+maintenance method is developed in
+<a href="developing_book_and_program.html">Developing the book and program together</a>,
+self-consistency in
+<a href="generator_that_generates_itself.html">A generator that generates itself</a>, and
+conservative failure policy in
+<a href="resource_bounds_fail_closed.html">Resource bounds and fail-closed behavior</a>.</p>
+<p>No single command proves the whole system. Compilation, unit tests, generated-file
+comparison, fixed-point verification, package inspection, real-host acceptance, and
+human publication review answer different questions.</p>
+<h2>Test ownership: generated is not ordinary source</h2>
+<p>Most files under <code>src/test/</code> are ordinary authoritative source and should be edited
+directly. Six test or acceptance files are exceptions: they are generated outputs
+owned by the literate book.</p>
+<p>The generated test roots are:</p>
+<ul>
+<li><code>src/test/headless/publication-headings.test.ts</code></li>
+<li><code>src/test/headless/publication-settings.test.ts</code></li>
+<li><code>src/test/headless/publication-highlight.test.ts</code></li>
+<li><code>src/test/headless/publication-fonts.test.ts</code></li>
+<li><code>src/test/headless/publication-screen.test.ts</code></li>
+<li><code>src/test/acceptance/screen-host.js</code></li>
+</ul>
+<p>Their root assembly is recorded in
+<a href="assembly.html">Appendix A — Program assembly maps</a>, and their constituent fragments
+live with the publication policies they verify. Edit those <code>.literate</code> chapters and
+regenerate; a direct edit to one of these six files will be overwritten.</p>
+<p>All other test files are ordinary source unless and until a Literate output root says
+otherwise. This includes the remaining headless tests, <code>src/test/headless/vscode-fixture.ts</code>,
+<code>src/test/headless/authoritative-book.ts</code>, the remaining <code>src/test/acceptance/</code>
+harnesses and evidence descriptions, and the VS Code test runner under
+<code>src/test/suite/</code>. Package metadata and test scripts are ordinary source as well.</p>
+<p>Generated tests are still real tests: they compile, run, fail, and require independent
+expectations. Their ownership merely keeps a policy's explanation, implementation,
+and selected regression cases in one authoritative chapter. Ordinary tests remain
+appropriate when a fixture or cross-cutting harness is clearer outside the book.</p>
+<h2>Suite organization</h2>
+<h3>Headless regression tests</h3>
+<p>TypeScript headless tests live under <code>src/test/headless/</code> and compile to
+<code>out/test/headless/</code>. They use Node's test runner and cover the engine, parser, CLI,
+transactions, editor adapters with a VS Code fixture, fragment symbols, browser
+presentation, publication, self-hosting, projections, direct language-server
+protocol, diagnostics, navigation, and code actions.</p>
+<p><code>src/test/headless/vscode-fixture.ts</code> supplies the mocked editor surface used by
+adapter tests. <code>src/test/headless/authoritative-book.ts</code> loads <code>index.literate</code>, all
+chapter sources, and the source template, then exposes fresh generation results to
+checks that compare projections or generated artifacts against the actual book.</p>
+<p>Compile the TypeScript test tree without running it:</p>
+<pre><code>yarn test-compile
+</code></pre>
+<p>Run a focused compiled group after that command, for example:</p>
+<pre><code>node --<span class="hljs-built_in">test</span> out/test/headless/language-*.test.js \
+  out/test/headless/extension-adapter.test.js \
+  out/test/headless/editor-symbols.test.js \
+  out/test/headless/code-actions.test.js
+</code></pre>
+<p>A focused command is useful while iterating, but it does not include lint,
+generated-file comparison, unrelated headless suites, packaging, or real hosts.</p>
+<h3>Complete default suite</h3>
+<p>The default repository suite is:</p>
+<pre><code>yarn <span class="hljs-built_in">test</span>
+</code></pre>
+<p>Its script builds the publication Mermaid worker, compiles the project, lints
+TypeScript, runs every compiled <code>out/test/headless/*.test.js</code>, and finally runs the
+CLI generated-file check. It therefore detects stale generated source or HTML, but
+it does not perform self-host fixed-point verification, package a VSIX, run real
+editor UI, invoke every publication acceptance harness, or judge rendered pages.</p>
+<h3>VS Code extension-host suite</h3>
+<p>Run the extension test entry with:</p>
+<pre><code>yarn <span class="hljs-built_in">test</span>:extension
+</code></pre>
+<p>This builds the TypeScript and bundled extension, then invokes the VS Code test
+runner. The host runner may download its configured VS Code test host and requires a
+suitable graphical environment. Its sample/integration coverage supplements rather
+than replaces the headless suite and interactive smoke testing.</p>
+<h3>Publication acceptance scripts</h3>
+<p>The package scripts expose focused real-tool routes:</p>
+<pre><code>yarn <span class="hljs-built_in">test</span>:publication
+yarn <span class="hljs-built_in">test</span>:pdf
+yarn <span class="hljs-built_in">test</span>:polish
+yarn <span class="hljs-built_in">test</span>:annotations
+yarn <span class="hljs-built_in">test</span>:assets
+yarn <span class="hljs-built_in">test</span>:mermaid
+yarn <span class="hljs-built_in">test</span>:browser-security
+</code></pre>
+<p>The first six build the CLI and invoke the corresponding Python acceptance harness.
+They cover portable layout, PDF compilation, typography probes, annotations, local
+assets, and Mermaid publication. <code>test:browser-security</code> compiles the project, builds
+the worker, and runs the browser security harness. These routes may require installed
+external tools, fonts, browser, TeX resources, or explicit harness arguments; they do
+not install those prerequisites.</p>
+<p>Additional opt-in scripts under <code>src/test/acceptance/</code> exercise real editor hosts,
+configured language servers, automatic completion UI, publication commands, screen
+presentation, and packaged runtime isolation. Many intentionally consume existing
+builds and download nothing. Read each harness header or adjacent acceptance document
+before running it: executable paths, display needs, platform constraints, timeouts,
+and evidence destinations differ by boundary.</p>
+<h2>Generated-file verification</h2>
+<p>Use either command to compare the complete current generation plan with disk without
+writing outputs:</p>
+<pre><code>yarn literate check
+yarn check:generated
+</code></pre>
+<p>A valid check compares every planned source and HTML destination as <code>current</code>,
+<code>missing</code>, or <code>stale</code>. It does not detect or delete orphaned files left behind by a
+removed or renamed root. Inventory review is required for that case.</p>
+<p>For a read-only command invocation that must not rebuild the CLI wrapper first, use a
+known existing executable:</p>
+<pre><code>node out/cli-entry.js check
+</code></pre>
+<p>The direct command reads saved disk inputs. It does not see unsaved editor buffers.
+Do not run CLI generation concurrently with editor generation against the same
+project.</p>
+<h2>Fixed-point verification</h2>
+<p>The fixed-point route is:</p>
+<pre><code>yarn check:self
+</code></pre>
+<p>Equivalently, <code>yarn literate self-check</code> names the underlying CLI command. It first
+requires all planned outputs to match disk. It then:</p>
+<ol>
+<li>generates a fresh complete plan from the captured book;</li>
+<li>overlays fresh generated TypeScript in memory over ordinary checkout sources;</li>
+<li>type-checks that combined program without replacing project files;</li>
+<li>bundles the fresh engine and runs it in a bounded child process;</li>
+<li>requires the child to return a well-formed plan without diagnostics; and</li>
+<li>compares destination sets and exact content, independent of array order.</li>
+</ol>
+<p>If <code>S</code> is the captured snapshot, <code>P</code> is its fresh plan, and <code>E</code> is the engine built
+from that plan, the verified condition is:</p>
+<pre><code>E(S) = P
+</code></pre>
+<p>This proves that fresh generated sources type-check in context and that the fresh
+engine reproduces the complete plan from which it was built. It does not prove CLI
+reporting, transaction recovery, editor behavior, publication quality, external-tool
+compatibility, or safety of the project code it executes. Run it only for trusted
+self-hosting source.</p>
+<h2>Package verification</h2>
+<p>A build-directory test does not establish archive contents. After:</p>
+<pre><code>yarn package:vsix
+</code></pre>
+<p>inspect the actual <code>out/&lt;name&gt;-&lt;version&gt;.vsix</code>. The opt-in
+<code>src/test/acceptance/publication-package.mjs</code> harness can consume existing runtime
+bundles or an explicit existing VSIX. It checks the runtime allowlist, byte identity
+between archive and reviewed bundles, dependency-graph closure, publication-only
+request boundaries, snapshot publication, portable resources, and isolated helper
+execution. It does not build, generate, install, or download its prerequisites.</p>
+<p>Package closure is not a complete transitive license audit. Review
+<code>THIRD_PARTY_NOTICES.md</code>, manifest declarations, and portable resource licenses
+separately.</p>
+<h2>Security regression catalogue</h2>
+<p>The security posture is distributed across focused suites rather than one test named
+“security.” Use this catalogue to find the relevant boundary.</p>
+<h3>Parsing, graph, and output paths</h3>
+<p><code>engine.test.ts</code>, <code>parsing.test.ts</code>, <code>inspection.test.ts</code>, and CLI tests cover invalid
+fragment declarations, missing references, cycles, ordering, portable paths,
+template handling, complete-plan rejection, and structured diagnostics. Transaction
+suites cover symlink and special-file rejection, duplicate and ancestor collisions,
+exclusive staging, rollback, cleanup failures, retained recovery paths, permission
+behavior, and concurrent-writer limitations. See
+<a href="changing_files_safely.html">Changing files safely</a>.</p>
+<h3>Editor and source mutation</h3>
+<p>Editor adapter, symbol, code-action, input-watching, and publication-extension tests
+cover trust, workspace authority, buffer precedence, stale snapshots, provider
+registration, command confinement, prompt cancellation, destination containment,
+serialized writers, and commit-aware cancellation. Mutating projected-source tests
+require complete, non-overlapping edit sets to map into one current unique fragment
+occurrence; unsafe partial edits reject the whole action. See
+<a href="mutating_projected_source.html">Mutating projected source safely</a>.</p>
+<h3>Language-server protocol and projection</h3>
+<p>Language client, projection, feature, navigation, diagnostics, and action suites cover
+JSON-RPC framing, UTF-8 byte lengths, UTF-16 coordinates, envelope validation,
+capability gating, bounded synchronization, cancellation, stale replies, unsafe URIs,
+wrapper and seam omission, repeated expansions, diagnostic freshness, untrusted
+Markdown, command rejection, and whole-action atomicity. Real-server harnesses add
+representative compatibility evidence but do not imply support for every server. See
+<a href="appendix_language_server_protocol.html">Appendix E — Language-server protocol details</a>.</p>
+<h3>Browser programs</h3>
+<p>Mermaid preview, publication exploration, and browser security tests cover inert JSON,
+script-sensitive escaping, payload shape, ownership that cannot be forged through DOM
+attributes, panel preflight, cycles, depth and byte budgets, link authorization,
+Mermaid directives and active-content rejection, network denial, SVG validation,
+browser sandbox requirements, stale render suppression, process cleanup, and bounded
+logs and artifacts. See <a href="appendix_browser_programs.html">Appendix D — Browser programs</a>.</p>
+<h3>Publication formats and resources</h3>
+<p>Pandoc, annotation, LaTeX, rail, font, asset, Mermaid, PDF, runtime, helper, and CLI
+publication suites cover raw author-content rejection, stable identities, annotation
+ambiguity, heading links, geometry, TeX escaping, manifest schemas, license presence,
+binary signatures, path aliases, hard links, companion collisions, private stages,
+process groups, convergence, output bounds, request schemas, runtime separation, and
+preservation of a previous publication on failure. See
+<a href="appendix_publication_protocols.html">Appendix F — Publication formats and protocols</a>.</p>
+<p>Security tests establish enforced policy at named boundaries. They do not turn TeX,
+project-authored self-hosting code, a browser, or a language server into a sandbox.</p>
+<h2>Verification routes by change</h2>
+<p>Use these as starting points, then add the affected subsystem's focused tests.</p>
+<h3>Prose-only chapter change</h3>
+<pre><code>node out/cli-entry.js check
+</code></pre>
+<p>After deliberate regeneration, require no unexpected generated program-source diff.
+Review generated HTML, links, headings, diagrams, and publication order where the
+prose move changes structure.</p>
+<h3>Fragment implementation change</h3>
+<pre><code>yarn literate generate
+yarn <span class="hljs-built_in">test</span>
+yarn esbuild
+</code></pre>
+<p>Review generated source before testing. Add a focused test near the changed invariant.
+If the engine or generator changed, also run <code>yarn check:self</code>.</p>
+<h3>CLI or transaction change</h3>
+<p>Run the focused CLI and transaction tests, then <code>yarn test</code>. Exercise both human and
+<code>--json</code> output when the response contract changes. Use fault-injection cases for
+preflight, rollback, recovery, and committed cleanup.</p>
+<h3>Editor integration change</h3>
+<p>Run the focused headless adapter tests, <code>yarn test</code>, and <code>yarn esbuild</code>. Add extension
+host or interactive evidence when behavior depends on real workspace trust, commands,
+preview, completion widgets, editor buffers, filesystem providers, or cancellation UI.</p>
+<h3>Language-service change</h3>
+<p>Compile, run the focused <code>language-*.test.js</code> group, then the full suite. Use the
+appropriate installed-server or UI harness for claims about real protocol
+compatibility or visible editor behavior. Confirm that requests do not materialize
+generated files.</p>
+<h3>Publication change</h3>
+<p>Run the focused headless publication suites and the corresponding acceptance script.
+A format or renderer change may require real Pandoc, browser, font, or TeX evidence.
+Inspect warnings and pages; successful PDF compilation is not a typography review.</p>
+<h3>Packaging or release change</h3>
+<p>Build all shipped entry points, run the full suite and relevant fixed-point checks,
+create a VSIX, inspect its entries, and run package or installed-host acceptance for
+changed surfaces. Test the exact archive intended for publication.</p>
+<h2>Supported environments and known limits</h2>
+<ul>
+<li>Headless tests require no graphical editor, but some focused publication tests use
+injected adapters and therefore do not prove real tool compatibility.</li>
+<li>The extension-host route needs a suitable VS Code host and display and may acquire
+its configured test host.</li>
+<li>Direct language-server acceptance requires explicitly installed server executables;
+it neither installs servers nor proves universal LSP compatibility.</li>
+<li>Real publication acceptance requires the external tools appropriate to the tested
+route. Mermaid needs an explicit browser; PDF needs the supported TeX process model.</li>
+<li>Editor-driven process ownership is restricted to trusted local file workspaces;
+remote, web, and virtual environments retain only the capabilities their adapters
+can support safely.</li>
+<li>Filesystem tests establish recoverable exception behavior, not crash durability,
+simultaneous multi-file visibility, or protection from external concurrent writers.</li>
+<li>Deterministic engine plans do not imply byte-identical PDF or diagram output across
+external toolchains and fonts.</li>
+<li>Resource bounds fail closed at their defined boundaries but do not prove a universal
+CPU, memory, disk, or filesystem-latency limit.</li>
+</ul>
+<p>Report validation in terms of the command actually run and the claim it supports.
+“The headless suite passed,” “the fixed point passed,” “the VSIX was inspected,” and
+“the PDF was reviewed” are complementary statements, not interchangeable ones.</p>
+</div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Appendix F — Publication formats and protocols</h1>
+<p>This appendix is the lookup route for the data formats that connect Literate's
+publication stages. The conceptual route begins with
+<a href="separate_publication_pipeline.html">Why publication is a separate pipeline</a>,
+continues through
+<a href="building_publication_document.html">Building a publication document</a>, and ends
+with the screen and print renderers described in
+<a href="publication_on_screen.html">Publication on screen</a> and
+<a href="typesetting_the_book.html">Typesetting the book</a>.</p>
+<p>Publication is explicit. Ordinary source generation may produce chapter HTML, but
+it does not invoke Pandoc, a browser, TeX, or the PDF compiler. The <code>latex</code> and
+<code>pdf</code> commands consume the same parsed project while using a separate publication
+model and output transaction.</p>
+<h2>Format inventory</h2>
+<p>Literate uses several related but distinct publication representations:</p>
+<ul>
+<li><strong>Generated HTML</strong> is one page per <code>.literate</code> document, with semantic fragment
+and annotation links. It is part of ordinary generation.</li>
+<li><strong>Markdown preview</strong> is editor-hosted screen presentation over the current
+project snapshot. It may use unsaved buffers and does not write generated files.</li>
+<li><strong>The publication document</strong> is a renderer-neutral, validated block tree for the
+complete ordered project.</li>
+<li><strong>Pandoc JSON</strong> is the controlled in-memory bridge used to ask Pandoc for a
+LaTeX body. It is not an author-facing source format.</li>
+<li><strong>LaTeX publication</strong> is one renderer-owned document plus any planned image,
+diagram, font, and license companions.</li>
+<li><strong>PDF publication</strong> compiles a private copy of that LaTeX plan and publishes only
+the accepted PDF destination.</li>
+</ul>
+<p>Screen and print share logical fragment and annotation identities, but they do not
+promise identical layout, heading behavior, or interaction. See
+<a href="shared_annotations_identities.html">Shared annotations and identities</a> and
+<a href="what_literate_does_not_promise.html">What Literate does not promise</a>.</p>
+<h2>Controlled Pandoc JSON</h2>
+<p><a href="publication-pandoc.html">The controlled Pandoc bridge</a> constructs Pandoc data
+after the complete project, fragment graph, annotations, links, and supported block
+vocabulary have passed validation. Pandoc does not parse the original Literate
+Markdown and does not decide fragment identity or project order.</p>
+<p>The document envelope has this stable internal shape:</p>
+<pre><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;pandoc-api-version&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-number">1</span><span class="hljs-punctuation">,</span> <span class="hljs-number">23</span><span class="hljs-punctuation">,</span> <span class="hljs-number">1</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;meta&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span><span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;blocks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">]</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<p>The fixed API tuple is a wire-format compatibility choice. Metadata is deliberately
+empty; page geometry, fonts, palette, and other renderer policy cross typed options
+instead of arbitrary document metadata.</p>
+<p>The bridge admits paragraphs, plain blocks, headings, horizontal rules, block
+quotes, ordered and unordered lists, ordinary code blocks, inline emphasis,
+strong emphasis, strikeout, code, links, line breaks, fragment contributions,
+annotations, and supported standalone assets. Any unsupported token type that
+actually reaches the bridge diagnoses the source rather than disappearing or
+passing through as executable markup.</p>
+<p><code>RawBlock</code> and <code>RawInline</code> are reserved for trusted renderer callbacks. Normal
+parsing leaves HTML and TeX-like author text inert and does not recognize pipe-table
+syntax; none of those spellings becomes raw Pandoc output. Contribution and asset
+callbacks run only after complete validation succeeds. For the gate and its
+all-or-nothing behavior, see
+<a href="building_publication_document.html">Building a publication document</a>.</p>
+<p>The production converter receives JSON on standard input and is invoked without a
+shell using these conversion arguments:</p>
+<pre><code>pandoc --from=json --to=latex --top-level-division=chapter --no-highlight
+</code></pre>
+<p>Pandoc returns a LaTeX body, not a standalone document. Literate supplies the
+preamble, syntax presentation, destinations, geometry, fonts, colors, annotation
+rail, and resource references. The Pandoc process is bounded, and an empty body,
+nonzero exit, timeout, stream error, or excessive output fails publication before
+commit.</p>
+<h2>Annotation author format</h2>
+<p>Annotations are authored as exact, case-sensitive fenced-block forms. A term has a
+key and a JSON-quoted display title:</p>
+<pre><code><span class="hljs-code">```TERM transaction &quot;Output transaction&quot;
+A transaction publishes related outputs together, or preserves the previous set.
+```</span>
+</code></pre>
+<p>A note has no header arguments:</p>
+<pre><code><span class="hljs-code">```NOTE
+This explanation belongs beside this point in the prose.
+```</span>
+</code></pre>
+<p>A term use is an explicit Markdown link:</p>
+<pre><code>See the [<span class="hljs-string">transaction contract</span>](<span class="hljs-link">term:transaction</span>).
+</code></pre>
+<p>The contracts are:</p>
+<ul>
+<li>a term key matches <code>[A-Za-z][A-Za-z0-9_.:-]{0,99}</code> and is case-sensitive;</li>
+<li>the required display title is a JSON string of at most 200 Unicode code points;</li>
+<li><code>NOTE</code> takes no arguments;</li>
+<li>term destinations are decoded once and must resolve to exactly one definition;</li>
+<li>duplicate terms, missing or ambiguous uses, invalid headers, and unsupported
+bodies block publication;</li>
+<li>links in headings are rejected because replaying a heading in contents or running
+matter would replay annotation markers;</li>
+<li>there is no authored <code>INDEX</code> fence: term and fragment indexes are derived from the
+validated model.</li>
+</ul>
+<p>Annotation bodies accept paragraphs, lists, emphasis, strong emphasis, inline code,
+links, and line breaks. They reject headings, quotations, tables, images,
+strikethrough, block code, nested annotation or Mermaid fences, and raw HTML. TERM
+bodies remain in document flow. NOTE bodies become numbered screen asides or
+controlled print-rail entries. The model and resolution rules are explained in
+<a href="shared_annotations_identities.html">Shared annotations and identities</a>; the exact
+parser is in <a href="publication-annotations.html">Shared publication annotations</a>.</p>
+<h2>Font settings and manifest format</h2>
+<p>Root publication settings select five font roles:</p>
+<pre><code>font-body
+font-heading
+font-code
+font-fragment
+font-note
+font-code-ligatures
+</code></pre>
+<p>The family values are trimmed ASCII names from one to one hundred characters,
+beginning with a letter or digit and continuing with letters, digits, spaces, dots,
+or hyphens. They are names, not paths or TeX expressions. <code>font-code-ligatures</code> is
+exactly <code>on</code> or <code>off</code>. Settings are read only from root <code>index.literate</code> <code>SETTINGS</code>
+fences; the last valid value wins, while every invalid occurrence remains a
+diagnostic. If <code>font-note</code> is omitted, it inherits the final body family.</p>
+<p>An optional font manifest turns selected families into portable companions. Its
+version is a stable data-format boundary, so it is stated explicitly. Version 1 has
+this shape:</p>
+<pre><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;version&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;families&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;Example Serif&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;regular&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;fonts/serif-regular.otf&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;bold&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;fonts/serif-bold.otf&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;italic&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;fonts/serif-italic.otf&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;boldItalic&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;fonts/serif-bolditalic.otf&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;licenses&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;fonts/OFL.txt&quot;</span><span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<p>Every family entry requires all four faces and a nonempty <code>licenses</code> array. Unknown
+fields are errors. Paths are safe project-root-relative paths, not paths relative to
+the manifest. Font containers are limited to <code>.ttf</code> and <code>.otf</code>; all declared files
+must exist as regular non-symlink files. Every entry is validated and protected from
+output collisions, although only selected families are copied.</p>
+<p>Italic and bold-italic faces may explicitly request bounded synthetic slant:</p>
+<pre><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;file&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;fonts/example-regular.ttf&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;slant&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.2</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<p>Only those two roles accept this object. <code>slant</code> must be a finite JSON number from
+<code>0.01</code> through <code>0.3</code>. There is no implicit fallback, synthetic weight, directory
+scan, font installation, or license interpretation. License bytes travel with the
+selected fonts, but the publisher remains responsible for redistribution rights.
+See <a href="portable_publication_resources.html">Portable publication resources</a>,
+<a href="publication-settings.html">Publication font settings</a>, and
+<a href="publication-fonts.html">Explicit portable font companions</a>.</p>
+<h2>Asset metadata and author forms</h2>
+<p>The renderer-neutral asset record is:</p>
+<pre><code>kind: &quot;image&quot; | &quot;mermaid&quot;
+source: string
+caption: string
+at: { path, line, column }
+</code></pre>
+<p>For an image, <code>source</code> is the authored path. Image paths are resolved relative to
+the chapter containing the image, decoded once, and required to remain inside the
+project. A supported image is a standalone Markdown image using PNG, JPEG, or PDF;
+the extension and binary signature must agree. The title becomes the plain caption,
+falling back to plain alternative text. Inline images, formatted alternatives,
+remote URLs, query strings, fragments, raw SVG, symlinks, and unsupported file types
+are rejected.</p>
+<p>For a Mermaid asset, <code>source</code> is the complete diagram source and the caption is
+empty. A plain Mermaid fence requests a diagram; a named Literate fragment whose
+language is Mermaid remains program code. Diagram publication requires an explicitly
+selected browser and produces validated PDF and SVG companions in a private worker.
+Books without diagrams need no browser.</p>
+<p>Companion names are derived from content or role identities rather than source
+basenames. Equal image bytes are retained once, while every source alias remains a
+protected input. TeX, images, diagram products, portable fonts, and license files
+join one output plan and one transaction. Old companions are not pruned
+automatically, so move or distribute the containing export directory as a unit.</p>
+<h2>Publication helper request</h2>
+<p>Editor publication uses a one-request external helper described in
+<a href="isolating_publication_editor.html">Isolating publication from the editor</a>. Standard
+input contains one JSON value and end-of-file terminates the request. The envelope
+has exactly two top-level members:</p>
+<pre><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;args&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;latex&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;/project/root&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;--output&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;book.tex&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;--json&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;documents&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span> <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;index.literate&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;text&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;# Book\n&quot;</span> <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<p><code>args</code> is an array of strings. Its first item is <code>latex</code> or <code>pdf</code>; <code>--json</code> is
+required; help flags and all other commands are rejected. <code>documents</code> is an array of
+<code>{path, text}</code> source snapshots. Open file-backed editor buffers take precedence
+when the adapter constructs that array. Binary assets, manifests, fonts, and licenses
+remain policy-checked disk inputs rather than entering the JSON snapshot. Images and
+diagrams have dedicated byte budgets; font and license companions currently do not.</p>
+<p>The helper emits no readiness text. Standard output is exactly one CLI response, and
+standard error is treated as bounded diagnostic transport. The request and response
+are independently size-bounded. Cancellation remains latched through the runner and
+output transaction.</p>
+<h2>Publication helper response</h2>
+<p>Successful helper output uses CLI response schema version 1:</p>
+<pre><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;schemaVersion&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;command&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;latex&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;ok&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;root&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/project/root&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;diagnostics&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;errors&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;outputs&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span> <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;book.tex&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;written&quot;</span> <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;publication&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;warnings&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">]</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<p><code>command</code> is the requested <code>latex</code> or <code>pdf</code> command. Output status is one of
+<code>current</code>, <code>missing</code>, <code>stale</code>, or <code>written</code>; a successful editor publication requires
+the selected destination to be <code>written</code> or <code>current</code>. PDF results may additionally
+report <code>publication.buildDirectory</code> when private build retention was requested.
+<code>publication.warnings</code> contains deduplicated compiler warnings and does not turn a
+successful build into a clean-typography guarantee.</p>
+<p>A transport success is not enough. The editor also requires process close, a zero
+exit status, valid JSON, schema version 1, the matching command, <code>ok: true</code>, and the
+selected output status. A failure before commit preserves the previous output. A
+cancellation arriving after a validated commit does not turn success into failure.
+The shared machine-readable contract for all commands is documented in
+<a href="cli.html">Command-line generation</a>.</p>
+<h2>LaTeX integration contract</h2>
+<p>Literate owns publication template version 1. This version identifies the emitted
+renderer template; it is not a custom-template extension point. The renderer expects
+Pandoc to provide only a body, uses top-level chapters, and disables Pandoc syntax
+highlighting so Literate can preserve fragment-aware syntax and links.</p>
+<p>The template targets LuaLaTeX and uses a one-sided KOMA-Script book with controlled
+font, geometry, color, code, image, link, index, and annotation-rail support. Text is
+escaped as data. Logical destinations are encoded again before entering LaTeX; raw
+fragment names, paths, and annotation keys are never interpolated as commands.</p>
+<p>Page choices are <code>a4</code>, <code>a5</code>, <code>letter</code>, and <code>legal</code>. Margins are decimal millimetres,
+each from 5 through 50, and must leave at least an 80 × 100 mm body. An annotated
+book reserves a right-hand rail and gap in addition to the author's requested margin,
+so geometry that works for an unannotated book may be rejected for an annotated one.</p>
+<p><code>latex</code> writes the TeX document and planned companions but never starts TeX. <code>pdf</code>
+stages that same plan privately, preflights the compiler tools and packages, checks
+reference and annotation-rail convergence, validates bounded PDF bytes, and then
+publishes only the requested PDF. The exact safety and cancellation boundary is in
+<a href="compiling_publishing_pdf.html">Compiling and publishing a PDF</a>.</p>
+<h2>Failure lookup</h2>
+<ul>
+<li><strong>Publication rejects the document before Pandoc:</strong> check for inline images or token
+extensions outside the controlled vocabulary. Raw HTML and TeX are normally inert
+text, and pipe-table syntax is not recognized by the parser.</li>
+<li><strong>A term link is inert or publication fails:</strong> check exact key case, duplicate or
+missing definitions, percent encoding, and whether the use appears in a heading.</li>
+<li><strong>A font manifest fails before rendering:</strong> check <code>version: 1</code>, exact family names,
+all four faces, a nonempty license list, safe root-relative paths, and unknown
+fields.</li>
+<li><strong>An image is rejected:</strong> make it a standalone PNG, JPEG, or PDF with a matching
+signature and a chapter-relative local path.</li>
+<li><strong>Mermaid export asks for a browser:</strong> either supply the explicit browser option or
+remove ordinary Mermaid fences; named Mermaid fragments do not require rendering.</li>
+<li><strong>The editor rejects helper success:</strong> require a matching schema, command, output
+path, and <code>written</code> or <code>current</code> status, not merely exit code zero.</li>
+<li><strong>A PDF succeeds with warnings:</strong> inspect the publication warnings and the actual
+pages; compilation success does not establish glyph coverage or good typography.</li>
+</ul>
+</div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

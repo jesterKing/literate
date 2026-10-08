@@ -1,0 +1,400 @@
+# Appendix E — Language-server protocol details
+
+This appendix records the direct stdio language-server contract used for mapped
+programming-language features. It is a protocol and compatibility reference; the
+reason for projections is developed in [The projection problem](projection_problem.html),
+session ownership in [Owning a language-server session](owning_language_server_session.html),
+and editor scheduling in
+[Coordinating language features in the editor](coordinating_language_features.html).
+
+## Configuration and session identity
+
+`literate.languageServers` is a restricted machine-scoped setting read from global
+user configuration. Workspace values do not select executables. Each entry is keyed
+by a canonical VS Code language ID and has this shape:
+
+```json
+{
+  "literate.languageServers": {
+    "typescript": {
+      "command": "/absolute/path/to/server",
+      "args": ["--stdio"],
+      "initializationOptions": {},
+      "configuration": {}
+    }
+  }
+}
+```
+
+`command` must be an absolute path. `args` are literal strings. The two optional
+objects cross the protocol only in their documented roles. Literate launches the
+process directly with no shell expansion and does not install, download, or borrow a
+server from another extension.
+
+A session belongs to one local workspace folder and one canonical language identity.
+Familiar fence aliases normalize to canonical IDs for selection but are not valid
+configuration aliases. JavaScript and TypeScript family outputs are synchronized
+together for project context; unrelated languages use separate sessions.
+
+Starting a configured server requires a trusted, local, file-backed workspace and an
+open local `.literate` document using the Markdown language mode. Remote extension
+hosts, non-file workspaces, closed documents, and untrusted workspaces do not start a
+session. The configured process is trusted code with ordinary workspace access; it is
+not sandboxed by Literate.
+
+## Projected document model
+
+The server sees every relevant generated output at its intended absolute `file:` URI.
+The text is assembled in memory from the captured literate project and may differ
+from, or exist without, a physical generated file. Requests never save or generate
+those outputs.
+
+Projection is atomic across the project. Invalid fragment declarations, missing
+references, cycles, destination conflicts, unavailable templates, and expansion
+limits return no projected files. Mappings cover only unchanged literal source text.
+Reference markers, inserted indentation, escaped delimiters, template wrappers, and
+other synthetic text remain unmapped.
+
+Both editor and protocol coordinates are zero-based UTF-16 line and character values.
+The client offers UTF-16 during initialization and rejects a server that explicitly
+selects another position encoding. See
+[The projection problem](projection_problem.html) and
+[Mapped language sources](language-projection.html).
+
+## JSON-RPC framing
+
+Messages use JSON-RPC `2.0` over standard input and standard output with Language
+Server Protocol framing:
+
+```text
+Content-Length: <UTF-8 byte count>\r\n
+\r\n
+<one complete JSON value encoded as UTF-8>
+```
+
+`Content-Length` counts bytes, not JavaScript characters or Unicode code points. The
+reader accumulates at most one bounded header, requires exactly one decimal
+`Content-Length`, allocates a body only after validating that length, reads the
+complete body, decodes UTF-8 strictly, parses JSON, and then validates the envelope.
+
+Outgoing messages are serialized as UTF-8, measured in bytes, prefixed with the same
+framing, and added only when the bounded write queue has capacity. Standard error is
+drained separately and never parsed as protocol data.
+
+## Envelope validation
+
+Every incoming value must be an object with `jsonrpc: "2.0"`.
+
+- A message with a string `method` and no `id` is a notification.
+- A message with a string `method` and a string or numeric `id` is a server request.
+- A response must use the numeric ID of a client request and contain exactly one of
+  `result` or `error`.
+- An error response must contain a numeric `code` and string `message`; optional data
+  is retained only as protocol error data.
+- A response for a request that has already completed or been cancelled has no owner
+  and is ignored.
+
+Malformed framing, invalid UTF-8, invalid JSON, invalid envelopes, stream closure, and
+process exit stop the session. The client rejects pending work, clears synchronized
+document state and input buffers, releases listeners, destroys streams, and terminates
+the process through one cleanup path.
+
+## Initialization handshake
+
+The client sends `initialize` with:
+
+- the extension-host process ID;
+- the owning workspace `rootUri`;
+- one matching workspace-folder record;
+- configured `initializationOptions`;
+- the static client capabilities listed below.
+
+A successful result must contain an object-valued `capabilities`. If
+`positionEncoding` is present, it must be `utf-16`. The client then sends the
+`initialized` notification and permits synchronization and feature requests.
+Concurrent callers share one initialization attempt.
+
+Initialization failure is terminal for that session. Literate does not repeatedly
+restart a broken server in the background. Changing language-server configuration or
+running **Literate: Restart Language Servers** clears the failed session so a later
+request can start a new one.
+
+## Advertised client capabilities
+
+The direct client advertises a deliberately narrow static surface.
+
+### General and workspace capabilities
+
+- `general.positionEncodings` offers only `utf-16`.
+- `workspace.configuration` and `workspace.workspaceFolders` are supported.
+- Workspace edits advertise no document changes, no resource operations, and abort
+  failure handling.
+- Diagnostic refresh requests are supported.
+
+### Text-document capabilities
+
+- dynamic synchronization registration is disabled;
+- code actions advertise literal `quickfix` and `refactor` kinds only;
+- completion supports snippets, insert/replace ranges, Markdown or plain-text
+  documentation, and resolution of only `documentation` and `detail`;
+- signature help supports request context, Markdown or plain-text documentation, and
+  UTF-16 parameter-label offsets;
+- definition, type definition, and implementation accept location links;
+- references use static registration;
+- published diagnostics advertise version, related-information, and standard tag
+  awareness, although the mapping layer deliberately omits related information;
+- pull diagnostics use static registration without related-document support;
+- hover accepts plain text or Markdown.
+
+Advertising a protocol shape does not mean all returned fields cross into VS Code.
+Feature-specific validators reduce replies to the safe subset described below.
+
+## Server capabilities required at runtime
+
+Initialization results control which requests may be sent.
+
+- Projected documents require text synchronization kind full or incremental. Object
+  form must explicitly support open/close; legacy numeric full or incremental kinds
+  imply it.
+- Hover, completion, signature help, definition, type definition, implementation,
+  references, code actions, and diagnostics are requested only when the corresponding
+  server capability is present.
+- Completion and signature trigger characters are learned from the selected server,
+  bounded, and used only for that server's language.
+- A completion item is resolved only when the server advertises completion resolution.
+- Pull diagnostics take precedence when a diagnostic provider is advertised;
+  otherwise versioned or best-effort push diagnostics may be used.
+
+Dynamic capability registration is not implemented. A server must advertise the
+needed static capabilities during initialization.
+
+## Document synchronization
+
+Before sending notifications, the client validates the complete current document set.
+Duplicate URIs, unsupported synchronization, excessive document count, or excessive
+serialized input reject the synchronization as a whole.
+
+For each URI:
+
+- a new projected document sends `textDocument/didOpen` with complete text and a
+  monotonically increasing version;
+- unchanged language and text send no notification;
+- changed text sends `textDocument/didChange` with complete replacement text;
+- an incremental server receives one edit covering the complete previous document in
+  UTF-16 coordinates rather than a series of small edits;
+- a changed language ID closes and reopens the URI;
+- a removed document sends `textDocument/didClose`.
+
+Versions increase across changes and reopenings for the lifetime of the session. The
+client updates its local version state before writing notifications so an immediate
+push diagnostic can be compared with the text the server just received.
+
+## Client-to-server methods
+
+The coordinator may use these methods when capabilities and request context permit:
+
+- `initialize`, followed by `initialized`;
+- `textDocument/didOpen`, `textDocument/didChange`, and `textDocument/didClose`;
+- `textDocument/hover`;
+- `textDocument/completion` and `completionItem/resolve`;
+- `textDocument/signatureHelp`;
+- `textDocument/definition`, `textDocument/typeDefinition`,
+  `textDocument/implementation`, and `textDocument/references`;
+- explicitly invoked `textDocument/codeAction`;
+- `textDocument/diagnostic` for pull-capable servers;
+- `$/cancelRequest` for a request cancelled after it reaches the wire;
+- bounded cooperative `shutdown`, followed by `exit` during disposal.
+
+The generic request transport is not an authorization mechanism. Editor adapters call
+only methods for which they have a feature-specific validator.
+
+## Server-to-client surface
+
+The client accepts these notifications or requests:
+
+- `textDocument/publishDiagnostics` is delivered to the diagnostics controller;
+- `workspace/configuration` returns configured own-property sections, trying an exact
+  key before dotted traversal and returning `null` for missing values;
+- `workspace/workspaceFolders` returns the one owning workspace folder;
+- `workspace/diagnostic/refresh` is acknowledged and schedules a coalesced pull pass;
+- `workspace/applyEdit` is answered with `applied: false` and a read-only reason.
+
+Unknown server requests receive JSON-RPC method-not-found. They are not converted into
+commands, dynamic registrations, file operations, watchers, or arbitrary editor API
+calls. Notifications reach only explicitly registered method listeners.
+
+## Read-only reply validation
+
+Server replies are untrusted values. Common validation requires bounded object and
+array traversal, finite nonnegative UTF-16 positions, in-range lines and columns,
+current request/session/snapshot identity, and mapping through the exact projection
+occurrence used by the request.
+
+Feature rules then narrow further:
+
+- **Hover:** bounded plain text or untrusted Markdown; an explicit range must map
+  completely through the request occurrence, stay on the cursor line, and contain the
+  cursor.
+- **Completion:** commands and auxiliary edits are rejected. Replacement ranges remain
+  on the cursor line and within the exact mapping. Snippets are allowed only as local
+  insertions. Resolve may add documentation and detail but cannot change insertion
+  text, range, label, or behavior.
+- **Signature help:** signature, parameter, active-index, documentation, and label
+  offsets are independently bounded and validated.
+- **Navigation:** known projected URIs must map back to literate source. A validated
+  ordinary local `file:` URI may remain direct. Unsafe or seam-crossing locations are
+  omitted rather than widened or searched by text.
+- **References:** the request carries the caller's `includeDeclaration` choice;
+  returned locations follow the same navigation validation and deduplication.
+
+See [Read-only language services](read_only_language_services.html),
+[Mapped language locations](language-navigation.html), and
+[Direct, mapped language features](language-features.html).
+
+## Diagnostic protocols and freshness
+
+The client subscribes to `textDocument/publishDiagnostics` before synchronization so
+an immediate server report is not missed. Pull-capable sessions instead request
+`textDocument/diagnostic` and ignore push reports. Refresh requests coalesce into a
+bounded sequential pass; there is no polling loop.
+
+A versioned diagnostic report is publishable only while three identities agree:
+
+1. the current client session owns the report;
+2. the report version matches that URI's current wire version;
+3. the captured source, templates, workspace, trust, and diagnostic setting remain
+   fresh.
+
+An unversioned push report cannot prove which projected text produced it. It is
+ignored during synchronization and accepted afterward only while the session is
+fresh, idle, and owns the URI. Even then freshness is best effort.
+
+Generated ranges may split into separate mapped source intersections. Template-only
+and otherwise unmapped ranges are omitted. Messages, severity, code, source, and
+standard deprecated/unnecessary tags may survive sanitization; related information
+and code-description links do not. Mapped-language problems use a diagnostic
+collection separate from Literate's fragment and generation diagnostics.
+
+See [Diagnostics over changing projections](diagnostics_over_projections.html) and
+[Mapped language diagnostics](language-diagnostics.html).
+
+## Code-action protocol boundary
+
+Language-server code actions are available only on explicit editor invocation. A
+reply must be an array of valid edit-bearing actions; a bare command or malformed
+action rejects the whole reply.
+
+An accepted action:
+
+- is enabled and contains no executable command;
+- has no kind or belongs to the quick-fix or refactoring families;
+- uses eager `WorkspaceEdit.changes`, with exactly one URI equal to the projected URI
+  that received the request;
+- contains a nonempty bounded list of ordinary text edits;
+- maps every edit through the exact current occurrence and source document;
+- touches no wrapper, indentation, reference seam, other file, file operation,
+  annotation, or snippet edit;
+- refers to a source interval with exactly one matching occurrence in the requested
+  projected file;
+- contains no overlap or pair of edits sharing a start;
+- survives reply-time source, mapping, generated-text, and editor-version checks.
+
+The set is atomic: one unsafe edit rejects the complete action. Literate returns the
+validated action for VS Code to present; it never applies the workspace edit on the
+server's behalf. See [Mutating projected source safely](mutating_projected_source.html)
+and [Safe language code actions](language-actions.html).
+
+## Resource limits and deadlines
+
+The direct client enforces these transport and synchronization bounds:
+
+- message body: 8 MiB;
+- header: 8 KiB;
+- queued output, including framing: bounded to the message limit plus header allowance;
+- pending requests: 128;
+- initialization waiters: 128;
+- listeners: 128;
+- ordinary request deadline: five seconds;
+- initialization deadline: fifteen seconds;
+- synchronized documents: 1024;
+- serialized synchronized document data: 4 MiB;
+- cooperative shutdown wait: 500 milliseconds, followed by 500 milliseconds for
+  `exit` before forced termination.
+
+Higher-level feature adapters impose additional item, text, mapping, action, diagnostic,
+queue, and cache limits. Crossing a mutating limit rejects the whole operation.
+Observational services may omit excess unsafe data, but never invent a source range.
+For the broader policy, see
+[Resource bounds and fail-closed behavior](resource_bounds_fail_closed.html).
+
+## Cancellation and failure
+
+Cancellation before send creates no request. Cancellation after send rejects the local
+operation, removes its pending owner, and sends one `$/cancelRequest`. A late response
+cannot revive the operation.
+
+Protocol or process failure leaves the session stopped rather than starting a loop.
+Pending work is rejected, diagnostics owned by that session are cleared, and a bounded
+categorized message is written to the Literate language-server output channel. Logs
+do not include source, configuration values, raw protocol payloads, or raw server
+errors.
+
+Normal disposal shares one shutdown sequence across repeated callers. It first refuses
+new work, attempts bounded `shutdown`, sends `exit`, waits briefly, and forcefully
+terminates a process that remains alive.
+
+## Compatibility requirements and known limits
+
+A compatible server must be available as a standalone stdio executable and must:
+
+- complete the initialize/initialized handshake;
+- accept real local `file:` URIs whose text is supplied by open/change notifications;
+- support open/close plus full or incremental text synchronization;
+- use UTF-16 positions;
+- advertise each requested feature statically;
+- tolerate complete-text replacement when advertising incremental synchronization;
+- operate without relying on another editor extension's private transport.
+
+The project's exercised configurations include a TypeScript server running in native
+LSP stdio mode, `typescript-language-server`, and ZLS. The current README records
+installation-specific launch guidance and any tool-specific caveats. Compatibility is
+not inferred merely because a language extension is installed.
+
+Known limits are intentional:
+
+- remote extension hosts and non-file workspaces are unsupported;
+- rename and formatting are not forwarded to language servers;
+- server commands, dynamic registrations, general filesystem-watch registration,
+  file operations, edit annotations, and cross-file workspace edits are not honored;
+- auxiliary completion edits and auto-import changes are rejected;
+- wrapper-only diagnostics and navigation locations are omitted;
+- read-only requests choose the first deterministic expansion of repeated source;
+  mutating actions reject repeated expansion in the requested projected file;
+- unversioned push diagnostics have only best-effort freshness;
+- physical imports and project configuration remain the configured server's own
+  filesystem concern.
+
+After changing external dependencies or project configuration that a server does not
+observe, restart the session explicitly. After changing literate source or a captured
+template, the coordinator invalidates the old snapshot and synchronizes a fresh
+projection without generating files.
+
+## Troubleshooting route
+
+- **No session starts:** verify Markdown association, an open local `.literate` file,
+  trusted workspace, canonical language key, global setting scope, absolute executable,
+  and literal arguments.
+- **Initialization stops:** inspect required UTF-16 encoding, static capabilities,
+  initialization deadline, executable permission, and protocol framing.
+- **Imports resolve incorrectly:** remember that projected outputs are virtual overlays
+  at real URIs, while physical imports and project configuration are read by the
+  server. Keep required nonprojected dependencies available on disk.
+- **A feature returns nothing:** check server capability, complete project validity,
+  projection mapping at the cursor, response shape, exact occurrence confinement,
+  cancellation, and snapshot freshness.
+- **Diagnostics disappear:** source invalidation clears first; then inspect the
+  diagnostics setting, pull/push mode, URI ownership, wire version, and report limits.
+- **A code action is absent:** it must be explicitly invoked and every eager edit must
+  map atomically into one current uniquely expanded source occurrence.
+- **A failed server does not relaunch:** this is deliberate. Correct configuration or
+  environment, then run **Literate: Restart Language Servers**.

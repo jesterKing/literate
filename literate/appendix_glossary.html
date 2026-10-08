@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Appendix I — Glossary</h1>
+<p>This glossary gives plain-language meanings for terms used throughout the book. A
+term's linked chapter provides the fuller model, invariants, and limitations. Syntax
+forms and settings are collected separately in
+<a href="appendix_syntax_settings.html">Appendix B — Literate syntax and settings reference</a>.</p>
+<h2>Adapter</h2>
+<p>Code that connects the shared semantic engine to a particular environment or effect.
+The CLI adapter reads disk and reports to a terminal; the editor adapter reads
+workspace snapshots and uses VS Code APIs. An adapter may write a validated plan, but
+it does not define a second fragment language. See
+<a href="one_generator_several_hosts.html">One generator, several hosts</a>.</p>
+<h2>Annotation</h2>
+<p>Renderer-neutral explanatory material attached to the book. Literate annotations
+include reusable term definitions, explicit term uses, and numbered notes. Screen and
+print render them differently while sharing identity and resolution. See
+<a href="shared_annotations_identities.html">Shared annotations and identities</a>.</p>
+<h2>Append</h2>
+<p>An authored contribution declared with <code>=+</code> after a family's base definition. Appends
+join the family in project encounter order. They are not text patched into a generated
+file after tangling; they are ordered source contributions known before expansion.
+See <a href="choosing_fragments.html">Choosing fragments well</a>.</p>
+<h2>Assembly map</h2>
+<p>A mechanical reference showing how root and gathering fragments compose complete
+generated files. It answers “which pieces make this output?” while conceptual
+chapters explain why those pieces exist. See
+<a href="assembly.html">Appendix A — Program assembly maps</a>.</p>
+<h2>Bootstrap</h2>
+<p>Known-working material used to build the generator before a freshly generated version
+exists. In this repository, checked-in generated source and a buildable CLI provide
+the bridge from the authoritative book to a fresh engine. Bootstrap files are useful
+derived artifacts, not a second authority. See
+<a href="generator_that_generates_itself.html">A generator that generates itself</a>.</p>
+<h2>Capability</h2>
+<p>A narrowly scoped authority represented by data that must be validated before use.
+Examples include an opaque preview-navigation URI, an allowed executable path, or a
+resource path confined to a project. Possessing arbitrary text that resembles a
+capability does not grant the authority. See
+<a href="previewing_the_explanation.html">Previewing the explanation</a>.</p>
+<h2>Captured input</h2>
+<p>The exact documents and templates selected for one operation. Capturing turns a
+changing workspace into a stable value that can be parsed, planned, checked for
+freshness, or sent to another process. Later edits do not retroactively change that
+operation. See <a href="project_snapshot.html">The project snapshot</a>.</p>
+<h2>Companion</h2>
+<p>A file that travels beside a LaTeX publication, such as an image, diagram, font, or
+font license. Companions use safe generated names and join the same plan and
+transaction as the TeX document. See
+<a href="portable_publication_resources.html">Portable publication resources</a>.</p>
+<h2>Contribution</h2>
+<p>One authored fenced block belonging to a named fragment family. The first accepted
+contribution is the definition; later accepted <code>=+</code> blocks are appends. Contributions
+retain separate source locations even though tangling concatenates them. See
+<a href="fragment_graph.html">The fragment graph</a>.</p>
+<h2>Definition</h2>
+<p>The first accepted <code>=</code> declaration of a fragment family. It establishes the exact,
+case-sensitive family name and, for a root, its output destination and optional
+source template. A second base definition of the same name is a duplicate, not an
+append. See <a href="from_explanation_to_source.html">From explanation to source</a>.</p>
+<h2>Deterministic</h2>
+<p>Producing the same semantic result from the same accepted input and policy. In
+Literate this includes document order, contribution order, graph traversal,
+identities, diagnostics, and planned output bytes. Deterministic does not mean that
+identities survive arbitrary edits or that external PDF tools produce identical
+bytes on every machine. See
+<a href="determinism_design_principle.html">Determinism as a design principle</a>.</p>
+<h2>Diagnostic</h2>
+<p>A structured explanation that an input, graph, mapping, resource, or operation is
+invalid or unsupported. Engine diagnostics name a source path and zero-based line and
+column. A diagnostic prevents an all-or-nothing plan where continuing would require
+guessing or publishing partial results.</p>
+<h2>Effect</h2>
+<p>An observable interaction outside pure parsing and planning: reading a filesystem,
+writing an output, spawning a process, registering an editor provider, or opening a
+UI. Literate keeps effects in adapters so the same semantic model can serve several
+hosts. See <a href="parsing_without_effects.html">Parsing without side effects</a>.</p>
+<h2>Fail closed</h2>
+<p>Refusing an operation when its safety or meaning cannot be established. A missing
+mapping, malformed protocol reply, excessive payload, ambiguous term, or partial code
+action produces no invented fallback. Read-only views may omit unsafe data; mutating
+operations reject the complete change. See
+<a href="resource_bounds_fail_closed.html">Resource bounds and fail-closed behavior</a>.</p>
+<h2>Family</h2>
+<p>All ordered contributions with one exact fragment name. References point to the
+family, not to one contribution. Tangling expands the family by concatenating its
+base definition and appends in encounter order. See
+<a href="fragment_graph.html">The fragment graph</a>.</p>
+<h2>Fixed point</h2>
+<p>A state in which a fresh engine built from the generated plan reads the same captured
+book and reproduces exactly the same output path set and contents. A fixed point shows
+self-consistency of generation; it does not prove all application behavior correct.
+See <a href="generator_that_generates_itself.html">A generator that generates itself</a>.</p>
+<h2>Fragment</h2>
+<p>A named unit of authored program text chosen to express one explainable idea. In
+casual prose, “fragment” may refer to the family as a whole; when precision matters,
+a family contains one or more contributions. References let fragments be presented
+in explanatory order and assembled in source order. See
+<a href="choosing_fragments.html">Choosing fragments well</a>.</p>
+<h2>Fragment graph</h2>
+<p>The directed graph whose vertices are fragment families and whose edges are
+references from one family to another. Roots select generated outputs. Missing
+vertices and cycles are graph errors. See <a href="fragment_graph.html">The fragment graph</a>.</p>
+<h2>Freshness</h2>
+<p>Evidence that a result still belongs to the source, templates, settings, workspace,
+session, and request that produced it. Version numbers can prove some forms of
+freshness; unversioned asynchronous reports may only offer best-effort freshness.
+Known stale work is discarded rather than attached to current source. See
+<a href="diagnostics_over_projections.html">Diagnostics over changing projections</a>.</p>
+<h2>Generated output</h2>
+<p>A file described by a complete generation or publication plan. Generated program
+source and HTML are derived from the authoritative book; publication outputs are
+derived through the separate explicit pipeline. Generated files are important review,
+bootstrap, and packaging artifacts, but direct edits do not become authoritative.</p>
+<h2>Generation plan</h2>
+<p>The complete set of validated output paths and contents returned before a host writes
+anything. Planning is all-or-nothing: graph, template, destination, collision, and
+resource errors produce diagnostics and no partial file set. See
+<a href="complete_generation_plan.html">Planning a complete generation</a>.</p>
+<h2>Host</h2>
+<p>The environment that supplies inputs and owns effects around the shared engine.
+Literate's hosts include the command line, VS Code, Markdown preview, browser programs,
+and publication helpers. A host may have narrower trust, filesystem, or process
+capabilities than another host.</p>
+<h2>Identity</h2>
+<p>A stable target derived from semantic data such as an exact fragment name, canonical
+document path, heading slug, term key, or source location. Separate namespaces keep
+families, contributions, documents, headings, terms, and notes from colliding.
+Identity is deterministic under fixed input but may change after a meaningful rename
+or move. See <a href="building_publication_document.html">Building a publication document</a>.</p>
+<h2>Inspection</h2>
+<p>A read-only report of ordered documents, template dependencies, fragment declarations,
+roots, and references. Inspection can retain useful partial structure from an invalid
+project and does not read or preflight generated destinations. See
+<a href="command_line_adapter.html">The command-line adapter</a>.</p>
+<h2>Language server</h2>
+<p>A separate program that provides language intelligence through the Language Server
+Protocol. Literate launches explicitly configured stdio servers for generated-language
+projections and validates their replies before mapping results into fragments. It does
+not borrow another extension's private server or install one automatically. See
+<a href="owning_language_server_session.html">Owning a language-server session</a>.</p>
+<h2>Mapping segment</h2>
+<p>A half-open correspondence between unchanged literal text in a literate contribution
+and one interval in assembled generated text. Inserted indentation, reference markers,
+template wrappers, and other synthetic text have no source mapping. See
+<a href="projection_problem.html">The projection problem</a>.</p>
+<h2>Occurrence</h2>
+<p>One appearance of source text in a generated projection. A reused fragment can have
+several occurrences. Read-only services can select a deterministic occurrence;
+mutating services require a uniquely safe occurrence so one edit is not unexpectedly
+amplified through every expansion. See
+<a href="mutating_projected_source.html">Mutating projected source safely</a>.</p>
+<h2>Output root</h2>
+<p>A fragment family whose name ends in <code>.*</code> and whose initial declaration names a
+workspace-relative destination. Expanding a root produces one generated source file,
+possibly through a source template. “Root” may also mean the workspace directory in
+filesystem discussions; the surrounding phrase should make the meaning clear. See
+<a href="from_explanation_to_source.html">From explanation to source</a>.</p>
+<h2>Output transaction</h2>
+<p>The host protocol that compares planned bytes, preflights every destination, stages
+all changed files, preserves originals, installs the batch, rolls back ordinary
+failures, and reports retained recovery material. It offers recoverable exception
+safety, not a crash-durable journal, concurrency lock, or instant filesystem-wide
+atomicity. See <a href="changing_files_safely.html">Changing files safely</a>.</p>
+<h2>Pandoc bridge</h2>
+<p>The controlled conversion boundary from Literate's validated publication model to a
+small Pandoc JSON document and then to a LaTeX body. Pandoc is a trusted prose writer
+inside this boundary, not the parser of Literate source or the owner of fragment
+semantics. See <a href="building_publication_document.html">Building a publication document</a>.</p>
+<h2>Plan</h2>
+<p>A complete proposed result returned before effects. Depending on context, this may be
+a generation plan, resource plan, or publication plan. A plan makes validation and
+review possible before a transaction changes destinations.</p>
+<h2>Preview</h2>
+<p>A screen presentation intended for reading while editing. Markdown preview can use
+current buffers, semantic links, Mermaid rendering, and optional fragment exploration,
+but it does not define generation authority or imply that print publication will have
+the same layout. See <a href="previewing_the_explanation.html">Previewing the explanation</a>.</p>
+<h2>Project</h2>
+<p>The semantic unit formed from every eligible <code>.literate</code> document under one root,
+plus declared templates and root settings. The root index controls the beginning of
+document order but does not exclude unlinked chapters. See
+<a href="project_snapshot.html">The project snapshot</a>.</p>
+<h2>Projection</h2>
+<p>An in-memory view of assembled generated-language files presented at their intended
+URIs without requiring those files to be written. A projection includes source
+mappings so validated language-server results can return to authored fragments. See
+<a href="projection_problem.html">The projection problem</a>.</p>
+<h2>Protocol</h2>
+<p>An explicit contract for exchanging data between independently owned components.
+Examples include JSON-RPC framing for language servers, inert browser payloads, the
+publication helper's single JSON request, and versioned CLI responses. A protocol
+includes validation, limits, lifecycle, and failure rules—not only a JSON shape.</p>
+<h2>Publication document</h2>
+<p>The complete renderer-neutral block tree produced after project order, fragment graph,
+links, annotations, and supported Markdown have all been validated. Screen and print
+renderers consume related semantic data, while the Pandoc bridge carries the print
+document toward LaTeX. See
+<a href="building_publication_document.html">Building a publication document</a>.</p>
+<h2>Reference</h2>
+<p>A <code>&lt;&lt;name&gt;&gt;</code> use inside an accepted contribution. Tangling replaces it recursively
+with the target family's ordered contributions. Its use-site indentation is applied
+to every expanded line. An escaped opening delimiter is literal text rather than a
+reference. See <a href="from_explanation_to_source.html">From explanation to source</a>.</p>
+<h2>Renderer</h2>
+<p>A component that turns an already understood model into presentation for a medium.
+HTML, editor preview, LaTeX, syntax highlighting, annotation rails, and Mermaid assets
+have renderers. Renderers decide appearance but do not redefine fragment identity or
+project order.</p>
+<h2>Root settings</h2>
+<p>Project-wide options authored in exact <code>SETTINGS</code> fences in normalized root
+<code>index.literate</code>. Source/HTML settings select template, authors, and theme; print
+publication additionally reads font roles and code-ligature policy. Chapter-local
+settings do not override the root. See
+<a href="appendix_syntax_settings.html">Appendix B — Literate syntax and settings reference</a>.</p>
+<h2>Self-hosting</h2>
+<p>Using Literate to describe and generate Literate's own engine. Self-hosting creates a
+bootstrap obligation: an available generator must understand enough of the book to
+produce its replacement. It is verified by a fixed point rather than assumed from the
+circular description. See
+<a href="generator_that_generates_itself.html">A generator that generates itself</a>.</p>
+<h2>Snapshot</h2>
+<p>An ordered, immutable capture of project inputs for one operation. In the CLI it is
+built from saved disk files. In the editor, eligible open buffers can override disk,
+including empty or newly created file-backed documents. A snapshot is not a live
+workspace view. See <a href="project_snapshot.html">The project snapshot</a>.</p>
+<h2>Source mapping</h2>
+<p>The collection of mapping segments that relates authored fragment text to generated
+projection text. Mappings let diagnostics, navigation, completion ranges, and selected
+edits return to source without searching by text. A missing or seam-crossing mapping
+is omitted rather than guessed.</p>
+<h2>Stable target</h2>
+<p>A collision-safe identifier used for semantic links. Fragment-family targets derive
+from exact names; contribution targets additionally use canonical path and local
+ordinal; document, heading, term, and note targets use their own namespaces. Stable
+means deterministic for the same structure, not permanent across every edit.</p>
+<h2>Tangle</h2>
+<p>To expand roots and named references into generated program source. Tangling follows
+the fragment graph, concatenates contributions in project order, preserves use-site
+indentation, applies source templates, and reports graph errors. In this book,
+“generate” includes tangling plus HTML planning and host-side output handling. See
+<a href="from_explanation_to_source.html">From explanation to source</a>.</p>
+<h2>Template</h2>
+<p>A captured input containing a fixed literal placeholder. Source templates replace
+every original <code>[CODE]</code>; HTML templates replace <code>[CONTENT]</code>, <code>[AUTHORS]</code>, and
+<code>[THEME]</code>. Substitution is single-pass, and inserted values are not scanned again.
+Template wrapper text has no authored fragment mapping.</p>
+<h2>Term</h2>
+<p>A named reusable definition authored with a <code>TERM</code> fence and referenced only through
+explicit <code>term:</code> links. A term definition remains in prose; generated indexes and
+print page lookups point to it rather than relocating its body. See
+<a href="shared_annotations_identities.html">Shared annotations and identities</a>.</p>
+<h2>Trust boundary</h2>
+<p>A point where data or authority must be checked before crossing into a more powerful
+operation. Examples include accepting a language-server reply, selecting an
+executable, resolving an output path, turning author structure into raw LaTeX, or
+committing planned bytes. A trust boundary narrows authority; it is not automatically
+a sandbox.</p>
+<h2>Weave</h2>
+<p>To render the explanatory work for people, traditionally as a document with prose,
+code, and cross-references. Literate's screen weaving appears as generated HTML and
+Markdown preview; print publication uses a separate validated path through Pandoc and
+LaTeX. The implementation often says “render” or “publish” for these concrete forms.
+See <a href="programs_for_people_and_machines.html">Programs for people and machines</a>.</p>
+<h2>Workspace root</h2>
+<p>The directory that bounds one project's discovery, relative paths, templates, inputs,
+and outputs. Paths are validated against this authority. This filesystem meaning is
+distinct from an output-root fragment.</p>
+</div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

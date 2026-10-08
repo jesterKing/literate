@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Appendix C — Editor integration details</h1>
+<p>This appendix maps Literate's host-independent model onto VS Code's extension and
+Markdown APIs. The architectural account is in
+<a href="editor_project_repository.html">The editor-side project repository</a>,
+<a href="fragments_as_editor_symbols.html">Fragments as editor symbols</a>,
+<a href="previewing_the_explanation.html">Previewing the explanation</a>, and
+<a href="extension_activation_surface.html">Extension activation and public surface</a>.
+Here the emphasis is registration, adapter ownership, and the contracts a contributor
+needs when tracing an editor request.</p>
+<h2>Declarative and runtime surfaces</h2>
+<p>The package manifest makes features discoverable before extension code runs. It
+declares the Fragment Explorer view and refresh menu, public commands, configuration
+schemas, the pending-completion keybinding, Markdown-it participation, and the local
+browser scripts used by Markdown preview.</p>
+<p>Activation then creates the session-owned objects behind that surface. The exported
+<code>activate</code> function is the extension entry point. It returns an <code>extendMarkdownIt</code>
+hook, which is the runtime entry point used by the Markdown host.</p>
+<p>The manifest contains no imperative activation list because the host can infer
+activation from contributed commands, views, and Markdown support. Command IDs,
+view IDs, and setting keys should be treated as public compatibility boundaries.</p>
+<h2>Activation order</h2>
+<p>Activation follows dependency order rather than chapter or generated-file order:</p>
+<ol>
+<li>construct the shared <code>FragmentRepository</code> and attach it to the extension context;</li>
+<li>register publication commands around the repository's serialized publication
+boundary;</li>
+<li>register mapped language features around a source-capture function, not around
+unrestricted repository internals;</li>
+<li>perform an awaited, read-only initial project scan;</li>
+<li>create the preview-navigation capability handler;</li>
+<li>register fragment authoring commands, the Fragment Explorer, and fragment symbol
+providers;</li>
+<li>return the Markdown-it extension hook.</li>
+</ol>
+<p>A failed initial read is contained. Providers and commands still register and can
+report or recover from the current project state. Initial activation never generates
+source or HTML. See <a href="one_generator_several_hosts.html">One generator, several hosts</a>
+for the host boundary and <a href="changing_files_safely.html">Changing files safely</a> for the
+separate write transaction.</p>
+<h2>The project repository adapter</h2>
+<p><code>FragmentRepository</code> maintains one coherent editor-side view per workspace folder.
+Its published state includes accepted source snapshots, fragment records, Markdown
+token locations needed by existing commands, preview theme state, generated-output
+ownership, and the diagnostics owned by Literate.</p>
+<p>Source capture follows these rules:</p>
+<ul>
+<li>discover all eligible <code>.literate</code> paths, including unlinked chapters;</li>
+<li>apply the same excluded-directory and semantic ordering policies as the CLI;</li>
+<li>prefer an exact open text buffer over disk, including an empty buffer;</li>
+<li>include new file-backed buffers that have a stable workspace-relative identity;</li>
+<li>exclude untitled documents from project membership;</li>
+<li>discover declared templates through the engine, then capture them with the same
+open-buffer precedence;</li>
+<li>treat genuine absence as a missing input, while propagating other acquisition
+failures rather than constructing a partial snapshot.</li>
+</ul>
+<p>Repository work is serialized. Providers request a read-only refresh. Explicit
+processing, accepted source changes, relevant filesystem events, and added workspace
+folders may request generation. Publication joins the queue for capture and lifetime
+coordination but uses its own helper pipeline. Preview rendering is synchronous and
+uses a separate in-memory overlay on the last discovered membership.</p>
+<p>The repository translates engine diagnostics into one workspace-scoped
+<code>DiagnosticCollection</code>. Replacement is whole-snapshot replacement: repairing a
+project clears obsolete entries, and refreshing one workspace does not clear another.</p>
+<h2><code>grabber.literate</code>: the Markdown parser state bridge</h2>
+<p><a href="grabber.html">The grabber</a> is a small but important bridge between Markdown parsing
+and editor adapters. <code>grabberPlugin</code> installs a Markdown-it core rule named <code>grabit</code>
+before Markdown-it's <code>normalize</code> rule. When the parser receives an environment
+object, that rule stores the current parser <code>StateCore</code> as <code>env.gstate</code>, then returns
+without consuming or rewriting the token stream.</p>
+<p>The captured state gives the extension the actual token array, token maps, fence
+contents, and parser environment associated with one document. A <code>GrabbedState</code>
+joins that parser state to the document's workspace-relative name and full editor URI.
+The repository parses documents in engine-determined order with this plug-in and
+retains one such record per source.</p>
+<p>The bridge is intentionally not a second fragment parser. The engine's inspection
+result decides which declarations were accepted. Later adapter code matches each
+accepted definition location to the corresponding captured fence token by document
+and opening line. This join supplies concrete Markdown token locations to legacy
+commands and views without allowing a token scan to overrule semantic validation.</p>
+<p>The same plug-in is installed in the Markdown parser returned by <code>extendMarkdownIt</code>.
+That makes host preview token state available to Literate's fence and document
+wrappers while preserving the built-in Markdown pipeline. The contract is narrow:</p>
+<ul>
+<li>capture the parser-owned <code>StateCore</code> in <code>env.gstate</code>;</li>
+<li>do not mutate source, normalize it early, render, or generate files;</li>
+<li>let the next Markdown-it core rule continue;</li>
+<li>use captured tokens only in combination with current engine-approved identities.</li>
+</ul>
+<p>This is why <code>grabber.literate</code> is best understood as a Markdown parser state bridge,
+not as the source of fragment semantics.</p>
+<h2>Fragment provider registration</h2>
+<p>Fragment-oriented providers register for the Markdown language because <code>.literate</code>
+files use VS Code's built-in Markdown support. Registration is broader than action:
+each adapter locates the current workspace, refreshes read-only state, and declines
+when the cursor is outside a meaningful fragment occurrence.</p>
+<p>The registered fragment providers are:</p>
+<ul>
+<li>a <code>CompletionItemProvider</code>, triggered by <code>&lt;</code>, which offers family names only after
+an unmatched <code>&lt;&lt;</code> before the cursor;</li>
+<li>a <code>DefinitionProvider</code>, which selects the base family definition;</li>
+<li>a <code>ReferenceProvider</code>, which returns semantic references and prose mentions, with
+declarations controlled by the caller's request;</li>
+<li>a <code>HoverProvider</code>, which presents bounded unexpanded family content;</li>
+<li>a <code>RenameProvider</code>, which previews and reparses a complete project-wide name edit;</li>
+<li>a <code>CodeActionProvider</code>, which offers a current-snapshot fix for a verified missing
+reference.</li>
+</ul>
+<p>The providers use raw UTF-16 editor coordinates. Rename edits only the inner name
+range, leaving chevrons and operators intact. A read-only refresh may inspect unsaved
+buffers but does not write generated output.</p>
+<p>Mapped programming-language providers use a narrower document selector: local
+file-backed Markdown documents matching <code>**/*.literate</code>. Runtime checks additionally
+require an open document, a trusted local workspace, an accepted named-fragment body,
+a configured canonical language, and a position that maps into an in-memory output.
+Their registrations are listed in
+<a href="coordinating_language_features.html">Coordinating language features in the editor</a>.</p>
+<h2>Command registration and effect levels</h2>
+<p>Activation registers command implementations and places every returned disposable in
+the extension context.</p>
+<ul>
+<li><code>literate.process</code> asks the repository to capture and process workspace projects
+with write intent. Only a complete valid plan reaches output preflight and commit.</li>
+<li><code>literate.create_fragment_for_tag</code> edits the active document to define the selected
+family.</li>
+<li><code>literate.split_fragment</code> closes the current fence and opens an append below the
+selected position, preserving the current language and family.</li>
+<li><code>fragmentExplorer.refreshEntry</code> fires tree invalidation so VS Code requests visible
+children again; it does not generate files.</li>
+<li><code>literate.restartLanguageServers</code> resets mapped-language sessions so later requests
+may create new processes.</li>
+<li>publication commands begin explicit, trusted export flows and do not run during
+activation or ordinary preview.</li>
+</ul>
+<p>The manifest also declares <code>literate.cancelAutomaticCompletion</code>. Its keybinding is
+enabled only while an automatic request is pending and ordinary editor widgets do not
+already own Escape.</p>
+<h2>Fragment Explorer adapters</h2>
+<p>The Explorer contribution uses the public view ID <code>fragmentExplorer</code>.
+<code>FragmentExplorer</code> owns the view registration, view instance, refresh command, and
+change subscription. <code>FragmentNodeProvider</code> implements <code>TreeDataProvider&lt;FragmentNode&gt;</code>
+and emits <code>onDidChangeTreeData</code> when its cached presentation should be queried again.</p>
+<p>Top-level children represent workspace folders and accepted families. Expanding a
+family asks for its direct unexpanded references; selecting a resolved item opens its
+first accepted contribution. Missing targets remain visible without an invented
+location. Child discovery is lazy, so creating the view does not recursively unfold
+the graph.</p>
+<p>The tree mirrors graph edges and currently has no active-path cycle marker or global
+expansion budget. The bounded inline browser explorer is a different adapter with a
+different safety contract. See <a href="exploring_fragment_graph.html">Exploring the fragment graph</a>
+and <a href="appendix_browser_programs.html">Appendix D — Browser programs</a>.</p>
+<h2>Markdown preview integration</h2>
+<p><code>extendMarkdownIt</code> installs three cooperating pieces on the host parser:</p>
+<ol>
+<li><code>grabberPlugin</code> captures parser state in the environment;</li>
+<li><code>installPreviewFences</code> wraps fence rendering;</li>
+<li><code>installPreviewDocument</code> wraps complete document rendering with project theme,
+semantic links, annotations, and optional exploration data.</li>
+</ol>
+<p>Fence handling narrows in this order:</p>
+<ul>
+<li>fence headers containing <code>SETTINGS</code> currently render nothing in preview, while
+only an exactly trimmed <code>SETTINGS</code> info string is interpreted as project settings;</li>
+<li>a plain <code>mermaid</code> fence becomes an escaped source container for the local browser
+renderer;</li>
+<li>an engine-approved named contribution receives stable identity, navigation, and
+semantic reference decoration only after the current token matches path, line,
+header, role, language, and content;</li>
+<li>every other fence delegates to the renderer that was installed before Literate.</li>
+</ul>
+<p>A named fragment whose language is Mermaid remains source code; only a plain Mermaid
+fence is a diagram. A stale or malformed declaration remains safely rendered code
+without semantic links.</p>
+<p>Preview builds a read-only in-memory project by overlaying open buffers and the exact
+source currently given to the parser on the repository's last discovered membership.
+It does not wait for filesystem discovery and never acquires generation authority.
+See <a href="previewing_the_explanation.html">Previewing the explanation</a>.</p>
+<h2>Preview navigation adapter</h2>
+<p>Cross-document preview links use a temporary opaque capability rather than a command
+URI containing a path and line number. The activation-owned URI handler mints a
+capability only for a trusted current workspace and an accepted logical publication
+target.</p>
+<p>When activated, the handler rechecks its scheme and authority, token shape, session
+membership, expiry, workspace identity, trust, current project semantics, and
+canonical path. It then resolves the logical target against fresh source before
+opening and selecting it. The rendered document cannot supply an arbitrary command,
+filename, or stale line as editor authority.</p>
+<p>Generated HTML uses ordinary relative chapter links for the same logical identities.
+The screen renderer therefore owns target meaning, while the editor adapter owns the
+privilege of opening a source document.</p>
+<h2>Routine VS Code conversions</h2>
+<p>Host adapters should remain mechanical and fail closed:</p>
+<ul>
+<li>engine zero-based line and UTF-16 column values become <code>Position</code> and <code>Range</code>;</li>
+<li>workspace-relative source paths become URIs by joining them to the owning folder,
+never by accepting an arbitrary URI from rendered or server data;</li>
+<li>pure occurrence records become <code>Location</code>, <code>CompletionItem</code>, <code>Hover</code>,
+<code>WorkspaceEdit</code>, <code>CodeAction</code>, <code>TreeItem</code>, or <code>Diagnostic</code> values only after their
+feature-specific checks pass;</li>
+<li>cancellation tokens are checked before and after asynchronous refreshes;</li>
+<li>editor document versions are retained whenever a later result could propose an edit;</li>
+<li>missing or stale evidence returns no provider result rather than a guessed range.</li>
+</ul>
+<p>These conversions should not redefine fragment grammar, ordering, graph validity,
+projection, or output policy. Those belong to the engine and pure helper modules.</p>
+<h2>Trust and configuration boundaries</h2>
+<p>Read-only fragment inspection can remain available without starting an executable.
+Capabilities with greater authority are checked where exercised:</p>
+<ul>
+<li>preview-to-editor navigation requires a trusted current workspace and a valid
+temporary capability;</li>
+<li>mapped language servers require trusted local file workspaces and restricted global
+executable configuration;</li>
+<li>publication requires a trusted local desktop workspace and independently validated
+process and path settings;</li>
+<li>generated-file replacement requires a complete plan plus destination preflight and
+transaction commit.</li>
+</ul>
+<p>Workspace Trust is therefore not a substitute for path, protocol, freshness, or
+transaction validation. Each adapter must enforce the narrower boundary attached to
+its own effect.</p>
+<h2>Disposal and ownership</h2>
+<p>Every provider, command, listener, view, diagnostic collection, timer, URI handler,
+server coordinator, and repository enters an explicit owner. Extension-level
+resources are attached to <code>context.subscriptions</code>.</p>
+<p>Disposal closes input before clearing state: new repository work is refused, timers
+are cancelled, preview capabilities are invalidated, providers and listeners are
+released, diagnostics and bounded caches are cleared, and workspace snapshots are
+dropped. Language sessions have a bounded shutdown sequence. Publication helpers
+receive graceful cancellation, but the editor continues waiting if transaction
+cleanup outlives its deadline rather than risking an abandoned rollback. Cleanup is
+idempotent because normal deactivation and failure paths may meet the same resource.</p>
+<h2>Tracing an editor request</h2>
+<p>For a fragment-name operation, follow this route:</p>
+<ol>
+<li>provider registration in the activation assembly;</li>
+<li>read-only repository refresh;</li>
+<li>engine inspection and pure symbol collection;</li>
+<li>exact occurrence lookup;</li>
+<li>feature-specific conversion to an editor result.</li>
+</ol>
+<p>For a Markdown preview problem, follow:</p>
+<ol>
+<li>the returned <code>extendMarkdownIt</code> hook;</li>
+<li><code>grabber.literate</code> and <code>env.gstate</code>;</li>
+<li>the fence and document wrappers;</li>
+<li>the repository's synchronous preview overlay;</li>
+<li>screen rendering and the relevant browser program.</li>
+</ol>
+<p>For mapped programming-language behavior, begin with
+<a href="coordinating_language_features.html">Coordinating language features in the editor</a>,
+then use <a href="appendix_language_server_protocol.html">Appendix E — Language-server protocol details</a>
+for transport and reply contracts.</p>
+</div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

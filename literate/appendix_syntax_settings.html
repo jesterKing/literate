@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Appendix B — Literate syntax and settings reference</h1>
+<p>This appendix is the lookup route for authored Literate syntax and the settings
+that select host behavior. The language model behind the notation is developed in
+<a href="from_explanation_to_source.html">From explanation to source</a>, while
+<a href="project_snapshot.html">The project snapshot</a> explains why document order and root
+settings are semantic input rather than presentation details.</p>
+<h2>Documents and project order</h2>
+<p>A project consists of every eligible <code>.literate</code> document beneath a workspace root,
+not only the files linked by the index. Documents are interpreted in this order:</p>
+<ol>
+<li>the normalized root <code>index.literate</code>, when present;</li>
+<li>documents linked from that index, in link encounter order;</li>
+<li>all remaining documents, sorted by normalized workspace-relative path.</li>
+</ol>
+<p>An index link ending in <code>.html</code> selects the corresponding <code>.literate</code> source for
+ordering. Query strings and fragments do not affect that selection, repeated links
+do not insert a document twice, and unlinked chapters remain part of the project.
+Because appends are assembled in project order, changing chapter order can change
+generated source. See <a href="project_snapshot.html">The project snapshot</a> and
+<a href="fragment_graph.html">The fragment graph</a>.</p>
+<h2>Fragment declarations</h2>
+<p>A named fragment is a fenced Markdown code block whose info string contains a
+language, a colon, a name in double chevrons, and a definition operator. Whitespace
+around the parts is permitted.</p>
+<pre><code>```typescript : &lt;&lt;parse one request&gt;&gt;=
+// fragment body
+```
+</code></pre>
+<p>The language may be omitted by retaining the colon:</p>
+<pre><code>``` : &lt;&lt;language-neutral text&gt;&gt;=
+text
+```
+</code></pre>
+<p>The first accepted declaration defines a fragment family. A second <code>=</code> definition
+with the same exact name is a duplicate, not an implicit append. Names are exact and
+case-sensitive; blank names and names containing angle brackets or line breaks are
+invalid.</p>
+<p>The opening fence may use any Markdown fence marker accepted by Markdown-it. The
+fragment grammar applies to the complete info string, however, so unrelated trailing
+text is not accepted as a comment.</p>
+<h2>Ordered contributions</h2>
+<p>Use <code>=+</code> to append another contribution to a family that has already been defined:</p>
+<pre><code>```typescript : &lt;&lt;parse one request&gt;&gt;=+
+// later contribution
+```
+</code></pre>
+<p>An append must encounter its base definition earlier in project order. It may carry
+its own language label for presentation, but it cannot declare an output path or a
+source template. Contributions are concatenated in deterministic encounter order.
+Their separate source locations are retained for diagnostics, navigation, and
+publication.</p>
+<p>For the design consequences of definitions and appends, see
+<a href="choosing_fragments.html">Choosing fragments well</a> and
+<a href="fragments_as_editor_symbols.html">Fragments as editor symbols</a>.</p>
+<h2>References and expansion</h2>
+<p>Inside an accepted fragment body, a plain tag references another family:</p>
+<pre><code>&lt;&lt;parse one request&gt;&gt;
+</code></pre>
+<p>References may precede their definitions in reading order. Tangling recursively
+replaces each reference with the target family's ordered contributions. A reference
+operator such as <code>=</code> or <code>=+</code> inside a body is invalid; definition operators belong in
+fence headers.</p>
+<p>When a reference appears after indentation on its line, each newline in the expanded
+text receives that indentation. The indentation belongs to the use site, not to the
+referenced family. Missing families, cycles, invalid operators, and expansion-limit
+violations diagnose the project and prevent the complete generation plan.</p>
+<p>To emit a literal opening delimiter from fragment code, escape it:</p>
+<pre><code>&lt;&lt;not a fragment reference&gt;&gt;
+</code></pre>
+<p>The escape prevents reference recognition, and the backslash is removed from the
+generated and rendered code. Escaping is lexical: it applies to the opening chevrons,
+not to a later matching name found by search.</p>
+<h2>Output roots</h2>
+<p>A fragment whose exact name ends in <code>.*</code> is an output root. Its initial declaration
+must name a workspace-relative destination followed by whitespace and <code>$</code>:</p>
+<pre><code>```typescript : &lt;&lt;assemble the request parser.*&gt;&gt;= src/request-parser.ts $
+&lt;&lt;parse one request&gt;&gt;
+```
+</code></pre>
+<p>Only roots may declare destinations. Paths must remain within the project, satisfy
+the portable path policy, and avoid collisions with source documents, templates,
+HTML pages, other outputs, and ancestor file paths. A root without a destination is
+invalid. Appending to a root uses only the ordinary append form; the destination is
+not repeated.</p>
+<p>Generation validates every root and dependency before returning any source or HTML
+file. For expansion and all-or-nothing planning, see
+<a href="complete_generation_plan.html">Planning a complete generation</a>. For the complete
+root inventory, see <a href="assembly.html">Appendix A — Program assembly maps</a>.</p>
+<h2>Source templates</h2>
+<p>A root may select one source template after its destination:</p>
+<pre><code>```typescript : &lt;&lt;assemble the extension.*&gt;&gt;= src/extension.ts $ template=tssrc.template
+&lt;&lt;extension body&gt;&gt;
+```
+</code></pre>
+<p>The template path is workspace-relative and is loaded as declared project input.
+Every original <code>[CODE]</code> marker is replaced with the complete tangled source. A
+template without that marker remains valid but inserts no tangled code. Substitution
+is literal and single-pass: inserted code is not scanned again for placeholders.
+Wrapper text outside a <code>[CODE]</code> slot has no literate source mapping.</p>
+<p>Only one <code>template</code> setting is accepted on a fragment declaration. Semicolons delimit
+fragment settings, although <code>template</code> is currently the only recognized key. A
+missing explicitly selected template is an error rather than a request to continue
+without the wrapper.</p>
+<h2>Root <code>SETTINGS</code> fences</h2>
+<p>Project-wide settings are ordinary fenced blocks whose trimmed info string is exactly
+<code>SETTINGS</code>. They are hidden from rendered HTML and preview. Only settings in the
+normalized root <code>index.literate</code> have project-wide authority; a chapter-local block
+cannot override them.</p>
+<pre><code><span class="hljs-code">```SETTINGS
+theme=rosepine-dawn
+authors=First Author;Second Author
+template=page.template
+```</span>
+</code></pre>
+<p>Settings use one <code>key=value</code> pair per line. Key matching is case-sensitive. Unknown
+lines are ignored by the settings consumers rather than becoming a general extension
+mechanism.</p>
+<h3>Source and HTML settings</h3>
+<ul>
+<li><code>template</code> selects a workspace-relative HTML template. The template receives
+<code>[CONTENT]</code>, <code>[AUTHORS]</code>, and <code>[THEME]</code> by literal, single-pass substitution.
+<code>[CONTENT]</code> is rendered document content, <code>[AUTHORS]</code> is generated author metadata,
+and <code>[THEME]</code> is the complete selected document stylesheet.</li>
+<li><code>authors</code> is a semicolon-separated author list used to construct HTML author
+metadata. A later recognized occurrence replaces the earlier value.</li>
+<li><code>theme</code> selects an exact, case-sensitive name from the built-in catalogue. Omission
+uses the default catalogue theme. The last valid occurrence wins; every invalid
+occurrence remains a diagnostic. See <a href="themes.html">Document themes</a> for names and
+color behavior.</li>
+</ul>
+<p>Legacy HTML templates without <code>[THEME]</code> receive the stylesheet beside <code>[CONTENT]</code>.
+An explicitly selected but unavailable HTML template is an error; the default page is
+used only when no template was requested.</p>
+<h3>Publication font settings</h3>
+<p>Print publication additionally recognizes these root keys:</p>
+<ul>
+<li><code>font-body</code></li>
+<li><code>font-heading</code></li>
+<li><code>font-code</code></li>
+<li><code>font-fragment</code></li>
+<li><code>font-note</code></li>
+<li><code>font-code-ligatures</code>, whose value is exactly <code>on</code> or <code>off</code></li>
+</ul>
+<p>Font-family values are trimmed simple ASCII names: one to one hundred letters,
+digits, spaces, dots, or hyphens, beginning with a letter or digit. They are family
+names, not paths or TeX expressions. The last valid value for a role wins while
+invalid occurrences remain diagnostics. If <code>font-note</code> is omitted, notes inherit the
+final body family. Resolving these values does not install, locate, or bundle fonts.
+See <a href="publication-settings.html">Publication font settings</a> and
+<a href="portable_publication_resources.html">Portable publication resources</a>.</p>
+<h2>HTML template placeholders</h2>
+<p>HTML and source templates share one deliberately small substitution mechanism:</p>
+<ul>
+<li>source templates recognize <code>[CODE]</code>;</li>
+<li>HTML templates recognize <code>[CONTENT]</code>, <code>[AUTHORS]</code>, and <code>[THEME]</code>;</li>
+<li>matching original placeholders are replaced literally;</li>
+<li>inserted values are never scanned for more placeholders;</li>
+<li>unknown placeholders remain unchanged.</li>
+</ul>
+<p>This is not a scripting or expression language. Template files are captured project
+inputs and participate in freshness checks in the editor and language-service paths.</p>
+<h2>Command-line reference</h2>
+<p>The headless adapter uses the same parser and generation engine as the extension.
+Every command accepts an optional project root and <code>--json</code>; help is available through
+<code>--help</code>, <code>-h</code>, or <code>help &lt;command&gt;</code>.</p>
+<ul>
+<li><code>inspect</code> reports ordered documents, template dependencies, fragment declarations,
+roots, and references. It does not inspect output destinations.</li>
+<li><code>check</code> constructs a complete valid plan and reports outputs as current, missing, or
+stale without writing.</li>
+<li><code>generate</code> writes only missing or changed planned source and HTML outputs through the
+output transaction boundary.</li>
+<li><code>self-check</code> verifies the repository's trusted self-hosting fixed point without
+generating files; planned outputs must already be current.</li>
+<li><code>latex</code> requires <code>--output path.tex</code> and explicitly exports the publication model to
+LaTeX without generating source/HTML or compiling a PDF.</li>
+<li><code>pdf</code> requires <code>--output path.pdf</code> and explicitly compiles in a private build
+directory, publishing only the requested PDF. <code>--keep-build</code> retains that private
+directory for inspection.</li>
+</ul>
+<p><code>latex</code> and <code>pdf</code> accept paper and margin options, <code>--font-manifest</code>, and an explicit
+<code>--browser</code> path for Mermaid publication assets. Output paths are relative to the
+selected project root. Consult <a href="cli.html">Command-line generation</a> for the complete
+flag grammar and structured response schema, and
+<a href="command_line_adapter.html">The command-line adapter</a> for effect boundaries.</p>
+<p>In JSON mode the CLI emits one response object. Its <code>schemaVersion</code> is the automation
+compatibility boundary; engine coordinates remain zero-based. Human output presents
+one-based line and column numbers.</p>
+<h2>Extension commands</h2>
+<p>The manifest exposes these stable command identifiers:</p>
+<ul>
+<li><code>literate.process</code> — process every workspace project and commit valid changed
+generated outputs;</li>
+<li><code>literate.create_fragment_for_tag</code> — create a family for the tag selected in the
+active document;</li>
+<li><code>literate.split_fragment</code> — split a contribution and continue it as an append;</li>
+<li><code>fragmentExplorer.refreshEntry</code> — refresh the Fragment Explorer view;</li>
+<li><code>literate.restartLanguageServers</code> — dispose mapped-language sessions so later work
+starts fresh ones;</li>
+<li><code>literate.exportLatex</code> and <code>literate.exportPdf</code> — begin explicit publication exports;</li>
+<li><code>literate.cancelAutomaticCompletion</code> — cancel a pending automatic mapped-language
+request under its context-sensitive keybinding.</li>
+</ul>
+<p>Command identifiers are compatibility boundaries for keybindings, tasks, and menus.
+Their registration and effect levels are described in
+<a href="extension_activation_surface.html">Extension activation and public surface</a>.</p>
+<h2>Extension settings</h2>
+<h3>Mapped language services</h3>
+<ul>
+<li><code>literate.automaticCompletion</code> is a resource-scoped boolean, enabled by default. It
+controls automatic suggestions inside mapped fragment code; manual completion is
+unaffected.</li>
+<li><code>literate.languageDiagnostics</code> is a resource-scoped boolean, enabled by default. It
+controls the separate mapped-language diagnostic collection, not Literate's own
+fragment and generation diagnostics.</li>
+<li><code>literate.languageServers</code> is a restricted machine-scoped object read from global
+user settings. Keys are canonical VS Code language IDs. Each value requires an
+absolute <code>command</code> and may contain literal string <code>args</code>, object
+<code>initializationOptions</code>, and object <code>configuration</code>. No shell expansion occurs,
+workspace overrides are ignored, and servers are not installed automatically.</li>
+</ul>
+<p>See <a href="owning_language_server_session.html">Owning a language-server session</a> and
+<a href="appendix_language_server_protocol.html">Appendix E — Language-server protocol details</a>.</p>
+<h3>Publication tools</h3>
+<ul>
+<li><code>literate.publication.nodePath</code> selects the absolute external Node executable used
+by explicit publication work. Workspace overrides are ignored.</li>
+<li><code>literate.publication.browserPath</code> optionally selects an installed, sandbox-capable
+Chromium executable for Mermaid publication. Literate does not download a browser.</li>
+<li><code>literate.publication.fontManifest</code> selects an optional manifest path relative to
+the workspace folder. It remains subject to publication path and license checks.</li>
+</ul>
+<p>These are restricted machine settings because they influence external process or
+resource boundaries. See <a href="isolating_publication_editor.html">Isolating publication from the editor</a>.</p>
+<h2>Common failure lookup</h2>
+<ul>
+<li><strong>A declaration is ignored:</strong> check that the complete fence info string matches the
+fragment header grammar and that the name is nonempty.</li>
+<li><strong>An append is rejected:</strong> its base definition must occur earlier, and the append
+must not repeat output or template settings.</li>
+<li><strong>A root produces no file:</strong> a root name must end in <code>.*</code>, declare a nonempty
+destination terminated by <code>$</code>, and belong to a project with no diagnostics.</li>
+<li><strong>A tag is copied literally:</strong> it may be escaped, outside an accepted fragment body,
+or shown in ordinary Markdown rather than used as a reference.</li>
+<li><strong>A setting has no effect:</strong> verify exact case, an exact <code>SETTINGS</code> info string, and
+placement in the normalized root <code>index.literate</code>.</li>
+<li><strong>No files are returned:</strong> generation is intentionally all-or-nothing; inspect every
+diagnostic, including errors in unreachable families and templates.</li>
+</ul>
+</div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>
