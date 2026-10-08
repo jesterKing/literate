@@ -6,6 +6,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { generateProject, SourceDocument } from '../../engine';
 import { projectLanguageSources, mapSourcePosition, mapGeneratedRange } from '../../language-projection';
+import { generatedFromBook } from './authoritative-book';
 
 const fence = (header: string, body: string) => '```' + header + '\n' + body + '\n```\n';
 const document = (text: string): SourceDocument => ({ path: 'index.literate', text });
@@ -22,13 +23,9 @@ function parity(documents: SourceDocument[], templates: Record<string, string> =
 
 test('owned chapters assemble in memory to their checked-in TypeScript outputs', () => {
     const root = path.resolve(__dirname, '../../..');
-    const documents = ['engine', 'language-projection'].map(name => ({ path: 'literate/' + name + '.literate',
-        text: fs.readFileSync(path.join(root, 'literate', name + '.literate'), 'utf8') }));
-    const generated = generateProject(documents);
-    assert.deepEqual(generated.diagnostics, []);
     for (const name of ['engine', 'language-projection']) {
         const output = 'src/' + name + '.ts';
-        assert.equal(generated.files.find(file => file.path === output)?.content, fs.readFileSync(path.join(root, output), 'utf8'));
+        assert.equal(generatedFromBook(output).content, fs.readFileSync(path.join(root, output), 'utf8'));
     }
 });
 

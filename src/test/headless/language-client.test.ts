@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { LanguageClient } from '../../language-client';
-import { generateProject } from '../../engine';
+import { generatedFromBook } from './authoritative-book';
 
 const server = String.raw`
 const mode = process.argv[1];
@@ -116,10 +116,8 @@ test('language client chapter generates exactly the owned source', () => {
     for (const fragment of text.matchAll(/```ts[^\n]*\n([\s\S]*?)```/g)) {
         assert.ok(fragment[1].trimEnd().split('\n').length <= 30, 'fragments stay within 30 lines');
     }
-    const generated = generateProject([{ path: 'literate/language-client.literate', text }]);
-    assert.deepEqual(generated.diagnostics, []);
-    assert.equal(generated.files.find(file => file.path === 'src/language-client.ts')?.content,
-        fs.readFileSync(path.join(root, 'src/language-client.ts'), 'utf8'));
+    const generated = generatedFromBook('src/language-client.ts');
+    assert.equal(generated.content, fs.readFileSync(path.join(root, 'src/language-client.ts'), 'utf8'));
 });
 
 test('deduplicated initialization, split Unicode frames, server requests and document lifecycle', async t => {

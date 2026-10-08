@@ -7,9 +7,10 @@ import * as path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import * as ts from 'typescript';
 import type * as vscode from 'vscode';
-import { generateProject, SourceDocument } from '../../engine';
+import { SourceDocument } from '../../engine';
 import { projectLanguageSources } from '../../language-projection';
 import type { LanguageLocationContext } from '../../language-navigation';
+import { generatedFromBook } from './authoritative-book';
 import { Position, Range } from './vscode-fixture';
 
 const root = path.resolve(__dirname, '../../..');
@@ -51,9 +52,8 @@ const values = (locations: vscode.Location[]) => locations.map(value => [value.u
     value.range.start.line, value.range.start.character, value.range.end.line, value.range.end.character]);
 
 test('owned chapter assembles exactly, with bounded design fragments', () => {
-    const generated = generateProject([{ path: 'literate/language-navigation.literate', text: chapter }]);
-    assert.deepEqual(generated.diagnostics, []);
-    assert.equal(generated.files.find(file => file.path === 'src/language-navigation.ts')?.content, source);
+    const generated = generatedFromBook('src/language-navigation.ts');
+    assert.equal(generated.content, source);
     for (const match of chapter.matchAll(/```ts[^\n]*\n([\s\S]*?)\n```/g)) {
         assert.ok(match[1].split('\n').length <= 30);
     }

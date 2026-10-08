@@ -9,9 +9,10 @@ import * as ts from 'typescript';
 import type * as vscode from 'vscode';
 import type { LanguageClient, LanguageDocument } from '../../language-client';
 import type { LanguageLocationContext } from '../../language-navigation';
-import { generateProject, SourceDocument } from '../../engine';
+import type { SourceDocument } from '../../engine';
 import { projectLanguageSources } from '../../language-projection';
 import { Position, Range, fence, tick } from './vscode-fixture';
+import { generatedFromBook } from './authoritative-book';
 
 const root = path.resolve(__dirname, '../../..');
 const source = fs.readFileSync(path.join(root, 'src/language-diagnostics.ts'), 'utf8');
@@ -120,9 +121,7 @@ function fixture(documents: SourceDocument[] = [
 
 test('chapter assembles the owned source exactly with snippets no longer than thirty lines', () => {
     const chapter = fs.readFileSync(path.join(root, 'literate/language-diagnostics.literate'), 'utf8');
-    const result = generateProject([{ path: 'literate/language-diagnostics.literate', text: chapter }]);
-    assert.deepEqual(result.diagnostics, []);
-    assert.equal(result.files.find(file => file.path === 'src/language-diagnostics.ts')?.content, source);
+    assert.equal(generatedFromBook('src/language-diagnostics.ts').content, source);
     for (const match of chapter.matchAll(/```ts[^\n]*\n([\s\S]*?)\n```/g)) { assert.ok(match[1].split('\n').length <= 30); }
 });
 

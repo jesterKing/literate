@@ -1,16 +1,13 @@
 import assert = require('node:assert/strict');
 import { test } from 'node:test';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as ts from 'typescript';
 import * as engine from '../../engine';
+import { generatedFromBook } from './authoritative-book';
 
-// Exercise the authoritative chapter without writing generated sources. This also
+// Exercise the authoritative book without writing generated sources. This also
 // keeps these tests runnable while the generated module is deliberately absent.
-const chapter = fs.readFileSync(path.resolve(__dirname, '../../../literate/output_transactions.literate'), 'utf8');
-const generated = engine.generateProject([{ path: 'output_transactions.literate', text: chapter }]);
-assert.deepEqual(generated.diagnostics, []);
-const source = generated.files.find(file => file.path === 'src/output-transactions.ts')!.content;
+const source = generatedFromBook('src/output-transactions.ts').content;
 const exportsObject: Record<string, unknown> = {};
 new Function('require', 'exports', ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 }

@@ -6,9 +6,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as ts from 'typescript';
 import type * as vscode from 'vscode';
-import { generateProject, SourceDocument } from '../../engine';
+import { SourceDocument } from '../../engine';
 import { mapGeneratedRange, projectLanguageSources } from '../../language-projection';
 import type { LanguageCodeActionContext } from '../../language-actions';
+import { generatedFromBook } from './authoritative-book';
 import { Position, Range } from './vscode-fixture';
 
 const root = path.resolve(__dirname, '../../..');
@@ -88,9 +89,8 @@ function values(result: vscode.CodeAction[]) {
 }
 
 test('owned chapter assembles exactly with bounded design fragments', () => {
-    const generated = generateProject([{ path: 'literate/language-actions.literate', text: chapter }]);
-    assert.deepEqual(generated.diagnostics, []);
-    assert.equal(generated.files.find(file => file.path === 'src/language-actions.ts')?.content, source);
+    const generated = generatedFromBook('src/language-actions.ts');
+    assert.equal(generated.content, source);
     for (const match of chapter.matchAll(/```ts[^\n]*\n([\s\S]*?)\n```/g)) {
         assert.ok(match[1].split('\n').length <= 30);
     }

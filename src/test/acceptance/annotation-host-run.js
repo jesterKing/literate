@@ -13,7 +13,7 @@ async function main() {
     const run = await fs.mkdtemp(path.join(project, 'out/m6-host-'));
     console.log('M6_HOST_EVIDENCE', run);
     const inputs = ['src/extension.ts', 'src/engine.ts', 'src/publication-screen.ts', 'src/publication-annotations.ts',
-        'literate/literate.literate', 'literate/engine.literate', 'literate/publication-screen.literate', 'literate/publication-annotations.literate'];
+        'literate/literate.literate', 'literate/engine.literate', 'literate/assembly.literate', 'literate/publication-screen.literate', 'literate/publication-annotations.literate'];
     const mainPath = path.join(project, 'out/main.js');
     let fresh = false;
     for (let attempt = 0; attempt < 45; attempt++) {

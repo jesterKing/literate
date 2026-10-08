@@ -6,8 +6,9 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as ts from 'typescript';
 import { EventEmitter } from 'node:events';
-import { generateProject, parseProject, parseFragmentHeader, scanFragmentTags } from '../../engine';
+import { parseProject, parseFragmentHeader, scanFragmentTags } from '../../engine';
 import * as projection from '../../language-projection';
+import { generatedFromBook } from './authoritative-book';
 
 const root = path.resolve(__dirname, '../../..');
 const chapter = fs.readFileSync(path.join(root, 'literate/language-features.literate'), 'utf8');
@@ -853,9 +854,8 @@ test('chapter has bounded fragments and exactly assembles the owned output', () 
         assert.ok(match[1].split('\n').length <= 30, match[0].split('\n')[0]);
     }
     assert.equal(source, fs.readFileSync(path.join(root, 'src/language-features.ts'), 'utf8'));
-    const generated = generateProject([{ path: 'language-features.literate', text: chapter }]);
-    assert.deepEqual(generated.diagnostics, []);
-    assert.equal(generated.files.find(file => file.path === 'src/language-features.ts')?.content, source);
+    const generated = generatedFromBook('src/language-features.ts');
+    assert.equal(generated.content, source);
 });
 
 test('selectors match markdown .literate files, with independent runtime guards', async () => {

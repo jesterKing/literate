@@ -6,17 +6,14 @@ import * as vm from 'node:vm';
 import { createHash } from 'node:crypto';
 import * as ts from 'typescript';
 import * as esbuild from 'esbuild';
-import { generateProject } from '../../engine';
+import { generatedFromBook } from './authoritative-book';
 
-// Test the authoritative chapter without writing generated files or importing
+// Test the authoritative book without writing generated files or importing
 // src/themes.ts: the integrating agent owns project registration/generation.
 const root = path.resolve(__dirname, '../../..');
 const filename = 'literate/themes.literate';
 const chapter = fs.readFileSync(path.join(root, filename), 'utf8');
-const result = generateProject([{ path: filename, text: chapter }]);
-assert.deepEqual(result.diagnostics, []);
-const source = result.files.find(file => file.path === 'src/themes.ts');
-assert.ok(source);
+const source = generatedFromBook('src/themes.ts');
 const compiled = ts.transpileModule(source.content, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
     reportDiagnostics: true

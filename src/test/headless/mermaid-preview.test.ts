@@ -1,43 +1,21 @@
 import assert = require('node:assert/strict');
 import { test } from 'node:test';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as vm from 'node:vm';
 import * as esbuild from 'esbuild';
-import { generateProject } from '../../engine';
 import { themes, themeCss } from '../../themes';
-
-const root = path.resolve(__dirname, '../../..');
-function chapterSource(filename: string, output: string): string {
-    const result = generateProject([{ path: filename,
-        text: fs.readFileSync(path.join(root, filename), 'utf8') }]);
-    assert.deepEqual(result.diagnostics, []);
-    const client = result.files.find(file => file.path === output);
-    assert.ok(client, `the authoritative source must emit ${output}`);
-    return client.content;
-}
-function bookSource(output: string): string {
-    const names = fs.readdirSync(path.join(root, 'literate')).filter(name => name.endsWith('.literate'));
-    const documents = [{ path: 'index.literate', text: fs.readFileSync(path.join(root, 'index.literate'), 'utf8') },
-        ...names.map(name => ({ path: `literate/${name}`,
-            text: fs.readFileSync(path.join(root, 'literate', name), 'utf8') }))];
-    const result = generateProject(documents, { 'tssrc.template': fs.readFileSync(path.join(root, 'tssrc.template'), 'utf8') });
-    assert.deepEqual(result.diagnostics, []);
-    const generated = result.files.find(file => file.path === output);
-    assert.ok(generated, `the authoritative book must emit ${output}`);
-    return generated.content;
-}
+import { generatedFromBook } from './authoritative-book';
 
 function bundle(stub: boolean) {
     return esbuild.build({
-        stdin: { contents: bookSource('src/mermaid-preview.js'), loader: 'js',
+        stdin: { contents: generatedFromBook('src/mermaid-preview.js').content, loader: 'js',
             resolveDir: path.resolve(__dirname, '../../..'), sourcefile: 'mermaid-preview.js' },
         bundle: true, write: false, platform: 'browser', format: 'iife',
         // Resolve the catalogue in memory: this test must not require generated files.
         plugins: [{ name: 'theme-catalogue', setup(build) {
             build.onResolve({ filter: /^\.\/themes$/ }, () => ({ path: 'themes', namespace: 'catalogue' }));
             build.onLoad({ filter: /.*/, namespace: 'catalogue' }, () => ({
-                contents: chapterSource('literate/themes.literate', 'src/themes.ts'), loader: 'ts'
+                contents: generatedFromBook('src/themes.ts').content, loader: 'ts'
             }));
         } }, ...(stub ? [{ name: 'mermaid-stub', setup(build: esbuild.PluginBuild) {
             build.onResolve({ filter: /^mermaid$/ }, () => ({ path: 'mermaid', namespace: 'stub' }));
