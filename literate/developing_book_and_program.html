@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Developing the book and program together</h1>
+<p>In an ordinary codebase, editing a source file and editing its design document are
+two separate acts. In Literate they are one act: authoritative chapters contain the
+explanation and the fragments from which much of the program is generated. A good
+contributor workflow must therefore protect two products at once—the program that
+runs and the book that explains why it has that shape.</p>
+<p>The central discipline is simple:</p>
+<blockquote>
+<p>Change the authoritative work, regenerate its derived artifacts, and review both
+meanings before accepting either.</p>
+</blockquote>
+<p>This chapter gives a durable method for doing that. Exact tool releases and host
+installation details belong in the package manifest and contributor reference;
+the method remains useful as those details change.</p>
+<h2>Know which artifact has authority</h2>
+<p>Not every repository file has the same role. Authoritative <code>.literate</code> chapters own
+the generated implementation fragments and their rendered HTML. Generated source
+is checked in so a fresh checkout can bootstrap and ordinary language tools can
+work with it, but it is not the place to make lasting implementation edits.</p>
+<p>Other files may remain ordinary authoritative sources: package metadata, styles,
+templates, fixtures, licenses, build configuration, and tests not generated from a
+chapter. Some tests are themselves generated, so a contributor must determine the
+owner of the particular test before editing it. “The book is the source” does not
+mean that every byte in the repository must be hidden in a fragment. It means that
+code represented by the book must be changed there rather than patched in its
+derived file.</p>
+<pre class="mermaid">
+flowchart TD
+    Intent[Design or behavior change] --&gt; Authority{Which source owns it?}
+    Authority --&gt;|Explained generated code| Chapter[Edit prose and fragments]
+    Authority --&gt;|Ordinary source not generated from a chapter| Ordinary[Edit ordinary source]
+    Chapter --&gt; Generate[Regenerate derived source and HTML]
+    Ordinary --&gt; Review[Review direct changes]
+    Generate --&gt; Review
+    Review --&gt; Verify[Verify behavior, explanation, and artifacts]
+</pre>
+<p>The branches identify ownership, not importance. An ordinary test can be as
+critical as a generated engine module. The distinction prevents a successful local
+patch from being erased by the next generation.</p>
+<h2>Begin with an invariant, not a file</h2>
+<p>Before editing, state the change in terms a reader and reviewer can test. Examples
+include:</p>
+<ul>
+<li>every generated destination is validated before any write;</li>
+<li>a language-server edit may affect only one exact source occurrence;</li>
+<li>the screen and print renderers resolve the same logical annotation;</li>
+<li>a prose-only reorganization leaves generated program bytes unchanged.</li>
+</ul>
+<p>An invariant provides a better search key than a filename. Use inspection,
+fragment navigation, references, and the assembly maps to find the fragments and
+ordinary files that realize it. Read the surrounding explanation before changing
+an implementation detail; the prose may reveal constraints that the generated
+source no longer makes obvious.</p>
+<p>This approach also improves the chapter. If the intended change cannot be explained
+without naming a private helper, the design may not yet be stated at the right
+level.</p>
+<h2>Edit explanation and implementation as one unit</h2>
+<p>A durable chapter normally introduces the human problem, gives a conceptual model,
+states its safety or correctness boundary, and only then presents the selected
+implementation. When behavior changes, revise every part whose truth changes:</p>
+<ul>
+<li>motivation, when the supported use or tradeoff changes;</li>
+<li>diagrams, when ownership or sequence changes;</li>
+<li>prose contracts, when accepted inputs or failures change;</li>
+<li>fragments, when executable behavior changes;</li>
+<li>tests and fixtures, when observable outcomes change;</li>
+<li>reference material, when commands or supported environments change.</li>
+</ul>
+<p>Do not add prose that merely translates each statement into English. Explain why
+the statements belong together, what must remain true, and what is deliberately
+not supported. Conversely, do not leave an important invariant only in prose if a
+test can make its failure visible.</p>
+<p>Fragment boundaries deserve the same review as function boundaries. A fragment
+should express one explainable responsibility, have a name that reads naturally in
+the surrounding sentence, and compose with its siblings into a useful outline.
+Mechanical imports, gathering roots, and routine registration belong in the
+assembly or integration references when they would interrupt the main argument.</p>
+<h2>Regeneration is a semantic comparison</h2>
+<p>Generation is not clerical cleanup at the end of a change. It is the operation that
+reveals what the authoritative edit means to compilers, browsers, and readers.
+After regeneration, classify every changed artifact.</p>
+<p>A useful review matrix has three common cases:</p>
+<ul>
+<li><strong>Prose-only change:</strong> rendered chapters should change; generated program source
+should not.</li>
+<li><strong>Behavioral fragment change:</strong> the expected generated modules and tests should
+change; unrelated generated files should not.</li>
+<li><strong>Structural chapter change:</strong> generated program bytes may remain equal while
+document order, anchors, indexes, or publication pages change.</li>
+</ul>
+<p>Unexpected absence matters as much as unexpected presence. If a fragment edit
+produces no source diff, the contributor may have edited an unused family or the
+wrong contribution. If moving a chapter changes source bytes, contribution order
+may carry more semantics than the edit intended.</p>
+<p>The ordinary loop is concise:</p>
+<pre><code>yarn literate generate
+yarn literate check
+yarn <span class="hljs-built_in">test</span>
+yarn esbuild
+</code></pre>
+<p>The repository's contributor reference remains authoritative for available scripts
+and prerequisites. The important sequence is generate, compare, test, and build—not
+the permanence of one wrapper command.</p>
+<h2>Use a validation ladder</h2>
+<p>No single command answers every question. Validation should move from the smallest
+relevant claim to broader integration.</p>
+<pre class="mermaid">
+flowchart TD
+    Source[Authoritative edit] --&gt; Inspect[Inspect fragments and planned outputs]
+    Inspect --&gt; Focused[Run focused parser or subsystem tests]
+    Focused --&gt; Generated[Check generated files are current]
+    Generated --&gt; Self[Verify the generation fixed point when relevant]
+    Self --&gt; Suite[Run the complete automated suite]
+    Suite --&gt; Package[Build the shipped entry points]
+    Package --&gt; Real[Exercise real hosts or external tools where needed]
+</pre>
+<p>Each arrow adds evidence of a different kind:</p>
+<ol>
+<li><strong>Inspection</strong> checks that definitions, references, roots, and destinations are
+the ones intended.</li>
+<li><strong>Focused tests</strong> give fast feedback near the changed policy.</li>
+<li><strong>Generated-file checks</strong> compare the complete in-memory plan with tracked
+artifacts without treating stale output as source.</li>
+<li><strong>Self-host verification</strong> type-checks fresh generated sources and asks the fresh
+engine to reproduce the plan.</li>
+<li><strong>The full suite</strong> catches interactions outside the contributor's first model.</li>
+<li><strong>Packaging builds</strong> prove that actual extension and runtime entry points can be
+assembled, not merely imported by tests.</li>
+<li><strong>Real-host acceptance</strong> covers behavior that mocks cannot establish, such as
+editor UI, a language server, a browser, or a typesetter.</li>
+</ol>
+<p>Not every change needs every expensive final step. The choice should follow the
+claim. A typography change needs rendered screen and print inspection; a protocol
+change needs framing and real-server evidence; an engine change needs the fixed
+point. Record skipped environmental checks honestly rather than implying that a
+headless suite performed them.</p>
+<h2>Changing the generator requires a bridge</h2>
+<p>Self-hosting creates a bootstrapping problem: the old generated engine must first
+understand enough of the edited book to produce the new engine. A safe generator
+change therefore has two conceptual generations.</p>
+<pre class="mermaid">
+sequenceDiagram
+    participant B as Authoritative book
+    participant O as Known-working engine
+    participant N as Fresh engine
+    participant V as Verification
+
+    B-&gt;&gt;O: Generate candidate outputs
+    O--&gt;&gt;N: Candidate engine source
+    N-&gt;&gt;V: Type-check and build
+    V-&gt;&gt;N: Generate from the same book
+    N--&gt;&gt;V: Candidate outputs again
+    V-&gt;&gt;V: Compare paths and bytes
+</pre>
+<p>If the first candidate does not build, repair the literate source and use a
+known-working bootstrap executable again. Do not hand-edit generated TypeScript as
+a second source of truth. A syntax migration may need a compatibility bridge so the
+old parser can generate the new parser before the book adopts the new form.</p>
+<p>The fixed-point check is intentionally narrower than the test suite. It proves that
+the generated engine agrees with its own authoritative input. It does not prove
+that command-line effects, editor activation, or publication tools behave correctly.
+Those remain separate layers in the validation ladder.</p>
+<h2>Review changes in both reading orders</h2>
+<p>A literate program has at least two meaningful orders:</p>
+<ul>
+<li>the chapter order in which a person encounters ideas;</li>
+<li>the assembled order in which generated source reaches language tools.</li>
+</ul>
+<p>Review the chapter while skipping code blocks. The argument should remain coherent,
+technical terms should be introduced before use, and diagrams should answer a
+specific question. Then read parent fragments as outlines and inspect the generated
+diff. The assembly should remain complete, and fragment names should explain why
+pieces are connected.</p>
+<p>This double reading catches opposite failures. A program can compile while its
+book has become a change log or a source dump. A chapter can read beautifully while
+its fragments assemble an unintended program. Neither is a successful literate
+change.</p>
+<h2>Treat generated files as review evidence</h2>
+<p>Checked-in generated files serve practical purposes: bootstrapping, ordinary
+language tooling, packaging, and transparent review of what the book produces.
+They should be committed with the authoritative chapters that changed them.</p>
+<p>Review them without granting them authority. Useful questions include:</p>
+<ul>
+<li>Are changed paths exactly those predicted by the edited roots?</li>
+<li>Is the diff a semantic change or only ordering and whitespace?</li>
+<li>Did a prose edit accidentally enter generated source?</li>
+<li>Did a moved contribution change assembly order?</li>
+<li>Are generated HTML links and identities still valid?</li>
+<li>Did generation leave an old orphan that requires deliberate removal?</li>
+</ul>
+<p>Generation does not delete obsolete destinations automatically. Renaming or
+removing a root therefore requires an explicit inventory review; an old file can
+remain plausible long after it has stopped belonging to the plan.</p>
+<h2>Package what users will actually run</h2>
+<p>Tests often import modules directly, while users run bundled entry points with
+packaged assets. Before release, build those entry points and inspect the package
+contents. Confirm that runtime bundles, browser programs, templates, styles,
+licenses, and declared contributions are present, and that development-only or
+private material is absent.</p>
+<p>External publication tools and language servers deserve separate acceptance. A
+mock can prove how Literate reacts to a response; it cannot prove compatibility
+with every real executable. Test representative supported configurations, record
+the boundary of that evidence, and keep missing-tool diagnostics actionable. The
+program should not download compilers, browsers, fonts, or servers merely to make
+a release check pass.</p>
+<h2>Version and release the whole contract</h2>
+<p>A release version describes more than executable bytes. It also describes syntax,
+commands, settings, generated-file expectations, publication formats, packaged
+resources, and known limitations. Release review should therefore include:</p>
+<ol>
+<li>update the version and user-facing change record consistently;</li>
+<li>regenerate and require a clean generated-file check;</li>
+<li>run the relevant fixed-point, test, lint, and package builds;</li>
+<li>inspect the distributable archive rather than assuming its manifest is enough;</li>
+<li>exercise installation or host acceptance for changed integration surfaces;</li>
+<li>review third-party notices and portable asset licenses;</li>
+<li>verify that examples and contributor instructions match the shipped behavior;</li>
+<li>publish only the reviewed artifact, preserving a traceable source state.</li>
+</ol>
+<p>A release command can automate these steps, but it cannot decide whether the book
+is clear, a diagram is legible, or a PDF has an awkward page break. Human review is
+part of the release contract for a program whose documentation is itself a primary
+product.</p>
+<h2>Keep the loop sustainable</h2>
+<p>The method works only if contributors can run it repeatedly. Keep focused tests
+fast, make diagnostics point back to authoritative chapters, preserve a dependable
+bootstrap, and avoid requiring a graphical editor for core generation. Expensive
+real-tool checks can be explicit without being forgotten; package scripts and
+contributor references should make their purpose clear.</p>
+<p>Most of all, keep the claims proportional to the evidence. “The fixed point passed”
+is not “the extension is correct.” “The headless suite passed” is not “every
+language server is compatible.” “The PDF compiled” is not “the typography needs no
+review.” This precision makes both maintenance and release more trustworthy.</p>
+<p>The method keeps book and program aligned, but it cannot remove every cost of
+literate programming or every limitation of the surrounding tools. The next
+chapter states those boundaries directly.</p>
+</div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

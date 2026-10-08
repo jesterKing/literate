@@ -1,0 +1,252 @@
+# Resource bounds and fail-closed behavior
+
+A project can be structurally valid and still ask for unreasonable work. A long
+acyclic chain can be deeply nested. A small fragment can be referenced often enough
+to produce a large expansion. A language server can announce a message larger than
+the editor should allocate, and a compiler can write without end even when it never
+finishes a useful document.
+
+Literate treats resource limits as policy boundaries. When a required operation
+crosses a boundary, the safe result is a diagnostic and no new product—not a
+truncated program, a half-parsed protocol message, or a partially replaced book.
+Optional presentation can become unavailable while its underlying document remains
+readable, but it must say so explicitly.
+
+## Valid does not mean affordable
+
+Graph validation answers whether references exist and whether expansion contains a
+cycle. It does not by itself bound the amount of text copied. If `literal(F)` is
+the text written directly in fragment `F`, an approximate byte model is:
+
+```text
+bytes(expand(F)) ≈ bytes(literal(F)) + Σ bytes(expand(Rⱼ))
+```
+
+The sum has one term for every reference occurrence `Rⱼ` in `F`, and `bytes` means
+the UTF-8 size of the resulting text. The equation is approximate because preserved
+indentation, line-ending normalization, and later templates can add or alter bytes.
+Repeated references still appear repeatedly in the sum. Even when each family is
+parsed once and cached, inserting a cached expansion contributes its bytes at every
+use. Acyclic graphs can therefore create outputs much larger than their source.
+
+Depth is a related but different resource. Literate drives fragment expansion with
+an explicit frame stack rather than the JavaScript call stack. That prevents a
+deep valid graph from becoming accidental language-level recursion. It is not a
+promise that arbitrary projects fit in memory or finish quickly. Structural
+handling and resource quotas solve different problems.
+
+This distinction is important because limits must describe the actual protected
+boundary. A message-size cap does not bound the whole session. A subprocess timeout
+does not bound memory used by every descendant. A browser panel budget does not
+bound the size of the source project. Honest bounds are local and named.
+
+## Think in a vector of budgets
+
+One number cannot describe all costly work. Let the operation's observed use be a
+vector
+
+```text
+U = (u_depth, u_bytes, u_segments, u_messages, u_time, u_processes)
+B = (b_depth, b_bytes, b_segments, b_messages, b_time, b_processes)
+```
+
+`U` records observed use and `B` the corresponding accepted budgets. The operation
+is accepted only when every enforced component fits:
+
+```text
+accept exactly when u[i] <= b[i] for every enforced dimension i
+```
+
+The formula is simply a checklist. It reminds us that staying below a byte limit
+does not excuse exceeding a time limit, and that limiting the number of objects
+does not bound their combined encoded size.
+
+```mermaid
+flowchart TD
+    Input[Captured input] --> Count[Measure relevant resources]
+    Count --> Fits{Every enforced budget fits?}
+    Fits -->|No| Reject[Diagnostic or unavailable capability]
+    Fits -->|Yes| Work[Perform bounded work]
+    Work --> Complete{Complete valid result?}
+    Complete -->|No| Reject
+    Complete -->|Yes| Publish[Expose the whole result]
+```
+
+The arrows show a gate, not a claim that every cost can be known in advance. Some
+budgets are checked incrementally while work proceeds. What matters is that
+crossing one cannot be reinterpreted as successful completion.
+
+## Bound data before allocating from it
+
+A length supplied by another process is a request, not permission. The language
+client reads and validates the protocol header before allocating the announced
+body. It limits header bytes, body bytes, queued output, pending requests,
+listeners, synchronized documents, and retained diagnostics. Invalid framing or an
+oversized message fails the session rather than attempting to resynchronize inside
+untrusted bytes.
+
+The publication helper applies the same idea to its one-request input. It counts
+bytes while reading the stream, enforces a deadline, and only then parses the
+complete JSON envelope. Image and diagram planners check fixed item and aggregate
+budgets at their planning boundaries. Font and license companions are validated for
+paths, manifest shape, presence, and file kind, but currently have no dedicated byte
+or count budgets.
+
+Three details make such limits meaningful:
+
+- count encoded bytes when the transport is byte-based, rather than JavaScript
+  characters or human-visible glyphs;
+- reject impossible or unsafe declared lengths before allocation;
+- include framing, escaping, or retained metadata when those consume memory too.
+
+A string of non-ASCII text illustrates the first point. Its character count may be
+smaller than its UTF-8 byte count. A transport budget measured in characters could
+therefore admit more memory than its name suggests.
+
+## Bound collections as well as items
+
+Small items can become expensive in large numbers. Literate places limits at
+collection boundaries such as pending protocol requests, synchronized documents,
+diagnostic reports, publication assets, fragment-exploration parts, and rendered
+segments. These limits protect bookkeeping and traversal even when each individual
+entry is modest.
+
+Collection policy depends on the feature's role. A required publication input that
+exceeds its accepted set causes publication to fail. A bounded diagnostic cache may
+discard old or oversized cached reports because the cache is an aid, not the source
+of truth. The distinction is not “strict versus lenient”; it is whether omission
+could make an incomplete product look complete.
+
+This gives a useful rule:
+
+> Reject incomplete required meaning. Degrade only optional presentation, and make
+> the degradation visible.
+
+## Browser work needs a lifetime budget
+
+Optional fragment exploration can recursively reveal referenced contributions. A
+click may therefore create further controls, panels, text nodes, and links. Limiting
+only the initial payload would leave later DOM growth unbounded.
+
+Literate gives one initialized document budgets for payload bytes, nesting layers,
+open panels, visited parts, rendered segments, and retained panel text. A requested
+panel is costed before its candidate DOM is attached. Duplicate part identities
+are rejected rather than silently rendered twice. Closing a panel releases the
+cost owned by that panel and its descendants.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Collapsed
+    Collapsed --> Measuring: request expansion
+    Measuring --> Expanded: complete panel fits
+    Measuring --> Refused: any panel budget exceeded
+    Expanded --> Collapsed: close and release ownership
+    Refused --> Collapsed: keep baseline link and source readable
+```
+
+This state diagram concerns the optional explorer, not ordinary document links.
+Refusal does not erase the chapter or truncate code. The baseline publication
+remains readable, and the control can explain that exploration is unavailable.
+That is fail-closed behavior at the capability boundary rather than failure of the
+whole book.
+
+## Subprocesses need more than a timeout
+
+Publication and language intelligence depend on child processes. A timeout is
+necessary, but it is not sufficient. A process can fill stdout or stderr before
+the deadline, keep inherited pipes open after its main child exits, or leave
+descendants running.
+
+Literate's process boundaries combine several controls:
+
+1. spawn a named executable with an argument vector rather than a shell command;
+2. bound captured output across the streams that are retained;
+3. apply a deadline to the complete invocation, including pipe closure;
+4. terminate only the lifetime the adapter actually owns;
+5. accept only the expected output type and size after successful exit;
+6. clean temporary resources while preserving actionable diagnostics.
+
+Ownership differs by adapter. Mermaid rendering and PDF compilation use POSIX
+process groups so browser or compiler descendants can be terminated together.
+Pandoc conversion, language-server sessions, and self-host verification own their
+direct child, not an arbitrary descendant tree. The editor publication helper is
+also a direct child, but cancellation is deliberately graceful: the editor waits
+for transaction cleanup rather than imposing an automatic hard-kill fallback.
+
+PDF compilation illustrates the last two points. A zero exit status is not enough:
+the expected PDF must be a bounded, nonempty regular file with an appropriate
+header, and it must remain the same file while being read. This is still not a full
+PDF proof. It is a deliberately narrow acceptance check before publication.
+
+External tools run only on trusted inputs. Time, output, and filesystem boundaries
+limit accidents and denial of service; they do not turn TeX, Lua, a browser, or a
+language server into a security sandbox.
+
+## Failure must preserve the last coherent state
+
+Limits are most valuable when they are checked before irreversible effects. The
+engine plans every output in memory and returns an empty file list on generation
+diagnostics. Publication conversion finishes before its output transaction begins.
+The filesystem adapter preflights the complete destination set before creating
+output directories or replacing files.
+
+```mermaid
+flowchart TD
+    Snapshot[Accepted snapshot] --> Validate[Validate graph and policy]
+    Validate --> Build[Build complete candidate result]
+    Build --> Gate{Diagnostic or enforced limit exceeded?}
+    Gate -->|Yes| Old[Keep previous outputs]
+    Gate -->|No| Preflight[Preflight every destination]
+    Preflight --> Commit[Stage and commit as one batch]
+```
+
+The diagram omits rollback detail. Its point is temporal: expensive or fallible
+semantic work belongs before commitment. If a protocol reply, diagram render, or
+compiler output is incomplete, no destination should be opened merely because an
+earlier stage succeeded.
+
+Truncation is particularly dangerous for generated source. Suppose a segment
+budget is `S` and expansion requires `S + 1` segments. Returning the first `S`
+segments would produce a different program while presenting it as successful.
+The only honest outcomes are a complete accepted expansion or rejection.
+
+## Fail closed at the right scope
+
+“Fail closed” does not require shutting down every feature after every local
+problem. It requires refusing the authority that could make the uncertain result
+harmful.
+
+- An invalid generation graph returns no generated files.
+- An oversized protocol frame closes the affected session and rejects pending work.
+- A stale language reply produces no mapped result or edit.
+- An over-budget exploration panel is not attached to the document.
+- A failed PDF build leaves the previous published destination untouched.
+- A rollback failure reports recovery locations instead of claiming restoration.
+
+The scope follows the capability. Read-only inspection may retain partial metadata
+that helps locate a malformed fragment, but partial metadata is not permission to
+write outputs. A preview may show an unavailable explorer, but it must not invent
+missing fragment content.
+
+## Limits are policy, not proof of safety
+
+Every bound has a tradeoff. A low threshold rejects legitimate large work; a high
+threshold may not protect an interactive host soon enough. Limits should be based
+on the protected environment, tested at and just beyond their boundaries, and
+reported with enough context for an author to reduce the request.
+
+They also need review when representations change. Adding escaping can increase
+serialized bytes. Retaining a new diagnostic field can enlarge a cache. Rendering
+a new node type can increase DOM ownership. A bound copied mechanically from an
+older representation may no longer bound what its name claims.
+
+Most importantly, local bounds do not add up to a universal resource guarantee.
+The core engine still consumes memory proportional to accepted source, graph, and
+expanded output; external processes have resources beyond the streams Literate
+counts; filesystems can stall; and providers can violate assumptions. The design
+reduces these risks through explicit boundaries and conservative rejection, but it
+does not promise operation under every load.
+
+The next chapter turns from runtime policy to contributor practice. Keeping these
+guarantees trustworthy requires a development method in which the explanation,
+generated program, tests, and distributable artifacts are reviewed together.

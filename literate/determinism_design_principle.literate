@@ -1,0 +1,229 @@
+# Determinism as a design principle
+
+A useful generator should not surprise its author. Given the same captured project
+and the same declared inputs, it should choose the same fragments, report problems
+in the same order, and produce the same source and documentation bytes. Literate
+treats that expectation as an architectural principle rather than a testing
+convenience.
+
+Determinism does not mean that every run everywhere has an identical environment.
+An editor may include unsaved buffers while a command-line run reads saved files.
+A PDF compiler may use fonts installed on one machine but absent on another. The
+meaningful promise begins after those differences have been made explicit:
+
+```text
+same accepted snapshot + same policy inputs = same semantic result
+```
+
+This chapter follows that principle through ordering, expansion, mappings,
+diagnostics, and self-hosting. It also marks the edge of the promise: deterministic
+planning cannot make filesystems atomic or external tools identical.
+
+## Make the input a value
+
+Hidden input is the most common enemy of repeatability. If parsing consults the
+filesystem halfway through its work, a file can change between two reads. If a
+renderer reads a global setting, two projects can influence one another. If order
+comes from directory enumeration, the host may decide the result accidentally.
+
+Literate first captures a project snapshot. It contains the ordered documents,
+their complete text, required templates, and project settings. The engine receives
+these as values and performs no filesystem writes. A host may capture another
+snapshot later, but one interpretation never switches input beneath itself.
+
+```mermaid
+flowchart TD
+    World[Disk, buffers, settings] --> Capture[Capture explicit snapshot]
+    Capture --> Engine[Interpret snapshot]
+    Engine --> Model[Parsed project and fragment graph]
+    Model --> Plan[Complete output plan]
+    Plan --> Host[Host compares or commits]
+```
+
+The first arrow is deliberately host-specific. The remaining arrows describe the
+shared semantics. The diagram omits preview and publication branches so that one
+point remains clear: acquisition happens before interpretation, and effects happen
+after planning.
+
+We can write the pure part as a function `G`:
+
+```text
+G(snapshot, policy) = { files, diagnostics, inspection, publication }
+```
+
+For fixed arguments, `G` should return the same result. Diagnostics that make
+generation unsafe force `files` to be empty, while inspection or publication
+metadata may still explain the captured project. Time, current directory, open
+editor state, and filesystem enumeration are not undeclared extra arguments.
+
+## Order is part of meaning
+
+A fragment family may receive contributions from several documents. Their order
+therefore cannot be left to a map, a directory provider, or the completion order
+of asynchronous tasks. Literate establishes a project order: the root comes first,
+linked chapters follow their narrative order, and remaining documents follow a
+normalized path order. Contributions retain encounter order within that sequence.
+
+Expansion follows references depth first. Earlier contributions finish before later
+ones, and cached expansions are reused without changing their position. This gives
+one answer to questions that would otherwise be ambiguous:
+
+- Which append contribution comes first?
+- Which repeated generated occurrence is selected for a read-only editor request?
+- In what order are dependency failures reported?
+- Which contribution receives a publication identity?
+
+Sorting everything alphabetically would also be repeatable, but it would erase
+authorial intent. Determinism means applying a declared order consistently, not
+pretending that order has no meaning.
+
+## Literal transformations reduce ambiguity
+
+Each additional interpretation pass creates another opportunity for surprising
+results. Literate consequently keeps its central transformations narrow. Fragment
+references are recognized in contribution source, expansion preserves the
+reference site's indentation, escaped delimiters become literal text once, and
+templates receive literal single-pass substitutions. Inserted text is not scanned
+again as a new fragment or template program.
+
+Line endings in final source and HTML are normalized. This small rule matters:
+without it, two hosts could agree on every fragment and still disagree byte for
+byte. Stable bytes make generated diffs useful evidence rather than a record of
+incidental platform choices.
+
+The same restraint applies to publication identities. A logical target is derived
+before an HTML, preview, or LaTeX renderer encodes it. Each renderer may choose a
+medium-appropriate representation, but it starts from the same resolved object.
+This avoids three renderers inventing three subtly different notions of a
+fragment.
+
+Deterministic identity is not the same as identity that survives every edit.
+Renaming a fragment changes its family identity, and inserting an earlier repeated
+contribution can change a later ordinal. Arbitrary edit-stability would require an
+explicit author-supplied identity. Literate promises collision-resistant,
+repeatable identities for one accepted project, not that all structural edits are
+invisible.
+
+## Mappings need an occurrence, not a guess
+
+Generated source can contain the same contribution more than once. Equal text does
+not reveal which expansion produced a server response, and a search for the first
+matching string can change its answer after an unrelated edit.
+
+Literate instead records mappings while it emits each occurrence. A language
+request selects one deterministic occurrence and carries that exact mapping until
+the reply returns. Reverse mapping is confined to the same generated file and
+segment. If a reply crosses a reference seam, wrapper text, or another occurrence,
+it is rejected rather than reassigned by resemblance.
+
+```mermaid
+sequenceDiagram
+    participant S as Captured source
+    participant P as Projection
+    participant L as Language server
+    participant E as Editor
+
+    S->>P: Build ordered occurrences and mappings
+    P->>L: Request at one generated occurrence
+    L-->>P: Reply in generated coordinates
+    P->>P: Check snapshot and exact occurrence
+    alt Current and unambiguous
+        P-->>E: Mapped source result
+    else Stale or ambiguous
+        P-->>E: No result
+    end
+```
+
+The arrows show ownership of coordinates. They do not claim that a language server
+is deterministic internally. Literate's responsibility is narrower: the same
+accepted reply against the same occurrence maps in the same way, and uncertain
+replies do not become edits by guesswork.
+
+## Diagnostics are part of the result
+
+Repeatability includes failure. A missing reference that appears before a cycle
+should not sometimes be reported after it because two tasks happened to finish in
+a different order. Template keys that arrive through an object are normalized and
+visited predictably. Expansion retains encounter order even while using caches.
+Publication validates the complete document before calling contribution renderers.
+
+Stable diagnostics help people compare runs, help tests locate regressions, and let
+tools correlate problems with a captured snapshot. They do not imply that every
+consumer must show every diagnostic. An editor may replace stale problems with
+newer ones, but the diagnostic set produced for a fixed accepted input remains a
+semantic result rather than logging noise.
+
+## A fixed point checks the generator itself
+
+Self-hosting raises a sharper question. The program is generated from the book, so
+how can a checkout know that its checked-in generator still agrees with the source
+that describes it?
+
+Let `E` be the checked-in engine, `S` the literate snapshot, and `O = E(S)` the
+planned outputs. Some files in `O` define a fresh engine `E'`. The fixed-point
+condition is:
+
+```text
+E'(S) = O
+```
+
+Equality here concerns the planned output paths and bytes. The self-check also
+type-checks fresh generated sources before executing the rebuilt engine. It does
+not write project files, and it runs the fresh engine in a bounded child process.
+
+```mermaid
+flowchart TD
+    Book[Authoritative book snapshot] --> Old[Checked-in engine]
+    Old --> Outputs[Fresh planned outputs]
+    Outputs --> Check[Type-check fresh sources]
+    Check --> New[Build fresh engine]
+    New --> Again[Generate from the same snapshot]
+    Again --> Equal{Same paths and bytes?}
+    Equal -->|Yes| Fixed[Generation fixed point]
+    Equal -->|No| Drift[Report disagreement]
+```
+
+The loop proves a focused property: fresh engine generation reproduces the same
+plan for this project. It does not prove that every CLI branch works, that the
+editor behaves correctly, or that the implementation is free of defects. Those
+claims require separate tests and host-level acceptance.
+
+## Reproducibility has layers
+
+It helps to distinguish three layers that are often collapsed into one word:
+
+1. **Semantic reproducibility:** the same explicit snapshot yields the same parsed
+   model, diagnostics, expansions, and planned files.
+2. **Repository reproducibility:** a checkout can rebuild the generator and reach
+   the same generation fixed point with its locked toolchain inputs.
+3. **Environmental reproducibility:** external browsers, language servers, fonts,
+   typesetters, and filesystems behave identically.
+
+Literate is strongest at the first layer and verifies an important part of the
+second. It narrows and validates environmental input where practical, but it does
+not control every external implementation. A source or LaTeX plan can be stable
+while a PDF's low-level metadata or font rendering differs across toolchains.
+
+Nor does deterministic planning make a multi-file commit physically simultaneous.
+The host can preflight, stage, install, and roll back, but another process or a
+power failure belongs to the filesystem boundary. Determinism tells the host what
+should be written; transaction policy governs how safely it approaches that state.
+
+## Design questions for deterministic features
+
+A new feature should answer a short set of questions before its implementation is
+considered complete:
+
+- What is its complete input, and when is that input captured?
+- Which order has semantic meaning?
+- Which values require normalization?
+- Is identity derived from semantics or presentation?
+- Can asynchronous work return after its snapshot becomes stale?
+- What equality establishes successful reproduction?
+- Which environmental differences remain outside the promise?
+
+These questions turn reproducibility from a final test into a design method. They
+also expose the next concern. A deterministic operation can still consume
+unbounded memory, wait forever, or produce an unusably large result. The following
+chapter adds resource limits and explains why crossing one must not create a
+plausible partial success.

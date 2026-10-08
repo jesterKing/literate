@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Lessons from implementing Literate literately</h1>
+<p>Literate programming begins with a compelling reversal: arrange a program for
+understanding, then derive the arrangement required by tools. Implementing a
+literate-programming environment in its own language tests that idea at a scale
+where both its strengths and its weaknesses become difficult to hide.</p>
+<p>The strongest lesson is not that every program should become a book. It is that
+explanation can be treated as an engineering structure. When concepts, invariants,
+code, diagrams, tests, and generated artifacts are allowed to challenge one
+another, the result can be easier to reason about than any one representation.
+That result is never automatic. It requires continuing editorial work.</p>
+<h2>Explanatory order is an architectural tool</h2>
+<p>A conventional source tree encourages explanations to follow modules. A literate
+book can instead begin with the problem a boundary solves, introduce the shared
+model, and only later show how several modules realize it. That freedom is most
+valuable when a concern crosses files: deterministic snapshots, output safety,
+source mapping, publication identity, or process isolation.</p>
+<pre class="mermaid">
+flowchart TD
+    Question[Human question] --&gt; Model[Conceptual model]
+    Model --&gt; Invariant[Invariant and tradeoff]
+    Invariant --&gt; Fragments[Selected implementation fragments]
+    Fragments --&gt; Files[Generated source files]
+    Invariant --&gt; Tests[Tests and acceptance evidence]
+</pre>
+<p>The arrows show a desired direction of explanation, not the order in which a
+feature must be coded. The question gives the model a purpose; the invariant joins
+prose, implementation, and tests. Generated files remain essential products, but
+they no longer dictate the reader's first encounter with the idea.</p>
+<p>This can improve architecture itself. A responsibility that cannot be named without
+reference to accidental storage is often not yet well understood. A parent fragment
+that does not read as a coherent outline may reveal misplaced responsibilities.
+Writing for a reader becomes a form of design review.</p>
+<h2>Fragment names form a design vocabulary</h2>
+<p>A good fragment name does more than identify text. It gives authors and readers a
+phrase for discussing an intention: capture a project snapshot, reject a stale
+reply, reserve every destination, or map one exact occurrence. Those phrases can
+appear in prose, diagrams, tests, and parent fragments.</p>
+<p>This vocabulary makes cross-cutting behavior visible. It also creates pressure for
+honest boundaries. A fragment called <code>handle result</code> says little; a fragment called
+<code>reject a reply from an obsolete snapshot</code> states both action and reason.</p>
+<p>The pressure can be misused. Giving every few lines a polished name does not make
+them conceptual. Over-fragmentation increases navigation and lets the author avoid
+deciding which statements form one responsibility. The useful test is not fragment
+length but explanatory independence: can the name carry real meaning in the
+chapter and in the assembled outline?</p>
+<h2>The shared model earns its central place</h2>
+<p>A self-describing tool is tempted to grow a separate interpretation for every
+feature: one parser for generation, another for preview, a regular expression for
+navigation, and a conversion-specific scanner for print. That path produces quick
+local progress and long-term disagreement.</p>
+<p>Literate's more durable architecture is a captured project interpreted into shared
+fragment and publication models. Generation, inspection, screen rendering, print
+rendering, and language projection then add policies appropriate to their roles.</p>
+<pre class="mermaid">
+flowchart TD
+    Snapshot[Captured project] --&gt; Shared[Shared parsed meaning]
+    Shared --&gt; Generate[Generate complete outputs]
+    Shared --&gt; Inspect[Inspect fragments]
+    Shared --&gt; Screen[Present on screen]
+    Shared --&gt; Print[Prepare print publication]
+    Shared --&gt; Project[Project generated language]
+</pre>
+<p>The fan-out is the important relationship. It does not mean every consumer accepts
+the same incomplete input or uses the same presentation. It means they disagree by
+explicit policy rather than accidental parsing.</p>
+<p>This lesson extends beyond literate programming. Whenever several tools discuss the
+same source, a renderer-neutral semantic center is usually more valuable than a
+collection of similar adapters.</p>
+<h2>Determinism makes the system discussable</h2>
+<p>Stable input, order, identities, mappings, diagnostics, and bytes do more than make
+tests pass. They let different tools and people refer to the same event. A source
+location in a diagnostic, a contribution in a fragment index, and a segment in a
+language projection can all be traced back to one captured project.</p>
+<p>Without determinism, failures become stories about timing: perhaps a directory was
+enumerated differently, a late reply won a race, or a generated file reflected a
+mixture of two edits. With deterministic semantics, disagreement is evidence of a
+different input, a policy boundary, or a defect that can be isolated.</p>
+<p>Self-hosting sharpens this benefit. A generation fixed point makes drift between the
+book and its generator observable. It does not prove correctness, but it gives the
+project a strong answer to a foundational question: does the fresh program reproduce
+the source state that claims to define it?</p>
+<h2>Failures deserve as much design as success</h2>
+<p>Many of Literate's most important decisions concern what must not happen:</p>
+<ul>
+<li>no partial files after a graph error;</li>
+<li>no mapped edit across an ambiguous occurrence;</li>
+<li>no publication callback before whole-document validation;</li>
+<li>no unbounded allocation from a protocol length;</li>
+<li>no claim of rollback when recovery failed;</li>
+<li>no claim that a temporary directory is a sandbox.</li>
+</ul>
+<p>These negative guarantees are easier to understand when presented as part of the
+main architecture rather than scattered among exception handlers. Literate
+programming is well suited to this because a chapter can place the failure model
+before the implementation paths it constrains.</p>
+<p>The lesson is broader than “validate input.” Each boundary must identify the
+authority being withheld. A malformed preview enhancement may lose only that
+enhancement. An uncertain generated edit must lose permission to modify source. An
+incomplete generation plan must lose permission to touch every output. Fail closed
+at the scope where uncertainty could become harm.</p>
+<h2>Completeness and explanation pull in different directions</h2>
+<p>A self-hosted book must retain every line needed to assemble the program. A readable
+book must not give every line equal narrative weight. Imports, registrations,
+protocol fields, and host adapters are important for completeness, but placing all
+of them in the main argument can make implementation order displace explanatory
+order.</p>
+<p>This tension is not solved by deleting detail. It is managed through layers:</p>
+<ol>
+<li>the main chapters explain motivation, models, invariants, algorithms, and major
+boundaries;</li>
+<li>themed appendices retain assembly maps and exact integration contracts;</li>
+<li>generated source presents the compiler's complete view;</li>
+<li>tests and contributor references preserve executable examples and operational
+detail.</li>
+</ol>
+<pre class="mermaid">
+flowchart TD
+    Main[Main narrative: understanding] --&gt; Concept[Concepts and invariants]
+    Appendix[Themed appendices: lookup] --&gt; Mechanics[Assembly and protocols]
+    Generated[Generated source: tooling] --&gt; Complete[Complete executable order]
+    Tests[Tests: evidence] --&gt; Contracts[Concrete accepted behavior]
+    Concept --&gt; Program[One maintained system]
+    Mechanics --&gt; Program
+    Complete --&gt; Program
+    Contracts --&gt; Program
+</pre>
+<p>No layer is disposable, and no layer is sufficient alone. Auditability requires a
+path to exact mechanics. Readability requires that the reader is not forced down
+that path before understanding why it matters.</p>
+<h2>The book can drift while every test passes</h2>
+<p>Executable tests detect many kinds of disagreement, but prose can become obsolete
+without changing a byte of behavior. A diagram can preserve an old ownership
+boundary. A chapter can describe a temporary workaround as though it were a design
+principle. A fragment name can remain technically connected while no longer
+matching its responsibility.</p>
+<p>This is the central maintenance lesson: a literate program needs editorial tests as
+well as executable ones. Reviewers should ask whether the prose works when code is
+skipped, whether diagrams answer stated questions, whether terms are introduced
+before use, and whether limitations remain proportional to the evidence.</p>
+<p>The reverse drift is possible too. A beautiful explanation can conceal incomplete
+assembly or an untested safety claim. Generated diffs, fixed-point verification,
+and focused boundary tests keep the narrative answerable to the program.</p>
+<h2>Implementation order will try to become book order</h2>
+<p>Features usually enter a project through practical pressure: a module is added, a
+host needs an adapter, or a protocol gains another message. It is natural to place
+new explanation beside the code that happened to change. Over time, that accretion
+can turn a book into a chronological source tour.</p>
+<p>A mature literate program must periodically restore conceptual order. That does not
+require narrating every rearrangement or preserving development history in the main
+text. It means asking afresh what a reader needs to know first and moving mechanical
+completeness to a layer where it remains available without controlling the story.</p>
+<p>This work cannot be delegated entirely to generation. Generation can find missing
+fragment references and stale outputs, while publication validates supported links
+to included documents and headings. Arbitrary Markdown links are not universally
+checked. No automated pass can determine that a paragraph introduces a concept too
+late or that two chapters make the same argument under different names.</p>
+<h2>Accessibility can strengthen precision</h2>
+<p>Opening a technical idea in ordinary language is not a retreat from rigor. It forces
+the author to say what the mechanism is for before presenting names and formulas.
+Once the reader has that foothold, precise terms, diagrams, coordinate systems, and
+bounds become easier to understand.</p>
+<p>For example, “two tools count positions differently and may highlight the wrong
+word” gives source-coordinate encoding a human consequence. The exact UTF-16 rule
+can then be stated without mystery. “A partial generated program may combine new
+and old modules” gives all-or-nothing planning a reason before transaction terms
+arrive.</p>
+<p>The durable pattern is intuition, model, invariant, implementation, and consequence.
+Different chapters may emphasize different steps, but omitting the first two turns
+technical precision into unnecessary exclusion.</p>
+<h2>Self-hosting should create humility</h2>
+<p>A tool that can generate itself is impressive, but the fixed point is not a proof
+that the design is wise or the program correct. Two implementations can reproduce
+the same mistaken output. A book can generate perfectly while explaining poorly.
+A passing bootstrap can coexist with a broken editor command.</p>
+<p>Self-hosting is most useful when treated as one strong check in a larger argument.
+It verifies continuity of authority: the fresh generator agrees with the book and
+checked-in outputs. Tests, host acceptance, security review, publication inspection,
+and reader review establish different claims.</p>
+<p>This humility improves technical writing. Each claim should name its evidence and
+its boundary. Doing so makes limitations useful design information instead of
+fine print.</p>
+<h2>Continue both the editorial and technical practice</h2>
+<p>Maintaining Literate means improving both sides of the method. Technical work may
+seek richer but still exact source mappings, clearer explicit identities where
+edit-stability matters, broader tested host support, and resource accounting across
+more expensive boundaries. Editorial work strengthens cross-chapter transitions,
+examples, accessible algorithm explanations, and appendices that remain easy to
+audit as the program grows.</p>
+<p>Those efforts should be judged by questions larger than feature count:</p>
+<ul>
+<li>Is the book still the clearest route to understanding the program?</li>
+<li>Can a contributor identify the authority for a behavior without guessing?</li>
+<li>Do failures preserve coherent state and explain what was withheld?</li>
+<li>Can generated consequences be reviewed without reading every implementation line?</li>
+<li>Are unsupported cases omitted honestly rather than approximated dangerously?</li>
+<li>Do screen, print, editor, and command-line views still discuss one project model?</li>
+</ul>
+<p>The answer will never remain permanently “yes” without maintenance. Architecture
+changes, external tools evolve, and explanations accumulate. Literate programming
+turns that continuing responsibility into visible work rather than eliminating it.</p>
+<h2>A continuing practice</h2>
+<p>The deepest lesson is that a literate program is not source code with more comments,
+and it is not a book that happens to contain compilable examples. It is a maintained
+agreement among explanation, executable fragments, generated artifacts, and
+evidence.</p>
+<p>When that agreement is healthy, the book can reveal why the program has its shape,
+the program can hold the book accountable to exact behavior, and generation can
+connect the two without making either secondary. When it is neglected, the same
+machinery can produce a complete but unreadable source archive.</p>
+<p>Literate therefore ends not with a claim that the method is finished, but with a
+standard for its future: keep the explanation authoritative, keep the boundaries
+honest, keep the generated consequences inspectable, and keep revising the route by
+which another person can understand the whole.</p>
+</div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

@@ -1,0 +1,244 @@
+# What Literate does not promise
+
+A tool is easier to trust when its limits are stated beside its strengths. Literate
+keeps explanation and implementation together, plans deterministic outputs, maps
+generated code back to fragments, and supports several publication forms. None of
+those capabilities removes the underlying tradeoffs of indirection, generated
+artifacts, external tools, or host filesystems.
+
+This chapter is not a list of apologies. It draws the boundary around the system's
+actual contract so authors can decide when the method fits and contributors can
+recognize proposals that require new guarantees.
+
+## It does not remove indirection
+
+Named fragments let explanatory order differ from source-file order. The cost is
+that a statement's surrounding generated code may live elsewhere in the book. A
+reader sometimes has to follow a reference, inspect a family with several
+contributions, or view the assembled source.
+
+Good names, parent outlines, definition links, indexes, and the Fragment Explorer
+reduce that cost. They do not make it disappear. Excessive fragmentation can still
+turn a chapter into a trail of links, and a family amended in many distant places
+can be harder to understand than one coherent definition.
+
+Literate also does not infer the best fragments automatically. Syntax boundaries
+are not necessarily conceptual boundaries. Choosing names and deciding where an
+idea belongs remain authorial work.
+
+## Generated files remain real artifacts
+
+The book is authoritative for the program fragments it contains, but generated
+source still matters. Compilers, language servers, package builders, debuggers, and
+reviewers consume it. Literate keeps generated files in the repository to support
+bootstrapping and ordinary tools.
+
+This creates obligations rather than a second source of truth:
+
+- generated files can become stale and must be checked;
+- direct edits to them will be overwritten and must be moved back to the book;
+- generated diffs need review because they reveal assembly consequences;
+- removed or renamed roots can leave orphaned files that are not deleted
+  automatically;
+- merge conflicts may appear in both authoritative and derived views.
+
+A successful generation updates changed destinations; it does not perform general
+repository garbage collection or decide that an unplanned file is safe to delete.
+
+## Text generation is not language understanding
+
+Fragment expansion is intentionally language-neutral. References are recognized by
+Literate's fragment syntax even when they appear inside what the generated language
+would call a string or comment. Escaping an opening delimiter is therefore part of
+the literate source contract.
+
+Literate does not parse every generated language to prove that the assembled source
+is syntactically or semantically correct. That is the job of its compiler, tests,
+and language tools. Templates and wrappers can also introduce generated text that
+has no direct editable source span.
+
+```mermaid
+flowchart TD
+    Literate[Literate structure] --> Tangle[Assembled text]
+    Tangle --> Compiler[Language compiler or interpreter]
+    Compiler --> Behavior[Program behavior]
+    Literate --> Validate[Fragment graph and output policy]
+    Validate --> Tangle
+```
+
+The upper path shows separate responsibilities. Literate validates its own graph
+and output rules; the target-language tool validates the assembled program. One
+cannot substitute for the other.
+
+## Projection cannot make every generated position editable
+
+Language projection lets a server analyze assembled source while the author edits
+fragments. The mapping is exact for literal source segments and deliberately
+conservative elsewhere. Wrapper text, indentation inserted during expansion,
+reference seams, and positions spanning several mappings may have no safe reverse
+translation.
+
+Repeated fragments create a deeper ambiguity. One source interval can appear at
+several generated positions. Read-only services can select an occurrence in stable
+order and return useful hover or navigation information. A generated edit is held
+to a stronger rule: it must map completely through the exact requested occurrence
+and remain confined to current source. If applying it would amplify one server edit
+through repeated expansion, Literate rejects it.
+
+The result is intentionally incomplete language intelligence. Some valid server
+answers are omitted, and some refactorings must be performed in the literate source
+rather than accepted as projected edits. The system prefers no edit to a plausible
+edit at the wrong place.
+
+Nor does direct protocol support imply compatibility with every language server.
+Servers differ in initialization, project discovery, dynamic capabilities,
+filesystem expectations, and extensions. Tested configurations establish evidence
+for those configurations, not a universal LSP guarantee.
+
+## Safety boundaries are not sandboxes
+
+Workspace Trust, path validation, bounded messages, private temporary directories,
+disabled shell escape, and process termination all reduce risk. They do not make
+trusted project code or external compilers safe to run on hostile input.
+
+Self-host verification executes a freshly built engine. PDF publication invokes
+programs capable of reading files and executing substantial logic. A browser or
+language server is a large external process. These features are intended for
+trusted projects and explicitly selected tools.
+
+Likewise, a temporary directory is an isolation aid, not a security boundary by
+itself. A child process can access resources permitted to the user unless the
+operating system supplies stronger confinement outside Literate.
+
+## Output transactions are not filesystem-wide atomicity
+
+Literate plans all outputs before writing and uses a shared transaction protocol to
+preflight, stage, install, roll back, and report recovery material. This protects
+against many ordinary exceptions. It does not provide database semantics.
+
+In particular, the transaction has no crash-durable journal, no lock against
+external writers, and no instant at which every reader on every filesystem must see
+all new files simultaneously. A power loss can interrupt a batch. Another process
+can race a preflight check. Filesystem providers may expose weaker link or metadata
+information than a local POSIX filesystem.
+
+```mermaid
+flowchart TD
+    Plan[Complete semantic plan] --> Preflight[Inspect destinations]
+    Preflight --> Stage[Stage changed files]
+    Stage --> Install[Install and back up]
+    Install --> Cleanup[Remove private recovery files]
+    External[Power loss or competing writer] -. outside full control .-> Preflight
+    External -. outside full control .-> Install
+```
+
+The dotted arrows mark interference Literate can detect or recover from in some
+cases but cannot abolish. Callers must serialize writers, avoid concurrent manual
+changes, and inspect reported recovery paths rather than assuming rollback always
+completed.
+
+## External dependencies remain external
+
+Core parsing and planning do not require a graphical editor, but richer features
+rely on other programs and resources. Publication may require a document converter,
+a TeX toolchain, suitable fonts, and an explicitly selected browser for diagrams.
+Language intelligence requires configured language servers. Packaging relies on the
+repository's build toolchain.
+
+Literate validates and invokes these dependencies; it does not silently download or
+install them. It cannot guarantee that a font contains every glyph, that a compiler
+accepts every project, or that a future external release preserves behavior. Locked
+project dependencies improve repeatability, while system tools still need explicit
+preflight and supported-environment testing.
+
+Portable publication also has a bounded meaning. Explicit font and license
+companions can travel with an export, and local supported images can be copied, but
+Literate does not determine whether a license permits redistribution. It does not
+turn remote images, arbitrary raw graphics, or every browser resource into a
+self-contained book.
+
+## Not every feature works in every workspace
+
+The shared engine and workspace filesystem adapter can serve more environments than
+process-owning integrations. Remote providers can participate in project capture,
+generation, and preview through the editor's filesystem API, subject to the
+provider's semantics.
+
+Features that launch local processes have a narrower boundary. Direct language
+servers require a trusted local file workspace. Editor-driven publication requires
+a trusted local desktop POSIX environment. Remote, web, and Windows extension hosts
+are rejected for these process-owning features; displaying a `.literate` document
+does not grant the missing authority or process model.
+
+This difference is intentional. Pretending that a remote URI is a local path would
+be less portable, not more. Unsupported environments should retain read-only or
+core capabilities where safe and explain why a process-owning feature is absent.
+
+## Screen and print are related, not identical
+
+A shared publication model gives HTML, editor preview, LaTeX, and PDF the same
+contributions, annotations, and logical targets. Each medium still has different
+layout and navigation. A link on screen may become a page reference in print;
+interactive fragment expansion has no direct paper equivalent; line and page
+breaks depend on typography.
+
+The print bridge supports a controlled document vocabulary rather than arbitrary
+Markdown, HTML, TeX, or browser behavior. Unsupported or ambiguous constructs are
+reported instead of being copied into executable TeX. Images and diagrams have
+explicit format and resource limits. Font companions instead receive path,
+manifest, presence, and file-kind validation; they do not currently have dedicated
+byte or count budgets.
+
+Successful PDF compilation proves that the selected tools produced an accepted
+file. It does not prove perfect typography. Missing glyphs, overfull lines,
+unfortunate page breaks, figure scale, and the readability of dense code still
+need human review. Screen success also does not prove print success, or vice versa.
+
+## Determinism is not permanence
+
+The same accepted snapshot and policy produce the same semantic result, but an edit
+can intentionally change identity and order. Renaming a fragment changes its target.
+Moving a contribution can change encounter order. Inserting a duplicate heading or
+contribution can change later disambiguating ordinals.
+
+Literate promises deterministic identities under a fixed accepted input. It does
+not promise that all links survive arbitrary structural edits without review.
+Explicit author identities would be needed wherever edit-stability must outweigh
+derived identity.
+
+Deterministic planning also does not guarantee byte-identical output from every
+external renderer. Tool releases, installed fonts, and platform libraries can
+affect a final PDF or image even when the renderer-neutral plan is unchanged.
+
+## Bounds do not guarantee every project will finish
+
+Explicit budgets protect protocol messages, caches, browser exploration,
+publication requests, assets, subprocess time, logs, and compiler products. They
+fail conservatively at those boundaries. They are not a proof that total CPU,
+memory, disk, or filesystem latency is bounded for every accepted project.
+
+Large source sets and expansions still require proportional work. External
+processes have internal resources that Literate cannot fully account for. An
+unresponsive filesystem can delay operations outside a child-process deadline.
+Resource policy makes failure safer and more predictable; it does not create
+unlimited capacity.
+
+## The honest promise
+
+The limits above leave a substantial and useful contract:
+
+- one captured project has one declared document and contribution order;
+- fragment errors and unsafe output plans do not become partial generation success;
+- the engine returns plans rather than performing hidden writes;
+- hosts compare and commit complete plans through explicit policies;
+- generated-language mappings prefer exact omission over ambiguous invention;
+- screen and print publication share semantic identities while respecting their
+  media;
+- self-host verification checks a real generation fixed point without claiming to
+  prove the whole application;
+- unsupported environments and exceeded limits are reported rather than disguised.
+
+That contract is narrower than “prose and code can never drift” or “all tools work
+everywhere.” It is also stronger because it can be tested. The final chapter draws
+lessons from building and maintaining a system around this boundary, and asks what
+continued literate development should optimize for.
