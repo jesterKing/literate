@@ -6,16 +6,6 @@ Puppeteer adapter, excluding browser management and download code. Each diagram
 gets a new browser context, preventing one diagram's DOM and Mermaid counters
 from affecting another. The controller owns the deadline, process group and temporary directory.
 
-```js : <<Mermaid browser worker.*>>= ./src/publication-mermaid-worker.mjs $
-<<Mermaid worker imports>>
-
-<<Mermaid page isolation>>
-<<Mermaid SVG geometry>>
-<<Mermaid vector rendering>>
-<<Mermaid browser batch>>
-<<Mermaid owned browser process>>
-<<Mermaid worker entry>>
-```
 
 ## Complete offline renderer graph
 
@@ -26,25 +16,6 @@ plugin; tidy-tree supplies an optional layout, not a new diagram family. Their
 pinned packages are the same integrations offered by the Mermaid CLI. The plugin's
 prebundled ESM distribution avoids importing its Node-facing rendering helpers.
 
-```js : <<publication Mermaid browser bundle.*>>= ./src/publication-mermaid-browser.mjs $
-import mermaid from 'mermaid/dist/mermaid.esm.mjs';
-import zenuml from '@mermaid-js/mermaid-zenuml/dist/mermaid-zenuml.esm.mjs';
-import tidyTree from '@mermaid-js/layout-tidy-tree';
-const offlineZenuml = { ...zenuml, loader: async () => {
-    const existingStyles = new Set(document.querySelectorAll('style'));
-    const definition = await zenuml.loader();
-    const bundledFont = '@font-face{font-family:MS Sans Serif;src:url(/fonts/MS%20Sans%20Serif.ttf) format("truetype")}';
-    for (const style of document.querySelectorAll('style')) {
-        if (!existingStyles.has(style) && style.textContent.includes(bundledFont)) {
-            style.textContent = style.textContent.replaceAll(bundledFont, '');
-        }
-    }
-    return definition;
-} };
-mermaid.registerLayoutLoaders(tidyTree);
-globalThis.mermaid = mermaid;
-globalThis.publicationMermaidReady = mermaid.registerExternalDiagrams([offlineZenuml]);
-```
 
 The pinned ZenUML definition injects CSS containing a neon-theme font face whose
 source is `/fonts/MS%20Sans%20Serif.ttf`. Forcing a sans-serif family does not remove

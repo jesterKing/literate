@@ -693,3 +693,102 @@ prompts, and command registration from [Publication commands](publication-extens
 <<publication extension prompts>>
 <<publication extension commands>>
 ```
+
+## Assemble browser and build programs
+
+The shared theme catalogue combines its data model, palettes, syntax mappings,
+serializers, diagram configuration, license notice, and document stylesheet from
+[Portable theme catalogue](themes.html).
+
+```ts : <<assemble the portable theme catalogue.*>>= ./src/themes.ts $
+<<Theme contract>>
+<<Theme palette rows>>
+<<Theme catalogue>>
+<<Theme syntax scope groups>>
+<<Theme syntax adapters>>
+<<Theme serialization>>
+<<Theme Mermaid configuration>>
+<<Theme upstream notice>>
+<<Theme document stylesheet>>
+```
+
+The publication worker combines its browser process, isolated pages, geometry,
+vector rendering, and request loop from
+[A browser that produces assets](publication-mermaid-worker.html).
+
+```js : <<assemble the publication browser worker.*>>= ./src/publication-mermaid-worker.mjs $
+<<Mermaid worker imports>>
+
+<<Mermaid page isolation>>
+<<Mermaid SVG geometry>>
+<<Mermaid vector rendering>>
+<<Mermaid browser batch>>
+<<Mermaid owned browser process>>
+<<Mermaid worker entry>>
+```
+
+The browser bundle installs Mermaid and its explicitly supported extensions into
+one offline runtime.
+
+```js : <<assemble the offline Mermaid browser.*>>= ./src/publication-mermaid-browser.mjs $
+import mermaid from 'mermaid/dist/mermaid.esm.mjs';
+import zenuml from '@mermaid-js/mermaid-zenuml/dist/mermaid-zenuml.esm.mjs';
+import tidyTree from '@mermaid-js/layout-tidy-tree';
+const offlineZenuml = { ...zenuml, loader: async () => {
+    const existingStyles = new Set(document.querySelectorAll('style'));
+    const definition = await zenuml.loader();
+    const bundledFont = '@font-face{font-family:MS Sans Serif;src:url(/fonts/MS%20Sans%20Serif.ttf) format("truetype")}';
+    for (const style of document.querySelectorAll('style')) {
+        if (!existingStyles.has(style) && style.textContent.includes(bundledFont)) {
+            style.textContent = style.textContent.replaceAll(bundledFont, '');
+        }
+    }
+    return definition;
+} };
+mermaid.registerLayoutLoaders(tidyTree);
+globalThis.mermaid = mermaid;
+globalThis.publicationMermaidReady = mermaid.registerExternalDiagrams([offlineZenuml]);
+```
+
+The publication build joins dependency pinning, graph validation, and the three
+runtime entry points from [Shipping a publication runtime](publication-runtime.html).
+
+```js : <<assemble the publication runtime build.*>>= ./src/build-publication.mjs $
+<<publication build imports>>
+<<publication pinned dependencies>>
+<<publication dependency metadata>>
+<<publication version validation>>
+<<publication launch snapshot>>
+<<publication self hosting boundary>>
+<<publication graph validation>>
+<<publication bundle preparation>>
+<<publication browser build>>
+<<publication worker build>>
+<<publication helper build>>
+<<publication build orchestration>>
+<<publication build entry>>
+```
+
+The connect-only Puppeteer adapter exposes only the arguments and endpoint needed
+by the worker.
+
+```js : <<assemble the publication browser adapter.*>>= ./src/publication-puppeteer.mjs $
+import * as path from 'node:path';
+import puppeteer from 'puppeteer-core/internal/puppeteer-core-browser.js';
+<<publication adapter arguments>>
+<<publication adapter connection>>
+export default { defaultArgs, connect };
+```
+
+The disabled browser-manager boundary fails closed if upstream code attempts to
+enter installation, discovery, or channel selection.
+
+```js : <<assemble the disabled browser manager.*>>= ./src/publication-browser-manager-disabled.mjs $
+function disabled() {
+    throw new Error('Browser management is unavailable; publication requires an explicit system Chromium');
+}
+export const Browser = new Proxy(Object.freeze({}), { get: disabled });
+export const ChromeReleaseChannel = new Proxy(Object.freeze({}), { get: disabled });
+export const detectBrowserPlatform = disabled;
+export const resolveDefaultUserDataDir = disabled;
+```
