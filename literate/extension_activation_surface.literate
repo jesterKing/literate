@@ -1,0 +1,256 @@
+# Extension activation and public surface
+
+An editor extension becomes part of a larger application. It cannot assume that its
+module is always running, that every workspace is trusted, or that every registered
+feature should act on every Markdown document. It must tell the host what users can
+see, then create and dispose the runtime objects that make those declarations true.
+
+This produces two related surfaces. The manifest is declarative: it names commands,
+views, settings, preview resources, and keybindings before the extension runs.
+Activation is operational: it creates the repository, providers, URI handling, and
+command implementations for the current editor session.
+
+## Declare discoverability before behavior
+
+The manifest lets the editor show a feature without loading its implementation just
+to learn that the feature exists. Literate declares:
+
+- a fragment view in the Explorer and a refresh action in that view's title;
+- commands for processing, fragment authoring, language-server restart, and
+  publication export;
+- settings for mapped-language behavior, configured server processes, and
+  publication tools;
+- a keybinding that can cancel a pending automatic completion request;
+- participation in the Markdown parser and locally packaged browser scripts for
+  diagrams and inline exploration.
+
+```mermaid
+flowchart TD
+    Manifest[Extension manifest] --> Commands[Command palette and enablement]
+    Manifest --> View[Fragment Explorer contribution]
+    Manifest --> Settings[Configuration schema and scope]
+    Manifest --> Markdown[Markdown parser and preview resources]
+    Manifest --> Keys[Context-sensitive keybinding]
+    Commands --> Activate[Host activates the extension when needed]
+    View --> Activate
+    Markdown --> Activate
+    Activate --> Runtime[Session-owned adapters and providers]
+```
+
+The arrows from the manifest mean “makes discoverable to the host.” They do not
+execute commands or create providers. The final arrow marks the point at which the
+extension module can allocate runtime state. Explicit activation-event duplication
+is unnecessary for this contribution-driven surface; the host can infer when the
+contributed capabilities require activation.
+
+The public command identifiers and setting keys are compatibility boundaries. Their
+human-readable titles and descriptions may improve, but changing an identifier can
+break keybindings, tasks, menus, or user configuration outside the repository.
+
+## Activation assembles services in dependency order
+
+Activation first creates the editor-side repository because fragment providers,
+preview rendering, and command handlers depend on its snapshots. The repository and
+its diagnostic collection enter the extension context's subscription set so the host
+can dispose them together.
+
+Publication commands and mapped language features are registered around narrower
+interfaces rather than receiving unrestricted access to repository internals.
+Publication receives a serialization boundary so its capture and helper lifetime do
+not overlap ordinary generation. Language features receive a source-capture function
+that returns documents and templates without generating files.
+
+The initial repository pass is awaited and read-only. This gives navigation and
+preview a discovered project without writing source or HTML merely because the
+extension became active. Failure to read one generation input does not prevent
+independent commands from being registered; later operations can report their own
+specific errors.
+
+```mermaid
+sequenceDiagram
+    participant Host as VS Code
+    participant Entry as Extension entry point
+    participant Repo as Project repository
+    participant Surface as Commands, views, and providers
+    participant Preview as Markdown integration
+
+    Host->>Entry: Activate with extension context
+    Entry->>Repo: Create session-owned repository
+    Entry->>Surface: Register publication and language boundaries
+    Entry->>Repo: Capture initial project state without writes
+    Repo-->>Entry: Initial snapshot or contained failure
+    Entry->>Surface: Register fragment commands, tree, and symbol providers
+    Entry->>Preview: Create navigation handler and return parser extension
+    Entry-->>Host: Activated public Markdown contribution
+```
+
+The diagram emphasizes dependency order, not source-file order. Some registrations
+can be implemented in separate modules, and browser scripts are loaded by the
+Markdown host rather than called during this sequence. The key invariant is that no
+provider observes a half-constructed shared repository.
+
+The exported `activate` function and returned `extendMarkdownIt` hook are the runtime
+entry points recognized by VS Code. Literate does not expose its repository as a
+general extension API. Other modules within the bundle share it through explicit
+construction and registration.
+
+## Registration is broad; action is narrow
+
+Fragment tools currently register against Markdown because `.literate` documents
+use the built-in Markdown language support. That selector is intentionally broader
+than the semantic domain. Each provider must therefore locate a current workspace
+folder and refresh the relevant project. Navigation and refactoring decline when
+the cursor does not identify a valid fragment occurrence. Fragment-name completion
+uses the broader lexical signal of an unmatched `<<` before the cursor.
+
+Mapped programming-language features narrow further: they require an open
+file-backed `.literate` document in a current local workspace, an accepted fragment
+body, a configured canonical language, and a position that maps into generated code.
+A registration tells VS Code who may answer a request; it does not guarantee that
+every request receives a result.
+
+This fail-quiet behavior matters in mixed Markdown workspaces. Semantic hovers,
+navigation, refactoring, and mapped language services decline outside their domain.
+Fragment-name completion is intentionally less semantic and may appear after an
+unmatched `<<`; accepting a suggestion still edits only the current cursor range.
+
+## Commands express different effect levels
+
+The public command surface groups actions that look similar in a palette but have
+different authority:
+
+- **Process** captures projects, asks the shared engine for complete plans, updates
+  diagnostics and navigation, and commits valid requested outputs through the
+  transaction boundary.
+- **Create fragment** and **Split fragment** edit the active literate document at an
+  explicitly chosen position. Normal change processing follows those edits.
+- **Refresh Fragment Explorer** invalidates the view so visible children are requested
+  again; it does not itself generate files.
+- **Restart language servers** disposes configured sessions so later requests create
+  fresh ones.
+- **Export LaTeX** and **Export PDF** begin explicit publication workflows with fresh
+  input capture, user choices, and isolated external processes.
+
+Keeping these meanings distinct is part of the public contract. A view refresh must
+not become Process, activation must not become export, and asking for completion must
+not write outputs.
+
+## Trust is a set of capability boundaries
+
+Workspace Trust is not best modeled as a single switch that makes the entire
+extension disappear. Reading Markdown and identifying fragment symbols are different
+risks from launching a configured executable or accepting a browser-to-editor
+navigation capability.
+
+Literate applies trust at the boundary that needs authority:
+
+- preview cross-document capabilities are minted and honored only for trusted,
+  currently present workspaces;
+- mapped language servers require a trusted local file workspace and configuration
+  taken from the user's global settings;
+- publication requires a trusted local desktop workspace and performs additional
+  path, process, and platform checks;
+- ordinary symbol inspection remains useful without starting an external process.
+
+```mermaid
+flowchart TD
+    Request[Requested extension capability] --> Process{Starts an external process?}
+    Process -->|Yes| Trusted{Trusted local workspace and allowed configuration?}
+    Trusted -->|No| Deny[Decline with no process]
+    Trusted -->|Yes| Start[Create bounded isolated operation]
+    Process -->|No| Write{Writes project files?}
+    Write -->|Yes| Commit[Preflight and commit a complete plan]
+    Write -->|No| Navigate{Crosses from preview into the editor?}
+    Navigate -->|Yes| Capability{Valid temporary capability in current workspace?}
+    Capability -->|No| Plain[Leave text or link inert]
+    Capability -->|Yes| Open[Resolve fresh logical target and open safely]
+    Navigate -->|No| Inspect[Serve read-only project information]
+```
+
+The arrows classify authority, not individual command names. Filesystem generation
+has its own destination preflight and transaction policy described in the host and
+output chapters; trust does not replace those checks. Conversely, path checks do not
+make an arbitrary external executable safe. Each boundary defends the capability it
+actually grants.
+
+## Configuration authority follows risk
+
+A convenience preference such as automatic mapped completion can vary by resource.
+Executable paths and process initialization data have a stronger authority and are
+restricted to machine-scoped user configuration. Workspace content must not be able
+to select a program that the extension launches.
+
+For mapped language servers, a setting identifies an absolute executable, literal
+arguments, and optional protocol configuration. No shell performs expansion. An
+invalid entry is rejected rather than partially interpreted. Publication similarly
+uses user-controlled tool paths while keeping project-relative resource choices,
+such as a font manifest, inside separately validated workspace boundaries.
+
+VS Code exposes these policies through the `contributes.configuration` schema and
+runtime configuration inspection. The schema makes settings discoverable and
+communicates scope; runtime checks remain necessary because configuration is input,
+not proof.
+
+## Browser scripts are public resources with private authority
+
+The Mermaid renderer and exploration client run in the Markdown preview's browser
+context. The manifest packages them as local preview scripts, but neither script owns
+editor APIs. They receive escaped DOM containers and inert semantic data.
+
+Navigation crosses back into the extension only through the activation-owned URI
+handler. That handler validates scheme, authority, token shape, session membership,
+expiry, trust, workspace identity, fresh semantic target, and canonical path before
+opening a document. This narrow bridge is preferable to exposing arbitrary commands
+to rendered content.
+
+The split also improves portability. Generated HTML can use the same screen model
+and exploration client with ordinary local links, while editor preview supplies
+capabilities appropriate to its host.
+
+## Disposal closes the input side first
+
+Every listener, provider, view, timer, diagnostic collection, server coordinator,
+and URI handler has a lifetime. Activation attaches their disposables to the
+extension context. When the host deactivates the extension, disposal prevents new
+work, cancels timers, clears bounded caches, releases subscriptions, and then drops
+workspace snapshots.
+
+Repository disposal marks the adapter closed before draining its state, so a queued
+callback cannot repopulate caches during teardown. Preview navigation invalidates its
+capabilities and ignores late URL-resolution results. Language sessions and
+publication helpers own their own shutdown policies. Idempotent disposal is essential
+because failures and normal deactivation may converge on the same cleanup path.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Declared
+    Declared --> Activating: host needs a contribution
+    Activating --> Active: repository and registrations ready
+    Activating --> Active: nonfatal initial scan failure contained
+    Active --> Disposing: host deactivates or owner shuts down
+    Disposing --> Disposed: inputs closed, resources released
+    Disposed --> Disposed: repeated cleanup is inert
+```
+
+The state diagram describes the extension session, not language-server subprocesses
+or output transactions, which have their own finer-grained states. Notice that a
+contained initial scan failure does not create a half-active public surface. Commands
+and providers can still exist and report or recover from current project conditions.
+
+## A small public surface supports a large internal architecture
+
+The host sees commands, a view, settings, a Markdown extension, browser resources,
+and provider registrations. Behind them, the pure engine, symbol collector,
+publication model, projection layer, transaction coordinator, and process adapters
+remain separately testable components.
+
+This is the purpose of activation: not to contain the whole program, but to join
+well-defined responsibilities at the last responsible moment. Future commands and
+views should preserve that shape. Declare discoverability in the manifest, register
+a narrow adapter during activation, keep semantic work in host-independent modules,
+gate authority where it is exercised, and make the complete lifetime disposable.
+
+With the editor environment assembled, the next part can turn from fragment symbols
+to programming-language intelligence. That work begins with the projection problem:
+the author edits scattered contributions, while a language server expects assembled
+source with stable positions and project context.

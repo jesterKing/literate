@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Changing files safely</h1>
+<p>A complete generation plan is atomically valid in memory: either every planned
+file is available or none is. A filesystem cannot usually replace several files at
+one physical instant. Between those two facts lies the output transaction.</p>
+<p>The transaction's purpose is narrower than the database term may suggest. It gives
+a batch recoverable behavior for caught failures: validate before mutation, stage
+all changed bytes, retain originals while installing replacements, and attempt to
+restore the old state if preparation or installation fails. It does not turn an
+ordinary filesystem into a crash-durable, isolated database.</p>
+<h2>Safety begins by naming the promises</h2>
+<p>For one serialized writer and a cooperating filesystem adapter, the transaction
+maintains these invariants:</p>
+<ol>
+<li>unchanged outputs cause no file or directory changes;</li>
+<li>every destination and parent is checked before mutation begins;</li>
+<li>all changed content is staged before any target is replaced;</li>
+<li>an original remains recoverable until the whole batch reaches its commit point;</li>
+<li>rollback removes newly installed outputs and restores originals in reverse order;</li>
+<li>cleanup removes only artifacts the transaction knows it owns;</li>
+<li>every failure reports whether the requested bytes were committed.</li>
+</ol>
+<p>These promises make many ordinary errors recoverable without overstating atomicity.
+The distinction matters because callers choose very different actions after “nothing
+was committed,” “rollback was incomplete,” and “the files were committed but cleanup
+failed.”</p>
+<h2>Preflight the complete destination set</h2>
+<p>Preflight validates the batch before creating even an empty directory. Paths are
+normalized root-relative names. Case-folded duplicates are rejected for portability,
+as are conflicts where one output would also be another output's parent. Input byte
+arrays are copied so a caller cannot change planned content while asynchronous work
+is in progress.</p>
+<p>The filesystem adapter then inspects every parent and target, including paths for
+outputs whose bytes may prove unchanged. Existing ancestors must be directories.
+Existing targets must be regular files. Symbolic links, special entries, and errors
+other than genuine absence reject the batch.</p>
+<pre class="mermaid">
+flowchart TD
+    Batch[Planned output batch] --&gt; Normalize[Normalize paths and copy bytes]
+    Normalize --&gt; Conflicts{Any path conflict?}
+    Conflicts --&gt;|Yes| Reject[Reject without mutation]
+    Conflicts --&gt;|No| Walk[Inspect all parents and targets]
+    Walk --&gt; Safe{Every path acceptable?}
+    Safe --&gt;|No| Reject
+    Safe --&gt;|Yes| Compare[Read and compare existing bytes]
+    Compare --&gt; Ready[Changed set ready]
+</pre>
+<p>The arrows show permission being earned. They do not imply that the filesystem is
+frozen between checks. That remaining race is one reason the caller must serialize
+writers and exclude unrelated changes during a batch.</p>
+<p>Preflight also reserves private staging names without creating them. One staging
+directory is chosen within each changed target's parent. Keeping stage, backup, and
+target on the same filesystem and near the same directory avoids cross-filesystem
+moves and limits the scope of temporary artifacts.</p>
+<h2>Preparation is visible but not published</h2>
+<p>Preparation creates only missing parent directories required by changed outputs,
+then exclusively creates each private staging directory and stage file. Exclusive
+creation is essential: encountering another entry is a collision, not permission to
+reuse or erase it.</p>
+<p>Every changed file is written completely to its stage before installation begins.
+At this point the filesystem contains private preparation material, but all public
+targets still have their original meaning.</p>
+<pre class="mermaid">
+sequenceDiagram
+    participant T as Transaction
+    participant FS as Filesystem adapter
+
+    T-&gt;&gt;FS: Create owned missing parents
+    T-&gt;&gt;FS: Create private staging directories
+    loop Every changed output
+        T-&gt;&gt;FS: Write complete stage exclusively
+    end
+    Note over T,FS: Public targets are still untouched
+</pre>
+<p>Ownership must be based on positive knowledge. If exclusive directory creation
+fails because another writer won a race, the transaction must not infer that the
+observed directory belongs to it. Only a successful creation, or a precise adapter
+error saying that this operation created the directory but could not compensate,
+transfers cleanup responsibility to the coordinator.</p>
+<h2>Installation keeps originals nearby</h2>
+<p>Installation handles each changed output in plan order. If a target already exists,
+it is renamed to the private backup location. The stage is then renamed to the
+public target. For a new output there is no backup; the staged file simply becomes
+the target.</p>
+<p>The transaction records an operation as attempted <em>before</em> asking the adapter to
+rename. Some filesystem interfaces can report failure after the move has taken
+effect. A rejected operation therefore means “the result is uncertain,” not always
+“nothing happened.” Recovery inspects both source and destination rather than
+trusting the shape of an exception.</p>
+<pre class="mermaid">
+stateDiagram-v2
+    [*] --&gt; Preflight
+    Preflight --&gt; Prepared: all stages written
+    Prepared --&gt; Installing
+    Installing --&gt; Installed: every target replaced
+    Installed --&gt; Committed: final cancellation check passes
+    Preflight --&gt; Rejected: validation fails
+    Prepared --&gt; Restoring: preparation fails
+    Installing --&gt; Restoring: installation or cancellation fails
+    Restoring --&gt; RolledBack: restoration succeeds
+    Restoring --&gt; RecoveryNeeded: restoration is uncertain
+    Committed --&gt; Complete: cleanup succeeds
+    Committed --&gt; CleanupNeeded: cleanup fails
+</pre>
+<p>The state diagram separates three facts that an undifferentiated error would hide:
+whether public installation began, whether restoration succeeded, and whether the
+commit point had already passed.</p>
+<h2>The commit point comes before cleanup</h2>
+<p>The batch commits only after every changed target has been installed and the final
+pre-commit cancellation check passes. Until then, retained backups support rollback.
+After that point the requested output bytes are authoritative.</p>
+<p>Cleanup follows commitment. It removes backup and stage files, then removes empty
+private directories. Deleting a backup is irreversible, so cleanup failure cannot
+honestly turn a committed batch back into an uncommitted one. The result must say
+“committed, cleanup failed” and report the remaining recovery locations.</p>
+<p>Cancellation follows the same rule. Before commitment it can trigger rollback.
+After commitment it cannot promise to undo already published files, so no new
+cancellation checkpoint interrupts cleanup.</p>
+<h2>Rollback reasons from observed state</h2>
+<p>When preparation or installation fails, rollback visits changed outputs in reverse
+order. Reverse order unwinds dependencies introduced by the forward sequence and
+reduces the number of mixed states that recovery must consider.</p>
+<p>For a replaced output, recovery first establishes that the original backup still
+exists. It must not delete an installed target and only then discover that the
+backup is gone. If a stage remains beside a public target after an uncertain rename,
+the situation is ambiguous; preserving both is safer than guessing which bytes to
+destroy.</p>
+<p>A successful rollback restores every original, removes every new target, removes
+owned stage and backup files, and removes newly created parents only when they are
+empty. Cleanup is nonrecursive. Unexpected content causes a reported failure rather
+than broad deletion.</p>
+<pre class="mermaid">
+flowchart TD
+    Failure[Preparation or installation failure] --&gt; Reverse[Visit outputs in reverse]
+    Reverse --&gt; Certain{State safe to undo?}
+    Certain --&gt;|Yes| Restore[Remove new target or restore backup]
+    Certain --&gt;|No| Preserve[Preserve recovery material]
+    Restore --&gt; More{More outputs?}
+    More --&gt;|Yes| Reverse
+    More --&gt;|No| Clean[Remove known artifacts and empty owned parents]
+    Preserve --&gt; Report[Report recovery paths]
+    Clean --&gt; Outcome{Cleanup complete?}
+    Outcome --&gt;|Yes| Rolled[Report rolled back]
+    Outcome --&gt;|No| Report
+</pre>
+<p>The preservation branch is deliberate. Recovery code has more power to destroy
+valuable evidence than the failed installation had. When ownership or state is
+uncertain, fail closed and tell the operator where to inspect.</p>
+<h2>Failure results describe what is true</h2>
+<p>The transaction distinguishes four outcomes rather than flattening them into
+“write failed”:</p>
+<ul>
+<li><strong>Preflight failed.</strong> No mutation was attempted. The old filesystem state remains
+outside the transaction's ownership.</li>
+<li><strong>Rolled back.</strong> Mutation began, but originals and absence of new outputs were
+restored and owned artifacts were removed.</li>
+<li><strong>Rollback failed.</strong> Restoration or its cleanup could not be completed. Public
+targets may be mixed, and reported recovery material must be preserved for
+inspection.</li>
+<li><strong>Cleanup failed after commit.</strong> Every requested output was installed, but some
+owned stage or backup material remains. Retrying the whole generation blindly
+would misrepresent what already succeeded.</li>
+</ul>
+<p>A failure also identifies the active or conflicting paths, the initiating error,
+and any retained recovery locations. For a committed cleanup failure it includes
+the changed output list that a successful transaction would have returned. This
+allows a host to report installed files without pretending cleanup succeeded.</p>
+<p>Recovery locations are evidence, not rubbish. They may contain the only surviving
+original after an interrupted restoration. A person or recovery tool should inspect
+the reported target, stage, and backup states before moving or deleting anything.</p>
+<h2>Filesystem adapters carry the physical contract</h2>
+<p>The coordinator is independent of a particular filesystem API. Its adapter must
+provide path inspection, reads, exclusive single-directory creation, exclusive file
+creation, non-overwriting rename, nonrecursive removal, and a safe unique token.
+Those operations are obligations, not assumptions about a platform's default calls.</p>
+<p>Inspection validates every existing component and the trusted root. Rename must not
+silently overwrite its destination. Removal checks the expected kind again. If the
+platform cannot provide a genuinely non-overwriting rename, an inspection followed
+by rename narrows ordinary mistakes but leaves a race with another writer. The
+serialization contract remains necessary.</p>
+<p>A local adapter can preserve ordinary permission bits by remembering them when it
+reads an original and applying them to the replacement stage before installation.
+A remote editor provider may not expose portable permission metadata. Sharing the
+transaction protocol does not erase such physical differences.</p>
+<h2>What atomicity does not mean here</h2>
+<p>The transaction does <strong>not</strong> promise simultaneous visibility. A reader that ignores
+the serialization boundary may observe some new files while later files still hold
+old content. It does not maintain a durable journal, so a process crash or power
+loss can stop between any two filesystem operations. It does not lock out another
+writer, and preflight cannot eliminate time-of-check-to-time-of-use races.</p>
+<p>It also does not delete obsolete outputs absent from the new plan. The plan can say
+what should be produced from the current snapshot; it cannot prove that an unrelated
+old file is safe to remove.</p>
+<p>The honest claim is therefore precise: for caught failures in a serialized batch,
+retain enough information to restore the prior state, attempt that restoration
+conservatively, and report uncertainty without destroying recovery material. This
+is strong enough to protect ordinary generation while leaving crash durability,
+concurrent isolation, and global atomic visibility to systems designed to provide
+them.</p>
+<p>Safe commitment protects the products of a generator. It does not yet answer a more
+circular question: how can the generator trust a new copy of itself when that copy
+is one of its own products? The next chapter replaces filesystem recovery with a
+fixed-point argument over bootstrap material and freshly generated code.</p>
+</div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
+</script>
+</body>
+</html>

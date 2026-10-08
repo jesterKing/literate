@@ -1,0 +1,222 @@
+# Fragments as editor symbols
+
+A fragment name is written as text, but authors use it as something richer. It can
+be declared in one chapter, extended in another, referenced from generated code, and
+mentioned in explanatory prose. Readers expect to jump between those places. Authors
+expect a rename to change the symbol without rewriting unrelated sentences or
+Markdown structure.
+
+The editor can provide those expectations only if it knows where fragment names are
+meaningful. Searching every pair of angle brackets is not enough. Markdown links,
+examples, escaped text, code spans, tables, and malformed fences all affect whether
+the same characters are a symbol or ordinary writing.
+
+## One identity, several kinds of occurrence
+
+A fragment family is identified by its exact name. The editor records every semantic
+occurrence of that name with a source path and a range. Occurrences have four roles:
+
+- a **definition** begins a family;
+- an **append** contributes more text to an existing family;
+- a **reference** expands the family inside fragment code;
+- a **mention** discusses the family in explanatory Markdown.
+
+This is intentionally smaller than a compiler's symbol table. Identity does not need
+a mutable object with hidden host state. The exact name and the captured occurrence
+sequence are enough for completion, navigation, references, hover, and rename
+planning.
+
+```mermaid
+classDiagram
+    class FragmentFamily {
+        exact name
+        ordered contributions
+    }
+    class Definition {
+        source range
+    }
+    class Append {
+        source range
+    }
+    class Reference {
+        source range
+    }
+    class Mention {
+        source range
+    }
+    FragmentFamily "1" --> "1" Definition : begins at
+    FragmentFamily "1" --> "0..*" Append : continues at
+    FragmentFamily "1" --> "0..*" Reference : used by
+    FragmentFamily "1" --> "0..*" Mention : discussed by
+```
+
+The lines mean “shares this family identity,” not ownership of source text. Each
+occurrence remains in its original document, and an append is still a declaration
+location even though it is not the family's base definition. The diagram omits
+output expansion because editor symbols describe authored source, not copies in a
+generated file.
+
+In the pure symbol layer these records are `FragmentOccurrence` values. Their lines
+and columns use raw UTF-16 positions, the same coordinate convention used by the
+editor. The complete tag range supports highlighting and navigation; a rename edit
+uses only the inner name range so delimiters remain untouched.
+
+## Parse meaning instead of searching spelling
+
+A textual search produces convincing mistakes. It may rename a tag shown as an
+example, match a name inside a longer name, edit a link destination, or choose the
+wrong repeated occurrence. Literate instead collects symbols from the same Markdown
+and fragment grammars used by the project engine.
+
+Named fence headers contribute definitions and appends only when the shared header
+parser accepts them. Their bodies contribute references using the shared tag scanner.
+Settings bodies, ordinary code fences, malformed declarations, and output filenames
+are not searched as prose.
+
+Prose mentions pass through Markdown's inline parser. This preserves distinctions a
+reader already sees: escaped openers are literal; link labels can discuss a symbol,
+while destinations and titles are not author-facing symbol text; successful inline
+code spans may contain mentions; image alternate text is excluded when its source
+coordinates cannot be recovered safely. HTML blocks are conservatively excluded
+rather than treating attributes as renameable prose.
+
+Tables need special care because a Markdown parser exposes cell content after
+splitting and unescaping it. The collector keeps a map back to raw source columns,
+then validates each recovered slice with the fragment scanner. This extra work serves
+a simple invariant: every editor range must come from syntax at that exact location,
+never from searching for a familiar string after parsing.
+
+```mermaid
+flowchart TD
+    Text[Captured document text] --> Block[Parse Markdown blocks]
+    Block --> Fence{Accepted named fence?}
+    Fence -->|Yes| Declarations[Collect definition or append and body references]
+    Fence -->|No| Inline[Parse meaningful inline regions]
+    Inline --> Mentions[Collect prose mentions with raw ranges]
+    Declarations --> Ordered[Order occurrences by document and source position]
+    Mentions --> Ordered
+    Ordered --> Check[Ranges retain exact authored spelling]
+```
+
+The arrows describe narrowing: each stage discards text that has no fragment-symbol
+meaning. They do not describe expansion or generation. The important consequence is
+that unresolved references are still retained. A missing family is invalid for
+generation but remains exactly the symbol an author may want to define with a quick
+fix.
+
+## Completion lowers recall without taking over Markdown
+
+When an author has begun a fragment tag but not finished its name, completion offers
+the known families in that workspace project. Outside that context it offers
+nothing, leaving ordinary Markdown completion and mapped programming-language
+completion to their own providers.
+
+Before answering, completion asks the repository for a read-only refresh. Suggestions
+therefore include unsaved contributions from open buffers without writing generated
+files. In VS Code this behavior is exposed through a `CompletionItemProvider`. Its
+trigger is deliberately lexical: an unmatched `<<` before the cursor asks for
+fragment-family names from a coherent project snapshot. Navigation and refactoring
+apply stricter occurrence checks before acting.
+
+## Definition, references, and hover answer different questions
+
+“Go to definition” chooses the base definition of the family at the cursor. It does
+not choose the nearest append or the place from which generated text happened to
+arrive. “Find references” returns uses in fragment bodies and explicit prose mentions,
+with declarations included only when the caller asks for them. These policies share
+identity and ranges while preserving the different questions users asked.
+
+Hover provides a compact inspection of the family's unexpanded authored code. It is
+useful for following an indirection without leaving the explanation, but it is not a
+claim about a particular generated occurrence. A shared family may be expanded in
+several roots or at several indentation levels; the projection chapters address
+services that need those assembled contexts.
+
+VS Code names the adapters `DefinitionProvider`, `ReferenceProvider`, and
+`HoverProvider`. Each adapter refreshes read-only state, honors cancellation, locates
+the exact occurrence at the cursor, and translates pure source ranges into editor
+locations or display content. The language rules stay outside those classes.
+
+## Rename is a project-wide proof before it is an edit
+
+Rename is the most demanding symbol operation because a plausible but incomplete
+result can silently break the program or its explanation. Literate plans the complete
+change in memory before returning any edit to the editor.
+
+Both names must be valid fragment identities. The old family must have exactly one
+base definition. The new name must not collide with any known occurrence, including
+an unresolved reference or prose mention that could otherwise be captured by the
+rename. Root status cannot be added or removed by changing the name.
+
+Every occurrence of the old name then receives a name-only replacement in a copied
+snapshot. The symbol collector parses that preview again. The full ordered occurrence
+sequence must survive: paths, lines, roles, and unrelated names remain equal, while
+only the requested name changes. If punctuation in the new name would alter a table,
+fence, inline-code span, or other Markdown structure, the plan is rejected.
+
+```mermaid
+flowchart TD
+    Request[Requested old and new names] --> Names[Validate both identities]
+    Names --> Base[Require one unambiguous base definition]
+    Base --> Collision[Reject collisions and root-status changes]
+    Collision --> Plan[Plan name-only edits for every occurrence]
+    Plan --> Copy[Apply edits to copied source text]
+    Copy --> Parse[Collect every occurrence again]
+    Parse --> Equal{Same ordered syntax except for the new name?}
+    Equal -->|No| Reject[Return no edits]
+    Equal -->|Yes| Offer[Offer one atomic workspace edit]
+```
+
+The arrows form a fail-closed pipeline. No source changes occur along it. Only the
+last step hands a proposal to VS Code, which owns applying the `WorkspaceEdit` as one
+editor operation. A later document-change event follows the normal project-processing
+path. Cancellation likewise returns no partial set.
+
+This validation does not promise that an arbitrary new name is desirable prose. It
+proves the narrower property an editor refactoring can establish mechanically: the
+recognized symbol structure remains intact.
+
+## Fixes start from current evidence
+
+A missing-reference diagnostic can support a useful quick fix: create an empty family
+near the fragment that contains the reference. The human benefit is obvious, but the
+diagnostic may already be stale by the time the light bulb appears.
+
+The fix therefore filters by a stable diagnostic code, refreshes the project without
+writing, and verifies that the requested buffer still has the captured version and
+text. It then requires an exact unresolved reference at the diagnostic range and a
+closed, top-level containing fence. Unsafe or ambiguous insertion sites produce no
+action.
+
+The result is another proposed `WorkspaceEdit`, attached to the document that owns
+the diagnostic rather than whichever editor happens to be active. This is the role
+of a VS Code `CodeActionProvider`: translate current semantic evidence into an edit
+the host may present and apply, not execute a hidden generation command.
+
+## Structural commands are deliberately separate
+
+Creating a family for the tag at the cursor and splitting a contribution into an
+append are direct authoring commands. They use the shared header parser and editor
+token locations to preserve the current language and family name. Splitting closes
+the current fence and opens an append below the selected line, allowing the
+explanation to continue between two contributions to one family.
+
+These commands operate on the active document when explicitly invoked. They are not
+rename-like semantic proofs across the whole project, and they should not be confused
+with diagnostic quick fixes, which validate a particular current snapshot before
+offering an edit. Keeping the distinction visible leaves room for future structural
+commands to adopt stronger preview-and-reparse checks without changing symbol
+identity.
+
+## Exploration is navigation at a larger scale
+
+Completion and hover help at one cursor position. Definition and references connect
+a small set of locations. When an author wants to understand a whole dependency
+neighborhood, the same family identities become nodes and their references become
+edges. That larger view should not invent a competing symbol model.
+
+The editor tree and the inline preview explorer both consume accepted families and
+references, but they present different journeys. Their treatment of repeated edges,
+cycles, lazy expansion, and browser resource limits is the subject of the fragment
+graph exploration chapter. Before that, we need to understand the preview in which
+explanation, semantic links, code, diagrams, and exploration controls meet.

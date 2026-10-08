@@ -1,0 +1,215 @@
+# The editor-side project repository
+
+Editing a literate program creates a problem that a command-line generator does not
+have. The text an author sees may not yet exist on disk. Several workspace folders
+may be open at once. A file can change again while an earlier request is still
+reading its neighbors. Completion needs a quick, read-only answer, while an explicit
+processing request may eventually replace generated files.
+
+The editor therefore needs more than a parser. It needs a boundary that captures a
+coherent project, presents that project to the pure engine, and publishes the result
+to editor features without turning every question into a filesystem side effect.
+That boundary is the editor-side project repository.
+
+## A repository is a view, not a second language implementation
+
+The word *repository* can suggest a database that owns the truth. Here it means
+something narrower: an adapter-maintained view of each workspace folder. The
+literate documents and templates remain the inputs, and the headless engine remains
+the authority on their meaning. The repository coordinates editor state around that
+authority.
+
+For each workspace folder it retains the most recently accepted source snapshot,
+fragment occurrences, parser locations used by navigation, the effective preview
+theme, and the diagnostics owned by Literate. These values are related, so they are
+replaced as one processing result rather than updated independently.
+
+```mermaid
+flowchart TD
+    Folder[One workspace folder] --> Capture[Capture current project text]
+    Capture --> Engine[Interpret with the shared engine]
+    Engine --> Diagnostics[Generation diagnostics]
+    Engine --> Inspection[Accepted fragments and locations]
+    Inspection --> Symbols[Editor symbol snapshot]
+    Inspection --> Preview[Preview model and theme]
+    Engine --> Plan[Optional output plan]
+    Plan --> Gate{Were writes requested and is the plan valid?}
+    Gate -->|No| Stop[Keep the operation read-only]
+    Gate -->|Yes| Transaction[Preflight and commit changed outputs]
+```
+
+The arrows show the flow of one captured interpretation. They do not mean that
+editor features call one another. Diagnostics, symbols, preview, and an optional
+write plan are sibling consequences of the same input. The diagram intentionally
+omits the details of expansion and output transactions, which belong to the engine
+and filesystem chapters.
+
+In the implementation this coordinating adapter is `FragmentRepository`. Its name
+reflects the editor feature that first consumes it, but its architectural role is
+broader: it owns the lifetime of editor-side project snapshots, not fragment
+semantics.
+
+## Capture what the author can currently see
+
+A snapshot begins with project membership. Literate discovers every `.literate`
+document in a workspace folder, including chapters that are not linked from the
+root index. Directories used for dependencies, version-control data, generated
+builds, and test runtimes are excluded by the same policy used by the command-line
+adapter. This keeps host differences from changing which project the engine sees.
+
+Discovery and reading answer different questions. Discovery asks which paths
+belong to the project. Reading asks which text currently represents each path. If a
+discovered path has an open editor buffer, that buffer wins over disk—even when it
+is empty. Otherwise the adapter reads the saved file. New file-backed buffers can
+join the snapshot before their first save; untitled documents cannot, because they
+have no stable workspace-relative identity.
+
+```mermaid
+flowchart TD
+    Discover[Discover eligible project paths] --> Path[Consider one canonical path]
+    Open{Is that exact URI open?}
+    Path --> Open
+    Open -->|Yes| Buffer[Capture the complete buffer text]
+    Open -->|No| Disk[Read the saved file]
+    Buffer --> Snapshot[Add one path and one text]
+    Disk --> Snapshot
+    Snapshot --> Order[Apply semantic document order]
+```
+
+The important detail is the decision by presence, not by nonempty content. An empty
+buffer means the author removed everything; falling back to disk would silently
+revive text that is no longer visible. URI identity also matters in a multi-root
+workspace, where equal relative names can belong to different projects.
+
+After source capture, the engine identifies template dependencies. The adapter then
+captures those templates with the same open-buffer precedence. A missing template
+stays absent so the engine can report the error at the declaration that requested
+it. Other read failures abort the operation rather than constructing a misleading
+partial snapshot.
+
+Finally, the engine's ordering policy puts the root document first, follows linked
+chapters in narrative order, and then includes remaining sources deterministically.
+Filesystem enumeration order never becomes fragment contribution order by accident.
+
+## One queue gives changing inputs a comprehensible order
+
+Editor events can overlap. A keystroke may trigger processing while a completion
+request asks for a refresh, or publication may begin while generation is still
+installing files. Allowing these operations to mutate shared state concurrently
+would make their outcome depend on timing.
+
+The repository therefore serializes work. Each request waits for earlier work to
+finish, captures its own inputs, asks the engine for a result, and only then publishes
+its replacement state. A failure is reported but does not poison the queue; later
+requests can still run.
+
+```mermaid
+sequenceDiagram
+    participant Event as Editor event or command
+    participant Repo as Project repository
+    participant Store as Buffers and workspace storage
+    participant Engine as Pure engine
+
+    Event->>Repo: Request refresh with write intent
+    Note over Repo: Wait for earlier repository work
+    Repo->>Store: Discover and capture current inputs
+    Store-->>Repo: Documents and templates
+    Repo->>Engine: Interpret explicit snapshot
+    Engine-->>Repo: Diagnostics, inspection, publication model, plan
+    Repo-->>Event: Publish coherent editor state
+    opt Writes were explicitly requested and the plan is valid
+        Repo->>Store: Preflight, stage, and commit changed outputs
+    end
+```
+
+The `write intent` carried by a request is as important as its trigger. Providers
+such as completion, definition, references, hover, rename preparation, and code
+actions request a read-only refresh. Asking a question must not generate source or
+HTML. Explicit processing, literate document changes, recognized input-file events,
+and newly added workspace folders may request generation with writes enabled.
+Publication joins the same queue but uses its own fresh capture and isolated helper
+pipeline.
+
+The queue orders effects; it does not freeze the editor. If the author changes a
+buffer while a provider is awaiting refresh, that provider must compare versions or
+capture again before proposing an edit. Freshness remains the responsibility of the
+caller that will expose or apply the result.
+
+## Scheduling follows causes, not just files
+
+Open-buffer changes and saved-file changes arrive through different host channels.
+A text-document event already identifies the changed buffer and can request work
+directly. Filesystem notifications often arrive in bursts, so they are briefly
+coalesced per workspace folder. A burst in one root does not delay an unrelated
+root, although all repository operations still enter the common serial queue.
+
+The input filter recognizes literate documents and templates currently named by the
+project. It ignores known generated destinations, even if one happens to end in
+`.literate`, so generation cannot trigger itself indefinitely. Removing a workspace
+folder cancels its pending timer and discards every cache keyed by that folder's full
+URI. Adding a folder captures an initial view.
+
+This scheduling is deliberately conservative. A filesystem change to a template
+currently named by the project is recognized and coalesced like other input changes.
+Inputs that have not yet become project dependencies cannot grant themselves that
+authority. Obsolete generated outputs are not inferred and deleted, avoiding a
+destructive conclusion from an incomplete event stream.
+
+## Publish diagnostics and navigation from the same result
+
+A malformed header, missing family, cycle, invalid path, or absent template is a
+semantic problem. The engine reports it once. The editor adapter translates its
+workspace-relative location into an editor range and replaces Literate's diagnostics
+for that workspace. It does not ask navigation helpers to invent a second validation
+policy.
+
+Replacement matters when a project is repaired: a successful result may contain no
+errors, so the previous entries must be removed. Workspace scoping matters too: a
+refresh in one root must not clear problems in another. VS Code calls the resulting
+container a `DiagnosticCollection`; the concept is simply ownership of one named set
+of Problems entries.
+
+Navigation state is rebuilt even when generation cannot produce files. Definitions,
+mentions, and valid fragment contributions remain useful while the project is
+incomplete. The repository first installs empty containers, then fills them from the
+new ordered snapshot. If ordering itself fails, no earlier valid map survives to
+misdirect a later request.
+
+The engine's inspection identifies accepted contributions. A Markdown parser then
+adds host-facing token locations for existing editor commands. This second parse
+does not expand fragments, render the book, or decide which declarations are valid.
+It attaches editor coordinates to decisions already made by shared semantics.
+
+## Preview reads a snapshot without joining the effect queue
+
+Markdown preview rendering is synchronous from the parser's point of view. It cannot
+wait for discovery or filesystem reads. The repository therefore supplies the last
+discovered project as a base, overlays every currently open literate buffer, and
+finally overlays the exact source being rendered. Parsing this in-memory view is
+read-only.
+
+This arrangement has a useful division of responsibility:
+
+- queued processing discovers membership, captures templates, owns diagnostics, and
+  may commit outputs when asked;
+- synchronous preview overlays visible text on the cached membership and creates no
+  files;
+- language services capture a fresh snapshot independently and reject it if inputs
+  change during asynchronous acquisition.
+
+These are different freshness contracts around the same pure semantic core. Treating
+them as one cache would either block preview on I/O or let generation rely on a
+partial display snapshot.
+
+## The boundary makes future editor features cheaper
+
+Once the repository can provide a coherent, read-only project view, editor features
+become projections rather than miniature parsers. They can ask which symbol occupies
+a position, where its family begins, which occurrences share its identity, or which
+semantic target belongs in a preview link. New features should continue this pattern:
+request explicit state, remain read-only until the user chooses an edit, and let the
+engine own language meaning.
+
+That leads to the next question. A snapshot knows the whole project, but how should
+an editor turn fragment names scattered through prose and code into symbols that can
+be completed, navigated, inspected, and changed safely?

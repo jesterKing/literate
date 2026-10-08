@@ -1,0 +1,195 @@
+# A generator that generates itself
+
+Literate's book describes the engine that reads Literate's book. That statement is
+appealing, but it contains a circle. Before the described engine exists, something
+must already be able to read the description and produce executable source. After
+a change, the project also needs evidence that the produced engine agrees with the
+book that produced it.
+
+Self-hosting manages this circle with explicit bootstrap material and a fixed-point
+check. It does not ask the circle to justify itself from nothing.
+
+## Bootstrap material makes the first step possible
+
+A checkout carries generated source and a known executable path capable of reading
+the authoritative literate documents. These files are not a second authority. They
+are the material needed to turn the authority—the book—into a fresh executable.
+
+```mermaid
+flowchart TD
+    Book[Authoritative literate project] --> Bootstrap[Known generator]
+    Bootstrap --> Plan[Fresh generated sources]
+    Plan --> Build[Fresh executable engine]
+    Build --> Again[Generate from the same book]
+    Again --> Compare[Compare complete plans]
+```
+
+The first arrow means “is read by,” not “is derived from.” That asymmetry is the
+bootstrap assumption. The remaining arrows test whether the assumption leads to a
+self-consistent generator.
+
+Generated source remains useful even though it is not authoritative. It lets common
+compilers and build tools construct the generator without first understanding
+literate syntax. It also gives reviewers a conventional representation of the
+program. Any direct edit to that representation is temporary, however, because the
+next generation derives it again from the book.
+
+## A generator language must be able to describe itself
+
+Self-description creates a lexical problem before it creates a philosophical one.
+The generator's source needs to discuss and recognize fragment delimiters that are
+also meaningful to the generator. Literal delimiter escaping keeps that description
+inside the ordinary language instead of granting the self-hosted project a hidden
+exception.
+
+An illustration can show the syntax without defining a live fragment:
+
+```text
+source : \<<generator entry.*>>= generator.ts $
+    \<<parse fragment declarations>>
+```
+
+The escaped opening delimiters are literal text in this chapter. During normal
+source expansion an escaped delimiter becomes an unescaped delimiter exactly once.
+The produced text is not rescanned as another layer of fragment instructions. A
+single, explicit escape rule is easier to reason about than special cases activated
+only while generating the generator.
+
+## Bootstrap readability is an invariant
+
+The authoritative book must remain readable by an available bootstrap generator
+until a fresh generator can reproduce it. A language change may require a temporary
+compatibility bridge, but the enduring rule is simple: never make the only available
+generator unable to read the book that defines its replacement.
+
+The same invariant covers deliberate output-shape changes. Compilation alone is not
+enough; the fresh engine must interpret the captured input and reach the exact plan
+that will serve as the next bootstrap state.
+
+## The fixed point is an equality of plans
+
+Let `S` be the complete captured literate snapshot. Let `P` be the complete output
+plan produced from `S` by the trusted bootstrap path. Build a fresh engine `E` from
+the generated engine source contained in `P`. Self-hosting reaches a fixed point
+when:
+
+```text
+E(S) = P
+```
+
+The equality covers the set of output paths and the exact bytes at every path.
+Array order is irrelevant because a plan is identified by its destinations, but a
+missing path, an extra path, or one changed byte breaks the equality.
+
+In ordinary language, the newly described generator must read the same book and
+produce exactly the material from which it was built. The formula is useful because
+it rules out weaker interpretations such as “the important file looks similar” or
+“running the new engine did not throw an error.”
+
+## Verify fresh source without replacing the checkout
+
+Fixed-point verification should not depend on writing fresh generated files over the
+bootstrap files it is trying to check. Instead, it creates an in-memory overlay: a
+map in which generated paths resolve to fresh planned content while ordinary
+handwritten sources and installed dependencies still resolve from the checkout.
+
+The overlay boundary is validated first. Destinations must remain beneath the
+project root, duplicates are rejected, and the fresh engine and command-line source
+must both be present. Generated source directories are represented virtually so
+module resolution can find files that need not exist on disk.
+
+A compiler then checks one program built from the overlay and the project's ordinary
+configuration. Emission and incremental state are disabled. Existing handwritten
+sources and tests remain part of the type-check, while stale generated source on
+disk cannot take precedence over fresh planned content.
+
+```mermaid
+flowchart TD
+    Plan[Fresh complete plan] --> Layout[Validate overlay layout]
+    Layout --> Types[Type-check fresh sources in memory]
+    Types --> Bundle[Bundle the fresh engine from the overlay]
+    Bundle --> Child[Run the fresh engine in a bounded child]
+    Child --> Result{Exact plan equality?}
+    Result -->|Yes| Fixed[Fixed point verified]
+    Result -->|No| Fail[Named verification failure]
+```
+
+Each downward arrow is a policy boundary. A layout failure does not become a
+compiler message. A type error prevents bundling. A bundling failure prevents
+execution. A generator diagnostic or malformed child result prevents comparison.
+Named stages make failure actionable without pretending that later evidence exists.
+
+## Execute the fresh engine, not stale emitted code
+
+Passing a type-check is necessary but not enough. The verifier bundles the engine
+entry from overlay contents, resolving relative generated modules against the same
+fresh map. Ordinary package resolution remains ordinary; a virtual directory must
+not accidentally hide an existing sibling file or package entry.
+
+The bundle runs in a separate child process with a private temporary working
+directory. The original captured documents and templates are sent as data. The
+child returns the generation result as data. A process boundary allows the verifier
+to terminate a fresh engine that enters a synchronous infinite loop—something a
+promise timeout in the parent could not interrupt.
+
+The private directory limits accidental output in the checkout and makes cleanup
+straightforward. It is not a security sandbox. The bundled engine is project-authored
+code and may use the capabilities of the account that runs it. Self-verification is
+therefore appropriate only for trusted source.
+
+## Compare a complete and well-formed result
+
+Before equality is tested, the child result must itself be credible. It must contain
+an output list and a diagnostic list. Any generator diagnostic fails verification.
+Every output must have a string path, string content, and a unique destination.
+Malformed protocol data cannot count as an empty successful plan.
+
+Comparison builds a map from regenerated destinations. Each planned path must occur
+with exactly equal content and is removed as it matches. A missing path or content
+difference fails immediately; entries left at the end are unexpected outputs. This
+makes the comparison independent of incidental array ordering while preserving
+exact path and byte identity.
+
+Temporary material is removed on success and failure. Cleanup is part of the
+verification result: a verifier that leaves unexplained executable material behind
+has not completed all of its promised work.
+
+## What the fixed point proves
+
+A successful check provides strong, specific evidence:
+
+- fresh generated sources satisfy the project's type constraints together with the
+  surrounding handwritten program;
+- the engine that is executed was built from those fresh sources rather than stale
+  emitted code;
+- that engine accepts the captured authoritative project without diagnostics;
+- it reproduces the same complete output path set and exact contents;
+- verification did not need to replace project files.
+
+This establishes self-consistency for the engine and captured project under the
+verification environment. It also checks that fresh command-line source participates
+in the type-correct program, even though the fixed-point execution itself invokes
+the engine.
+
+## What the fixed point cannot prove
+
+Self-consistency is not the same as correctness. Two generations can agree on the
+same wrong interpretation. Exact reproduction does not prove that diagnostics are
+helpful, the command line reports failures correctly, output rollback works, an
+editor handles stale buffers safely, or publication renders every supported construct
+well. Those claims require focused tests and review at their own boundaries.
+
+The check also does not make project code safe to execute, prove behavior on every
+host filesystem, or establish crash durability. Its child timeout bounds engine
+execution, not every preceding compiler or bundler operation. It verifies one
+captured project; another snapshot must earn its own result.
+
+These limitations do not weaken the fixed point. They locate it. Self-hosting answers
+one difficult question precisely: does the freshly generated engine reproduce the
+complete plan from which it was built when given the same authority?
+
+With that circle made explicit, the book can turn to the editor without giving the
+editor semantic authority of its own. The next chapter develops the editor-side
+project repository: the long-lived host that captures workspace snapshots, gives
+open buffers precedence, schedules refreshes, and keeps diagnostics and generated
+effects current without confusing either task with parsing.

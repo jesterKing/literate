@@ -1,0 +1,244 @@
+# Changing files safely
+
+A complete generation plan is atomically valid in memory: either every planned
+file is available or none is. A filesystem cannot usually replace several files at
+one physical instant. Between those two facts lies the output transaction.
+
+The transaction's purpose is narrower than the database term may suggest. It gives
+a batch recoverable behavior for caught failures: validate before mutation, stage
+all changed bytes, retain originals while installing replacements, and attempt to
+restore the old state if preparation or installation fails. It does not turn an
+ordinary filesystem into a crash-durable, isolated database.
+
+## Safety begins by naming the promises
+
+For one serialized writer and a cooperating filesystem adapter, the transaction
+maintains these invariants:
+
+1. unchanged outputs cause no file or directory changes;
+2. every destination and parent is checked before mutation begins;
+3. all changed content is staged before any target is replaced;
+4. an original remains recoverable until the whole batch reaches its commit point;
+5. rollback removes newly installed outputs and restores originals in reverse order;
+6. cleanup removes only artifacts the transaction knows it owns;
+7. every failure reports whether the requested bytes were committed.
+
+These promises make many ordinary errors recoverable without overstating atomicity.
+The distinction matters because callers choose very different actions after “nothing
+was committed,” “rollback was incomplete,” and “the files were committed but cleanup
+failed.”
+
+## Preflight the complete destination set
+
+Preflight validates the batch before creating even an empty directory. Paths are
+normalized root-relative names. Case-folded duplicates are rejected for portability,
+as are conflicts where one output would also be another output's parent. Input byte
+arrays are copied so a caller cannot change planned content while asynchronous work
+is in progress.
+
+The filesystem adapter then inspects every parent and target, including paths for
+outputs whose bytes may prove unchanged. Existing ancestors must be directories.
+Existing targets must be regular files. Symbolic links, special entries, and errors
+other than genuine absence reject the batch.
+
+```mermaid
+flowchart TD
+    Batch[Planned output batch] --> Normalize[Normalize paths and copy bytes]
+    Normalize --> Conflicts{Any path conflict?}
+    Conflicts -->|Yes| Reject[Reject without mutation]
+    Conflicts -->|No| Walk[Inspect all parents and targets]
+    Walk --> Safe{Every path acceptable?}
+    Safe -->|No| Reject
+    Safe -->|Yes| Compare[Read and compare existing bytes]
+    Compare --> Ready[Changed set ready]
+```
+
+The arrows show permission being earned. They do not imply that the filesystem is
+frozen between checks. That remaining race is one reason the caller must serialize
+writers and exclude unrelated changes during a batch.
+
+Preflight also reserves private staging names without creating them. One staging
+directory is chosen within each changed target's parent. Keeping stage, backup, and
+target on the same filesystem and near the same directory avoids cross-filesystem
+moves and limits the scope of temporary artifacts.
+
+## Preparation is visible but not published
+
+Preparation creates only missing parent directories required by changed outputs,
+then exclusively creates each private staging directory and stage file. Exclusive
+creation is essential: encountering another entry is a collision, not permission to
+reuse or erase it.
+
+Every changed file is written completely to its stage before installation begins.
+At this point the filesystem contains private preparation material, but all public
+targets still have their original meaning.
+
+```mermaid
+sequenceDiagram
+    participant T as Transaction
+    participant FS as Filesystem adapter
+
+    T->>FS: Create owned missing parents
+    T->>FS: Create private staging directories
+    loop Every changed output
+        T->>FS: Write complete stage exclusively
+    end
+    Note over T,FS: Public targets are still untouched
+```
+
+Ownership must be based on positive knowledge. If exclusive directory creation
+fails because another writer won a race, the transaction must not infer that the
+observed directory belongs to it. Only a successful creation, or a precise adapter
+error saying that this operation created the directory but could not compensate,
+transfers cleanup responsibility to the coordinator.
+
+## Installation keeps originals nearby
+
+Installation handles each changed output in plan order. If a target already exists,
+it is renamed to the private backup location. The stage is then renamed to the
+public target. For a new output there is no backup; the staged file simply becomes
+the target.
+
+The transaction records an operation as attempted *before* asking the adapter to
+rename. Some filesystem interfaces can report failure after the move has taken
+effect. A rejected operation therefore means “the result is uncertain,” not always
+“nothing happened.” Recovery inspects both source and destination rather than
+trusting the shape of an exception.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Preflight
+    Preflight --> Prepared: all stages written
+    Prepared --> Installing
+    Installing --> Installed: every target replaced
+    Installed --> Committed: final cancellation check passes
+    Preflight --> Rejected: validation fails
+    Prepared --> Restoring: preparation fails
+    Installing --> Restoring: installation or cancellation fails
+    Restoring --> RolledBack: restoration succeeds
+    Restoring --> RecoveryNeeded: restoration is uncertain
+    Committed --> Complete: cleanup succeeds
+    Committed --> CleanupNeeded: cleanup fails
+```
+
+The state diagram separates three facts that an undifferentiated error would hide:
+whether public installation began, whether restoration succeeded, and whether the
+commit point had already passed.
+
+## The commit point comes before cleanup
+
+The batch commits only after every changed target has been installed and the final
+pre-commit cancellation check passes. Until then, retained backups support rollback.
+After that point the requested output bytes are authoritative.
+
+Cleanup follows commitment. It removes backup and stage files, then removes empty
+private directories. Deleting a backup is irreversible, so cleanup failure cannot
+honestly turn a committed batch back into an uncommitted one. The result must say
+“committed, cleanup failed” and report the remaining recovery locations.
+
+Cancellation follows the same rule. Before commitment it can trigger rollback.
+After commitment it cannot promise to undo already published files, so no new
+cancellation checkpoint interrupts cleanup.
+
+## Rollback reasons from observed state
+
+When preparation or installation fails, rollback visits changed outputs in reverse
+order. Reverse order unwinds dependencies introduced by the forward sequence and
+reduces the number of mixed states that recovery must consider.
+
+For a replaced output, recovery first establishes that the original backup still
+exists. It must not delete an installed target and only then discover that the
+backup is gone. If a stage remains beside a public target after an uncertain rename,
+the situation is ambiguous; preserving both is safer than guessing which bytes to
+destroy.
+
+A successful rollback restores every original, removes every new target, removes
+owned stage and backup files, and removes newly created parents only when they are
+empty. Cleanup is nonrecursive. Unexpected content causes a reported failure rather
+than broad deletion.
+
+```mermaid
+flowchart TD
+    Failure[Preparation or installation failure] --> Reverse[Visit outputs in reverse]
+    Reverse --> Certain{State safe to undo?}
+    Certain -->|Yes| Restore[Remove new target or restore backup]
+    Certain -->|No| Preserve[Preserve recovery material]
+    Restore --> More{More outputs?}
+    More -->|Yes| Reverse
+    More -->|No| Clean[Remove known artifacts and empty owned parents]
+    Preserve --> Report[Report recovery paths]
+    Clean --> Outcome{Cleanup complete?}
+    Outcome -->|Yes| Rolled[Report rolled back]
+    Outcome -->|No| Report
+```
+
+The preservation branch is deliberate. Recovery code has more power to destroy
+valuable evidence than the failed installation had. When ownership or state is
+uncertain, fail closed and tell the operator where to inspect.
+
+## Failure results describe what is true
+
+The transaction distinguishes four outcomes rather than flattening them into
+“write failed”:
+
+- **Preflight failed.** No mutation was attempted. The old filesystem state remains
+  outside the transaction's ownership.
+- **Rolled back.** Mutation began, but originals and absence of new outputs were
+  restored and owned artifacts were removed.
+- **Rollback failed.** Restoration or its cleanup could not be completed. Public
+  targets may be mixed, and reported recovery material must be preserved for
+  inspection.
+- **Cleanup failed after commit.** Every requested output was installed, but some
+  owned stage or backup material remains. Retrying the whole generation blindly
+  would misrepresent what already succeeded.
+
+A failure also identifies the active or conflicting paths, the initiating error,
+and any retained recovery locations. For a committed cleanup failure it includes
+the changed output list that a successful transaction would have returned. This
+allows a host to report installed files without pretending cleanup succeeded.
+
+Recovery locations are evidence, not rubbish. They may contain the only surviving
+original after an interrupted restoration. A person or recovery tool should inspect
+the reported target, stage, and backup states before moving or deleting anything.
+
+## Filesystem adapters carry the physical contract
+
+The coordinator is independent of a particular filesystem API. Its adapter must
+provide path inspection, reads, exclusive single-directory creation, exclusive file
+creation, non-overwriting rename, nonrecursive removal, and a safe unique token.
+Those operations are obligations, not assumptions about a platform's default calls.
+
+Inspection validates every existing component and the trusted root. Rename must not
+silently overwrite its destination. Removal checks the expected kind again. If the
+platform cannot provide a genuinely non-overwriting rename, an inspection followed
+by rename narrows ordinary mistakes but leaves a race with another writer. The
+serialization contract remains necessary.
+
+A local adapter can preserve ordinary permission bits by remembering them when it
+reads an original and applying them to the replacement stage before installation.
+A remote editor provider may not expose portable permission metadata. Sharing the
+transaction protocol does not erase such physical differences.
+
+## What atomicity does not mean here
+
+The transaction does **not** promise simultaneous visibility. A reader that ignores
+the serialization boundary may observe some new files while later files still hold
+old content. It does not maintain a durable journal, so a process crash or power
+loss can stop between any two filesystem operations. It does not lock out another
+writer, and preflight cannot eliminate time-of-check-to-time-of-use races.
+
+It also does not delete obsolete outputs absent from the new plan. The plan can say
+what should be produced from the current snapshot; it cannot prove that an unrelated
+old file is safe to remove.
+
+The honest claim is therefore precise: for caught failures in a serialized batch,
+retain enough information to restore the prior state, attempt that restoration
+conservatively, and report uncertainty without destroying recovery material. This
+is strong enough to protect ordinary generation while leaving crash durability,
+concurrent isolation, and global atomic visibility to systems designed to provide
+them.
+
+Safe commitment protects the products of a generator. It does not yet answer a more
+circular question: how can the generator trust a new copy of itself when that copy
+is one of its own products? The next chapter replaces filesystem recovery with a
+fixed-point argument over bootstrap material and freshly generated code.

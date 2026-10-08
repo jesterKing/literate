@@ -1,0 +1,233 @@
+# The command-line adapter
+
+The command line is the clearest place to see where interpretation ends and effects
+begin. It has no open buffers, persistent views, or background refreshes. It receives
+an operation and an optional project root, captures saved input, calls the shared
+semantic core, and reports one result.
+
+That apparent simplicity is useful discipline. Argument handling must not read a
+project merely to explain help. Inspection must not touch output paths. Checking
+must not become generation by accident. Generation must not write until the entire
+project and every destination have passed their respective checks.
+
+## One lifecycle with an explicit write boundary
+
+The adapter follows one ordered journey. Early exits are part of the design, not
+special cases added around the main operation.
+
+```mermaid
+flowchart TD
+    Args[Arguments] --> Usage{Valid request?}
+    Usage -->|No| UsageError[Report usage error]
+    Usage -->|Help| Help[Report help]
+    Usage -->|Run| Discover[Discover saved documents]
+    Discover --> Load[Load declared inputs]
+    Load --> Interpret[Interpret one snapshot]
+    Interpret --> Sound{Diagnostics empty?}
+    Sound -->|No| Diagnose[Report diagnostics]
+    Sound -->|Yes| Mode{Requested operation}
+    Mode -->|Inspect| Inspect[Report structure]
+    Mode -->|Check| Compare[Compare planned bytes]
+    Mode -->|Generate| Write[Commit changed outputs]
+```
+
+The downward arrows mean that each stage earns permission for the next. The three
+final branches share captured input and semantics, but only one crosses the write
+boundary. Specialized publication and self-verification commands use the same
+principle: they are explicit operations and do not silently run as a side effect of
+ordinary inspection or generation.
+
+## Arguments are resolved before project access
+
+A command should be understandable even when the current directory is not a
+Literate project. Help therefore completes before filesystem discovery. Unknown
+commands, duplicate options, missing option values, and extra positional arguments
+are usage errors rather than guesses about what the caller intended.
+
+This distinction is important for automation. A malformed request is different
+from a well-formed check that finds an invalid project. The terminal status and
+structured response preserve that difference, allowing a script to decide whether
+to fix its invocation or report a project problem.
+
+The selected root is resolved once and must identify a directory. An empty discovery
+is an error. Treating “no documents” as a successful project would make a wrong path
+look reassuringly current.
+
+## Discovery captures saved literate documents
+
+Discovery walks beneath the selected root and selects regular files whose names
+identify literate documents. Directory entries are sorted so that incidental
+filesystem enumeration order cannot leak into the captured input. Known output,
+dependency, and vendor directories are excluded under the same policy used by the
+editor.
+
+Symbolic links are skipped during input discovery. Following them would blur the
+project boundary and could make the snapshot depend on content outside the selected
+root. A selected document is checked again before reading so a path that disappears
+or changes kind during discovery is not silently accepted as another file.
+
+Discovery order is not yet semantic document order. The engine still places the
+root index first, follows its declared chapter order, and then includes remaining
+documents deterministically. The adapter finds candidates; the core decides their
+meaningful order.
+
+## Load only dependencies the project declares
+
+Templates present a small acquisition loop. Their names occur in literate source,
+so the adapter first gives the captured documents to dependency discovery. It then
+loads only the normalized template paths returned by that pure step and supplies
+the resulting texts to full interpretation.
+
+```mermaid
+sequenceDiagram
+    participant CLI as Command line
+    participant Core as Semantic core
+    participant Disk
+
+    CLI->>Disk: Discover and read literate documents
+    CLI->>Core: Ask for declared template paths
+    Core-->>CLI: Safe normalized paths
+    CLI->>Disk: Read available declared templates
+    CLI->>Core: Interpret complete captured snapshot
+    Core-->>CLI: Diagnostics, inspection, and plan
+```
+
+A missing declared template is omitted from the supplied template map so that the
+engine can report the problem at the declaration that requested it. Permission
+failures and other unexpected I/O errors are not disguised as absence; they remain
+adapter errors. This gives source mistakes useful locations without hiding failures
+in the environment.
+
+The command line reads saved files. It cannot promise that its snapshot matches
+unsaved editor buffers. Running disk-based checks while an editor has unpublished
+changes asks two hosts to reason about different inputs, even though they share the
+same semantics.
+
+## Inspect describes structure without testing outputs
+
+Inspection answers questions such as:
+
+- Which documents belong to the ordered project?
+- Which templates are referenced?
+- Where is each fragment defined or extended?
+- Which fragments does each contribution reference?
+- Which roots claim output destinations?
+
+The answer comes from parser metadata, including useful partial metadata when later
+validation fails. Inspection is therefore not implemented as a separate pattern
+search over source text. It sees the same declarations and source positions as the
+engine.
+
+Inspection deliberately stops before output preflight or comparison. A broken,
+inaccessible, or missing output directory should not prevent a reader from asking
+where a fragment is defined. Read-only is stronger here than “does not write”: the
+operation does not even inspect destinations that are irrelevant to its question.
+
+## Check compares content without changing it
+
+Check asks whether the complete valid generation plan agrees with disk. It first
+requires successful project validation; an invalid project has no trustworthy plan
+to compare. Every planned destination is then inspected under the host filesystem
+policy, and existing regular files are read for a byte comparison.
+
+Bytes, not modification times, determine the result. A timestamp can change while
+content stays equal, or remain misleading after content changes. Byte equality
+also preserves the generator's claim that identical input yields identical output.
+
+Each planned output receives one of three read-only observations:
+
+- **current** means a regular file exists with exactly the planned bytes;
+- **missing** means no entry exists at the destination beneath otherwise acceptable
+  parents;
+- **stale** means a regular file exists with different bytes.
+
+Any missing or stale output makes the check unsuccessful, but no destination is
+created or replaced. Unplanned old files are not inferred from the current plan and
+are not deleted. Removing or renaming an output remains an explicit review task.
+
+## Generate writes only the differences
+
+Generation begins with the same complete plan and comparison as check. The adapter
+passes that complete plan to the shared output transaction coordinator rather than
+writing files independently. The coordinator compares bytes again and omits current
+outputs from the changed batch. This avoids needless writes, preserves metadata
+where no change is needed, and prevents avoidable editor or build-system events.
+
+The coordinator
+preflights every target, stages new bytes, preserves originals for recovery, and
+reports whether failure occurred before commitment, during rollback, or after a
+successful commit while cleaning up.
+
+```mermaid
+flowchart TD
+    Plan[Complete valid plan] --> Inspect[Inspect every destination]
+    Inspect --> Compare[Compare existing bytes]
+    Compare --> Changes{Any changed outputs?}
+    Changes -->|No| Current[Report all current]
+    Changes -->|Yes| Batch[Commit the changed outputs as one batch]
+    Batch --> Done[Mark completed writes]
+```
+
+A status becomes **written** only after the transaction reports that the requested
+bytes were installed. Planned status must not be mistaken for physical success. If
+cleanup fails after commitment, reporting must still say that the files were
+committed while separately identifying retained recovery material.
+
+## Filesystem policy belongs to the adapter
+
+The semantic core rejects unsafe and colliding relative destinations before a plan
+exists. The command-line adapter adds facts available only from the local
+filesystem. It validates the trusted root and walks every existing path component
+without following symbolic links. Ancestors must be directories; an existing target
+must be a regular file; special files and directories at file destinations are
+errors.
+
+Genuine absence is expected for a new output. Permission errors, provider failures,
+and malformed path states are not absence. Making this distinction prevents a
+failed inspection from granting permission to create or replace something.
+
+For changed local files, the adapter can carry ordinary permission bits from the
+original to its staged replacement. It does not claim to preserve ownership,
+access-control lists, or metadata that the transaction protocol cannot represent.
+That limitation belongs in the result and documentation, not behind a broad promise
+that “the file is unchanged except for content.”
+
+## Reporting serves people and tools
+
+Human output favors concise messages and source positions counted in the way people
+normally read an editor. Diagnostics name the source path, line, column, and reason.
+Progress and failures use the appropriate terminal stream so generated data can be
+redirected without mixing it with explanations.
+
+Structured output emits one complete object, including for usage and I/O failures.
+It contains the requested command, overall success, diagnostics, errors, and output
+statuses, with command-specific inspection or verification details when relevant.
+Coordinates remain in the engine's zero-based convention so another tool can use
+them directly.
+
+Exactly one structured result is easier to consume than a stream of partially
+related events. It also makes an important invariant visible: an output status
+records an observed comparison or a completed write, never an optimistic intention.
+
+Terminal completion falls into three broad classes:
+
+- the request completed successfully;
+- the request was valid but the project, environment, comparison, or verification
+  failed;
+- the invocation itself was invalid.
+
+Keeping these classes distinct gives both a person and an automated caller enough
+information to choose the next action without parsing prose.
+
+## The adapter remains deliberately thin
+
+“Thin” does not mean trivial. Discovery, path inspection, byte comparison, terminal
+protocols, cancellation, and filesystem adaptation all require careful policy.
+Thin means that none of those responsibilities redefine fragments, expansion,
+document ordering, or diagnostics already owned by the semantic core.
+
+The command line therefore exposes the architecture in a compact form: capture a
+saved snapshot, interpret it once, stop early for read-only intent, and cross the
+write boundary only with a complete valid batch. The next chapter follows that
+batch across the boundary and examines what “safely” can honestly mean when several
+filesystem entries must change.

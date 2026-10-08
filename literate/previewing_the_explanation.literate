@@ -1,0 +1,220 @@
+# Previewing the explanation
+
+A literate-program author does not edit code with comments around it. The explanation
+is the working surface. Headings, links, prose, diagrams, and named contributions
+need to remain readable while they are still changing, including before the document
+is valid enough to generate anything.
+
+The editor preview therefore has a different promise from generation. Generation
+plans a complete, reproducible set of files and refuses partial output. Preview is a
+read-only interpretation of the text currently visible in the editor. It should show
+useful structure during an incomplete edit without claiming that invalid source is a
+valid project.
+
+## Preview and generation share meaning, not effects
+
+Both paths begin with the same fragment header grammar, tag scanner, project ordering,
+publication identities, and theme policy. They diverge at the host boundary.
+Generation receives captured documents and templates, validates the complete output
+plan, and may hand that plan to a transaction. Preview parses an in-memory overlay
+and returns HTML to the editor's Markdown renderer. It neither writes generated
+source nor replaces the generated book.
+
+```mermaid
+flowchart TD
+    Visible[Visible literate text] --> Semantics[Shared parsing and semantic model]
+    Saved[Captured project and templates] --> Engine[Complete generation]
+    Semantics --> Preview[Live editor preview HTML]
+    Engine --> Valid{Complete plan valid?}
+    Valid -->|No| Diagnostics[Diagnostics and no files]
+    Valid -->|Yes| Outputs[Planned source and publication files]
+    Preview --> Screen[Read-only screen presentation]
+```
+
+The upper arrows answer “what can the author understand now?” The lower path answers
+“what complete files can this captured project produce?” The diagram intentionally
+omits filesystem transactions and print publication. The separation matters because
+a preview refresh must never become an accidental generation request.
+
+## Build the live view from visible text
+
+The Markdown host asks its renderer for HTML synchronously. That request cannot pause
+for a fresh recursive workspace scan. The editor repository supplies the latest
+discovered project as a base, then overlays all open literate buffers and the exact
+source handed to the current parser. The pure `parseProject` operation turns that
+in-memory set into publication contributions, annotations, semantic targets, and
+Markdown tokens without templates or output planning.
+
+Capturing the exact parser source is important. Markdown normalization can replace
+some invalid characters. If preview reconstructed source from normalized tokens, an
+invalid document might accidentally acquire semantic links it did not have in the
+editor. The original source remains the authority.
+
+The implementation joins this behavior to VS Code through a Markdown-it extension.
+The returned `extendMarkdownIt` hook installs fence rendering and a document wrapper
+on the parser supplied by the built-in Markdown preview. The concept comes first:
+Literate extends the host's normal Markdown path rather than maintaining a separate
+preview editor.
+
+## A named fence remains code, with semantic surroundings
+
+Ordinary fences delegate to the renderer that was already installed. A valid named
+fragment fence keeps its code presentation but gains a family label, stable anchors,
+and navigation among contributions. Settings fences are hidden because their content
+configures the project rather than forming part of the explanation.
+
+Decoration is conditional on an exact semantic match. The current path, source line,
+complete authored header, contribution role, language, and content must agree with
+the parsed model. A stale token or malformed edit remains escaped code without
+borrowing an older target. Missing families remain plain text rather than receiving
+invented destinations.
+
+```mermaid
+flowchart TD
+    Fence[Markdown fence token] --> Settings{Project settings fence?}
+    Settings -->|Yes| Hide[Omit from preview]
+    Settings -->|No| Diagram{Plain Mermaid fence?}
+    Diagram -->|Yes| Source[Emit safe diagram source container]
+    Diagram -->|No| Named{Accepted named contribution?}
+    Named -->|No| Delegate[Use ordinary fence rendering]
+    Named -->|Yes| Match{Exact current semantic match?}
+    Match -->|No| Safe[Render escaped code without semantic links]
+    Match -->|Yes| Decorate[Render code with family identity and navigation]
+```
+
+Each arrow is a narrowing decision for one fence. The diagram omits syntax-highlighter
+details. What matters is the fail-closed final check: editor decoration follows
+current semantics; it never upgrades merely similar text.
+
+Named fragments whose language is Mermaid remain program code. Only a plain Mermaid
+fence is a book diagram. This distinction prevents an implementation contribution
+from being executed as preview markup merely because its generated language happens
+to name the diagram syntax.
+
+## Screen rendering is shared across preview and publication
+
+The preview does not rediscover fragment references by scanning rendered HTML. The
+parsed project already records semantic ranges. A screen renderer overlays those
+ranges on syntax-highlighted code, producing links only for accepted references.
+The same renderer supports generated HTML, so contribution labels, source spans,
+annotation identities, and fragment navigation have one model.
+
+Presentation-specific destinations remain outside that model. Generated HTML can
+use relative chapter links and stable anchors. The editor preview may need an opaque
+host URL to cross documents. In both cases the logical target is the same publication
+identity. Changing how a screen opens a destination does not change what the target
+means.
+
+Contribution navigation appears outside the code block so Previous, Base, and Next
+controls do not alter copied code or indentation. Native anchors carry descriptive
+labels and remain keyboard reachable. Source-line metadata lets the Markdown host
+synchronize the current preview with its document.
+
+## Cross-document navigation is a temporary capability
+
+A raw preview link containing a filename, command, and line number would grant more
+authority than the rendered document needs. It could also become stale as edits move
+a contribution. Literate instead gives the preview a short-lived opaque capability
+for one workspace object and one logical target.
+
+The capability contains no filename or command. Before minting it, the host verifies
+that the target belongs to the parsed model and that the workspace is trusted and
+still present. Resolution to an external editor URL is bounded and cached briefly.
+While resolution is pending or failed, the preview leaves the destination as text;
+it does not fall back to a weaker line-link scheme.
+
+```mermaid
+sequenceDiagram
+    participant Render as Preview renderer
+    participant Host as Navigation capability adapter
+    participant Browser as Preview link
+    participant Project as Fresh project snapshot
+    participant Editor
+
+    Render->>Host: Request destination for logical target
+    Host->>Host: Check trust, membership, target, and capacity
+    Host-->>Render: Opaque resolved URL or no link
+    Browser->>Host: Activate opaque capability
+    Host->>Project: Rediscover and parse current visible sources
+    Project-->>Host: Current location for the same target
+    Host->>Host: Recheck capability and safe workspace path
+    Host->>Editor: Open canonical document and select current location
+```
+
+The arrows show authority moving from a rendered identity back to fresh project
+state. The original rendered line is never trusted as a current destination. The
+diagram omits expiry renewal and request coalescing; those are lifecycle controls,
+not changes to navigation meaning.
+
+Capabilities expire, disappear with their workspace, and become invalid when the
+extension session ends. Opening a target performs read-only discovery again, checks
+canonical workspace membership and path components, opens the document, then
+resolves the logical identity once more before selecting it. If any check changes
+across an asynchronous boundary, navigation stops.
+
+## Theme the project, not the editor chrome
+
+The root document chooses the Literate screen theme. An open root buffer takes
+precedence over its saved text, so a theme edit can be previewed before save. A local
+chapter setting cannot silently redefine the project, and an invalid selection uses
+the shared default while generation remains responsible for reporting the diagnostic.
+
+The selected catalogue theme controls both the scoped document stylesheet and the
+diagram palette. It is independent of the surrounding editor theme. Scoping prevents
+a book stylesheet from restyling the preview host itself.
+
+A semantic contribution change, annotation change, or effective theme change requests
+a Markdown preview refresh only after the repository has installed the new snapshot.
+Refresh is coalesced and not awaited inside synchronous rendering. This ordering
+prevents a fresh preview from consulting old destinations and avoids a cycle in which
+rendering waits for the refresh it triggered.
+
+## Diagrams run as a constrained local browser feature
+
+A plain Mermaid fence becomes escaped source in a dedicated preview container. A
+locally bundled browser program later turns that source into SVG. No renderer is
+fetched from the network, and the document cannot select a different runtime.
+
+The browser client disables diagram directives and frontmatter, uses strict rendering,
+sets text and edge budgets, and does not install interactive callbacks. Rendering is
+serialized because diagram initialization is shared mutable browser state. If source
+or theme changes while rendering is asynchronous, the result is installed only when
+the original container, markup, and theme are still current.
+
+```mermaid
+stateDiagram-v2
+    [*] --> SourceVisible
+    SourceVisible --> Queued: diagram or theme observed
+    Queued --> Rendering: serial queue begins attempt
+    Rendering --> DiagramVisible: source container and theme still current
+    Rendering --> ErrorVisible: current attempt fails safely
+    Rendering --> Discarded: container, source, or theme changed
+    DiagramVisible --> Queued: source or theme changes
+    ErrorVisible --> Queued: source or theme changes
+    Discarded --> [*]
+```
+
+The states describe one preview container, not the whole document. A discarded
+result is not an error shown to the author; it is obsolete work. Failures that are
+still current are rendered as text with an alert role and the original source, never
+as untrusted HTML.
+
+## Preview is useful precisely because it is not publication
+
+The live view favors immediate, read-only feedback from visible buffers. Generated
+HTML favors deterministic destinations and portable files. Print publication adds a
+renderer-neutral document bridge, external tools, resource validation, and an
+explicit command. Sharing semantic identities does not require collapsing these
+hosts into one pipeline.
+
+This distinction also explains the limits of preview. Its project membership begins
+with the repository's last discovery, so a newly created path becomes available
+through the editor's normal document and filesystem events rather than synchronous
+rendering. Cross-document links may temporarily remain text while capabilities are
+resolved. Invalid contributions may be shown as code without semantic decoration.
+These are honest intermediate states, not partial generation.
+
+The preview now gives each accepted reference a navigable identity. The next chapter
+asks what happens when a reader wants more than one jump: an explorable view of the
+fragment graph that remains useful in the presence of repetition, cycles, and large
+projects.
