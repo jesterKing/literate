@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 import { publicationRail, RailNote, RailTerm } from '../../publication-rail';
+import { generatedFromBook } from './authoritative-book';
 
 const term: RailTerm = { target: 'annotation-term-0061', title: 'Alpha', label: 'lit-00610062' };
 const note: RailNote = { target: 'annotation-note-0062', number: 1, body: 'An explanation.\\par Another paragraph.' };
@@ -103,14 +104,7 @@ test('box macro names remain alphabetic beyond the first 26 declarations', () =>
     assert.ok(tex.includes('\\LitRailBodyAB{'));
 });
 
-test('owning literate fragments exactly match the TypeScript without running generation', () => {
-    const source = readFileSync(resolve('literate/publication-rail.literate'), 'utf8');
-    const blocks = new Map([...source.matchAll(/^```ts : <<([^>]+)>>=.*\n([\s\S]*?)^```/gm)]
-        .map(match => [match[1], match[2]]));
-    const expand = (name: string): string => {
-        const block = blocks.get(name);
-        assert.notEqual(block, undefined, name);
-        return block!.replace(/^<<([^>]+)>>\n/gm, (_, nested: string) => expand(nested));
-    };
-    assert.equal(expand('publication rail.*'), readFileSync(resolve('src/publication-rail.ts'), 'utf8'));
+test('authoritative book exactly assembles the publication rail', () => {
+    assert.equal(generatedFromBook('src/publication-rail.ts').content,
+        readFileSync(resolve('src/publication-rail.ts'), 'utf8'));
 });

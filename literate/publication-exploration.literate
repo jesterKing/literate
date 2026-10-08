@@ -4,14 +4,6 @@ The model stores each accepted contribution once, without traversing references.
 Payload and DOM limits reject whole views, never truncate code. Ordinary links
 remain independent of the optional browser client.
 
-```ts : <<publication exploration.*>>= ./src/publication-exploration.ts $
-<<exploration types>>
-<<exploration neutral cache>>
-<<exploration collect parts>>
-
-<<exploration document payload>>
-<<exploration script serialization>>
-```
 
 ```ts : <<exploration types>>=
 import type { PublicationModel } from './engine';
@@ -154,19 +146,11 @@ export function explorationBrowserScript(): string {
 ```
 
 
-## Browser exploration assembly
+## A browser implementation for both views
 
-One browser implementation serves both standalone HTML and editor previews.
-The module assembles strict mode, a self-contained initializer and the entry
-points that expose or invoke it in each environment.
-
-```js : <<exploration browser module.*>>= ./src/publication-exploration-browser.js $
-'use strict';
-
-<<exploration browser initializer>>
-
-<<exploration browser entry points>>
-```
+One browser implementation serves both standalone HTML and editor previews. Its
+self-contained initializer and narrow entry points keep the behavior identical in
+both environments without making either renderer depend on the browser client.
 
 ### A self-contained lifetime
 
