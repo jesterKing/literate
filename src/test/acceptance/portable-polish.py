@@ -16,19 +16,22 @@ import tempfile
 import xml.etree.ElementTree as ET
 
 REPO = Path(__file__).resolve().parents[3]
-# Test-only loader: expand only the owning chapter, never write generated sources.
+# Test-only loader: assemble the authoritative book in memory; never write generated sources.
 LOADER = r'''
 const fs = require('fs'), ts = require('typescript'), path = require('path');
-const source = fs.readFileSync('literate/publication-latex.literate', 'utf8');
-const blocks = new Map();
-for (const match of source.matchAll(/^```ts : <<([^>]+)>>=.*\n([\s\S]*?)^```/gm)) {
-    blocks.set(match[1], (blocks.get(match[1]) || '') + match[2]);
-}
-const expand = name => blocks.get(name).replace(/^<<([^>]+)>>\n/gm, (_, nested) => expand(nested));
+let latex;
 require.extensions['.ts'] = (module, file) => module._compile(ts.transpileModule(
-    file === path.resolve('src/publication-latex.ts') ? expand('publication LaTeX.*') : fs.readFileSync(file, 'utf8'),
+    file === path.resolve('src/publication-latex.ts') && latex ? latex : fs.readFileSync(file, 'utf8'),
     { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }
 ).outputText, file);
+const { generateProject } = require('./src/engine.ts');
+const names = fs.readdirSync('literate').filter(name => name.endsWith('.literate')).sort();
+const documents = [{ path: 'index.literate', text: fs.readFileSync('index.literate', 'utf8') },
+    ...names.map(name => ({ path: `literate/${name}`, text: fs.readFileSync(`literate/${name}`, 'utf8') }))];
+const result = generateProject(documents, { 'tssrc.template': fs.readFileSync('tssrc.template', 'utf8') });
+if (result.diagnostics.length) { throw new Error(`book diagnostics: ${result.diagnostics.length}`); }
+latex = result.files.find(file => file.path === 'src/publication-latex.ts').content;
+delete require.cache[path.resolve('src/publication-latex.ts')];
 require('./src/test/headless/publication-polish.test.ts');
 '''
 
