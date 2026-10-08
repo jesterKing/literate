@@ -1,20 +1,39 @@
 # Shared publication annotations
 
-Annotations are prose-local fenced blocks, not fragment contributions. A TERM
-header is exactly `TERM key "Display title"`; NOTE has no arguments. Headers are
-case-sensitive, with whitespace separating fields. Keys match ASCII
-`[A-Za-z][A-Za-z0-9_.:-]{0,99}`. The title is a required JSON string of at most
-200 Unicode code points (including an empty string). Trailing header whitespace
-is ignored. Markdown-it determines fence boundaries, including unclosed fences.
-TERM bodies stay in source prose; NOTE bodies belong in the publication rail.
-This module supplies data only, without choosing HTML or print presentation.
+Some explanations need a little more than the main flow of prose. A term may need
+a reusable definition, while a note may deserve space beside the page instead of
+interrupting the paragraph. Literate records both forms as annotations in the
+book and lets each renderer decide how best to present them.
 
-```ts : <<publication annotations.*>>= ./src/publication-annotations.ts $
-<<annotation contracts>>
-<<annotation body parsing>>
-<<annotation identities and hrefs>>
-<<annotation collection>>
+```mermaid
+flowchart TD
+    Prose[Prose and annotation fences] --> Collect[Collect terms, notes, and uses]
+    Collect --> Resolve[Resolve stable identities and references]
+    Resolve --> Shared[Renderer-neutral annotation model]
+    Shared --> Screen[Preview and generated HTML]
+    Shared --> Print[LaTeX notes and indexes]
 ```
+
+The shared model deliberately stops before presentation. It says which terms and
+notes exist, where they came from, and how references resolve; it does not decide
+whether a note becomes a side rail, a panel, a link, or an index entry. That
+separation lets screen and print disagree about appearance without disagreeing
+about meaning.
+
+Annotations are prose-local fenced blocks, not contributions to generated program
+fragments. A `TERM` header names a reusable concept and gives it a display title;
+a `NOTE` header takes no arguments. TERM bodies remain part of the source prose,
+while NOTE bodies are available to the publication rail. Headers are
+case-sensitive, and Markdown-it determines their fence boundaries, including the
+behavior of an unclosed fence.
+
+The exact accepted grammar is intentionally narrow. A term header has the form
+`TERM key "Display title"`. Keys begin with an ASCII letter and may continue with
+letters, digits, `_`, `.`, `:`, or `-`, up to one hundred characters. The title is
+a required JSON string of at most two hundred Unicode code points. These limits
+make identities predictable before any renderer sees them. The mechanical root
+that assembles the annotation module is in the
+[program assembly appendix](assembly.html).
 
 ## Renderer-neutral contract
 

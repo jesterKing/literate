@@ -7,18 +7,30 @@ import * as esbuild from 'esbuild';
 import { generateProject } from '../../engine';
 import { themes, themeCss } from '../../themes';
 
+const root = path.resolve(__dirname, '../../..');
 function chapterSource(filename: string, output: string): string {
     const result = generateProject([{ path: filename,
-        text: fs.readFileSync(path.resolve(__dirname, '../../..', filename), 'utf8') }]);
+        text: fs.readFileSync(path.join(root, filename), 'utf8') }]);
     assert.deepEqual(result.diagnostics, []);
     const client = result.files.find(file => file.path === output);
     assert.ok(client, `the authoritative source must emit ${output}`);
     return client.content;
 }
+function bookSource(output: string): string {
+    const names = fs.readdirSync(path.join(root, 'literate')).filter(name => name.endsWith('.literate'));
+    const documents = [{ path: 'index.literate', text: fs.readFileSync(path.join(root, 'index.literate'), 'utf8') },
+        ...names.map(name => ({ path: `literate/${name}`,
+            text: fs.readFileSync(path.join(root, 'literate', name), 'utf8') }))];
+    const result = generateProject(documents, { 'tssrc.template': fs.readFileSync(path.join(root, 'tssrc.template'), 'utf8') });
+    assert.deepEqual(result.diagnostics, []);
+    const generated = result.files.find(file => file.path === output);
+    assert.ok(generated, `the authoritative book must emit ${output}`);
+    return generated.content;
+}
 
 function bundle(stub: boolean) {
     return esbuild.build({
-        stdin: { contents: chapterSource('literate/mermaid_preview.literate', 'src/mermaid-preview.js'), loader: 'js',
+        stdin: { contents: bookSource('src/mermaid-preview.js'), loader: 'js',
             resolveDir: path.resolve(__dirname, '../../..'), sourcefile: 'mermaid-preview.js' },
         bundle: true, write: false, platform: 'browser', format: 'iife',
         // Resolve the catalogue in memory: this test must not require generated files.

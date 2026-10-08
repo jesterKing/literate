@@ -122,25 +122,37 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 </head>
 <body>
 <div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Shared publication annotations</h1>
-<p>Annotations are prose-local fenced blocks, not fragment contributions. A TERM
-header is exactly <code>TERM key &quot;Display title&quot;</code>; NOTE has no arguments. Headers are
-case-sensitive, with whitespace separating fields. Keys match ASCII
-<code>[A-Za-z][A-Za-z0-9_.:-]{0,99}</code>. The title is a required JSON string of at most
-200 Unicode code points (including an empty string). Trailing header whitespace
-is ignored. Markdown-it determines fence boundaries, including unclosed fences.
-TERM bodies stay in source prose; NOTE bodies belong in the publication rail.
-This module supplies data only, without choosing HTML or print presentation.</p>
-<div class="codefragment">
-<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200061006e006e006f0074006100740069006f006e0073002e002a-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0061006e006e006f0074006100740069006f006e0073002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200061006e006e006f0074006100740069006f006e0073002e002a"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200061006e006e006f0074006100740069006f006e0073002e002a" data-literate-target="f-007000750062006c00690063006100740069006f006e00200061006e006e006f0074006100740069006f006e0073002e002a" aria-label="Definition of publication annotations.*">&lt;&lt;publication annotations.*&gt;&gt;= src/publication-annotations.ts $</a></div>
-<div class="code">
-<pre><code><span data-literate-explore="f-0061006e006e006f0074006100740069006f006e00200063006f006e007400720061006300740073"><a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e00200063006f006e007400720061006300740073" data-literate-target="f-0061006e006e006f0074006100740069006f006e00200063006f006e007400720061006300740073" aria-label="Definition of annotation contracts">&lt;&lt;annotation contracts&gt;&gt;</a></span>
-<span data-literate-explore="f-0061006e006e006f0074006100740069006f006e00200062006f00640079002000700061007200730069006e0067"><a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e00200062006f00640079002000700061007200730069006e0067" data-literate-target="f-0061006e006e006f0074006100740069006f006e00200062006f00640079002000700061007200730069006e0067" aria-label="Definition of annotation body parsing">&lt;&lt;annotation body parsing&gt;&gt;</a></span>
-<span data-literate-explore="f-0061006e006e006f0074006100740069006f006e0020006900640065006e00740069007400690065007300200061006e0064002000680072006500660073"><a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e0020006900640065006e00740069007400690065007300200061006e0064002000680072006500660073" data-literate-target="f-0061006e006e006f0074006100740069006f006e0020006900640065006e00740069007400690065007300200061006e0064002000680072006500660073" aria-label="Definition of annotation identities and hrefs">&lt;&lt;annotation identities and hrefs&gt;&gt;</a></span>
-<span data-literate-explore="f-0061006e006e006f0074006100740069006f006e00200063006f006c006c0065006300740069006f006e"><a class="literate-tag-name" href="#f-0061006e006e006f0074006100740069006f006e00200063006f006c006c0065006300740069006f006e" data-literate-target="f-0061006e006e006f0074006100740069006f006e00200063006f006c006c0065006300740069006f006e" aria-label="Definition of annotation collection">&lt;&lt;annotation collection&gt;&gt;</a></span>
-</code></pre>
-
-</div>
-</div><h2>Renderer-neutral contract</h2>
+<p>Some explanations need a little more than the main flow of prose. A term may need
+a reusable definition, while a note may deserve space beside the page instead of
+interrupting the paragraph. Literate records both forms as annotations in the
+book and lets each renderer decide how best to present them.</p>
+<pre class="mermaid">
+flowchart TD
+    Prose[Prose and annotation fences] --&gt; Collect[Collect terms, notes, and uses]
+    Collect --&gt; Resolve[Resolve stable identities and references]
+    Resolve --&gt; Shared[Renderer-neutral annotation model]
+    Shared --&gt; Screen[Preview and generated HTML]
+    Shared --&gt; Print[LaTeX notes and indexes]
+</pre>
+<p>The shared model deliberately stops before presentation. It says which terms and
+notes exist, where they came from, and how references resolve; it does not decide
+whether a note becomes a side rail, a panel, a link, or an index entry. That
+separation lets screen and print disagree about appearance without disagreeing
+about meaning.</p>
+<p>Annotations are prose-local fenced blocks, not contributions to generated program
+fragments. A <code>TERM</code> header names a reusable concept and gives it a display title;
+a <code>NOTE</code> header takes no arguments. TERM bodies remain part of the source prose,
+while NOTE bodies are available to the publication rail. Headers are
+case-sensitive, and Markdown-it determines their fence boundaries, including the
+behavior of an unclosed fence.</p>
+<p>The exact accepted grammar is intentionally narrow. A term header has the form
+<code>TERM key &quot;Display title&quot;</code>. Keys begin with an ASCII letter and may continue with
+letters, digits, <code>_</code>, <code>.</code>, <code>:</code>, or <code>-</code>, up to one hundred characters. The title is
+a required JSON string of at most two hundred Unicode code points. These limits
+make identities predictable before any renderer sees them. The mechanical root
+that assembles the annotation module is in the
+<a href="assembly.html">program assembly appendix</a>.</p>
+<h2>Renderer-neutral contract</h2>
 <p>Locations use zero-based source lines and UTF-16 columns. Document uses point to
 the enclosing inline block; body uses point to the enclosing annotation fence.
 A use's tokenIndex selects an inline token in the document tokens or in
