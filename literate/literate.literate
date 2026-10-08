@@ -2290,122 +2290,14 @@ for (const reference of templateReferences(documents)) {
 }
 ```
 
-## The extension
+## Joining the editor features
 
-Our Visual Studio Code entry file is the `extension.ts` file. While developing
-the plug-in the JavaScript version created from this, in `out/extension.js` is
-set as the entry point for the extension, in `package.json`. But when it is
-prepared for release on the Visual Studio Code marketplace this needs to be
-changed to the minified and bundled version that gets realized as `out/main.js`.
-This ensures, together with a properly set up `.vscodeignore` that the published
-package stays small in size. Without that the package is easily over 2MB in
-size, but properly configured it is under 400KB.
-
-The extension main entry lies in the activation of the extension, as given by
-`<<activate the extension>>`, but before we get there we need to set up several
-bits and pieces that are required for the proper functioning of the tools.
-
-First of all we import all the functionality and modules we are going to need.
-
-``` ts : <<literate.*>>= ./src/extension.ts $ template=tssrc.template
-/* Literate Programming by Nathan 'jesterKing' Letwory */
-
-<<import necessary modules for literate>>
-```
-
-After the imports we introduce the fence delimiters used by editor commands.
-Each preview parser keeps its original fence renderer in its own installation
-closure, so creating an internal parser cannot change another parser's rule.
-
-HTML settings belong to the engine invocation, not global extension state, so
-settings cannot leak from one workspace project to another.
-
-```ts : <<literate.*>>=+
-
-const FENCE = '```';
-const OPENING = '\<<';
-const CLOSING = '>>';
-
-```
-
-With that out of the way we introduce the interfaces we use in the Literate
-Programming extension.
-
-```ts : <<literate.*>>=+
-<<introduce interfaces>>
-
-```
-
-Next we define everything needed to implement the fragment explorer. This explorer will show up in the Explorer bar
-when a literate project is open. We need a representation for a node in the tree
-view, a data provider for the tree view and then the actual tree view explorer
-itself.
-
-```ts : <<literate.*>>=+
-
-<<fragment node>>
-
-<<fragment tree provider>>
-
-<<fragment explorer>>
-
-<<fragment hover provider>>
-```
-
-For our extension we need to override the code fence rule since we want to
-augment the rendering of the code fences. Specifically we want to add the
-fragment line prior to the code block. This is explained in the section on
-`<<renderCodeFence rule>>`.
-
-Also we have a way to create a *MarkdownIt* parser the way we need it. It is
-explained in more detail in the section on `<<create markdownit parser>>`.
-
-``` ts : <<literate.*>>=+
-<<renderCodeFence rule>>
-
-<<create markdownit parser>>
-
-```
-
-The repository bridges editor state and the pure engine. Unexpanded fragments
-remain available for navigation without duplicating output generation.
-
-``` ts : <<literate.*>>=+
-<<handle fragments>>
-<<fragment repository>>
-<<rename provider class>>
-<<code action provider class>>
-<<definition provider class>>
-<<reference provider class>>
-```
-
-Utility function to determine the workspace folder for a TextDocument
-
-``` ts : <<literate.*>>=+
-function determineWorkspaceFolder(document : vscode.TextDocument) : vscode.WorkspaceFolder | undefined
-{
-  return vscode.workspace.getWorkspaceFolder(document.uri);
-}
-```
-
-Although the fragments mentioned above are the soul of the extension they are
-not of much use without the proper activation. With this `activate`
-implementation all providers and commands are registered with Visual Studio
-Code.
-
-``` ts : <<literate.*>>=+
-<<activate the extension>>
-<<utility functions>>
-<<create fragment for tag>>
-<<split fragment>>
-```
-
-There is nothing currently needed for deactivation of the extension, so there is
-just an empty-bodied implementation for it.
-
-``` ts : <<literate.*>>=+
-export function deactivate() {}
-```
+The extension entry point brings together several concerns that are easier to
+understand separately: Markdown rendering, the editor-side fragment repository,
+fragment tools, publication commands, mapped language services, and activation.
+Their complete source-file order is recorded in the program assembly appendix.
+The sections below explain the responsibilities themselves, beginning with the
+services on which the editor adapter depends.
 
 ### The imports
 

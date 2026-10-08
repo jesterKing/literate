@@ -264,3 +264,108 @@ contracts, preparation, installation, rollback, and cleanup developed in
 <<transaction cleanup>>
 <<transaction commit>>
 ```
+
+## Assemble the host adapters
+
+The command-line adapter combines terminal and filesystem boundaries with the
+shared engine, publication runner, and transaction protocol developed in
+[Command-line generation](cli.html).
+
+```typescript: <<assemble the command-line adapter.*>>= src/cli.ts $
+<<cli imports>>
+<<cli output contract>>
+<<cli usage>>
+<<cli default IO>>
+<<cli missing file predicate>>
+<<cli relative path validation>>
+<<cli filesystem inspection>>
+<<cli transaction IO>>
+<<cli document discovery>>
+<<cli Pandoc runner>>
+<<cli LaTeX plan>>
+<<cli command lifecycle>>
+```
+
+Its executable boundary deliberately does nothing except pass process arguments
+to the reusable runner.
+
+```typescript: <<assemble the command-line entry point.*>>= src/cli-entry.ts $
+import { run } from './cli';
+void run(process.argv.slice(2)).then(code => { process.exitCode = code; });
+```
+
+The fixed-point verifier joins its public result with the staged verification
+lifecycle explained in [Self-host verification](self_hosting.html).
+
+```typescript: <<assemble self-host verification.*>>= src/self-hosting.ts $
+<<self-host imports and result>>
+<<self-host verification lifecycle>>
+```
+
+
+The VS Code entry point gathers the editor features discussed throughout the
+editor chapters and applies the source template used by its generated module.
+
+```ts : <<assemble the VS Code extension.*>>= ./src/extension.ts $ template=tssrc.template
+/* Literate Programming by Nathan 'jesterKing' Letwory */
+
+<<import necessary modules for literate>>
+```
+
+```ts : <<assemble the VS Code extension.*>>=+
+
+const FENCE = '```';
+const OPENING = '\<<';
+const CLOSING = '>>';
+
+```
+
+```ts : <<assemble the VS Code extension.*>>=+
+<<introduce interfaces>>
+
+```
+
+```ts : <<assemble the VS Code extension.*>>=+
+
+<<fragment node>>
+
+<<fragment tree provider>>
+
+<<fragment explorer>>
+
+<<fragment hover provider>>
+```
+
+```ts : <<assemble the VS Code extension.*>>=+
+<<renderCodeFence rule>>
+
+<<create markdownit parser>>
+
+```
+
+```ts : <<assemble the VS Code extension.*>>=+
+<<handle fragments>>
+<<fragment repository>>
+<<rename provider class>>
+<<code action provider class>>
+<<definition provider class>>
+<<reference provider class>>
+```
+
+```ts : <<assemble the VS Code extension.*>>=+
+function determineWorkspaceFolder(document : vscode.TextDocument) : vscode.WorkspaceFolder | undefined
+{
+  return vscode.workspace.getWorkspaceFolder(document.uri);
+}
+```
+
+```ts : <<assemble the VS Code extension.*>>=+
+<<activate the extension>>
+<<utility functions>>
+<<create fragment for tag>>
+<<split fragment>>
+```
+
+```ts : <<assemble the VS Code extension.*>>=+
+export function deactivate() {}
+```
