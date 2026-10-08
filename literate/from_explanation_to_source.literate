@@ -1,0 +1,155 @@
+# From explanation to source
+
+The checklist example showed fragments by use. We can now describe their model
+more precisely. The purpose of the model is not mathematical decoration; it lets
+us reason about completeness, cycles, ordering, and the point at which generating
+a file is safe.
+
+## Projects, documents, and contributions
+
+A Literate project is an ordered collection of Markdown documents together with
+its templates and settings. A document may contain ordinary prose, diagrams, and
+fragment contributions. Each contribution adds source text to a named fragment
+family.
+
+The first contribution defines a family. Later contributions may append to it.
+References inside those contributions name other families. A root associates one
+family with an output path and programming language.
+
+```mermaid
+classDiagram
+    class Project {
+        ordered documents
+        templates
+        settings
+    }
+    class Document {
+        prose
+        contributions
+    }
+    class FragmentFamily {
+        name
+        ordered contributions
+    }
+    class Contribution {
+        source location
+        literal text and references
+    }
+    class Reference {
+        target family
+        source location
+    }
+    class OutputRoot {
+        destination
+        language
+        optional template
+    }
+
+    Project "1" *-- "many" Document
+    Document "1" *-- "many" Contribution
+    FragmentFamily "1" o-- "many" Contribution
+    Contribution "1" o-- "many" Reference
+    Reference --> FragmentFamily
+    OutputRoot --> FragmentFamily
+```
+
+The diagram describes concepts, not current TypeScript classes. Implementations may
+change while these relationships remain the language's stable vocabulary.
+
+## The fragment graph
+
+A graph is a collection of nodes connected by edges. Here each fragment family is
+a node and each reference is a directed edge from the family containing the
+reference to the family it names.
+
+We may write this as `G = (V, E)`, where `V` is the set of fragment families and
+`E` is the set of references between them. The notation says nothing mysterious:
+it is simply a compact way to name all fragments and all of their connections.
+
+A root chooses an entry point into this graph. Tangling follows every reachable
+edge and replaces each reference with the target family's ordered contributions.
+Fragments that cannot be reached from that root do not appear in its output, but
+the complete project must still be structurally valid.
+
+```mermaid
+flowchart TD
+    Root[Output root] --> Main[Main program]
+    Main --> Read[Read the input]
+    Main --> Transform[Transform the data]
+    Main --> Report[Report the result]
+    Transform --> Validate[Validate one item]
+```
+
+## Definitions may follow references
+
+The book's reading order does not need to match the direction of the graph. A
+parent may name a child before the child's definition appears. This lets the author
+present the whole before descending into detail.
+
+Contribution order still matters. If three chapters append to one family, their
+parts appear in deterministic project order. Forward references therefore remove
+a declaration-order restriction; they do not make the project unordered.
+
+## Expansion preserves context
+
+When a reference occupies an indented line, its expanded text inherits that
+indentation. Literal text remains literal. Escaped opening delimiters allow the
+book to discuss fragment notation without creating a reference.
+
+Expansion is recursive: a referenced family may itself contain references. A
+completed expansion can be reused, but its insertion context still matters because
+indentation belongs to the reference site.
+
+Templates add one controlled outer transformation. A source template contains a
+`[CODE]` marker, and Literate substitutes the complete tangled code into that
+marker. This is a literal, single-pass operation rather than a general template
+language.
+
+## Invalid graphs produce no plan
+
+Two failures are easiest to visualize. A missing reference points to no node. A
+cycle leads back to a family that is already being expanded.
+
+```mermaid
+flowchart TD
+    Start[Select an output root] --> Visit[Visit its fragment family]
+    Visit --> Target{Does every reference have a target?}
+    Target -->|No| Reject[Report diagnostics and produce no files]
+    Target -->|Yes| Active{Is the target already on this path?}
+    Active -->|Yes| Reject
+    Active -->|No| Expand[Expand referenced families]
+    Expand --> More{More references?}
+    More -->|Yes| Target
+    More -->|No| Template[Apply the optional source template]
+    Template --> Plan[Add the complete output to the plan]
+```
+
+Other validation protects names, paths, templates, sizes, and contribution forms.
+The common rule is more important than the individual checks: no generated file
+is returned until the whole project has a valid plan.
+
+If any diagnostic is found, the output list is empty. A host may display partial
+inspection information to help the author, but it must not treat partial knowledge
+as permission to replace files.
+
+## Planning precedes effects
+
+Tangling answers, “what bytes should every output contain?” It does not answer,
+“when should the filesystem change?” That distinction keeps the semantic engine
+independent of a terminal, editor, or storage provider.
+
+```mermaid
+flowchart TD
+    Snapshot[Captured project snapshot] --> Parse[Parse and validate]
+    Parse --> Graph[Build the fragment graph]
+    Graph --> Outputs[Plan all outputs]
+    Outputs --> Valid{Any diagnostics?}
+    Valid -->|Yes| Problems[Publish problems; write nothing]
+    Valid -->|No| Host[Return the complete plan to the host]
+    Host --> Commit[Host preflights and commits the plan]
+```
+
+The main book will return to every stage in more depth. The next part begins with
+the project snapshot, because deterministic generation depends on knowing exactly
+which documents, templates, and open editor buffers belong to one interpretation
+of the project.

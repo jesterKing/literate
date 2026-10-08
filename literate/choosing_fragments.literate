@@ -1,0 +1,119 @@
+# Choosing fragments well
+
+Fragments are the units through which a literate program explains itself. Choosing
+them well matters more than making them uniformly small. A fragment should express
+one idea that the surrounding prose can motivate, name, and connect to a larger
+whole.
+
+A useful fragment often answers one question:
+
+- How do we validate this request?
+- What belongs in a project snapshot?
+- How is a generated position mapped back to its source?
+- When must stale work be rejected?
+- What makes an output safe to replace?
+
+These questions describe responsibilities rather than source-language shapes. A
+class, function, loop, or interface may coincide with one responsibility, but
+syntax alone does not determine the boundary.
+
+## Names carry part of the explanation
+
+A fragment name should fit naturally into prose. Verb phrases suit behavior:
+`capture the project snapshot`, `plan every generated output`, or `reject a stale
+reply`. Noun phrases suit models and declarations: `the parsed project model` or
+`language-server capabilities`.
+
+Names such as `helpers`, `state`, `part two`, or `remaining methods` reveal little.
+They tell us where code was stored, not why it belongs together. If a fragment
+cannot be given a meaningful name, that is evidence that its boundary may be
+mechanical rather than conceptual.
+
+Sibling names should also use parallel grammar. The following parent reads as a
+sequence of actions:
+
+```text
+\<<process a literate project>>=
+    \<<capture the project snapshot>>
+    \<<build and validate the fragment graph>>
+    \<<plan every generated output>>
+    \<<commit the output transaction>>
+```
+
+A reader can understand the broad algorithm before opening any child. This is one
+of the most valuable forms of abstraction in a literate program: the parent is
+both executable composition and a compact explanation.
+
+## One idea is not one fixed size
+
+Line counts are useful warnings, not definitions. A sixty-line fragment deserves
+careful review because it may hide several decisions. Splitting it every twenty
+lines would not necessarily help. The better questions are whether its statements
+serve one idea and whether smaller named responsibilities would clarify the parent.
+
+The opposite problem is also possible. A one-line fragment that merely wraps a
+function call may force the reader to follow a link without gaining a concept.
+Too many fragments can turn a direct explanation into a scavenger hunt.
+
+```mermaid
+flowchart TD
+    Start[Candidate piece of code] --> One{One explainable idea?}
+    One -->|No| Divide[Find its distinct responsibilities]
+    One -->|Yes| Name{Can it be named naturally?}
+    Name -->|No| Rethink[Reconsider the boundary]
+    Name -->|Yes| Parent{Does separation clarify its parent?}
+    Parent -->|No| Inline[Keep it with the surrounding idea]
+    Parent -->|Yes| Kind{Conceptual or mechanical?}
+    Kind -->|Conceptual| Main[Explain it in the main chapter]
+    Kind -->|Mechanical| Appendix[Place it in a themed appendix]
+```
+
+The diagram is a review aid, not a rigid algorithm. Judgment still depends on the
+reader, the subject, and the complexity of the implementation.
+
+## Contributions should follow the narrative
+
+A fragment family may be developed in several contributions. This is useful when
+the explanation genuinely returns to an earlier idea. A basic parser may be
+introduced first and extended later when error recovery becomes relevant.
+
+Contributions should not be used merely to avoid moving code or to scatter one
+responsibility across convenient locations. Each return to a fragment should make
+sense in the narrative and preserve a deterministic contribution order.
+
+A parent fragment that refers to several families should read coherently. If the
+references mix forms such as `settings`, `do validation`, `helper part`, and
+`remaining setup`, the composition is probably following source layout rather
+than explanation.
+
+## Keep mechanical work visible but secondary
+
+Imports, exports, registration lists, complete-file roots, browser entry points,
+and build adapters are necessary. Hiding them would make the book incomplete and
+harder to audit. Giving each of them a prominent place in the main argument would
+make the book harder to read.
+
+The appendices preserve these mechanisms in themed maps. A reader interested in
+how a generated file is assembled can follow them. The main chapter can begin
+instead with the problem, model, and decisions that make the file worth having.
+
+This distinction is not based on whether code is difficult. A subtle validation
+algorithm may belong in the main text because it expresses the architecture. A
+simple registration call may belong in an appendix because it only connects ideas
+already explained elsewhere.
+
+## Review the prose and code together
+
+Before accepting a fragment, ask:
+
+1. What idea does it realize?
+2. Has the prose explained why that idea exists?
+3. Can its name participate naturally in a sentence?
+4. Do sibling names form a readable outline?
+5. Can a reader skip the code and retain the argument?
+6. Would moving it to an appendix remove anything important from that argument?
+
+A literate program cannot answer these questions once and remain finished. As the
+architecture changes, prose, diagrams, names, and boundaries must change with it.
+The next chapter gives the intuitive fragment model a more precise form and shows
+how explanation becomes a deterministic source plan.

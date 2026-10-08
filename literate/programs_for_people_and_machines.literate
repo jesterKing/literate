@@ -1,0 +1,131 @@
+# Programs for people and machines
+
+A program has at least two audiences. A computer needs instructions in a precise
+order and form. A person needs to understand the problem, the choices that shaped
+the solution, and the way its parts relate. Those needs overlap, but they are not
+the same.
+
+Conventional source files usually give the computer's order authority. We may add
+comments, separate documentation, diagrams, and examples, but the file remains the
+spine around which the explanation must fit. This works well for many programs.
+For a system whose reasoning matters as much as its syntax, however, the most
+helpful explanation may need a different order.
+
+Literate programming turns that relationship around. The author writes an
+explanation and places pieces of the program where they illuminate the ideas being
+discussed. Named fragments connect those pieces. A tool later arranges them into
+the source files expected by compilers and other language tools.
+
+```mermaid
+flowchart TD
+    Questions[Questions a reader asks] --> Explanation[Explanatory order]
+    Explanation --> Fragments[Named program fragments]
+    Build[Order required by tools] --> Source[Generated source files]
+    Fragments --> Source
+    Explanation --> Book[Readable book]
+```
+
+The upper path in this diagram is organized by understanding: what problem are we
+solving, what constraints matter, and why does one idea lead to the next? The lower
+path represents the order needed to build and run the program. Named fragments are
+the bridge between them.
+
+## Explanation becomes the source
+
+In a literate program, prose is not a commentary added after the implementation.
+It is part of the authoritative work. The code fragments shown among that prose
+are authoritative too. The generated source file is important—it is what ordinary
+language tools consume—but it is a result rather than the primary place where the
+author develops the program.
+
+Two traditional words describe the outputs:
+
+- **Tangling** follows fragment references to produce program source.
+- **Weaving** presents prose, diagrams, and fragments as a document for readers.
+
+The names come from textiles: separate threads become a useful whole. One process
+arranges code for the machine; the other arranges the same work for people.
+
+This does not free the author from structure. It creates a different responsibility.
+The explanation must introduce ideas in a helpful order, and fragment names must
+make their relationships intelligible. Poor prose and arbitrary fragments can turn
+a literate program into source code hidden inside a more complicated container.
+The method helps only when the book is maintained with the same care as the code.
+
+## Why named fragments matter
+
+An anonymous code sample says, “here are some statements.” A named fragment says,
+“this is the part of the program that carries out a particular idea.” Its name can
+participate in the prose and in a larger fragment:
+
+```text
+\<<process a literate project>>=
+    \<<capture the project snapshot>>
+    \<<build and validate the fragment graph>>
+    \<<plan every generated output>>
+    \<<commit the output transaction>>
+```
+
+In the actual notation these phrases are visibly marked as fragment references.
+Read as prose, they form an outline of the mechanism. Read by Literate, they name
+the pieces from which the implementation is assembled.
+
+This dual role is central. Fragment names are not labels attached only for the
+build system. They are part of the vocabulary with which the book explains the
+program.
+
+## What the method promises
+
+A well-written literate program can keep several forms of knowledge together:
+
+- the purpose of a component;
+- the assumptions on which it relies;
+- alternatives that were rejected;
+- diagrams of relationships and lifecycles;
+- formulas or measurements that justify a limit;
+- the implementation of each decision;
+- examples and tests that make the contract concrete.
+
+Because the explanation and implementation are edited together, a design decision
+need not live in a distant document that gradually stops matching the code. The
+book can also introduce a concept before its implementation location would permit
+in an ordinary source file.
+
+Literate itself is the running example in this book. Its fragments describe a
+language, a deterministic generator, an editor environment, and a publication
+system. The program is large enough to show where literate programming helps and
+where it creates new difficulties.
+
+## What the method costs
+
+The generated file is no longer the whole source of truth, so contributors need
+tools that understand fragments. Errors can occur in the fragment graph as well as
+in the generated programming language. A reader may need to follow a reference to
+another chapter. Bootstrapping requires care when the generator is itself generated.
+
+There is also a subtler cost: completeness can be mistaken for explanation. A book
+may contain every line of code and still make the program harder to understand.
+Assembly manifests, imports, registrations, and protocol plumbing are necessary,
+but they do not all deserve equal weight in the main narrative.
+
+This book therefore separates its roles. The main chapters concentrate on method,
+architecture, algorithms, and important boundaries. The appendices retain the
+mechanical maps and detailed references needed to assemble and audit the complete
+program.
+
+## Where literate programming fits
+
+The method is especially valuable when reasoning must survive for a long time:
+complex algorithms, unusual safety boundaries, scientific software, systems with
+several interacting representations, or projects meant to teach as well as run.
+It can also help whenever the best order for introducing ideas differs strongly
+from the best order for a compiler.
+
+It is not automatically the right choice for every task. A tiny disposable script
+may need no additional structure. Mechanically generated code may be better
+explained by its generator. A team unwilling to maintain the prose will gain
+little from making prose authoritative.
+
+The next chapter uses a small complete example. It begins with an everyday task,
+divides that task into named ideas, and follows those ideas into an executable
+source file and a readable document.

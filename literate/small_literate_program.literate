@@ -1,0 +1,174 @@
+# A small literate program
+
+A complete example is the quickest way to see how explanation and source can share
+one structure. Suppose we keep a checklist in Markdown and want a small program to
+summarize it. Checked items begin with `[x]`, unchecked items with `[ ]`, and all
+other lines are ignored.
+
+Given this text:
+
+```text
+[x] Choose an example
+[ ] Write the first draft
+A sentence that is not a checklist item
+[x] Draw the fragment graph
+```
+
+we want the report:
+
+```text
+2 complete, 1 remaining
+```
+
+Before thinking about programming syntax, we can divide the task into four ideas:
+receive the checklist text, recognize checklist items, count their states, and
+format a report.
+
+```mermaid
+flowchart TD
+    Root[Summarize a checklist] --> Receive[Receive checklist text]
+    Root --> Recognize[Recognize checklist items]
+    Root --> Count[Count checklist states]
+    Root --> Format[Format the checklist report]
+```
+
+The graph is small, but it already has the shape of a larger literate program. The
+root describes the whole. Each child gives a name to one responsibility that can
+be explained independently.
+
+## Write the program as an outline
+
+A root fragment associates the explanation with a generated file. Its body can
+read like an outline:
+
+```text
+\<<summarize a checklist.*>>= checklist-summary.js $
+\<<receive checklist text>>
+\<<recognize checklist items>>
+\<<count checklist states>>
+\<<format the checklist report>>
+```
+
+The star in the root name marks a family that produces an output. The filename and
+final dollar sign make the destination explicit. The four references can be
+written before their definitions because the book, rather than a compiler's
+single pass through this page, determines their relationship.
+
+At this point a reader knows the program's broad structure without seeing a line
+of JavaScript. That is useful information, not a temporary placeholder. The root
+fragment remains a compact description even after every child is implemented.
+
+## Receive the checklist text
+
+For this small example, every command-line argument is one input line. Joining the
+arguments gives the rest of the program one string to examine:
+
+```text
+\<<receive checklist text>>=
+const input = process.argv.slice(2).join('\n');
+```
+
+A production command might read a file or standard input instead. That choice is
+separate from understanding the checklist grammar, which is why it has its own
+name.
+
+## Recognize the input
+
+A checklist marker has a small grammar. After optional indentation, it contains an
+opening bracket, either a space or `x`, a closing bracket, and the item's text. We
+can explain that rule before expressing it as a regular expression.
+
+```text
+\<<recognize checklist items>>=
+function checklistState(line) {
+    const match = /^\s*\[([ x])\]\s+/.exec(line);
+    if (!match) return undefined;
+    return match[1] === 'x' ? 'complete' : 'remaining';
+}
+```
+
+The function deliberately returns no state for ordinary prose. That decision is
+part of the model: ignoring unrelated lines is expected behavior, not an error to
+be handled somewhere else.
+
+## Count what was recognized
+
+Let *C* be the number of complete items and *R* the number remaining. If the
+input contains *N* recognized checklist items, then:
+
+```text
+N = C + R
+```
+
+This formula is simple, but it states a useful invariant. Every recognized item
+must contribute to exactly one count. An item cannot disappear and cannot be
+counted twice.
+
+```text
+\<<count checklist states>>=
+const totals = { complete: 0, remaining: 0 };
+for (const line of input.split(/\r\n|\r|\n/)) {
+    const state = checklistState(line);
+    if (state) totals[state]++;
+}
+```
+
+The code illustrates the invariant rather than replacing its explanation. A reader
+who skips the block still knows what is counted and what must remain true.
+
+## Format the result
+
+Presentation is the final responsibility. It does not need to know how a checklist
+marker was recognized:
+
+```text
+\<<format the checklist report>>=
+console.log(`${totals.complete} complete, ${totals.remaining} remaining`);
+```
+
+Separating recognition from presentation may look generous for such a small
+program. Its value becomes clearer when either idea changes. Supporting uppercase
+`X` belongs with recognition; translating the report belongs with formatting.
+The names show where each decision fits.
+
+## Continue an idea later
+
+A fragment family may receive more than one contribution. Suppose a later section
+introduces a command-line input file. The root need not be rewritten in place; the
+idea that obtains input can be extended where that new concern is explained.
+
+Contributions are not an excuse to scatter one idea arbitrarily. They are valuable
+when the narrative genuinely returns to a responsibility with new knowledge. Their
+order is deterministic, and the generated source receives each contribution in
+that order.
+
+## Tangle and weave
+
+Tangling follows the four references and produces one ordinary source file:
+
+```mermaid
+flowchart TD
+    Book[Literate chapter] --> Graph[Resolve named fragments]
+    Graph --> Program[checklist-summary.js]
+    Book --> Weave[Render prose, diagrams, and fragments]
+    Weave --> Page[Readable chapter]
+```
+
+The generated file contains no fragment markers. JavaScript tools can read it as
+if it had been written directly. The woven page keeps the names, explanations,
+and relationships because those are what help a person understand the program.
+
+## Failure should preserve the last good result
+
+If the root refers to `<<read checklist input>>` but no such fragment exists, the
+graph is incomplete. Literate reports the missing name and produces no generation
+plan. It does not replace a previously valid program with a partial file.
+
+That behavior follows an important principle used throughout this book: inspect
+and validate a complete plan before performing an external effect. Later chapters
+apply the same principle to filesystem transactions, publication, language-server
+edits, and PDF compilation.
+
+This example introduced fragments by use. The next chapter asks how to choose them
+well, because the notation alone cannot turn an arbitrary code split into a clear
+explanation.

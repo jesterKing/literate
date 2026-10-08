@@ -1,7 +1,74 @@
 # Literate Programming
 
-A literate-programming tool with a shared generation engine, a command-line
-interface, and a Visual Studio Code extension.
+A program is usually arranged for the tools that build it. A book is arranged for
+the people who want to understand it. Literate programming connects those two
+orders: explanation leads, named fragments carry the implementation, and ordinary
+source files are generated from the same authoritative work.
+
+This book explains that method through Literate itself. The program is at once a
+deterministic generator, a Visual Studio Code environment, a publication system,
+and a substantial example of its own approach.
+
+## Preface — Why this program is a book
+
+The `.literate` chapters are the source of the program. Generated TypeScript,
+JavaScript, and HTML remain in the repository so a checkout can build and verify
+itself, but design work begins in the book. Prose, diagrams, formulas, examples,
+and code fragments should evolve together.
+
+The main chapters concentrate on method, architecture, algorithms, and the reasons
+behind important boundaries. Code may be read closely, but the central argument
+should remain understandable when a reader skips a code block. The appendices keep
+mechanical assembly and detailed references available without making them the
+spine of the explanation.
+
+```mermaid
+flowchart TD
+    Source[Literate project snapshot] --> Model[Fragment graph and parsed project]
+    Model --> Generation[Source and HTML generation]
+    Model --> Preview[Screen presentation]
+    Model --> Publication[Print publication]
+    Model --> Projection[Generated-language projections]
+    Generation --> CLI[Command-line adapter]
+    Generation --> Editor[VS Code adapter]
+    Projection --> Servers[Language servers]
+    Servers --> Editor
+    Publication --> Book[LaTeX and PDF]
+```
+
+Literate was inspired by Donald Knuth's account of literate programming and by the
+way *Physically Based Rendering: From Theory to Implementation* presents a large
+program as a sustained explanation. The aim here is not merely to place all source
+inside a book, but to make the book the clearest route to understanding it.
+
+## Reading paths
+
+The book is meant to support more than one journey:
+
+- **A first-time reader** can begin with Part I and then follow the architectural
+  overviews of generation, the editor, language intelligence, and publication.
+- **A literate-program author** can continue through the semantic model,
+  self-hosting, correctness, and the syntax reference.
+- **An extension contributor** will need the engine, host, editor, and maintenance
+  chapters together with the assembly and testing appendices.
+- **A language-service contributor** can move from the fragment graph to projection,
+  protocol ownership, mapping, diagnostics, and safe mutation.
+- **A publication contributor** can follow the parsed project into screen and print
+  rendering, portable resources, process isolation, and PDF compilation.
+- **An auditor** can combine the main architectural chapters with the complete
+  assembly maps, protocols, bounds, and verification references.
+
+These paths overlap because every subsystem starts from the same captured project
+and fragment model.
+
+## Part I — Literate programming as a method
+
+1. [Programs for people and machines](literate/programs_for_people_and_machines.html)
+2. [A small literate program](literate/small_literate_program.html)
+3. [Choosing fragments well](literate/choosing_fragments.html)
+4. [From explanation to source](literate/from_explanation_to_source.html)
+
+## Architecture and implementation
 
 * [Developing this literate program](literate/development.html)
 * [Headless generation engine](literate/engine.html)
@@ -41,28 +108,11 @@ interface, and a Visual Studio Code extension.
 * [Renaming](literate/renaming_fragments.html)
 * [Definitions](literate/definition_provider.html)
 * [References](literate/references.html)
-* [Grabber](literate/grabber.html), plug-in code used to grab the MarkdownIt
-  parser state
+* [Grabber](literate/grabber.html), the Markdown parser state bridge
 
 ## Appendices
 
 * [Appendix A — Program assembly maps](literate/assembly.html)
-
-## Publication settings
-
-The root settings below make our current defaults explicit. The theme applies to
-preview, HTML and LaTeX; font selection currently applies only to LaTeX books.
-Change any font family independently: `font-body` selects prose, `font-heading`
-selects headings, `font-code` selects code, `font-fragment` selects fragment
-names and references, and `font-note` selects running matter and reference page
-numbers. Omit `font-note` to inherit `font-body`; specifying it fixes that role
-independently. Use `font-code-ligatures=off` to disable contextual code ligatures.
-
-Font values are family names, not file paths. Selecting a family does not install
-it: make it available to the TeX compiler, or explicitly provide its faces and
-licenses with the CLI's `--font-manifest` option. Chapter-local settings do not
-override these root font choices. See [Publication font settings](literate/publication-settings.html)
-and [Portable font companions](literate/publication-fonts.html) for details.
 
 ``` SETTINGS
 authors=Nathan 'jesterKing' Letwory

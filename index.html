@@ -122,8 +122,66 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 </head>
 <body>
 <div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Literate Programming</h1>
-<p>A literate-programming tool with a shared generation engine, a command-line
-interface, and a Visual Studio Code extension.</p>
+<p>A program is usually arranged for the tools that build it. A book is arranged for
+the people who want to understand it. Literate programming connects those two
+orders: explanation leads, named fragments carry the implementation, and ordinary
+source files are generated from the same authoritative work.</p>
+<p>This book explains that method through Literate itself. The program is at once a
+deterministic generator, a Visual Studio Code environment, a publication system,
+and a substantial example of its own approach.</p>
+<h2>Preface — Why this program is a book</h2>
+<p>The <code>.literate</code> chapters are the source of the program. Generated TypeScript,
+JavaScript, and HTML remain in the repository so a checkout can build and verify
+itself, but design work begins in the book. Prose, diagrams, formulas, examples,
+and code fragments should evolve together.</p>
+<p>The main chapters concentrate on method, architecture, algorithms, and the reasons
+behind important boundaries. Code may be read closely, but the central argument
+should remain understandable when a reader skips a code block. The appendices keep
+mechanical assembly and detailed references available without making them the
+spine of the explanation.</p>
+<pre class="mermaid">
+flowchart TD
+    Source[Literate project snapshot] --&gt; Model[Fragment graph and parsed project]
+    Model --&gt; Generation[Source and HTML generation]
+    Model --&gt; Preview[Screen presentation]
+    Model --&gt; Publication[Print publication]
+    Model --&gt; Projection[Generated-language projections]
+    Generation --&gt; CLI[Command-line adapter]
+    Generation --&gt; Editor[VS Code adapter]
+    Projection --&gt; Servers[Language servers]
+    Servers --&gt; Editor
+    Publication --&gt; Book[LaTeX and PDF]
+</pre>
+<p>Literate was inspired by Donald Knuth's account of literate programming and by the
+way <em>Physically Based Rendering: From Theory to Implementation</em> presents a large
+program as a sustained explanation. The aim here is not merely to place all source
+inside a book, but to make the book the clearest route to understanding it.</p>
+<h2>Reading paths</h2>
+<p>The book is meant to support more than one journey:</p>
+<ul>
+<li><strong>A first-time reader</strong> can begin with Part I and then follow the architectural
+overviews of generation, the editor, language intelligence, and publication.</li>
+<li><strong>A literate-program author</strong> can continue through the semantic model,
+self-hosting, correctness, and the syntax reference.</li>
+<li><strong>An extension contributor</strong> will need the engine, host, editor, and maintenance
+chapters together with the assembly and testing appendices.</li>
+<li><strong>A language-service contributor</strong> can move from the fragment graph to projection,
+protocol ownership, mapping, diagnostics, and safe mutation.</li>
+<li><strong>A publication contributor</strong> can follow the parsed project into screen and print
+rendering, portable resources, process isolation, and PDF compilation.</li>
+<li><strong>An auditor</strong> can combine the main architectural chapters with the complete
+assembly maps, protocols, bounds, and verification references.</li>
+</ul>
+<p>These paths overlap because every subsystem starts from the same captured project
+and fragment model.</p>
+<h2>Part I — Literate programming as a method</h2>
+<ol>
+<li><a href="literate/programs_for_people_and_machines.html">Programs for people and machines</a></li>
+<li><a href="literate/small_literate_program.html">A small literate program</a></li>
+<li><a href="literate/choosing_fragments.html">Choosing fragments well</a></li>
+<li><a href="literate/from_explanation_to_source.html">From explanation to source</a></li>
+</ol>
+<h2>Architecture and implementation</h2>
 <ul>
 <li><a href="literate/development.html">Developing this literate program</a></li>
 <li><a href="literate/engine.html">Headless generation engine</a></li>
@@ -163,26 +221,12 @@ interface, and a Visual Studio Code extension.</p>
 <li><a href="literate/renaming_fragments.html">Renaming</a></li>
 <li><a href="literate/definition_provider.html">Definitions</a></li>
 <li><a href="literate/references.html">References</a></li>
-<li><a href="literate/grabber.html">Grabber</a>, plug-in code used to grab the MarkdownIt
-parser state</li>
+<li><a href="literate/grabber.html">Grabber</a>, the Markdown parser state bridge</li>
 </ul>
 <h2>Appendices</h2>
 <ul>
 <li><a href="literate/assembly.html">Appendix A — Program assembly maps</a></li>
 </ul>
-<h2>Publication settings</h2>
-<p>The root settings below make our current defaults explicit. The theme applies to
-preview, HTML and LaTeX; font selection currently applies only to LaTeX books.
-Change any font family independently: <code>font-body</code> selects prose, <code>font-heading</code>
-selects headings, <code>font-code</code> selects code, <code>font-fragment</code> selects fragment
-names and references, and <code>font-note</code> selects running matter and reference page
-numbers. Omit <code>font-note</code> to inherit <code>font-body</code>; specifying it fixes that role
-independently. Use <code>font-code-ligatures=off</code> to disable contextual code ligatures.</p>
-<p>Font values are family names, not file paths. Selecting a family does not install
-it: make it available to the TeX compiler, or explicitly provide its faces and
-licenses with the CLI's <code>--font-manifest</code> option. Chapter-local settings do not
-override these root font choices. See <a href="literate/publication-settings.html">Publication font settings</a>
-and <a href="literate/publication-fonts.html">Portable font companions</a> for details.</p>
 </div>
 <script type="module">
   import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
