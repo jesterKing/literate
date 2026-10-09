@@ -45,6 +45,7 @@ export type PublicationSegment =
     | { kind: 'text'; text: string }
     | { kind: 'reference'; text: string; name: string;
         start: number; end: number; at: PublicationLocation; modifier?: string;
+        occurrenceTarget: string; placement: 'standalone' | 'inline';
         resolution: { kind: 'resolved'; target: string } | { kind: 'missing' } };
 export const discoveryExcludedDirectories: readonly string[] = Object.freeze([
     '.git', 'node_modules', 'out', 'dist', '.yarn', '.vscode-test'
@@ -429,15 +430,22 @@ function collectProject(documents: SourceDocument[], policy?: CollectionPolicy) 
         contributionOrdinals.set(key, ordinal);
         const target = 'c-' + key + '-' + ordinal;
         const segments: PublicationSegment[] = [];
+        let referenceOrdinal = 0;
         let cursor = 0;
         for (const { name, start, end, modifier, at } of references(part)) {
             if (start > cursor) { segments.push({ kind: 'text', text: part.content.slice(cursor, start) }); }
-            const target = publicationFamilies.get(name)?.target;
+            const familyTarget = publicationFamilies.get(name)?.target;
             const textEnd = end + (modifier?.length || 0);
+            const lineStart = part.content.lastIndexOf('\n', start - 1) + 1;
+            const newline = part.content.indexOf('\n', textEnd);
+            const lineEnd = newline < 0 ? part.content.length : newline;
+            const placement = /^[ \t]*$/.test(part.content.slice(lineStart, start)) &&
+                /^[ \t]*$/.test(part.content.slice(textEnd, lineEnd)) ? 'standalone' : 'inline';
             segments.push({
                 kind: 'reference', text: part.content.slice(start, textEnd), name, start, end, at,
+                occurrenceTarget: `${target}-r-${++referenceOrdinal}`, placement,
                 ...(modifier === undefined ? {} : { modifier }),
-                resolution: target === undefined ? { kind: 'missing' } : { kind: 'resolved', target }
+                resolution: familyTarget === undefined ? { kind: 'missing' } : { kind: 'resolved', target: familyTarget }
             });
             cursor = textEnd;
         }

@@ -8,12 +8,20 @@ import type { PandocBlock } from '../../publication-pandoc';
 import { createHash } from 'node:crypto';
 import { highlightContribution, syntaxStyle } from '../../publication-highlight';
 const tag = (name: string) => '<' + '<' + name + '>>';
+const publicationFence = (header: string, content: string) => '```' + header + '\n' + content + '\n```\n';
 function part(body: string, language = 'javascript') {
-    const fence = (header: string, content: string) => '```' + header + '\n' + content + '\n```\n';
     const result = parseProject([{ path: 'index.literate', text:
-        fence(language + ': ' + tag('main') + '=', body) + fence(': ' + tag('piece') + '=', 'x') }]);
+        publicationFence(language + ': ' + tag('main') + '=', body) +
+        publicationFence(': ' + tag('piece') + '=', 'x') }]);
     assert.deepEqual(result.diagnostics, []);
     return result.publication.contributions[0];
+}
+function finalPart(body: string) {
+    const result = parseProject([{ path: 'index.literate', text:
+        publicationFence(': ' + tag('piece') + '=', 'x') +
+        '```javascript: ' + tag('main') + '=\n' + body }]);
+    assert.deepEqual(result.diagnostics, []);
+    return result.publication.contributions[1];
 }
 function scopeAt(result: ReturnType<typeof highlightContribution>, marker: string): string {
     const offset = result.text.indexOf(marker);
@@ -43,13 +51,43 @@ test('literal unescape maps repeated references after emoji in UTF-16', () => {
     assert.equal(result.text, tag('literal') + ' 😀 ' + tag('piece') + '/' + tag('piece') + '\n');
     assert.equal(result.references.length, 2);
     assert.equal(result.references[0].start, tag('literal').length + 4);
-    for (const ref of result.references) {
+    const source = input.segments.filter(
+        (segment): segment is Extract<(typeof input.segments)[number], { kind: 'reference' }> =>
+            segment.kind === 'reference');
+    for (const [index, ref] of result.references.entries()) {
         assert.equal(result.text.slice(ref.start, ref.end), tag('piece'));
         assert.equal(ref.name, 'piece');
         assert.ok(ref.target);
+        assert.equal(ref.occurrenceTarget, source[index].occurrenceTarget);
+        assert.equal(ref.placement, source[index].placement);
+        assert.equal(ref.occurrenceTarget, `${input.target}-r-${index + 1}`);
     }
     assert.deepEqual(result.spans, [{ start: 0, end: result.text.length, scope: '' }]);
     assert.equal(JSON.stringify(input), snapshot);
+});
+
+test('reference occurrences distinguish standalone lines and retain structural identities', () => {
+    const input = part(' \t' + tag('piece') + ' \t\n' +
+        'prefix ' + tag('piece') + '\n' + tag('piece') + ' suffix\n' +
+        tag('piece') + ' ' + tag('piece') + '\n\\' + tag('literal') + ' ' + tag('piece'));
+    const refs = input.segments.filter(
+        (segment): segment is Extract<(typeof input.segments)[number], { kind: 'reference' }> =>
+            segment.kind === 'reference');
+    assert.deepEqual(refs.map(ref => ref.placement),
+        ['standalone', 'inline', 'inline', 'inline', 'inline', 'inline']);
+    assert.deepEqual(refs.map(ref => ref.occurrenceTarget),
+        refs.map((_, index) => `${input.target}-r-${index + 1}`));
+    const eof = finalPart('\t' + tag('piece') + '  ');
+    const eofRef = eof.segments.find(
+        (segment): segment is Extract<(typeof eof.segments)[number], { kind: 'reference' }> =>
+            segment.kind === 'reference')!;
+    assert.equal(eofRef.placement, 'standalone');
+    assert.equal(eofRef.occurrenceTarget, `${eof.target}-r-1`);
+    const occurrences = (value: typeof input) => value.segments.flatMap(segment =>
+        segment.kind === 'reference' ? [segment.occurrenceTarget] : []);
+    const before = part('ordinary text\n' + tag('piece'));
+    const after = part('different ordinary text\n' + tag('piece'));
+    assert.deepEqual(occurrences(before), occurrences(after));
 });
 test('standalone validation rejects missing references, modifiers and invalid segments', () => {
     assert.throws(() => highlightContribution(part(tag('missing'))), /target is missing/);
@@ -61,6 +99,16 @@ test('standalone validation rejects missing references, modifiers and invalid se
     const ref = invalid.segments.find(segment => segment.kind === 'reference')!;
     if (ref.kind === 'reference') { ref.start++; }
     assert.throws(() => highlightContribution(invalid), /offsets/);
+    const missingOccurrence = part(tag('piece'));
+    const missingRef = missingOccurrence.segments.find(segment => segment.kind === 'reference')!;
+    if (missingRef.kind === 'reference') { missingRef.occurrenceTarget = ''; }
+    assert.throws(() => highlightContribution(missingOccurrence), /occurrence target/);
+    const invalidPlacement = part(tag('piece'));
+    const placementRef = invalidPlacement.segments.find(segment => segment.kind === 'reference')!;
+    if (placementRef.kind === 'reference') {
+        (placementRef as unknown as { placement: string }).placement = 'invalid';
+    }
+    assert.throws(() => highlightContribution(invalidPlacement), /placement/);
     const empty = part('', '');
     empty.content = ''; empty.segments = [];
     assert.deepEqual(highlightContribution(empty), { text: '', spans: [], references: [] });

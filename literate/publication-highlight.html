@@ -147,7 +147,8 @@ them when called independently. Invalid segment reconstruction fails closed.</p>
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">HighlightedContribution</span> {
     <span class="hljs-attr">text</span>: <span class="hljs-built_in">string</span>;
     <span class="hljs-attr">spans</span>: <span class="hljs-title">SyntaxSpan</span>[];
-    <span class="hljs-attr">references</span>: { <span class="hljs-attr">start</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">end</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span> }[];
+    <span class="hljs-attr">references</span>: { <span class="hljs-attr">start</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">end</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span>;
+        <span class="hljs-attr">occurrenceTarget</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">placement</span>: <span class="hljs-string">'standalone'</span> | <span class="hljs-string">'inline'</span> }[];
 }
 </code></pre>
 
@@ -172,6 +173,12 @@ an empty resolved target is just as unusable as an explicitly missing one.</p>
             <span class="hljs-keyword">if</span> (!screen &amp;&amp; (segment.<span class="hljs-property">resolution</span>.<span class="hljs-property">kind</span> !== <span class="hljs-string">'resolved'</span> || !segment.<span class="hljs-property">resolution</span>.<span class="hljs-property">target</span>)) {
                 <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Publication reference target is missing: '</span> + segment.<span class="hljs-property">name</span>);
             }
+            <span class="hljs-keyword">if</span> (!segment.<span class="hljs-property">occurrenceTarget</span>) {
+                <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Publication reference occurrence target is missing: '</span> + segment.<span class="hljs-property">name</span>);
+            }
+            <span class="hljs-keyword">if</span> (segment.<span class="hljs-property">placement</span> !== <span class="hljs-string">'standalone'</span> &amp;&amp; segment.<span class="hljs-property">placement</span> !== <span class="hljs-string">'inline'</span>) {
+                <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Publication reference placement is invalid: '</span> + segment.<span class="hljs-property">name</span>);
+            }
             <span class="hljs-keyword">if</span> (segment.<span class="hljs-property">start</span> !== rawOffset || segment.<span class="hljs-property">end</span> + (segment.<span class="hljs-property">modifier</span>?.<span class="hljs-property">length</span> || <span class="hljs-number">0</span>) !== rawOffset + text.<span class="hljs-property">length</span>) {
                 <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Publication reference offsets do not match segment text'</span>);
             }
@@ -186,7 +193,8 @@ instead defines the new coordinate space. No syntax decision affects this map.</
 <div class="code">
 <pre><code>            <span class="hljs-keyword">if</span> (segment.<span class="hljs-property">resolution</span>.<span class="hljs-property">kind</span> === <span class="hljs-string">'resolved'</span>) {
                 references.<span class="hljs-title">push</span>({ <span class="hljs-attr">start</span>: offset, <span class="hljs-attr">end</span>: offset + text.<span class="hljs-property">length</span>,
-                    <span class="hljs-attr">name</span>: segment.<span class="hljs-property">name</span>, <span class="hljs-attr">target</span>: segment.<span class="hljs-property">resolution</span>.<span class="hljs-property">target</span> });
+                    <span class="hljs-attr">name</span>: segment.<span class="hljs-property">name</span>, <span class="hljs-attr">target</span>: segment.<span class="hljs-property">resolution</span>.<span class="hljs-property">target</span>,
+                    <span class="hljs-attr">occurrenceTarget</span>: segment.<span class="hljs-property">occurrenceTarget</span>, <span class="hljs-attr">placement</span>: segment.<span class="hljs-property">placement</span> });
             }
         }
         chunks.<span class="hljs-title">push</span>(text);

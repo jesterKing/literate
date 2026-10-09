@@ -107,15 +107,18 @@ export interface PublicationContribution {
 Content and segment text retain Markdown-normalized code, including escapes.
 Joining segment text reconstructs content exactly. Reference offsets are UTF-16
 positions within that content; `end` excludes any definition operator, matching
-the scanner. Reference text includes that operator when present. Source locations
-are zero-based UTF-16 coordinates, not visual columns. A missing target is data,
-not a new diagnostic; expansion remains responsible for validation.
+the scanner. Reference text includes that operator when present. Each reference
+has a stable occurrence target within its accepted contribution and records whether
+it occupies a line by itself, apart from spaces or tabs. Source locations are
+zero-based UTF-16 coordinates, not visual columns. A missing target is data, not a
+new diagnostic; expansion remains responsible for validation.
 
 ```ts : <<engine interfaces and dependencies>>=+
 export type PublicationSegment =
     | { kind: 'text'; text: string }
     | { kind: 'reference'; text: string; name: string;
         start: number; end: number; at: PublicationLocation; modifier?: string;
+        occurrenceTarget: string; placement: 'standalone' | 'inline';
         resolution: { kind: 'resolved'; target: string } | { kind: 'missing' } };
 ```
 
@@ -898,6 +901,7 @@ for (const { header, part, tokenIndex } of accepted) {
     contributionOrdinals.set(key, ordinal);
     const target = 'c-' + key + '-' + ordinal;
     const segments: PublicationSegment[] = [];
+    let referenceOrdinal = 0;
     <<engine segment publication content>>
     publication.contributions.push({
         target, fragmentTarget: family.target, kind: header.append ? 'append' : 'definition',
@@ -912,18 +916,27 @@ for (const { header, part, tokenIndex } of accepted) {
 Segment the original normalized body before unescaping or highlighting. The
 shared scanner excludes escaped openers. Operators belong to reference text,
 while `end` retains the scanner's tag-only boundary; advancing past the operator
-prevents duplicating it in the next literal segment. Empty bodies need no segments.
+prevents duplicating it in the next literal segment. A reference is standalone
+only when spaces or tabs are its sole companions on the line. Its one-based
+ordinal is local to the accepted contribution, so prose and line-number changes do
+not alter its identity. Empty bodies need no segments.
 
 ```ts : <<engine segment publication content>>=
 let cursor = 0;
 for (const { name, start, end, modifier, at } of references(part)) {
     if (start > cursor) { segments.push({ kind: 'text', text: part.content.slice(cursor, start) }); }
-    const target = publicationFamilies.get(name)?.target;
+    const familyTarget = publicationFamilies.get(name)?.target;
     const textEnd = end + (modifier?.length || 0);
+    const lineStart = part.content.lastIndexOf('\n', start - 1) + 1;
+    const newline = part.content.indexOf('\n', textEnd);
+    const lineEnd = newline < 0 ? part.content.length : newline;
+    const placement = /^[ \t]*$/.test(part.content.slice(lineStart, start)) &&
+        /^[ \t]*$/.test(part.content.slice(textEnd, lineEnd)) ? 'standalone' : 'inline';
     segments.push({
         kind: 'reference', text: part.content.slice(start, textEnd), name, start, end, at,
+        occurrenceTarget: `${target}-r-${++referenceOrdinal}`, placement,
         ...(modifier === undefined ? {} : { modifier }),
-        resolution: target === undefined ? { kind: 'missing' } : { kind: 'resolved', target }
+        resolution: familyTarget === undefined ? { kind: 'missing' } : { kind: 'resolved', target: familyTarget }
     });
     cursor = textEnd;
 }

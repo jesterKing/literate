@@ -236,9 +236,11 @@ No Markdown tokens or renderer-specific destinations cross this boundary.</p>
 </div><p>Content and segment text retain Markdown-normalized code, including escapes.
 Joining segment text reconstructs content exactly. Reference offsets are UTF-16
 positions within that content; <code>end</code> excludes any definition operator, matching
-the scanner. Reference text includes that operator when present. Source locations
-are zero-based UTF-16 coordinates, not visual columns. A missing target is data,
-not a new diagnostic; expansion remains responsible for validation.</p>
+the scanner. Reference text includes that operator when present. Each reference
+has a stable occurrence target within its accepted contribution and records whether
+it occupies a line by itself, apart from spaces or tabs. Source locations are
+zero-based UTF-16 coordinates, not visual columns. A missing target is data, not a
+new diagnostic; expansion remains responsible for validation.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-4"><a class="literate-tag-name" href="#f-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073" data-literate-target="f-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073" aria-label="Definition of engine interfaces and dependencies">&lt;&lt;engine interfaces and dependencies&gt;&gt;=+</a></div>
 <div class="code">
@@ -246,6 +248,7 @@ not a new diagnostic; expansion remains responsible for validation.</p>
     | { <span class="hljs-attr">kind</span>: <span class="hljs-string">'text'</span>; <span class="hljs-attr">text</span>: <span class="hljs-built_in">string</span> }
     | { <span class="hljs-attr">kind</span>: <span class="hljs-string">'reference'</span>; <span class="hljs-attr">text</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>;
         <span class="hljs-attr">start</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">end</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">at</span>: <span class="hljs-title">PublicationLocation</span>; modifier?: <span class="hljs-built_in">string</span>;
+        <span class="hljs-attr">occurrenceTarget</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">placement</span>: <span class="hljs-string">'standalone'</span> | <span class="hljs-string">'inline'</span>;
         <span class="hljs-attr">resolution</span>: { <span class="hljs-attr">kind</span>: <span class="hljs-string">'resolved'</span>; <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span> } | { <span class="hljs-attr">kind</span>: <span class="hljs-string">'missing'</span> } };
 </code></pre>
 
@@ -1077,6 +1080,7 @@ unambiguous counter keys. Rejected declarations cannot consume ordinals.</p>
     contributionOrdinals.<span class="hljs-title">set</span>(key, ordinal);
     <span class="hljs-keyword">const</span> target = <span class="hljs-string">'c-'</span> + key + <span class="hljs-string">'-'</span> + ordinal;
     <span class="hljs-keyword">const</span> <span class="hljs-attr">segments</span>: <span class="hljs-title">PublicationSegment</span>[] = [];
+    <span class="hljs-keyword">let</span> referenceOrdinal = <span class="hljs-number">0</span>;
     <span data-literate-explore="f-0065006e00670069006e00650020007300650067006d0065006e00740020007000750062006c00690063006100740069006f006e00200063006f006e00740065006e0074"><a class="literate-tag-name" href="#f-0065006e00670069006e00650020007300650067006d0065006e00740020007000750062006c00690063006100740069006f006e00200063006f006e00740065006e0074" data-literate-target="f-0065006e00670069006e00650020007300650067006d0065006e00740020007000750062006c00690063006100740069006f006e00200063006f006e00740065006e0074" aria-label="Definition of engine segment publication content">&lt;&lt;engine segment publication content&gt;&gt;</a></span>
     publication.<span class="hljs-property">contributions</span>.<span class="hljs-title">push</span>({
         target, <span class="hljs-attr">fragmentTarget</span>: family.<span class="hljs-property">target</span>, <span class="hljs-attr">kind</span>: header.<span class="hljs-property">append</span> ? <span class="hljs-string">'append'</span> : <span class="hljs-string">'definition'</span>,
@@ -1092,19 +1096,28 @@ unambiguous counter keys. Rejected declarations cannot consume ordinals.</p>
 </div><p>Segment the original normalized body before unescaping or highlighting. The
 shared scanner excludes escaped openers. Operators belong to reference text,
 while <code>end</code> retains the scanner's tag-only boundary; advancing past the operator
-prevents duplicating it in the next literal segment. Empty bodies need no segments.</p>
+prevents duplicating it in the next literal segment. A reference is standalone
+only when spaces or tabs are its sole companions on the line. Its one-based
+ordinal is local to the accepted contribution, so prose and line-number changes do
+not alter its identity. Empty bodies need no segments.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0065006e00670069006e00650020007300650067006d0065006e00740020007000750062006c00690063006100740069006f006e00200063006f006e00740065006e0074-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-1"><span id="f-0065006e00670069006e00650020007300650067006d0065006e00740020007000750062006c00690063006100740069006f006e00200063006f006e00740065006e0074"></span><a class="literate-tag-name" href="#f-0065006e00670069006e00650020007300650067006d0065006e00740020007000750062006c00690063006100740069006f006e00200063006f006e00740065006e0074" data-literate-target="f-0065006e00670069006e00650020007300650067006d0065006e00740020007000750062006c00690063006100740069006f006e00200063006f006e00740065006e0074" aria-label="Definition of engine segment publication content">&lt;&lt;engine segment publication content&gt;&gt;=</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">let</span> cursor = <span class="hljs-number">0</span>;
 <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> { name, start, end, modifier, at } <span class="hljs-keyword">of</span> <span class="hljs-title">references</span>(part)) {
     <span class="hljs-keyword">if</span> (start &gt; cursor) { segments.<span class="hljs-title">push</span>({ <span class="hljs-attr">kind</span>: <span class="hljs-string">'text'</span>, <span class="hljs-attr">text</span>: part.<span class="hljs-property">content</span>.<span class="hljs-title">slice</span>(cursor, start) }); }
-    <span class="hljs-keyword">const</span> target = publicationFamilies.<span class="hljs-title">get</span>(name)?.<span class="hljs-property">target</span>;
+    <span class="hljs-keyword">const</span> familyTarget = publicationFamilies.<span class="hljs-title">get</span>(name)?.<span class="hljs-property">target</span>;
     <span class="hljs-keyword">const</span> textEnd = end + (modifier?.<span class="hljs-property">length</span> || <span class="hljs-number">0</span>);
+    <span class="hljs-keyword">const</span> lineStart = part.<span class="hljs-property">content</span>.<span class="hljs-title">lastIndexOf</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>, start - <span class="hljs-number">1</span>) + <span class="hljs-number">1</span>;
+    <span class="hljs-keyword">const</span> newline = part.<span class="hljs-property">content</span>.<span class="hljs-title">indexOf</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>, textEnd);
+    <span class="hljs-keyword">const</span> lineEnd = newline &lt; <span class="hljs-number">0</span> ? part.<span class="hljs-property">content</span>.<span class="hljs-property">length</span> : newline;
+    <span class="hljs-keyword">const</span> placement = <span class="hljs-regexp">/^</span><span class="hljs-regexp">[ </span><span class="hljs-regexp">\t</span><span class="hljs-regexp">]</span><span class="hljs-regexp">*$/</span>.<span class="hljs-title">test</span>(part.<span class="hljs-property">content</span>.<span class="hljs-title">slice</span>(lineStart, start)) &amp;&amp;
+        <span class="hljs-regexp">/^</span><span class="hljs-regexp">[ </span><span class="hljs-regexp">\t</span><span class="hljs-regexp">]</span><span class="hljs-regexp">*$/</span>.<span class="hljs-title">test</span>(part.<span class="hljs-property">content</span>.<span class="hljs-title">slice</span>(textEnd, lineEnd)) ? <span class="hljs-string">'standalone'</span> : <span class="hljs-string">'inline'</span>;
     segments.<span class="hljs-title">push</span>({
         <span class="hljs-attr">kind</span>: <span class="hljs-string">'reference'</span>, <span class="hljs-attr">text</span>: part.<span class="hljs-property">content</span>.<span class="hljs-title">slice</span>(start, textEnd), name, start, end, at,
+        <span class="hljs-attr">occurrenceTarget</span>: <span class="hljs-string">`</span><span class="hljs-subst">${target}</span><span class="hljs-string">-r-</span><span class="hljs-subst">${++referenceOrdinal}</span><span class="hljs-string">`</span>, placement,
         ...(modifier === <span class="hljs-literal">undefined</span> ? {} : { modifier }),
-        <span class="hljs-attr">resolution</span>: target === <span class="hljs-literal">undefined</span> ? { <span class="hljs-attr">kind</span>: <span class="hljs-string">'missing'</span> } : { <span class="hljs-attr">kind</span>: <span class="hljs-string">'resolved'</span>, target }
+        <span class="hljs-attr">resolution</span>: familyTarget === <span class="hljs-literal">undefined</span> ? { <span class="hljs-attr">kind</span>: <span class="hljs-string">'missing'</span> } : { <span class="hljs-attr">kind</span>: <span class="hljs-string">'resolved'</span>, <span class="hljs-attr">target</span>: familyTarget }
     });
     cursor = textEnd;
 }

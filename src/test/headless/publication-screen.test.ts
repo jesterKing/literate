@@ -135,6 +135,10 @@ for (const prefix of ['', 'Inserted prose.\n\n']) {
             }
             const model = parsed.publication, refs = references(model);
             assert.deepEqual(refs.map(ref => ref.name), ['a/b', 'a-b', 'a/b']);
+            assert.equal(new Set(refs.map(ref => ref.occurrenceTarget)).size, refs.length);
+            assert.deepEqual(refs.map(ref => ref.placement), ['inline', 'inline', 'inline']);
+            assert.deepEqual(refs.map(ref => ref.occurrenceTarget),
+                references(parseProject(documents()).publication).map(ref => ref.occurrenceTarget));
             for (const ref of refs) {
                 const family = model.fragments.find(value => value.name === ref.name)!;
                 assert.deepEqual(ref.resolution, { kind: 'resolved', target: family.target });

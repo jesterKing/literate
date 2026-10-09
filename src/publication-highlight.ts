@@ -7,7 +7,8 @@ export interface SyntaxSpan { start: number; end: number; scope: string; }
 export interface HighlightedContribution {
     text: string;
     spans: SyntaxSpan[];
-    references: { start: number; end: number; name: string; target: string }[];
+    references: { start: number; end: number; name: string; target: string;
+        occurrenceTarget: string; placement: 'standalone' | 'inline' }[];
 }
 function displayContribution(part: PublicationContribution, screen: boolean): HighlightedContribution {
     const chunks: string[] = [];
@@ -24,12 +25,19 @@ function displayContribution(part: PublicationContribution, screen: boolean): Hi
             if (!screen && (segment.resolution.kind !== 'resolved' || !segment.resolution.target)) {
                 throw new Error('Publication reference target is missing: ' + segment.name);
             }
+            if (!segment.occurrenceTarget) {
+                throw new Error('Publication reference occurrence target is missing: ' + segment.name);
+            }
+            if (segment.placement !== 'standalone' && segment.placement !== 'inline') {
+                throw new Error('Publication reference placement is invalid: ' + segment.name);
+            }
             if (segment.start !== rawOffset || segment.end + (segment.modifier?.length || 0) !== rawOffset + text.length) {
                 throw new Error('Publication reference offsets do not match segment text');
             }
             if (segment.resolution.kind === 'resolved') {
                 references.push({ start: offset, end: offset + text.length,
-                    name: segment.name, target: segment.resolution.target });
+                    name: segment.name, target: segment.resolution.target,
+                    occurrenceTarget: segment.occurrenceTarget, placement: segment.placement });
             }
         }
         chunks.push(text);
