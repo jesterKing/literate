@@ -98,6 +98,22 @@ test('LaTeX fits both dimensions, measures escaped captions, and honors all marg
         assert.ok(result.latex!.includes(expected), expected);
     }
 });
+test('LaTeX preserves Mermaid natural size and only shrinks at page bounds', async () => {
+    const project = parseProject([{ path: 'book.literate', text:
+        '```mermaid\nflowchart TD\nA --> B\n```' }]);
+    const file = `lit-assets-${'a'.repeat(64)}/${'b'.repeat(64)}.pdf`;
+    const result = await renderLatex(project, { assetPath: () => file }, async doc => raw(doc.blocks));
+    assert.deepEqual(result.diagnostics, []);
+    for (const expected of [`\\LitDiagram{${file}}`,
+        '\\sbox{\\LitDiagramBox}{\\includegraphics{#1}}',
+        '\\ifdim\\wd\\LitDiagramBox>\\linewidth',
+        '\\includegraphics[width=\\linewidth]{#1}',
+        '\\ifdim\\dimexpr\\ht\\LitDiagramBox+\\dp\\LitDiagramBox\\relax>\\LitDiagramHeight',
+        '\\includegraphics[height=\\LitDiagramHeight]{#1}']) {
+        assert.ok(result.latex!.includes(expected), expected);
+    }
+    assert.ok(!result.latex!.includes(`\\LitImage{${file}}`));
+});
 test('LaTeX escapes decoded caption entities and punctuation exactly once', async () => {
     const project = parseProject([{ path: 'book.literate',
         text: String.raw`![A &amp; B \*star\* \_name\_ \{value\} 100%](a.pdf)` }]);

@@ -63,29 +63,39 @@ test('diagram planner retains PDF and SVG once, resolves every occurrence and pr
     const requests = [asset(), asset(source, 10), { ...asset('a.pdf'), kind: 'image' as const }];
     const result = await planAssets(requests, 'book/book.tex', {
         async requireFile() {}, async read() { return bytes.pdf; }
-    }, assets => renderer(assets, 'rosepine-dawn'));
+    }, assets => renderer(assets, { theme: 'rosepine-dawn', fontSize: 16 }));
     assert.equal(result.files.length, 2); // PDF content also deduplicates against the local PDF.
     assert.deepEqual(result.inputs, ['a.pdf']); assert.equal(result.paths.size, 2);
     assert.ok(result.files.some(file => file.path.endsWith('.svg')));
 });
 test('no diagram means no executable lookup, worker call or browser requirement', async () => {
-    assert.deepEqual(await renderDiagrams([], 'invalid', undefined, async () => assert.fail()), new Map());
+    assert.deepEqual(await renderDiagrams([], { theme: 'invalid', fontSize: 16 },
+        async () => assert.fail()), new Map());
 });
 test('missing browser, nonexistent executable, invalid theme and request limits fail before the worker', async () => {
     const worker = async () => assert.fail('worker must not start');
-    await assert.rejects(renderDiagrams([asset()], 'rosepine-dawn', undefined, worker), /--browser.*No browser is downloaded/);
-    await assert.rejects(renderDiagrams([asset()], 'rosepine-dawn', '/nonexistent/literate-chromium', worker), /Cannot execute/);
-    await assert.rejects(renderDiagrams([asset()], 'invalid', process.execPath, worker), /Unknown.*theme/);
+    await assert.rejects(renderDiagrams([asset()], { theme: 'rosepine-dawn', fontSize: 16 }, worker),
+        /--browser.*No browser is downloaded/);
+    await assert.rejects(renderDiagrams([asset()], { theme: 'rosepine-dawn', fontSize: 16,
+        executable: '/nonexistent/literate-chromium' }, worker), /Cannot execute/);
+    await assert.rejects(renderDiagrams([asset()], { theme: 'invalid', fontSize: 16,
+        executable: process.execPath }, worker), /Unknown.*theme/);
+    for (const fontSize of [7.99, 48.01, NaN, Infinity]) {
+        await assert.rejects(renderDiagrams([asset()], { theme: 'rosepine-dawn', fontSize,
+            executable: process.execPath }, worker), /font size.*8.*48/);
+    }
     await assert.rejects(renderDiagrams(Array.from({ length: diagramLimits.count + 1 }, (_, i) => asset(source + i)),
-        'rosepine-dawn', process.execPath, worker), new RegExp(`${diagramLimits.count} unique`));
-    await assert.rejects(renderDiagrams([asset('%%{init:{}}%%')], 'rosepine-dawn', process.execPath, worker), /chapter.literate:3/);
+        { theme: 'rosepine-dawn', fontSize: 16, executable: process.execPath }, worker),
+        new RegExp(`${diagramLimits.count} unique`));
+    await assert.rejects(renderDiagrams([asset('%%{init:{}}%%')], { theme: 'rosepine-dawn',
+        fontSize: 16, executable: process.execPath }, worker), /chapter.literate:3/);
 });
 test('latched cancellation is checked at entry, even without diagrams', async () => {
     const cancellation = new Error('publication interrupted');
     const checkCancelled = (): void => { throw cancellation; };
     for (const assets of [[], [asset()]]) {
-        await assert.rejects(renderDiagrams(assets, 'invalid', undefined,
-            async () => assert.fail('worker must not start'), checkCancelled), error => error === cancellation);
+        await assert.rejects(renderDiagrams(assets, { theme: 'invalid', fontSize: 16,
+            checkCancelled }, async () => assert.fail('worker must not start')), error => error === cancellation);
     }
 });
 for (const stage of ['stat', 'access', 'mkdtemp', 'writeFile', 'worker', 'lstat', 'readFile']) {
@@ -114,7 +124,8 @@ for (const stage of ['stat', 'access', 'mkdtemp', 'writeFile', 'worker', 'lstat'
             const asset = ${JSON.stringify(asset())};
             (async () => {
                 try {
-                    await assert.rejects(renderDiagrams([asset], 'rosepine-dawn', process.execPath,
+                    await assert.rejects(renderDiagrams([asset], { theme: 'rosepine-dawn', fontSize: 16,
+                        executable: process.execPath, checkCancelled: () => { if (cancelled) { throw cancellation; } } },
                         async directory => {
                             workers++;
                             assert.equal(cancelled, false, 'cancelled preparation must not spawn a worker');
@@ -122,7 +133,7 @@ for (const stage of ['stat', 'access', 'mkdtemp', 'writeFile', 'worker', 'lstat'
                             fs.writeFileSync(path.join(directory, '0.pdf'), '%PDF-1.4');
                             fs.writeFileSync(path.join(directory, '0.svg'), '<svg/>');
                             if (stage === 'worker') { cancelled = true; }
-                        }, () => { if (cancelled) { throw cancellation; } }), error => error === cancellation);
+                        }), error => error === cancellation);
                     const steps = ['stat', 'access', 'mkdtemp', 'writeFile', 'worker', 'lstat', 'readFile'];
                     assert.deepEqual(calls, steps.slice(0, steps.indexOf(stage) + 1));
                     assert.equal(workers, steps.indexOf(stage) >= steps.indexOf('worker') ? 1 : 0);
@@ -138,11 +149,12 @@ for (const stage of ['stat', 'access', 'mkdtemp', 'writeFile', 'worker', 'lstat'
 for (const mode of ['success', 'worker-failure', 'missing', 'symlink', 'oversized', 'signature']) {
     test(`controller cleans its private directory on ${mode}`, async () => {
         let scratch = '', calls = 0;
-        const promise = renderDiagrams([asset(), asset(source, 10)], 'rosepine-dawn', process.execPath, async directory => {
+        const promise = renderDiagrams([asset(), asset(source, 10)], { theme: 'rosepine-dawn',
+            fontSize: 17.5, executable: process.execPath }, async directory => {
             scratch = directory; calls++;
             assert.equal(fs.statSync(directory).mode & 0o777, 0o700);
             const request = JSON.parse(fs.readFileSync(path.join(directory, 'request.json'), 'utf8'));
-            assert.deepEqual(request.sources, [source]);
+            assert.deepEqual(request, { sources: [source], theme: 'rosepine-dawn', fontSize: 17.5 });
             if (mode === 'worker-failure') { throw new Error('Diagram 1: injected browser failure'); }
             write(directory, '0.pdf', mode === 'signature' ? 'wrong' : bytes.pdf);
             if (mode !== 'missing') { write(directory, '0.svg', bytes.svg); }
@@ -222,6 +234,13 @@ test('SVG policy allows only local fragment references and pads measured bounds'
     });
     assert.equal(result.width, 416); assert.equal(result.height, 216);
 });
+test('worker configuration applies the trusted diagram font size without changing the palette', () => {
+    const small = worker.configuration('rosepine-dawn', 12.5, 'seed');
+    const large = worker.configuration('rosepine-dawn', 24, 'seed');
+    assert.equal(small.themeVariables.fontSize, '12.5px');
+    assert.equal(large.themeVariables.fontSize, '24px');
+    assert.equal(small.themeVariables.background, large.themeVariables.background);
+});
 test('renderer closes contexts on invalid diagrams and surfaces close failure', async () => {
     for (const closeFails of [false, true]) {
         let closed = 0;
@@ -231,7 +250,8 @@ test('renderer closes contexts on invalid diagrams and surfaces close failure', 
         const browser = { async createBrowserContext() { return { async newPage() { return page; }, async close() {
             closed++; if (closeFails) { throw new Error('context close failed'); }
         } }; } };
-        await assert.rejects(worker.renderVector(browser, source, 'rosepine-dawn', ''), closeFails ? /context close failed/ : /invalid diagram/);
+        await assert.rejects(worker.renderVector(browser, source, 'rosepine-dawn', 16, ''),
+            closeFails ? /context close failed/ : /invalid diagram/);
         assert.equal(closed, 1);
     }
 });
@@ -245,9 +265,17 @@ test('owned launcher reports spawn failure without leaking an endpoint timer', a
     await assert.rejects(worker.connectOwnedBrowser({ async defaultArgs() { return ['--user-data-dir=/private/profile']; } },
         { executablePath: '/missing/chromium', args: [], userDataDir: '/private/profile' }), /ENOENT/);
 });
+test('worker rejects missing, nonnumeric and out-of-range diagram font sizes before launch', async t => {
+    const directory = fixture(t);
+    for (const fontSize of [undefined, '16', 7.99, 48.01, null]) {
+        write(directory, 'request.json', JSON.stringify({ sources: [source], theme: 'rosepine-dawn', fontSize }));
+        await assert.rejects(worker.browserBatch(directory, '/explicit/chromium',
+            async () => assert.fail('browser must not launch')), /Invalid Mermaid worker request/);
+    }
+});
 test('launch adapter gets only fixed sandbox-enabled options and closes the browser on render failure', async t => {
     const directory = fixture(t); let closed = 0;
-    write(directory, 'request.json', JSON.stringify({ sources: [source], theme: 'rosepine-dawn' }));
+    write(directory, 'request.json', JSON.stringify({ sources: [source], theme: 'rosepine-dawn', fontSize: 16 }));
     await assert.rejects(worker.browserBatch(directory, '/explicit/chromium', async (options: { executablePath: string; args: string[]; userDataDir: string }) => {
         assert.equal(options.executablePath, '/explicit/chromium');
         assert.equal(options.userDataDir, path.join(directory, 'profile'));

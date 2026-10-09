@@ -76,8 +76,10 @@ test('inline spaces remain explicit and breakable after Markdown whitespace norm
 test('template identifies its contract and keeps fenced/reference wrapping and default fonts', async () => {
     const { document, latex } = await capture('`InlineCode`\n\n```js\nconst fenced = "' + path + '";\n```\n\n' +
         '```js : <<Caller>>=\n<<Shared>>\n```\n\n```js : <<Shared>>=\nconst shared = 1;\n```');
-    assert.equal(publicationTemplateVersion, 1);
-    assert.ok(latex.startsWith('% Literate publication template v1\n'));
+    assert.equal(publicationTemplateVersion, 2);
+    assert.ok(latex.startsWith('% Literate publication template v2\n'));
+    assert.ok(latex.includes('\\documentclass[fontsize=11pt,oneside,openany]{scrbook}'));
+    assert.ok(latex.includes('\\newcommand{\\LitCodeSize}{\\fontsize{10pt}{12pt}\\selectfont}'));
     assert.ok(latex.includes('\\DeclareRobustCommand{\\LitInlineCode}[1]{\\texttt{#1}}'));
 
     assert.ok(latex.includes('\\setlength{\\emergencystretch}{3em}'));

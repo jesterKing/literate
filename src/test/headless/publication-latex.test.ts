@@ -44,10 +44,20 @@ test('LaTeX defaults are borderless, ligature-enabled and use native Lilex style
     assert.deepEqual(result.diagnostics, []);
     for (const expected of ['a4paper,margin=20mm', 'Latin Modern Roman', 'Monofur Nerd Font',
         'Lilex Nerd Font', 'Ligatures=Common,Contextuals=Alternate',
+        'fontsize=11pt', '\\fontsize{10pt}{12pt}\\selectfont',
         'frame=none', '\\FancyVerbBreakStart#4\\FancyVerbBreakStop', 'breakanywheresymbolpre={}']) {
         assert.ok(result.latex?.includes(expected), expected);
     }
     assert.doesNotMatch(result.latex!, /Path=|\/home\/|RawFeature=\{-calt|FakeSlant|FakeBold|ItalicFont=/);
+});
+
+test('root settings independently select body and block-code point sizes', async () => {
+    const project = parseProject([{ path: 'index.literate', text:
+        '```SETTINGS\nfont-size-body=12.5\nfont-size-code=8.25\n```\n# Book\n' }]);
+    const result = await renderLatex(project, {}, convert);
+    assert.deepEqual(result.diagnostics, []);
+    assert.ok(result.latex!.includes('\\documentclass[fontsize=12.5pt,oneside,openany]{scrbook}'));
+    assert.ok(result.latex!.includes('\\fontsize{8.25pt}{9.9pt}\\selectfont'));
 });
 
 test('LaTeX links full hanging names, distinct contribution labels and navigation', async () => {

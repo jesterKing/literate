@@ -134,9 +134,10 @@ has no browser downloader. Its Node requirement belongs to this CLI feature,
 not to the extension's runtime. A separate process keeps its ESM dependencies
 and browser lifecycle outside normal generation and editor activation.</p>
 <h2>Bounded requests</h2>
-<p>Only the source text and a catalogue theme cross the worker boundary. Source
-locations remain in the controller, where failures can identify the chapter.
-The adapter contract returns bytes, never destinations or writes to the project.</p>
+<p>Only the source text, catalogue theme, and validated diagram font size cross the
+worker boundary. Source locations remain in the controller, where failures can
+identify the chapter. The adapter contract returns bytes, never destinations or
+writes to the project.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-004d00650072006d00610069006400200063006f006e00740072006f006c006c0065007200200069006d0070006f007200740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d00610069006400200063006f006e00740072006f006c006c0065007200200069006d0070006f007200740073"></span><a class="literate-tag-name" href="#f-004d00650072006d00610069006400200063006f006e00740072006f006c006c0065007200200069006d0070006f007200740073" data-literate-target="f-004d00650072006d00610069006400200063006f006e00740072006f006c006c0065007200200069006d0070006f007200740073" aria-label="Definition of Mermaid controller imports">&lt;&lt;Mermaid controller imports&gt;&gt;=</a></div>
 <div class="code">
@@ -146,10 +147,17 @@ The adapter contract returns bytes, never destinations or writes to the project.
 <span class="hljs-keyword">import</span> { tmpdir } <span class="hljs-keyword">from</span> <span class="hljs-string">'os'</span>;
 <span class="hljs-keyword">import</span> { spawn } <span class="hljs-keyword">from</span> <span class="hljs-string">'child_process'</span>;
 <span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">PublicationAsset</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-pandoc'</span>;
+<span class="hljs-keyword">import</span> { publicationFontSizeBounds } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-settings'</span>;
 <span class="hljs-keyword">import</span> { getTheme } <span class="hljs-keyword">from</span> <span class="hljs-string">'./themes'</span>;
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">DiagramBytes</span> { <span class="hljs-attr">pdf</span>: <span class="hljs-title">Uint8Array</span>; <span class="hljs-attr">svg</span>: <span class="hljs-title">Uint8Array</span> }
-<span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title">DiagramRenderer</span> = <span class="hljs-function">(</span><span class="hljs-params">assets: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> PublicationAsset[], theme: </span><span class="hljs-built_in">string</span><span class="hljs-params">,
-    executable?: </span><span class="hljs-built_in">string</span><span class="hljs-params">, checkCancelled?: </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span><span class="hljs-function">) =&gt;</span> <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">DiagramBytes</span>&gt;&gt;;
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">DiagramRenderOptions</span> {
+    <span class="hljs-attr">theme</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">fontSize</span>: <span class="hljs-built_in">number</span>;
+    executable?: <span class="hljs-built_in">string</span>;
+    checkCancelled?: <span class="hljs-function">() =&gt;</span> <span class="hljs-built_in">void</span>;
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title">DiagramRenderer</span> = <span class="hljs-function">(</span><span class="hljs-params">assets: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> PublicationAsset[], options: DiagramRenderOptions</span><span class="hljs-function">) =&gt;</span>
+    <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">DiagramBytes</span>&gt;&gt;;
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">const</span> diagramLimits = { <span class="hljs-attr">count</span>: <span class="hljs-number">128</span>, <span class="hljs-attr">source</span>: <span class="hljs-number">50000</span>, <span class="hljs-attr">pdf</span>: <span class="hljs-number">16</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>,
     <span class="hljs-attr">svg</span>: <span class="hljs-number">4</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>, <span class="hljs-attr">total</span>: <span class="hljs-number">32</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>, <span class="hljs-attr">timeMs</span>: <span class="hljs-number">120000</span> };
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title">DiagramWorker</span> = <span class="hljs-function">(</span><span class="hljs-params">directory: </span><span class="hljs-built_in">string</span><span class="hljs-params">, executable: </span><span class="hljs-built_in">string</span><span class="hljs-function">) =&gt;</span> <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt;;
@@ -299,13 +307,13 @@ with the same browser, Mermaid version and installed diagram fonts.</p>
 <p>The executable must be an absolute path to a trusted, executable regular file.
 Symlinks at this explicit system-tool boundary are allowed, unlike project image
 paths. There is no PATH discovery, browser cache lookup, installation or sandbox
-fallback. Identical source strings render once for the selected theme.</p>
+fallback. Identical source strings render once for the selected theme and font size.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-004d00650072006d006100690064002000720065006e0064006500720069006e006700200072006500710075006500730074-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d006100690064002000720065006e0064006500720069006e006700200072006500710075006500730074"></span><a class="literate-tag-name" href="#f-004d00650072006d006100690064002000720065006e0064006500720069006e006700200072006500710075006500730074" data-literate-target="f-004d00650072006d006100690064002000720065006e0064006500720069006e006700200072006500710075006500730074" aria-label="Definition of Mermaid rendering request">&lt;&lt;Mermaid rendering request&gt;&gt;=</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">renderDiagrams</span>(<span class="hljs-params">assets: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> PublicationAsset[], theme: </span><span class="hljs-built_in">string</span><span class="hljs-params">,
-    executable?: </span><span class="hljs-built_in">string</span><span class="hljs-params">, worker: DiagramWorker = executeDiagramWorker,
-    checkCancelled?: </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">DiagramBytes</span>&gt;&gt; {
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">renderDiagrams</span>(<span class="hljs-params">assets: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> PublicationAsset[], options: DiagramRenderOptions,
+    worker: DiagramWorker = executeDiagramWorker</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">DiagramBytes</span>&gt;&gt; {
+    <span class="hljs-keyword">const</span> { theme, fontSize, executable, checkCancelled } = options;
     checkCancelled?.();
     <span class="hljs-keyword">const</span> sources = [...<span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>(assets.<span class="hljs-title">map</span>(<span class="hljs-params">asset</span><span class="hljs-function"> =&gt;</span> asset.<span class="hljs-property">source</span>))];
     <span class="hljs-keyword">if</span> (!sources.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>(); }
@@ -317,6 +325,10 @@ fallback. Identical source strings render once for the selected theme.</p>
         <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Publication exceeds </span><span class="hljs-subst">${diagramLimits.count}</span><span class="hljs-string"> unique Mermaid diagrams`</span>);
     }
     <span class="hljs-keyword">if</span> (!<span class="hljs-title">getTheme</span>(theme)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Unknown Mermaid publication theme'</span>); }
+    <span class="hljs-keyword">const</span> size = publicationFontSizeBounds.<span class="hljs-property">diagram</span>;
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">Number</span>.<span class="hljs-built_in">isFinite</span>(fontSize) || fontSize &lt; size.<span class="hljs-property">minimum</span> || fontSize &gt; size.<span class="hljs-property">maximum</span>) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Mermaid font size must be </span><span class="hljs-subst">${size.minimum}</span><span class="hljs-string">–</span><span class="hljs-subst">${size.maximum}</span><span class="hljs-string"> CSS pixels`</span>);
+    }
     <span class="hljs-keyword">if</span> (!executable || !path.<span class="hljs-title">isAbsolute</span>(executable) || <span class="hljs-regexp">/</span><span class="hljs-regexp">[</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">0000-</span><span class="hljs-regexp">\u</span><span class="hljs-regexp">001f]</span><span class="hljs-regexp">/</span>.<span class="hljs-title">test</span>(executable)) {
         <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Mermaid requires --browser /absolute/path/to/chromium; install a system browser explicitly. No browser is downloaded.'</span>);
     }
@@ -364,7 +376,7 @@ directory exists, cancellation always passes through its cleanup scope.</p>
 <pre><code><span class="hljs-keyword">const</span> directory = <span class="hljs-keyword">await</span> fs.<span class="hljs-title">mkdtemp</span>(path.<span class="hljs-title">join</span>(<span class="hljs-title">tmpdir</span>(), <span class="hljs-string">'literate-mermaid-'</span>));
 <span class="hljs-keyword">try</span> {
     checkCancelled?.();
-    <span class="hljs-keyword">await</span> fs.<span class="hljs-title">writeFile</span>(path.<span class="hljs-title">join</span>(directory, <span class="hljs-string">'request.json'</span>), <span class="hljs-title">JSON</span>.<span class="hljs-title">stringify</span>({ sources, theme }), { <span class="hljs-attr">mode</span>: <span class="hljs-number">0o600</span> });
+    <span class="hljs-keyword">await</span> fs.<span class="hljs-title">writeFile</span>(path.<span class="hljs-title">join</span>(directory, <span class="hljs-string">'request.json'</span>), <span class="hljs-title">JSON</span>.<span class="hljs-title">stringify</span>({ sources, theme, fontSize }), { <span class="hljs-attr">mode</span>: <span class="hljs-number">0o600</span> });
     checkCancelled?.();
     <span class="hljs-keyword">try</span> { <span class="hljs-keyword">await</span> <span class="hljs-title">worker</span>(directory, executable); }
     <span class="hljs-keyword">catch</span> (error) {

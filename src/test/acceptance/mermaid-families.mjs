@@ -23,7 +23,8 @@ const report = { browser, bundleInputs: inputs, passed: [], failed: {} };
 for (const [family, source] of Object.entries(fixtures)) {
     try {
         const result = await renderDiagrams([{ kind: 'mermaid', source, caption: '',
-            at: { path: family + '.literate', line: 0, column: 0 } }], 'rosepine-dawn', browser);
+            at: { path: family + '.literate', line: 0, column: 0 } }],
+            { theme: 'rosepine-dawn', fontSize: 16, executable: browser });
         const bytes = result.get(source);
         await fs.writeFile(path.join(root, family + '.pdf'), bytes.pdf);
         await fs.writeFile(path.join(root, family + '.svg'), bytes.svg);

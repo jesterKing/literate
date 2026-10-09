@@ -7,8 +7,19 @@ export interface PublicationFonts {
     fragment: string;
     note: string;
 }
+export interface PublicationFontSizes {
+    body: number;
+    code: number;
+    diagram: number;
+}
+export const publicationFontSizeBounds = {
+    body: { minimum: 8, maximum: 24, defaultValue: 11 },
+    code: { minimum: 6, maximum: 24, defaultValue: 10 },
+    diagram: { minimum: 8, maximum: 48, defaultValue: 16 }
+} as const;
 export interface PublicationSettingsResult {
     fonts: PublicationFonts;
+    fontSizes: PublicationFontSizes;
     codeLigatures: boolean;
     diagnostics: GenerationDiagnostic[];
 }
@@ -17,6 +28,11 @@ export function resolvePublicationSettings(project: ParsedProject): PublicationS
         body: 'Latin Modern Roman', heading: 'Monofur Nerd Font',
         code: 'Lilex Nerd Font', fragment: 'Monofur Nerd Font', note: ''
     };
+    const fontSizes: PublicationFontSizes = {
+        body: publicationFontSizeBounds.body.defaultValue,
+        code: publicationFontSizeBounds.code.defaultValue,
+        diagram: publicationFontSizeBounds.diagram.defaultValue
+    };
     let codeLigatures = true;
     let explicitNote = false;
     const diagnostics: GenerationDiagnostic[] = [];
@@ -24,7 +40,7 @@ export function resolvePublicationSettings(project: ParsedProject): PublicationS
     for (const token of document?.tokens ?? []) {
         if (token.type !== 'fence' || token.info.trim() !== 'SETTINGS') { continue; }
         token.content.split('\n').forEach((line: string, index: number) => {
-            const match = /^\s*(font-body|font-heading|font-code|font-fragment|font-note|font-code-ligatures)\s*=(.*)$/.exec(line);
+            const match = /^\s*(font-body|font-heading|font-code|font-fragment|font-note|font-code-ligatures|font-size-body|font-size-code|font-size-diagram)\s*=(.*)$/.exec(line);
             if (!match) { return; }
             const key = match[1];
             const value = match[2].trim();
@@ -35,6 +51,16 @@ export function resolvePublicationSettings(project: ParsedProject): PublicationS
             if (key === 'font-code-ligatures') {
                 if (value === 'on' || value === 'off') { codeLigatures = value === 'on'; }
                 else { report(`Invalid ${key}: expected on or off`); }
+            } else if (key.startsWith('font-size-')) {
+                const role = key.slice('font-size-'.length) as keyof PublicationFontSizes;
+                const bounds = publicationFontSizeBounds[role];
+                const size = /^\d+(?:\.\d{1,2})?$/.test(value) ? Number(value) : NaN;
+                if (Number.isFinite(size) && size >= bounds.minimum && size <= bounds.maximum) {
+                    fontSizes[role] = size;
+                } else {
+                    const unit = role === 'diagram' ? 'CSS pixels' : 'points';
+                    report(`Invalid ${key}: expected ${bounds.minimum}–${bounds.maximum} ${unit}`);
+                }
             } else if (/^[A-Za-z0-9][A-Za-z0-9 .-]{0,99}$/.test(value)) {
                 const role = key.slice(5) as keyof PublicationFonts;
                 fonts[role] = value;
@@ -45,5 +71,5 @@ export function resolvePublicationSettings(project: ParsedProject): PublicationS
         });
     }
     if (!explicitNote) { fonts.note = fonts.body; }
-    return { fonts, codeLigatures, diagnostics };
+    return { fonts, fontSizes, codeLigatures, diagnostics };
 }

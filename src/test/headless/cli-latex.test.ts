@@ -156,14 +156,16 @@ for (const [paper, margin] of [['a4', '50mm'], ['a5', '34mm'], ['letter', '5mm']
 test('latex applies asymmetric CLI margins with uniform fallback and root font settings', async t => {
     const root = fixture(t);
     write(root, 'index.literate', '```SETTINGS\nfont-body=Body Font\nfont-heading=Heading Font\n'
-        + 'font-code=Code Font\nfont-fragment=Fragment Font\nfont-note=Note Font\nfont-code-ligatures=off\n```\n' + source);
+        + 'font-code=Code Font\nfont-fragment=Fragment Font\nfont-note=Note Font\n'
+        + 'font-size-body=12.5\nfont-size-code=8.25\nfont-code-ligatures=off\n```\n' + source);
     write(root, 'chapter.literate', '```SETTINGS\nfont-code=bad/path\n```\n');
     const result = await command([...latex(root), '--paper', 'a5', '--margin', '22mm',
         '--margin-top', '18mm', '--margin-left', '20mm', '--margin-right', '16mm']);
     assert.equal(result.code, 0, failureText(result.response));
     const tex = fs.readFileSync(path.join(root, 'books/book.tex'), 'utf8');
     for (const value of ['a5paper,top=18mm,right=16mm,bottom=22mm,left=20mm',
-        'Body Font', 'Heading Font', 'Code Font', 'Fragment Font', 'Note Font', 'RawFeature={-calt}']) {
+        'Body Font', 'Heading Font', 'Code Font', 'Fragment Font', 'Note Font',
+        'fontsize=12.5pt', '\\fontsize{8.25pt}{9.9pt}\\selectfont', 'RawFeature={-calt}']) {
         assert.ok(tex.includes(value), value);
     }
 });

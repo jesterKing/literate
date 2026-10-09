@@ -4,10 +4,17 @@ import * as path from 'path';
 import { tmpdir } from 'os';
 import { spawn } from 'child_process';
 import type { PublicationAsset } from './publication-pandoc';
+import { publicationFontSizeBounds } from './publication-settings';
 import { getTheme } from './themes';
 export interface DiagramBytes { pdf: Uint8Array; svg: Uint8Array }
-export type DiagramRenderer = (assets: readonly PublicationAsset[], theme: string,
-    executable?: string, checkCancelled?: () => void) => Promise<Map<string, DiagramBytes>>;
+export interface DiagramRenderOptions {
+    theme: string;
+    fontSize: number;
+    executable?: string;
+    checkCancelled?: () => void;
+}
+export type DiagramRenderer = (assets: readonly PublicationAsset[], options: DiagramRenderOptions) =>
+    Promise<Map<string, DiagramBytes>>;
 export const diagramLimits = { count: 128, source: 50000, pdf: 16 * 1024 * 1024,
     svg: 4 * 1024 * 1024, total: 32 * 1024 * 1024, timeMs: 120000 };
 export type DiagramWorker = (directory: string, executable: string) => Promise<void>;
@@ -91,9 +98,9 @@ async function diagramArtifact(directory: string, index: number, format: 'pdf' |
     }
     return bytes;
 }
-export async function renderDiagrams(assets: readonly PublicationAsset[], theme: string,
-    executable?: string, worker: DiagramWorker = executeDiagramWorker,
-    checkCancelled?: () => void): Promise<Map<string, DiagramBytes>> {
+export async function renderDiagrams(assets: readonly PublicationAsset[], options: DiagramRenderOptions,
+    worker: DiagramWorker = executeDiagramWorker): Promise<Map<string, DiagramBytes>> {
+    const { theme, fontSize, executable, checkCancelled } = options;
     checkCancelled?.();
     const sources = [...new Set(assets.map(asset => asset.source))];
     if (!sources.length) { return new Map(); }
@@ -105,6 +112,10 @@ export async function renderDiagrams(assets: readonly PublicationAsset[], theme:
         throw new Error(`Publication exceeds ${diagramLimits.count} unique Mermaid diagrams`);
     }
     if (!getTheme(theme)) { throw new Error('Unknown Mermaid publication theme'); }
+    const size = publicationFontSizeBounds.diagram;
+    if (!Number.isFinite(fontSize) || fontSize < size.minimum || fontSize > size.maximum) {
+        throw new Error(`Mermaid font size must be ${size.minimum}–${size.maximum} CSS pixels`);
+    }
     if (!executable || !path.isAbsolute(executable) || /[\u0000-\u001f]/.test(executable)) {
         throw new Error('Mermaid requires --browser /absolute/path/to/chromium; install a system browser explicitly. No browser is downloaded.');
     }
@@ -124,7 +135,7 @@ export async function renderDiagrams(assets: readonly PublicationAsset[], theme:
     const directory = await fs.mkdtemp(path.join(tmpdir(), 'literate-mermaid-'));
     try {
         checkCancelled?.();
-        await fs.writeFile(path.join(directory, 'request.json'), JSON.stringify({ sources, theme }), { mode: 0o600 });
+        await fs.writeFile(path.join(directory, 'request.json'), JSON.stringify({ sources, theme, fontSize }), { mode: 0o600 });
         checkCancelled?.();
         try { await worker(directory, executable); }
         catch (error) {

@@ -8,7 +8,7 @@ import type { PandocDocument, PandocBlock, PublicationAsset } from './publicatio
 import { defaultThemeName, getTheme } from './themes';
 import type { LiterateTheme } from './themes';
 import { highlightContribution, syntaxStyle } from './publication-highlight';
-export const publicationTemplateVersion = 1;
+export const publicationTemplateVersion = 2;
 export interface LatexOptions {
     assetPath?: (asset: PublicationAsset) => string;
     theme?: string;
@@ -38,6 +38,7 @@ interface CheckedOptions {
     theme: LiterateTheme; paper: string; geometry: string;
     bodyFont: string; headingFont: string; codeFont: string;
     fragmentFont: string; noteFont: string; codeLigatures: boolean;
+    bodyFontSize: number; codeFontSize: number;
     portableFonts?: Record<string, PortableFont>;
 }
 function fontName(value: string): string {
@@ -69,6 +70,7 @@ function checkOptions(options: LatexOptions, settings: PublicationSettingsResult
     const codeLigatures = options.codeLigatures ?? settings.codeLigatures;
     if (typeof codeLigatures !== 'boolean') { throw new Error('Code ligatures must be boolean'); }
     return { theme, paper: paper[0], geometry, codeLigatures, portableFonts: options.portableFonts,
+        bodyFontSize: settings.fontSizes.body, codeFontSize: settings.fontSizes.code,
         bodyFont: fontName(options.bodyFont ?? settings.fonts.body),
         headingFont: fontName(options.headingFont ?? settings.fonts.heading),
         codeFont: fontName(options.codeFont ?? settings.fonts.code),
@@ -158,7 +160,7 @@ function slantFeatures(font: PortableFont): string {
 function template(body: string, options: CheckedOptions, definitions: string[], rail: string): string {
     const c = options.theme.colors;
     return `% Literate publication template v${publicationTemplateVersion}\n` + themeNotice() + String.raw`\newcommand{\DoNotLoadEpstopdf}{}
-    \documentclass[11pt,oneside,openany]{scrbook}
+    \documentclass[fontsize=${decimal(options.bodyFontSize)}pt,oneside,openany]{scrbook}
 ${'\\usepackage'}{fontspec}
 ${fontCommand('\\setmainfont', options.bodyFont, options)}
 ${fontCommand('\\newfontfamily\\headingfont', options.headingFont, options)}
@@ -179,11 +181,17 @@ ${'\\usepackage'}[hidelinks]{hyperref}
 \providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 \providecommand{\passthrough}[1]{#1}
 \providecommand{\pandocbounded}[1]{#1}
-` + templateCodeSettings() + '\n' + templateImageSettings() + '\n' + definitions.join('\n') + (rail ? '\n' + rail : '') +
+` + templateCodeSettings(options) + '\n' + templateImageSettings() + '\n' + definitions.join('\n') + (rail ? '\n' + rail : '') +
         '\n\\begin{document}\n\\tableofcontents\n' + body + '\n\\end{document}\n';
 }
-function templateCodeSettings(): string {
-    return String.raw`\fvset{fontsize=\small,breaklines=true,breakanywhere=true,
+function decimal(value: number): string {
+    return String(Number(value.toFixed(2)));
+}
+function templateCodeSettings(options: CheckedOptions): string {
+    const size = decimal(options.codeFontSize);
+    const leading = decimal(options.codeFontSize * 1.2);
+    return String.raw`\newcommand{\LitCodeSize}{\fontsize{${size}pt}{${leading}pt}\selectfont}
+\fvset{fontsize=\LitCodeSize,breaklines=true,breakanywhere=true,
 breakautoindent=false,breaksymbolleft={},breaksymbolright={},
 breakanywheresymbolpre={},breakanywheresymbolpost={},frame=none}
 \DeclareRobustCommand{\LitInlineCode}[1]{\texttt{#1}}
@@ -223,7 +231,9 @@ function themeNotice(): string {
 }
 function templateImageSettings(): string {
     return String.raw`\newsavebox{\LitCaptionBox}
+\newsavebox{\LitDiagramBox}
 \newlength{\LitImageHeight}
+\newlength{\LitDiagramHeight}
 \newcommand{\LitImage}[2]{\par\penalty0\addvspace{6pt}%
 \begingroup
 \sbox{\LitCaptionBox}{\parbox{\linewidth}{\small\raggedright #2\par}}%
@@ -235,6 +245,18 @@ function templateImageSettings(): string {
     \includegraphics[width=\linewidth,height=\LitImageHeight,keepaspectratio]{#1}\hfil}%
     \kern6pt\nointerlineskip\hbox{${'\\usebox'}{\LitCaptionBox}}\kern0pt}%
 \fi
+\par\endgroup\addvspace{6pt}}
+\newcommand{\LitDiagram}[1]{\par\penalty0\addvspace{6pt}%
+\begingroup
+\setlength{\LitDiagramHeight}{\dimexpr\textheight-12pt\relax}%
+\sbox{\LitDiagramBox}{\includegraphics{#1}}%
+\ifdim\wd\LitDiagramBox>\linewidth
+  \sbox{\LitDiagramBox}{\includegraphics[width=\linewidth]{#1}}%
+\fi
+\ifdim\dimexpr\ht\LitDiagramBox+\dp\LitDiagramBox\relax>\LitDiagramHeight
+  \sbox{\LitDiagramBox}{\includegraphics[height=\LitDiagramHeight]{#1}}%
+\fi
+\noindent\vbox{\hbox to\linewidth{\hfil\usebox{\LitDiagramBox}\hfil}\kern0pt}%
 \par\endgroup\addvspace{6pt}}`;
 }
 type Highlighted = ReturnType<typeof highlightContribution>;
@@ -355,7 +377,8 @@ function imageBlock(asset: PublicationAsset, resolve: (asset: PublicationAsset) 
         throw new Error('Image adapter must return a safe publication companion path');
     }
     if (Array.from(asset.caption).length > 4096) { throw new Error('Image caption exceeds 4096 characters'); }
-    return [{ t: 'RawBlock', c: ['latex', `\\LitImage{${file}}{${tex(asset.caption)}}`] }];
+    return [{ t: 'RawBlock', c: ['latex', asset.kind === 'mermaid'
+        ? `\\LitDiagram{${file}}` : `\\LitImage{${file}}{${tex(asset.caption)}}`] }];
 }
 function contribution(part: PublicationContribution, project: ParsedProject,
     theme: LiterateTheme, definitions: string[]): PandocBlock[] {

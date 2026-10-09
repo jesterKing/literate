@@ -170,6 +170,7 @@ for (const alias of ['external-symlink', 'hardlink', 'ancestor']) {
 test('CLI accepts a trusted in-project browser symlink for Mermaid', async t => {
     const root = fixture(t);
     fs.appendFileSync(path.join(root, 'chapters/book.literate'), diagramSource);
+    write(root, 'index.literate', '```SETTINGS\nfont-size-diagram=22.5\n```\n# Index\n');
     write(root, 'tools/chromium', 'browser executable');
     const browser = path.join(root, 'tools/browser');
     fs.symlinkSync(path.join(root, 'tools/chromium'), browser);
@@ -177,7 +178,8 @@ test('CLI accepts a trusted in-project browser symlink for Mermaid', async t => 
     let renders = 0;
     const result = await command(root, createTransactionIO, undefined, ['--browser', browser], async (...args) => {
         renders++;
-        assert.equal(args[2], browser);
+        assert.equal(args[1].executable, browser);
+        assert.equal(args[1].fontSize, 22.5);
         return stubDiagrams(...args);
     });
     assert.equal(result.code, 0, JSON.stringify(result.response));

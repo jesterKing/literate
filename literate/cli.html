@@ -710,7 +710,8 @@ limits protect different boundaries.</p>
         <span class="hljs-keyword">if</span> (size &gt; maximumAssetBytes) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Image exceeds 32 MiB: </span><span class="hljs-subst">${value}</span><span class="hljs-string">`</span>); }
         <span class="hljs-keyword">return</span> fs.<span class="hljs-title">readFile</span>(path.<span class="hljs-title">join</span>(root, value));
     }
-}, <span class="hljs-params">requests</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">diagrams</span>(requests, theme.<span class="hljs-property">name</span>, browser));
+}, <span class="hljs-params">requests</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">diagrams</span>(requests, { <span class="hljs-attr">theme</span>: theme.<span class="hljs-property">name</span>,
+    <span class="hljs-attr">fontSize</span>: settings.<span class="hljs-property">fontSizes</span>.<span class="hljs-property">diagram</span>, <span class="hljs-attr">executable</span>: browser }));
 </code></pre>
 
 </div>
@@ -841,10 +842,10 @@ sets the exit status and emits a JSON response exactly once.</p>
 <pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">run</span>(<span class="hljs-params">args: </span><span class="hljs-built_in">string</span><span class="hljs-params">[], io: CliIO = defaultIO,
     transactionIO: </span><span class="hljs-params">(root: </span><span class="hljs-built_in">string</span><span class="hljs-params">)</span><span class="hljs-params"> =&gt; TransactionIO = createTransactionIO,
     convert: LatexConverter = runPandoc,
-    diagrams: DiagramRenderer = </span><span class="hljs-keyword">async</span><span class="hljs-params"> </span><span class="hljs-params">(assets, theme, executable, check)</span><span class="hljs-params"> =&gt; </span><span class="hljs-params">{
+    diagrams: DiagramRenderer = </span><span class="hljs-keyword">async</span><span class="hljs-params"> </span><span class="hljs-params">(assets, request)</span><span class="hljs-params"> =&gt; </span><span class="hljs-params">{
         </span><span class="hljs-keyword">const</span><span class="hljs-params"> renderer = </span><span class="hljs-keyword">await</span><span class="hljs-params"> </span><span class="hljs-keyword">import</span><span class="hljs-params">(</span><span class="hljs-string">'./publication-mermaid'</span><span class="hljs-params">);
-        check?.();
-        </span><span class="hljs-keyword">return</span><span class="hljs-params"> renderer.renderDiagrams(assets, theme, executable, </span><span class="hljs-literal">undefined</span><span class="hljs-params">, check);
+        request.checkCancelled?.();
+        </span><span class="hljs-keyword">return</span><span class="hljs-params"> renderer.renderDiagrams(assets, request);
     }</span><span class="hljs-params">,
     compile: PdfCompiler = </span><span class="hljs-keyword">async</span><span class="hljs-params"> </span><span class="hljs-params">(...args)</span><span class="hljs-params"> =&gt; </span><span class="hljs-params">(</span><span class="hljs-keyword">await</span><span class="hljs-params"> </span><span class="hljs-keyword">import</span><span class="hljs-params">(</span><span class="hljs-string">'./publication-pdf'</span><span class="hljs-params">)</span><span class="hljs-params">)</span><span class="hljs-params">.compilePdf</span><span class="hljs-params">(...args)</span><span class="hljs-params">,
     options: CliRunOptions = </span><span class="hljs-params">{}</span><span class="hljs-params">
@@ -1102,9 +1103,9 @@ Other commands stop on any diagnostic before examining or writing output files.<
             <span class="hljs-keyword">return</span> body;
         },
         values.<span class="hljs-title">has</span>(<span class="hljs-string">'--font-manifest'</span>) ? <span class="hljs-title">relative</span>(values.<span class="hljs-title">get</span>(<span class="hljs-string">'--font-manifest'</span>)!) : <span class="hljs-literal">undefined</span>,
-                values.<span class="hljs-title">get</span>(<span class="hljs-string">'--browser'</span>), <span class="hljs-keyword">async</span> (assets, theme, executable) =&gt; {
+                values.<span class="hljs-title">get</span>(<span class="hljs-string">'--browser'</span>), <span class="hljs-keyword">async</span> (assets, request) =&gt; {
                     checkCancelled?.();
-                    <span class="hljs-keyword">const</span> rendered = <span class="hljs-keyword">await</span> <span class="hljs-title">diagrams</span>(assets, theme, executable, checkCancelled);
+                    <span class="hljs-keyword">const</span> rendered = <span class="hljs-keyword">await</span> <span class="hljs-title">diagrams</span>(assets, { ...request, checkCancelled });
                     checkCancelled?.();
                     <span class="hljs-keyword">return</span> rendered;
                 }, command === <span class="hljs-string">'pdf'</span> ? { <span class="hljs-attr">destinations</span>: [latexOutput] } : <span class="hljs-literal">undefined</span>)

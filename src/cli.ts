@@ -285,7 +285,8 @@ async function planLatex(root: string, documents: SourceDocument[], output: stri
             if (size > maximumAssetBytes) { throw new Error(`Image exceeds 32 MiB: ${value}`); }
             return fs.readFile(path.join(root, value));
         }
-    }, requests => diagrams(requests, theme.name, browser));
+    }, requests => diagrams(requests, { theme: theme.name,
+        fontSize: settings.fontSizes.diagram, executable: browser }));
     const companions = manifest ? await planFonts(manifest, output, Object.values(settings.fonts), {
         async requireFile(value) {
             if (!await inspect(root, value)) { throw new Error(`Missing file: ${value}`); }
@@ -358,10 +359,10 @@ async function protectLatexAliases(root: string, inputs: string[], outputs: stri
 export async function run(args: string[], io: CliIO = defaultIO,
     transactionIO: (root: string) => TransactionIO = createTransactionIO,
     convert: LatexConverter = runPandoc,
-    diagrams: DiagramRenderer = async (assets, theme, executable, check) => {
+    diagrams: DiagramRenderer = async (assets, request) => {
         const renderer = await import('./publication-mermaid');
-        check?.();
-        return renderer.renderDiagrams(assets, theme, executable, undefined, check);
+        request.checkCancelled?.();
+        return renderer.renderDiagrams(assets, request);
     },
     compile: PdfCompiler = async (...args) => (await import('./publication-pdf')).compilePdf(...args),
     options: CliRunOptions = {}
@@ -505,9 +506,9 @@ export async function run(args: string[], io: CliIO = defaultIO,
                     return body;
                 },
                 values.has('--font-manifest') ? relative(values.get('--font-manifest')!) : undefined,
-                        values.get('--browser'), async (assets, theme, executable) => {
+                        values.get('--browser'), async (assets, request) => {
                             checkCancelled?.();
-                            const rendered = await diagrams(assets, theme, executable, checkCancelled);
+                            const rendered = await diagrams(assets, { ...request, checkCancelled });
                             checkCancelled?.();
                             return rendered;
                         }, command === 'pdf' ? { destinations: [latexOutput] } : undefined)

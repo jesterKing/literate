@@ -52,14 +52,16 @@ const source = 'flowchart TD\nA-->B';
 const asset = { kind: 'mermaid', source, caption: '', at: { path: 'probe.literate', line: 0, column: 0 } };
 const report = { hits: 0, errors: [] };
 try {
-    const result = await renderDiagrams([asset], 'rosepine-dawn', executable,
+    const result = await renderDiagrams([asset],
+        { theme: 'rosepine-dawn', fontSize: 16, executable },
         (directory, browser) => executeDiagramWorker(directory, browser, script, 30000));
     report.policy = Buffer.from(result.get(source).svg).toString();
     assert.equal(hits, 0);
     for (const input of ['flowchart TD\nA[', 'flowchart TD\nA@{ img: "' + url + '", label: "unsafe" }',
         'flowchart TD\n' + Array.from({ length: 501 }, (_, i) => `A${i}-->A${i + 1}`).join('\n'),
         'flowchart LR\n' + Array.from({ length: 250 }, (_, i) => `A${i}[Wide node]-->A${i + 1}[Wide node]`).join('\n')]) {
-        await assert.rejects(renderDiagrams([{ ...asset, source: input }], 'rosepine-dawn', executable), error => {
+        await assert.rejects(renderDiagrams([{ ...asset, source: input }],
+            { theme: 'rosepine-dawn', fontSize: 16, executable }), error => {
             report.errors.push(String(error)); return /Diagram 1:/.test(String(error));
         }, input.slice(0, 100));
     }

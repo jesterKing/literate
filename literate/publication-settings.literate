@@ -9,18 +9,21 @@ Code defaults to Lilex Nerd Font, whose regular, bold, italic and bold-italic
 files all report that exact family via `fc-scan`. Native italic faces avoid
 requiring synthesis for the default code comments.
 
-This is font selection, **not font bundling**. There is no filesystem access,
+This is typography selection, **not font bundling**. There is no filesystem access,
 font lookup, global installation, or runtime dependency. Renderers remain
-responsible for applying the selected families and ligature policy. In particular,
-`off` calls for disabling `calt` (`-calt`), verified for the actual D2 font, rather
-than merely disabling `liga`. This chapter does not change a renderer or CLI.
+responsible for applying the selected families, sizes, and ligature policy. In
+particular, `off` calls for disabling `calt` (`-calt`), verified for the actual D2
+font, rather than merely disabling `liga`. Body and code sizes are TeX points;
+diagram size is a CSS-pixel input to the isolated Mermaid renderer.
 
 
 ## Public contract
 
 All five families are resolved strings. Omitted notes inherit the final selected
-body family, whereas fragments default independently to Monofur. Diagnostics
-here describe settings only: they do not copy `project.diagnostics`. Callers must
+body family, whereas fragments default independently to Monofur. Three numeric
+roles retain compatibility defaults and their renderer-specific units: body and
+block code use TeX points, while Mermaid uses CSS pixels. Diagnostics here describe
+settings only: they do not copy `project.diagnostics`. Callers must
 still gate rendering on source diagnostics through preparation (`preparePandoc`);
 a settings result alone is not permission to render. Source NUL rejection belongs
 to the existing parser, before Markdown can replace NUL with a replacement glyph.
@@ -35,8 +38,19 @@ export interface PublicationFonts {
     fragment: string;
     note: string;
 }
+export interface PublicationFontSizes {
+    body: number;
+    code: number;
+    diagram: number;
+}
+export const publicationFontSizeBounds = {
+    body: { minimum: 8, maximum: 24, defaultValue: 11 },
+    code: { minimum: 6, maximum: 24, defaultValue: 10 },
+    diagram: { minimum: 8, maximum: 48, defaultValue: 16 }
+} as const;
 export interface PublicationSettingsResult {
     fonts: PublicationFonts;
+    fontSizes: PublicationFontSizes;
     codeLigatures: boolean;
     diagnostics: GenerationDiagnostic[];
 }
@@ -54,6 +68,11 @@ export function resolvePublicationSettings(project: ParsedProject): PublicationS
         body: 'Latin Modern Roman', heading: 'Monofur Nerd Font',
         code: 'Lilex Nerd Font', fragment: 'Monofur Nerd Font', note: ''
     };
+    const fontSizes: PublicationFontSizes = {
+        body: publicationFontSizeBounds.body.defaultValue,
+        code: publicationFontSizeBounds.code.defaultValue,
+        diagram: publicationFontSizeBounds.diagram.defaultValue
+    };
     let codeLigatures = true;
     let explicitNote = false;
     const diagnostics: GenerationDiagnostic[] = [];
@@ -61,7 +80,7 @@ export function resolvePublicationSettings(project: ParsedProject): PublicationS
     for (const token of document?.tokens ?? []) {
         if (token.type !== 'fence' || token.info.trim() !== 'SETTINGS') { continue; }
         token.content.split('\n').forEach((line: string, index: number) => {
-            const match = /^\s*(font-body|font-heading|font-code|font-fragment|font-note|font-code-ligatures)\s*=(.*)$/.exec(line);
+            const match = /^\s*(font-body|font-heading|font-code|font-fragment|font-note|font-code-ligatures|font-size-body|font-size-code|font-size-diagram)\s*=(.*)$/.exec(line);
             if (!match) { return; }
             const key = match[1];
             const value = match[2].trim();
@@ -69,9 +88,11 @@ export function resolvePublicationSettings(project: ParsedProject): PublicationS
 
 Family values use the same simple ASCII grammar as the existing LaTeX `fontName`:
 1–100 letters, digits, spaces, dots or hyphens, starting with a letter or digit.
-Whitespace around values is trimmed; empty names, paths and TeX syntax are rejected.
-Last valid wins, but every invalid occurrence remains a diagnostic, just as for
-theme settings. Coordinates are zero-based: the fence map starts at its opener,
+Sizes accept only whole numbers or decimals with one or two fractional digits, then
+apply role-specific inclusive bounds. Whitespace around values is trimmed; empty
+names, units, paths and TeX or CSS syntax are rejected. Last valid wins, but every
+invalid occurrence remains a diagnostic, just as for theme settings. Coordinates
+are zero-based: the fence map starts at its opener,
 so content line zero is source line `map[0] + 1`, also within lists and quotes.
 
 ```ts : <<publication settings resolver>>=+
@@ -82,6 +103,16 @@ so content line zero is source line `map[0] + 1`, also within lists and quotes.
             if (key === 'font-code-ligatures') {
                 if (value === 'on' || value === 'off') { codeLigatures = value === 'on'; }
                 else { report(`Invalid ${key}: expected on or off`); }
+            } else if (key.startsWith('font-size-')) {
+                const role = key.slice('font-size-'.length) as keyof PublicationFontSizes;
+                const bounds = publicationFontSizeBounds[role];
+                const size = /^\d+(?:\.\d{1,2})?$/.test(value) ? Number(value) : NaN;
+                if (Number.isFinite(size) && size >= bounds.minimum && size <= bounds.maximum) {
+                    fontSizes[role] = size;
+                } else {
+                    const unit = role === 'diagram' ? 'CSS pixels' : 'points';
+                    report(`Invalid ${key}: expected ${bounds.minimum}–${bounds.maximum} ${unit}`);
+                }
             } else if (/^[A-Za-z0-9][A-Za-z0-9 .-]{0,99}$/.test(value)) {
                 const role = key.slice(5) as keyof PublicationFonts;
                 fonts[role] = value;
@@ -92,7 +123,7 @@ so content line zero is source line `map[0] + 1`, also within lists and quotes.
         });
     }
     if (!explicitNote) { fonts.note = fonts.body; }
-    return { fonts, codeLigatures, diagnostics };
+    return { fonts, fontSizes, codeLigatures, diagnostics };
 }
 ```
 

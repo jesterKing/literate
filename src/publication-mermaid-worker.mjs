@@ -5,11 +5,14 @@ import mermaidPackage from 'mermaid/package.json' with { type: 'json' };
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { getTheme, mermaidTheme } from './themes';
+import { publicationFontSizeBounds } from './publication-settings';
 import { diagramLimits, validateDiagram } from './publication-mermaid';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
-export function configuration(theme, seed) {
-    return { ...mermaidTheme(getTheme(theme)), startOnLoad: false,
+export function configuration(theme, fontSize, seed) {
+    const palette = mermaidTheme(getTheme(theme));
+    return { ...palette, themeVariables: { ...palette.themeVariables, fontSize: `${fontSize}px` },
+        startOnLoad: false,
         securityLevel: 'strict', look: 'classic', suppressErrorRendering: true, maxTextSize: 50000,
         maxEdges: 500, htmlLabels: false, flowchart: { htmlLabels: false },
         fontFamily: 'sans-serif', deterministicIds: true, deterministicIDSeed: seed,
@@ -98,14 +101,14 @@ export function measureSvg() {
     svg.style.maxWidth = 'none';
     return { width, height, svg: svg.outerHTML };
 }
-export async function renderVector(browser, source, theme, bundle) {
+export async function renderVector(browser, source, theme, fontSize, bundle) {
     const context = await browser.createBrowserContext();
     try {
         const page = await context.newPage();
         await page.setViewport({ width: 1200, height: 900, deviceScaleFactor: 1 });
         const violations = await isolatePage(page);
         await page.addScriptTag({ content: bundle });
-        const seed = hash(JSON.stringify([source, theme]));
+        const seed = hash(JSON.stringify([source, theme, fontSize]));
         await page.evaluate(async (source, config, id) => {
             const policy = document.createElement('meta');
             policy.httpEquiv = 'Content-Security-Policy'; policy.content = "script-src 'none'";
@@ -121,7 +124,7 @@ export async function renderVector(browser, source, theme, bundle) {
             const svg = document.body.querySelector('svg');
             if (svg) { svg.style.backgroundColor = config.themeVariables.background; }
             await document.fonts.ready;
-        }, source, configuration(theme, seed), 'diagram-' + seed);
+        }, source, configuration(theme, fontSize, seed), 'diagram-' + seed);
         const geometry = await page.evaluate(measureSvg);
         if (Buffer.byteLength(geometry.svg) > diagramLimits.svg) { throw new Error('Mermaid SVG exceeds 4 MiB'); }
         const bytes = await page.pdf({ width: `${geometry.width + 1}px`, height: `${geometry.height + 1}px`,
@@ -138,8 +141,11 @@ export async function renderVector(browser, source, theme, bundle) {
 }
 export async function browserBatch(directory, executable, launch) {
     const request = JSON.parse(await fs.readFile(path.join(directory, 'request.json'), 'utf8'));
+    const size = publicationFontSizeBounds.diagram;
     if (!getTheme(request.theme) || !Array.isArray(request.sources)
-        || request.sources.length > diagramLimits.count) {
+        || request.sources.length > diagramLimits.count || typeof request.fontSize !== 'number'
+        || !Number.isFinite(request.fontSize) || request.fontSize < size.minimum
+        || request.fontSize > size.maximum) {
         throw new Error('Invalid Mermaid worker request');
     }
     request.sources.forEach(validateDiagram);
@@ -157,7 +163,7 @@ export async function browserBatch(directory, executable, launch) {
         let total = 0;
         for (const [index, source] of request.sources.entries()) {
             try {
-                const result = await renderVector(browser, source, request.theme, bundle);
+                const result = await renderVector(browser, source, request.theme, request.fontSize, bundle);
                 total += result.pdf.length + result.svg.length;
                 if (total > diagramLimits.total) { throw new Error('Mermaid artifacts exceed 32 MiB'); }
                 await fs.writeFile(path.join(directory, `${index}.pdf`), result.pdf);

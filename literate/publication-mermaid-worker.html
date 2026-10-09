@@ -150,9 +150,10 @@ external images, executable callbacks and author configuration remain disabled,
 regardless of the family requesting them. A new renderer does not gain new browser
 permissions merely by being registered.</p>
 <h2>Local, fixed configuration</h2>
-<p>Only catalogue colors and fixed security settings enter initialization. Source
-text cannot supply scripts, styles, callbacks, directives or configuration. Stable
-IDs depend on source and theme, not processing order or wall-clock time. Classic
+<p>Only catalogue colors, the bounded publication font size, and fixed security
+settings enter initialization. Source text cannot supply scripts, styles, callbacks,
+directives or configuration. Stable IDs depend on source, theme, and size, not
+processing order or wall-clock time. Classic
 shapes and disabled filters avoid Chromium's rasterization of decorative shadows;
 the selected palette still controls colors.</p>
 <div class="codefragment">
@@ -165,11 +166,14 @@ the selected palette still controls colors.</p>
 <span class="hljs-keyword">import</span> { fileURLToPath } <span class="hljs-keyword">from</span> <span class="hljs-string">'node:url'</span>;
 <span class="hljs-keyword">import</span> { spawn } <span class="hljs-keyword">from</span> <span class="hljs-string">'node:child_process'</span>;
 <span class="hljs-keyword">import</span> { getTheme, mermaidTheme } <span class="hljs-keyword">from</span> <span class="hljs-string">'./themes'</span>;
+<span class="hljs-keyword">import</span> { publicationFontSizeBounds } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-settings'</span>;
 <span class="hljs-keyword">import</span> { diagramLimits, validateDiagram } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-mermaid'</span>;
 
 <span class="hljs-keyword">const</span> <span class="hljs-title">hash</span> = value =&gt; <span class="hljs-title">createHash</span>(<span class="hljs-string">'sha256'</span>).<span class="hljs-title">update</span>(value).<span class="hljs-title">digest</span>(<span class="hljs-string">'hex'</span>);
-<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">configuration</span>(<span class="hljs-params">theme, seed</span>) {
-    <span class="hljs-keyword">return</span> { ...<span class="hljs-title">mermaidTheme</span>(<span class="hljs-title">getTheme</span>(theme)), <span class="hljs-attr">startOnLoad</span>: <span class="hljs-literal">false</span>,
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">configuration</span>(<span class="hljs-params">theme, fontSize, seed</span>) {
+    <span class="hljs-keyword">const</span> palette = <span class="hljs-title">mermaidTheme</span>(<span class="hljs-title">getTheme</span>(theme));
+    <span class="hljs-keyword">return</span> { ...palette, <span class="hljs-attr">themeVariables</span>: { ...palette.<span class="hljs-property">themeVariables</span>, <span class="hljs-attr">fontSize</span>: <span class="hljs-string">`</span><span class="hljs-subst">${fontSize}</span><span class="hljs-string">px`</span> },
+        <span class="hljs-attr">startOnLoad</span>: <span class="hljs-literal">false</span>,
         <span class="hljs-attr">securityLevel</span>: <span class="hljs-string">'strict'</span>, <span class="hljs-attr">look</span>: <span class="hljs-string">'classic'</span>, <span class="hljs-attr">suppressErrorRendering</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">maxTextSize</span>: <span class="hljs-number">50000</span>,
         <span class="hljs-attr">maxEdges</span>: <span class="hljs-number">500</span>, <span class="hljs-attr">htmlLabels</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">flowchart</span>: { <span class="hljs-attr">htmlLabels</span>: <span class="hljs-literal">false</span> },
         <span class="hljs-attr">fontFamily</span>: <span class="hljs-string">'sans-serif'</span>, <span class="hljs-attr">deterministicIds</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">deterministicIDSeed</span>: seed,
@@ -335,14 +339,14 @@ are normalized without changing byte lengths, preserving cross-reference offsets
 <div class="codefragment">
 <div class="fragmentname" id="c-004d00650072006d00610069006400200076006500630074006f0072002000720065006e0064006500720069006e0067-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006d00650072006d006100690064002d0077006f0072006b00650072002e006c0069007400650072006100740065-1"><span id="f-004d00650072006d00610069006400200076006500630074006f0072002000720065006e0064006500720069006e0067"></span><a class="literate-tag-name" href="#f-004d00650072006d00610069006400200076006500630074006f0072002000720065006e0064006500720069006e0067" data-literate-target="f-004d00650072006d00610069006400200076006500630074006f0072002000720065006e0064006500720069006e0067" aria-label="Definition of Mermaid vector rendering">&lt;&lt;Mermaid vector rendering&gt;&gt;=</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">renderVector</span>(<span class="hljs-params">browser, source, theme, bundle</span>) {
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">renderVector</span>(<span class="hljs-params">browser, source, theme, fontSize, bundle</span>) {
     <span class="hljs-keyword">const</span> context = <span class="hljs-keyword">await</span> browser.<span class="hljs-title">createBrowserContext</span>();
     <span class="hljs-keyword">try</span> {
         <span class="hljs-keyword">const</span> page = <span class="hljs-keyword">await</span> context.<span class="hljs-title">newPage</span>();
         <span class="hljs-keyword">await</span> page.<span class="hljs-title">setViewport</span>({ <span class="hljs-attr">width</span>: <span class="hljs-number">1200</span>, <span class="hljs-attr">height</span>: <span class="hljs-number">900</span>, <span class="hljs-attr">deviceScaleFactor</span>: <span class="hljs-number">1</span> });
         <span class="hljs-keyword">const</span> violations = <span class="hljs-keyword">await</span> <span class="hljs-title">isolatePage</span>(page);
         <span class="hljs-keyword">await</span> page.<span class="hljs-title">addScriptTag</span>({ <span class="hljs-attr">content</span>: bundle });
-        <span class="hljs-keyword">const</span> seed = <span class="hljs-title">hash</span>(<span class="hljs-title">JSON</span>.<span class="hljs-title">stringify</span>([source, theme]));
+        <span class="hljs-keyword">const</span> seed = <span class="hljs-title">hash</span>(<span class="hljs-title">JSON</span>.<span class="hljs-title">stringify</span>([source, theme, fontSize]));
         <span data-literate-explore="f-004d00650072006d00610069006400200070006100670065002000720065006e0064006500720069006e0067"><a class="literate-tag-name" href="#f-004d00650072006d00610069006400200070006100670065002000720065006e0064006500720069006e0067" data-literate-target="f-004d00650072006d00610069006400200070006100670065002000720065006e0064006500720069006e0067" aria-label="Definition of Mermaid page rendering">&lt;&lt;Mermaid page rendering&gt;&gt;</a></span>
         <span data-literate-explore="f-004d00650072006d00610069006400200050004400460020007000720069006e00740069006e0067"><a class="literate-tag-name" href="#f-004d00650072006d00610069006400200050004400460020007000720069006e00740069006e0067" data-literate-target="f-004d00650072006d00610069006400200050004400460020007000720069006e00740069006e0067" aria-label="Definition of Mermaid PDF printing">&lt;&lt;Mermaid PDF printing&gt;&gt;</a></span>
     } <span class="hljs-keyword">finally</span> { <span class="hljs-keyword">await</span> context.<span class="hljs-title">close</span>(); }
@@ -373,7 +377,7 @@ PDF printing, since print layout can otherwise trigger a delayed request.</p>
     <span class="hljs-keyword">const</span> svg = <span class="hljs-variable">document</span>.<span class="hljs-property">body</span>.<span class="hljs-title">querySelector</span>(<span class="hljs-string">'svg'</span>);
     <span class="hljs-keyword">if</span> (svg) { svg.<span class="hljs-property">style</span>.<span class="hljs-property">backgroundColor</span> = config.<span class="hljs-property">themeVariables</span>.<span class="hljs-property">background</span>; }
     <span class="hljs-keyword">await</span> <span class="hljs-variable">document</span>.<span class="hljs-property">fonts</span>.<span class="hljs-property">ready</span>;
-}, source, <span class="hljs-title">configuration</span>(theme, seed), <span class="hljs-string">'diagram-'</span> + seed);
+}, source, <span class="hljs-title">configuration</span>(theme, fontSize, seed), <span class="hljs-string">'diagram-'</span> + seed);
 <span class="hljs-keyword">const</span> geometry = <span class="hljs-keyword">await</span> page.evaluate(measureSvg);
 <span class="hljs-keyword">if</span> (<span class="hljs-title">Buffer</span>.<span class="hljs-title">byteLength</span>(geometry.<span class="hljs-property">svg</span>) &gt; diagramLimits.<span class="hljs-property">svg</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Mermaid SVG exceeds 4 MiB'</span>); }
 </code></pre>
@@ -411,8 +415,11 @@ JavaScript heaps are capped, but this is not a hard operating-system RSS quota.<
 <div class="code">
 <pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">browserBatch</span>(<span class="hljs-params">directory, executable, launch</span>) {
     <span class="hljs-keyword">const</span> request = <span class="hljs-title">JSON</span>.<span class="hljs-title">parse</span>(<span class="hljs-keyword">await</span> fs.<span class="hljs-title">readFile</span>(path.<span class="hljs-title">join</span>(directory, <span class="hljs-string">'request.json'</span>), <span class="hljs-string">'utf8'</span>));
+    <span class="hljs-keyword">const</span> size = publicationFontSizeBounds.<span class="hljs-property">diagram</span>;
     <span class="hljs-keyword">if</span> (!<span class="hljs-title">getTheme</span>(request.<span class="hljs-property">theme</span>) || !<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(request.<span class="hljs-property">sources</span>)
-        || request.<span class="hljs-property">sources</span>.<span class="hljs-property">length</span> &gt; diagramLimits.<span class="hljs-property">count</span>) {
+        || request.<span class="hljs-property">sources</span>.<span class="hljs-property">length</span> &gt; diagramLimits.<span class="hljs-property">count</span> || <span class="hljs-keyword">typeof</span> request.<span class="hljs-property">fontSize</span> !== <span class="hljs-string">'number'</span>
+        || !<span class="hljs-title">Number</span>.<span class="hljs-built_in">isFinite</span>(request.<span class="hljs-property">fontSize</span>) || request.<span class="hljs-property">fontSize</span> &lt; size.<span class="hljs-property">minimum</span>
+        || request.<span class="hljs-property">fontSize</span> &gt; size.<span class="hljs-property">maximum</span>) {
         <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Invalid Mermaid worker request'</span>);
     }
     request.<span class="hljs-property">sources</span>.<span class="hljs-title">forEach</span>(validateDiagram);
@@ -441,7 +448,7 @@ source location held by the controller; aggregate limits bound retained bytes.</
     <span class="hljs-keyword">let</span> total = <span class="hljs-number">0</span>;
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [index, source] <span class="hljs-keyword">of</span> request.<span class="hljs-property">sources</span>.<span class="hljs-title">entries</span>()) {
         <span class="hljs-keyword">try</span> {
-            <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">await</span> <span class="hljs-title">renderVector</span>(browser, source, request.<span class="hljs-property">theme</span>, bundle);
+            <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">await</span> <span class="hljs-title">renderVector</span>(browser, source, request.<span class="hljs-property">theme</span>, request.<span class="hljs-property">fontSize</span>, bundle);
             total += result.<span class="hljs-property">pdf</span>.<span class="hljs-property">length</span> + result.<span class="hljs-property">svg</span>.<span class="hljs-property">length</span>;
             <span class="hljs-keyword">if</span> (total &gt; diagramLimits.<span class="hljs-property">total</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Mermaid artifacts exceed 32 MiB'</span>); }
             <span class="hljs-keyword">await</span> fs.<span class="hljs-title">writeFile</span>(path.<span class="hljs-title">join</span>(directory, <span class="hljs-string">`</span><span class="hljs-subst">${index}</span><span class="hljs-string">.pdf`</span>), result.<span class="hljs-property">pdf</span>);

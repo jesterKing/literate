@@ -597,6 +597,9 @@ font-heading=Monofur Nerd Font
 font-code=Lilex Nerd Font
 font-fragment=Monofur Nerd Font
 font-note=Latin Modern Roman
+font-size-body=11
+font-size-code=10
+font-size-diagram=16
 font-code-ligatures=on
 ```
 ````
@@ -609,6 +612,12 @@ change them. Use `font-code-ligatures=off` to disable contextual substitutions
 (`calt`); font families may implement other ligatures through different features.
 Lilex has native regular, bold, italic and bold-italic faces, so default code
 comments use real italics rather than synthetic slant.
+
+`font-size-body` accepts 8–24 TeX points, `font-size-code` accepts 6–24 TeX
+points for block code, and `font-size-diagram` accepts 8–48 CSS pixels for
+Mermaid layout. Values are plain decimals with at most two fractional digits;
+do not include units. Diagram vectors retain their natural print size and are
+only reduced when they exceed the available width or page height.
 
 Family names accept 1–100 ASCII letters, digits, spaces, dots, or hyphens,
 starting with a letter or digit. Paths and TeX options are not accepted. Repeated

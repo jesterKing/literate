@@ -3,12 +3,14 @@ import { test } from 'node:test';
 import { parseProject } from '../../engine';
 import { preparePandoc } from '../../publication-pandoc';
 import { resolvePublicationSettings } from '../../publication-settings';
-import type { PublicationFonts, PublicationSettingsResult } from '../../publication-settings';
+import type { PublicationFonts, PublicationFontSizes,
+    PublicationSettingsResult } from '../../publication-settings';
 
 const defaults: PublicationFonts = {
     body: 'Latin Modern Roman', heading: 'Monofur Nerd Font',
     code: 'Lilex Nerd Font', fragment: 'Monofur Nerd Font', note: 'Latin Modern Roman'
 };
+const sizeDefaults: PublicationFontSizes = { body: 11, code: 10, diagram: 16 };
 const fence = (content: string, info = 'SETTINGS') => '```' + info + '\n' + content + '\n```\n';
 function resolve(text: string, path = 'index.literate'): PublicationSettingsResult {
     const project = parseProject([{ path, text }]);
@@ -16,7 +18,7 @@ function resolve(text: string, path = 'index.literate'): PublicationSettingsResu
     return resolvePublicationSettings(project);
 }
 test('publication settings defaults and root-only scope', () => {
-    const expected = { fonts: defaults, codeLigatures: true, diagnostics: [] };
+    const expected = { fonts: defaults, fontSizes: sizeDefaults, codeLigatures: true, diagnostics: [] };
     assert.deepEqual(resolvePublicationSettings(parseProject([])), expected);
     assert.deepEqual(resolve(''), expected);
     for (const path of ['chapter.literate', 'chapters/index.literate', 'Index.literate']) {
@@ -33,7 +35,7 @@ test('publication settings defaults and root-only scope', () => {
     assert.ok(rejected.diagnostics.some(d => d.message === 'Invalid source path'));
     assert.deepEqual(resolvePublicationSettings(rejected), expected);
     const changed = resolve('');
-    changed.fonts.body = 'Changed';
+    changed.fonts.body = 'Changed'; changed.fontSizes.body = 20;
     assert.deepEqual(resolve(''), expected);
 });
 test('publication settings select all roles and delay note inheritance', () => {
@@ -41,7 +43,7 @@ test('publication settings select all roles and delay note inheritance', () => {
         'font-code= Code Font \nfont-fragment= Fragment Font\nfont-code-ligatures= off '));
     assert.deepEqual(result, { fonts: { body: 'Body 2.0', heading: 'Heading-Font',
         code: 'Code Font', fragment: 'Fragment Font', note: 'Body 2.0' },
-        codeLigatures: false, diagnostics: [] });
+        fontSizes: sizeDefaults, codeLigatures: false, diagnostics: [] });
     const inherited = resolve(fence('font-note=\nfont-body=First') + fence('font-body=Last'));
     assert.equal(inherited.fonts.note, 'Last');
     assert.equal(inherited.diagnostics.length, 1);
@@ -78,11 +80,33 @@ test('publication settings enforce the simple ASCII family grammar', () => {
         }
     }
 });
+test('publication font sizes are bounded decimal values with explicit units', () => {
+    const selected = resolve(fence('font-size-body=8\nfont-size-body=12.5\n' +
+        'font-size-code=6.25\nfont-size-diagram=48'));
+    assert.deepEqual(selected.fontSizes, { body: 12.5, code: 6.25, diagram: 48 });
+    assert.deepEqual(selected.diagnostics, []);
+
+    for (const [role, minimum, maximum] of [
+        ['body', 8, 24], ['code', 6, 24], ['diagram', 8, 48]
+    ] as const) {
+        for (const value of [String(minimum - 0.01), String(maximum + 0.01),
+            '12pt', '1e1', '+10', '-10', '10.123', 'NaN', '']) {
+            const result = resolve(fence(`font-size-${role}=${value}`));
+            assert.equal(result.fontSizes[role], sizeDefaults[role], `${role}: ${value}`);
+            assert.equal(result.diagnostics.length, 1, `${role}: ${value}`);
+            assert.match(result.diagnostics[0].message, new RegExp(`${minimum}.*${maximum}`));
+        }
+    }
+    const repeated = resolve(fence('font-size-body=12\nfont-size-body=bad\nfont-size-body=13'));
+    assert.equal(repeated.fontSizes.body, 13);
+    assert.deepEqual(repeated.diagnostics.map(d => d.line), [2]);
+});
 test('publication settings ignore unrelated keys and non-settings text', () => {
     const text = fence('theme=unknown\nFont-body=\nfont-body-extra=\nfont-note-other=\nauthors=X') +
         fence('font-body=Wrong', 'settings') + fence('font-body=Wrong', 'text') +
         'font-body=Wrong\n\n    font-body=Wrong\n';
-    assert.deepEqual(resolve(text), { fonts: defaults, codeLigatures: true, diagnostics: [] });
+    assert.deepEqual(resolve(text), { fonts: defaults, fontSizes: sizeDefaults,
+        codeLigatures: true, diagnostics: [] });
 });
 
 test('publication settings map zero-based lines across newlines and containers', () => {
@@ -103,7 +127,7 @@ test('publication settings leave source diagnostics to the preparation gate', ()
     assert.ok(project.diagnostics.some(d => /NUL/.test(d.message)));
     const before = JSON.stringify(project);
     assert.deepEqual(resolvePublicationSettings(project), {
-        fonts: defaults, codeLigatures: true, diagnostics: []
+        fonts: defaults, fontSizes: sizeDefaults, codeLigatures: true, diagnostics: []
     });
     const prepared = preparePandoc(project, () => { throw new Error('must not render'); });
     assert.equal(prepared.document, undefined);
