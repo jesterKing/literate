@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { execFileSync } from 'node:child_process';
 import { test } from 'node:test';
-import { renderDiagrams, validateDiagram, executeDiagramWorker, DiagramRenderer } from '../../publication-mermaid';
+import { renderDiagrams, validateDiagram, executeDiagramWorker, DiagramRenderer, diagramLimits } from '../../publication-mermaid';
 import { collectAssets, planAssets } from '../../publication-assets';
 import { parseProject } from '../../engine';
 import { createTransactionIO, run } from '../../cli';
@@ -76,7 +76,8 @@ test('missing browser, nonexistent executable, invalid theme and request limits 
     await assert.rejects(renderDiagrams([asset()], 'rosepine-dawn', undefined, worker), /--browser.*No browser is downloaded/);
     await assert.rejects(renderDiagrams([asset()], 'rosepine-dawn', '/nonexistent/literate-chromium', worker), /Cannot execute/);
     await assert.rejects(renderDiagrams([asset()], 'invalid', process.execPath, worker), /Unknown.*theme/);
-    await assert.rejects(renderDiagrams(Array.from({ length: 65 }, (_, i) => asset(source + i)), 'rosepine-dawn', process.execPath, worker), /64 unique/);
+    await assert.rejects(renderDiagrams(Array.from({ length: diagramLimits.count + 1 }, (_, i) => asset(source + i)),
+        'rosepine-dawn', process.execPath, worker), new RegExp(`${diagramLimits.count} unique`));
     await assert.rejects(renderDiagrams([asset('%%{init:{}}%%')], 'rosepine-dawn', process.execPath, worker), /chapter.literate:3/);
 });
 test('latched cancellation is checked at entry, even without diagrams', async () => {

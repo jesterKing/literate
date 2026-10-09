@@ -276,7 +276,8 @@ JavaScript heaps are capped, but this is not a hard operating-system RSS quota.
 ```js : <<Mermaid browser batch>>=
 export async function browserBatch(directory, executable, launch) {
     const request = JSON.parse(await fs.readFile(path.join(directory, 'request.json'), 'utf8'));
-    if (!getTheme(request.theme) || !Array.isArray(request.sources) || request.sources.length > 64) {
+    if (!getTheme(request.theme) || !Array.isArray(request.sources)
+        || request.sources.length > diagramLimits.count) {
         throw new Error('Invalid Mermaid worker request');
     }
     request.sources.forEach(validateDiagram);

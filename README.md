@@ -761,7 +761,7 @@ Remote assets, image/icon resources, directives/frontmatter, authored HTML/CSS,
 and interactions are blocked. Double-quote labels containing command words such
 as `style`, `classDef`, `linkStyle`, `click`, `link` or `links` (for example,
 `A["click to continue"]`): quoted text and comments are masked for the keyword
-scan, not exempted from the other safety checks. Limits are 64 unique diagrams,
+scan, not exempted from the other safety checks. Limits are 128 unique diagrams,
 50,000 source characters each, Mermaid's 500-edge cap, 16,384 px per side and
 16 million pixels of geometry; artifacts are capped at 4 MiB SVG, 16 MiB PDF and
 32 MiB combined per batch. The worker has a 120-second batch deadline, 15-second

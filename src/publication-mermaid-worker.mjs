@@ -138,7 +138,8 @@ export async function renderVector(browser, source, theme, bundle) {
 }
 export async function browserBatch(directory, executable, launch) {
     const request = JSON.parse(await fs.readFile(path.join(directory, 'request.json'), 'utf8'));
-    if (!getTheme(request.theme) || !Array.isArray(request.sources) || request.sources.length > 64) {
+    if (!getTheme(request.theme) || !Array.isArray(request.sources)
+        || request.sources.length > diagramLimits.count) {
         throw new Error('Invalid Mermaid worker request');
     }
     request.sources.forEach(validateDiagram);

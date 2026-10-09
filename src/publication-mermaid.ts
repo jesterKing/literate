@@ -8,7 +8,7 @@ import { getTheme } from './themes';
 export interface DiagramBytes { pdf: Uint8Array; svg: Uint8Array }
 export type DiagramRenderer = (assets: readonly PublicationAsset[], theme: string,
     executable?: string, checkCancelled?: () => void) => Promise<Map<string, DiagramBytes>>;
-export const diagramLimits = { count: 64, source: 50000, pdf: 16 * 1024 * 1024,
+export const diagramLimits = { count: 128, source: 50000, pdf: 16 * 1024 * 1024,
     svg: 4 * 1024 * 1024, total: 32 * 1024 * 1024, timeMs: 120000 };
 export type DiagramWorker = (directory: string, executable: string) => Promise<void>;
 export function validateDiagram(source: string): void {
@@ -101,7 +101,9 @@ export async function renderDiagrams(assets: readonly PublicationAsset[], theme:
         try { validateDiagram(asset.source); }
         catch (error) { throw new Error(`${asset.at.path}:${asset.at.line + 1}: ${String(error)}`); }
     }
-    if (sources.length > diagramLimits.count) { throw new Error('Publication exceeds 64 unique Mermaid diagrams'); }
+    if (sources.length > diagramLimits.count) {
+        throw new Error(`Publication exceeds ${diagramLimits.count} unique Mermaid diagrams`);
+    }
     if (!getTheme(theme)) { throw new Error('Unknown Mermaid publication theme'); }
     if (!executable || !path.isAbsolute(executable) || /[\u0000-\u001f]/.test(executable)) {
         throw new Error('Mermaid requires --browser /absolute/path/to/chromium; install a system browser explicitly. No browser is downloaded.');
