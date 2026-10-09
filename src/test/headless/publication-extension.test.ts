@@ -306,7 +306,7 @@ test('PDF request arguments, disk fonts, warning channel, open URI and successfu
     assert.deepEqual(f.errors, []);
     assert.deepEqual(f.requests[0].slice(0, 3), ['/usr/bin/node', path.join(project, 'out/publication-helper.cjs'), f.root]);
     assert.deepEqual(f.requests[0][3], { args: ['pdf', f.root, '--output', 'book.pdf', '--paper', 'legal',
-        '--margin-top', '10mm', '--margin-right', '11mm', '--margin-bottom', '12mm', '--margin-left', '13mm',
+        '--margin-top', '10mm', '--margin-outer', '11mm', '--margin-bottom', '12mm', '--margin-inner', '13mm',
         '--browser', '/opt/chromium', '--font-manifest', 'fonts.json', '--json'], documents: [] });
     assert.ok(f.logs.some((line: string) => line.includes('fixture warning')));
     assert.equal(f.opened[0][0], 'vscode.open');
@@ -366,6 +366,23 @@ test('pre-cancelled progress avoids snapshot and launch; cancellation during bui
     assert.equal(f.requests.length, 1);
     assert.equal(f.state.size, 0);
     assert.deepEqual(f.opened, []);
+}));
+
+test('success notification does not retain the publication lock', () => using(async f => {
+    const entered = deferred(), release = deferred();
+    let notifications = 0;
+    f.onInfo = () => {
+        notifications++;
+        if (notifications === 1) { entered.resolve(); return release.promise; }
+        return undefined;
+    };
+    const first = f.run();
+    await entered.promise;
+    await f.run();
+    assert.equal(f.requests.length, 2);
+    assert.deepEqual(f.warnings, []);
+    release.resolve();
+    await first;
 }));
 
 test('global command lock rejects overlap across kinds until helper finishes', () => using(async f => {

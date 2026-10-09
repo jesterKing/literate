@@ -336,8 +336,10 @@ installed automatically.
 1. The active editor's workspace folder is selected when available; otherwise
    choose a workspace folder in the picker.
 2. Pick the page size: `a4`, `a5`, `letter`, or `legal`.
-3. Enter margins in **top,right,bottom,left** order, in millimetres, for example
-   `18,16,22,20`. Each must be 5–50 mm and leave at least an 80 × 100 mm text area.
+3. Enter margins in **top,outer,bottom,inner** order, in millimetres, for example
+   `18,20,22,14`. The inner margin is the binding edge: left on odd right-hand pages
+   and right on even left-hand pages. The outer margin exchanges those physical edges.
+   Each must be 5–50 mm and leave at least an 80 × 100 mm text area.
 4. Choose a `.tex` or `.pdf` save path **inside the selected root**. The Save dialog
    selects the output, not a request to save your input documents. Unsafe paths,
    symlinks and protected input aliases are rejected.
@@ -354,7 +356,9 @@ project inputs. Later edits do not change that captured export. Binary assets an
 font files are read from disk only, not from editor buffers.
 
 Publication and source/HTML generation use one serialized extension queue; a
-second publication is rejected while one is in progress. Initial activation is
+second publication is rejected while prompts, queueing, capture, or helper work is
+in progress. The guard is released before the optional **Open Output** notification,
+so leaving that notification visible does not block another export. Initial activation is
 read-only—no source/HTML output until a save or explicit processing. Invalid
 source/HTML generation templates do not disable publication. This queue does not
 coordinate separate CLI processes or other VS Code instances: do not run those
@@ -488,14 +492,16 @@ yarn literate pdf path/to/project --output books/book.pdf --paper a4 --margin 20
 The `.pdf` destination is relative to the selected project root, not the working
 directory; absolute paths and paths outside the root are rejected. `pdf` shares
 `latex` options: `--paper a4|a5|letter|legal`, `--margin`, `--margin-top`,
-`--margin-right`, `--margin-bottom`, `--margin-left`, `--font-manifest`,
-`--browser`, and `--json`. Geometry defaults and bounds are described below.
+`--margin-right`, `--margin-bottom`, `--margin-left`, `--margin-inner`,
+`--margin-outer`, `--font-manifest`, `--browser`, and `--json`. Geometry defaults
+and bounds are described below.
 Arguments take separate values. `--keep-build` is **PDF-only**. For example:
 
 ```sh
 yarn literate pdf path/to/project --output books/book.pdf --paper a5 \
-  --margin 20mm --margin-top 18mm --margin-right 16mm --margin-bottom 22mm \
-  --font-manifest fonts.json --browser /usr/bin/chromium-browser --keep-build --json
+  --margin 20mm --margin-top 18mm --margin-outer 20mm --margin-bottom 22mm \
+  --margin-inner 14mm --font-manifest fonts.json \
+  --browser /usr/bin/chromium-browser --keep-build --json
 ```
 
 Omit `--browser` for books without Mermaid; diagrams require an explicitly
@@ -555,14 +561,18 @@ yarn literate latex path/to/project --output books/book.tex --paper a4 --margin 
 Omit `path/to/project` to use the current directory. The `.tex` destination is
 relative to the selected project root; absolute paths and paths outside it are
 rejected. Paper choices are `a4`, `a5`, `letter`, and `legal`; defaults are A4 and
-20 mm uniform margins. Override individual sides with `--margin-top`,
-`--margin-right`, `--margin-bottom`, and `--margin-left`; unspecified sides use
-`--margin`. Values accept decimal millimetres only, each from 5 to 50 mm, leaving
-at least an 80 × 100 mm text area. For example:
+20 mm uniform margins. Physical `--margin-left` and `--margin-right` produce a
+one-sided layout. For a bound book, use `--margin-inner` and `--margin-outer` to
+produce mirrored two-sided pages; inner is the binding edge and outer is the
+opposite edge on both odd and even pages. Do not combine the physical and mirrored
+horizontal options. Top, bottom, and unspecified sides use `--margin`. Values
+accept decimal millimetres only, each from 5 to 50 mm, leaving at least an
+80 × 100 mm text area. For example:
 
 ```sh
 yarn literate latex path/to/project --output books/book.tex --paper a5 \
-  --margin 20mm --margin-top 18mm --margin-right 16mm --margin-bottom 22mm
+  --margin 20mm --margin-top 18mm --margin-outer 20mm --margin-bottom 22mm \
+  --margin-inner 14mm
 ```
 
 Run

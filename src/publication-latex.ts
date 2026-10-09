@@ -8,7 +8,7 @@ import type { PandocDocument, PandocBlock, PublicationAsset } from './publicatio
 import { defaultThemeName, getTheme } from './themes';
 import type { LiterateTheme } from './themes';
 import { highlightContribution, syntaxStyle } from './publication-highlight';
-export const publicationTemplateVersion = 2;
+export const publicationTemplateVersion = 3;
 export interface LatexOptions {
     assetPath?: (asset: PublicationAsset) => string;
     theme?: string;
@@ -18,6 +18,8 @@ export interface LatexOptions {
     marginRightMm?: number;
     marginBottomMm?: number;
     marginLeftMm?: number;
+    marginInnerMm?: number;
+    marginOuterMm?: number;
     bodyFont?: string;
     headingFont?: string;
     codeFont?: string;
@@ -35,7 +37,7 @@ export type LatexConverter = (document: PandocDocument,
     options: LatexConversionOptions) => Promise<string>;
 export interface LatexResult { latex?: string; diagnostics: GenerationDiagnostic[]; }
 interface CheckedOptions {
-    theme: LiterateTheme; paper: string; geometry: string;
+    theme: LiterateTheme; paper: string; geometry: string; sides: 'oneside' | 'twoside';
     bodyFont: string; headingFont: string; codeFont: string;
     fragmentFont: string; noteFont: string; codeLigatures: boolean;
     bodyFontSize: number; codeFontSize: number;
@@ -56,20 +58,31 @@ function checkOptions(options: LatexOptions, settings: PublicationSettingsResult
     ]);
     const paper = papers.get(options.paper ?? 'A4');
     const margin = options.marginMm ?? 20;
-    const overrides = [options.marginTopMm, options.marginRightMm,
-        options.marginBottomMm, options.marginLeftMm];
-    const [top, right, bottom, left] = overrides.map(value => value ?? margin);
-    if (!paper || [margin, top, right, bottom, left].some(value =>
+    const physical = [options.marginRightMm, options.marginLeftMm];
+    const mirrored = [options.marginOuterMm, options.marginInnerMm];
+    const twoSided = mirrored.some(value => value !== undefined);
+    if (twoSided && physical.some(value => value !== undefined)) {
+        throw new Error('Cannot mix left/right margins with inner/outer margins');
+    }
+    if (twoSided && rail) { throw new Error('Inner/outer margins are not supported with annotation rails'); }
+    const top = options.marginTopMm ?? margin, bottom = options.marginBottomMm ?? margin;
+    const first = (twoSided ? options.marginOuterMm : options.marginRightMm) ?? margin;
+    const second = (twoSided ? options.marginInnerMm : options.marginLeftMm) ?? margin;
+    if (!paper || [margin, top, bottom, first, second].some(value =>
         !Number.isFinite(value) || value < 5 || value > 50) ||
-        paper[1] - left - right - (rail ? 30 : 0) < 80 || paper[2] - top - bottom < 100) {
+        paper[1] - first - second - (rail ? 30 : 0) < 80 || paper[2] - top - bottom < 100) {
         throw new Error('Invalid paper or margin; require 5–50 mm and an 80 × 100 mm body');
     }
-    const geometry = rail || overrides.some(value => value !== undefined)
-        ? `top=${top}mm,right=${right + (rail ? 30 : 0)}mm,bottom=${bottom}mm,left=${left}mm`
-        : `margin=${margin}mm`;
+    const sides = twoSided ? 'twoside' : 'oneside';
+    const geometry = twoSided
+        ? `top=${top}mm,outer=${first}mm,bottom=${bottom}mm,inner=${second}mm`
+        : rail || physical.some(value => value !== undefined)
+            || options.marginTopMm !== undefined || options.marginBottomMm !== undefined
+            ? `top=${top}mm,right=${first + (rail ? 30 : 0)}mm,bottom=${bottom}mm,left=${second}mm`
+            : `margin=${margin}mm`;
     const codeLigatures = options.codeLigatures ?? settings.codeLigatures;
     if (typeof codeLigatures !== 'boolean') { throw new Error('Code ligatures must be boolean'); }
-    return { theme, paper: paper[0], geometry, codeLigatures, portableFonts: options.portableFonts,
+    return { theme, paper: paper[0], geometry, sides, codeLigatures, portableFonts: options.portableFonts,
         bodyFontSize: settings.fontSizes.body, codeFontSize: settings.fontSizes.code,
         bodyFont: fontName(options.bodyFont ?? settings.fonts.body),
         headingFont: fontName(options.headingFont ?? settings.fonts.heading),
@@ -160,7 +173,7 @@ function slantFeatures(font: PortableFont): string {
 function template(body: string, options: CheckedOptions, definitions: string[], rail: string): string {
     const c = options.theme.colors;
     return `% Literate publication template v${publicationTemplateVersion}\n` + themeNotice() + String.raw`\newcommand{\DoNotLoadEpstopdf}{}
-    \documentclass[fontsize=${decimal(options.bodyFontSize)}pt,oneside,openany]{scrbook}
+    \documentclass[fontsize=${decimal(options.bodyFontSize)}pt,${options.sides},openany]{scrbook}
 ${'\\usepackage'}{fontspec}
 ${fontCommand('\\setmainfont', options.bodyFont, options)}
 ${fontCommand('\\newfontfamily\\headingfont', options.headingFont, options)}

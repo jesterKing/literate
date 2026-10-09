@@ -57,6 +57,11 @@ function cancelled(token: vscode.CancellationToken): void {
 
 ## Workspace and geometry policy
 
+The editor asks for top, outer, bottom, and inner margins. Inner is the binding edge:
+it is left on odd right-hand pages and right on even left-hand pages. Outer exchanges
+those physical edges. The extension sends explicit inner/outer CLI options, selecting
+a mirrored two-sided book rather than treating left and right as fixed page edges.
+
 Recheck trust and workspace membership at asynchronous boundaries. A save dialog's
 initial directory is guidance, not containment enforcement. Each path is checked
 lexically and against disk ancestors, including dangling symlinks. Normal OS
@@ -80,7 +85,7 @@ export function validateMargins(paper: string, value: string): string | undefine
     const values = parts.map(Number);
     if (parts.length !== 4 || parts.some(part => !/^\d+(?:\.\d+)?$/.test(part)) ||
         values.some(value => !Number.isFinite(value) || value < 5 || value > 50)) {
-        return 'Enter four numbers in mm: top,right,bottom,left (each 5–50).';
+        return 'Enter four numbers in mm: top,outer,bottom,inner (each 5–50).';
     }
     const size = papers[paper];
     if (!size || size[0] - values[1] - values[3] < 80 || size[1] - values[0] - values[2] < 100) {
@@ -322,7 +327,8 @@ async function chooseOutput(root: string, kind: Kind, previous?: Choice): Promis
     if (previous && names.includes(previous.paper)) { names.splice(names.indexOf(previous.paper), 1); names.unshift(previous.paper); }
     const paper = await vscode.window.showQuickPick(names, { placeHolder: 'Publication page size' });
     if (paper === undefined) { return undefined; }
-    const margins = await vscode.window.showInputBox({ prompt: 'Margins in mm: top,right,bottom,left (5–50 each)',
+    const margins = await vscode.window.showInputBox({
+        prompt: 'Margins in mm: top, outer, bottom, inner/binding (5–50 each)',
         value: previous?.margins ?? '20,20,20,20', validateInput: value => validateMargins(paper, value) });
     if (margins === undefined) { return undefined; }
     const error = validateMargins(paper, margins);
@@ -345,7 +351,9 @@ async function chooseOutput(root: string, kind: Kind, previous?: Choice): Promis
 
 ## Command lifetime
 
-The global guard covers prompts, queue waiting, snapshot and helper cleanup.
+The global guard covers prompts, queue waiting, snapshot, helper cleanup, and
+remembering the successful choice. It is released before the optional Open Output
+notification, which is not publication work and must not block another export.
 Each operation owns its cancellation source. Removing its selected workspace folder
 latches authority revocation and cancels the source, even if the folder is re-added.
 The optional bridge parameter isolates process behavior in headless tests.
@@ -392,7 +400,7 @@ are resolved only after a destination has been chosen.
             cancelled(token);
             authority();
             const root = await canonicalRoot(folder);
-            const key = `literate.publication:${kind}:${root}`;
+            const key = `literate.publication:v2:${kind}:${root}`;
             const choice = await chooseOutput(root, kind, context.workspaceState.get<Choice>(key));
             if (!choice) { return; }
             cancelled(token);
@@ -423,7 +431,7 @@ the queue on resolution or rejection, never merely on a cancellation request.
                         authority();
                         const documents = await capturePublicationSnapshot(root, token);
                         const args = [kind, root, '--output', choice.destination, '--paper', choice.paper];
-                        ['top', 'right', 'bottom', 'left'].forEach((side, index) => {
+                        ['top', 'outer', 'bottom', 'inner'].forEach((side, index) => {
                             args.push(`--margin-${side}`, `${choice.margins.split(',')[index]}mm`);
                         });
                         if (browser) { args.push('--browser', browser); }
@@ -455,6 +463,7 @@ output without claiming failure or taking further success actions. PDFs open via
             authority();
             await context.workspaceState.update(key, choice);
             authority();
+            publishing = false;
             const action = await vscode.window.showInformationMessage(`Exported ${choice.destination}`, 'Open Output');
             if (action === 'Open Output') {
                 authority();
@@ -472,9 +481,8 @@ output without claiming failure or taking further success actions. PDFs open via
             }
         } finally {
             operation.source.dispose();
-            active = undefined;
-            publishing = false;
-            if (disposed) { output.dispose(); }
+            if (active === operation) { active = undefined; publishing = false; }
+            if (disposed && !active) { output.dispose(); }
         }
     };
 ```

@@ -123,11 +123,14 @@ test('LaTeX merges adjacent equivalent scopes instead of splitting operators int
 });
 
 const marginSides = ['marginTopMm', 'marginRightMm', 'marginBottomMm', 'marginLeftMm'] as const;
+const allMarginSides = [...marginSides, 'marginInnerMm', 'marginOuterMm'] as const;
 const invalidOptions: LatexOptions[] = [
-    ...marginSides.flatMap(side => [NaN, Infinity, -Infinity, 4.9, 50.1, '20'].map(value =>
+    ...allMarginSides.flatMap(side => [NaN, Infinity, -Infinity, 4.9, 50.1, '20'].map(value =>
         ({ [side]: value } as LatexOptions))),
     { paper: 'A5', marginLeftMm: 50, marginRightMm: 19 },
     { paper: 'A5', marginLeftMm: 19, marginRightMm: 50 },
+    { marginLeftMm: 10, marginInnerMm: 10 },
+    { marginRightMm: 10, marginOuterMm: 10 },
     { codeLigatures: 'off' as unknown as boolean },
     ...['bodyFont', 'headingFont', 'fragmentFont', 'noteFont'].flatMap(role =>
         ['', '../font', 'bad\\input', 'A'.repeat(101)].map(value => ({ [role]: value }))),
@@ -163,6 +166,22 @@ for (const side of marginSides) {
         }
     });
 }
+
+test('LaTeX mirrors inner and outer margins across two-sided pages', async () => {
+    const result = await renderLatex(parse(''), { marginTopMm: 18, marginOuterMm: 20,
+        marginBottomMm: 22, marginInnerMm: 14 }, convert);
+    assert.deepEqual(result.diagnostics, []);
+    assert.ok(result.latex!.includes('\\documentclass[fontsize=11pt,twoside,openany]{scrbook}'));
+    assert.ok(result.latex!.includes('[a4paper,top=18mm,outer=20mm,bottom=22mm,inner=14mm]{geometry}'));
+});
+
+test('LaTeX rejects mirrored margins while annotation rails remain one-sided', async () => {
+    const result = await renderLatex(parse('```NOTE\nBinding note.\n```\n'),
+        { marginInnerMm: 14, marginOuterMm: 20 }, convert);
+    assert.equal(result.latex, undefined);
+    assert.equal(result.diagnostics[0].code, 'latex-options');
+    assert.match(result.diagnostics[0].message, /annotation rails/);
+});
 
 test('LaTeX validates opposite-side sums and keeps inclusive margin bounds', async () => {
     const result = await renderLatex(parse(''), { paper: 'A5', marginTopMm: 50,

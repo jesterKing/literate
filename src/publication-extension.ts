@@ -40,7 +40,7 @@ export function validateMargins(paper: string, value: string): string | undefine
     const values = parts.map(Number);
     if (parts.length !== 4 || parts.some(part => !/^\d+(?:\.\d+)?$/.test(part)) ||
         values.some(value => !Number.isFinite(value) || value < 5 || value > 50)) {
-        return 'Enter four numbers in mm: top,right,bottom,left (each 5–50).';
+        return 'Enter four numbers in mm: top,outer,bottom,inner (each 5–50).';
     }
     const size = papers[paper];
     if (!size || size[0] - values[1] - values[3] < 80 || size[1] - values[0] - values[2] < 100) {
@@ -213,7 +213,8 @@ async function chooseOutput(root: string, kind: Kind, previous?: Choice): Promis
     if (previous && names.includes(previous.paper)) { names.splice(names.indexOf(previous.paper), 1); names.unshift(previous.paper); }
     const paper = await vscode.window.showQuickPick(names, { placeHolder: 'Publication page size' });
     if (paper === undefined) { return undefined; }
-    const margins = await vscode.window.showInputBox({ prompt: 'Margins in mm: top,right,bottom,left (5–50 each)',
+    const margins = await vscode.window.showInputBox({
+        prompt: 'Margins in mm: top, outer, bottom, inner/binding (5–50 each)',
         value: previous?.margins ?? '20,20,20,20', validateInput: value => validateMargins(paper, value) });
     if (margins === undefined) { return undefined; }
     const error = validateMargins(paper, margins);
@@ -266,7 +267,7 @@ export function registerPublicationCommands(context: vscode.ExtensionContext,
             cancelled(token);
             authority();
             const root = await canonicalRoot(folder);
-            const key = `literate.publication:${kind}:${root}`;
+            const key = `literate.publication:v2:${kind}:${root}`;
             const choice = await chooseOutput(root, kind, context.workspaceState.get<Choice>(key));
             if (!choice) { return; }
             cancelled(token);
@@ -288,7 +289,7 @@ export function registerPublicationCommands(context: vscode.ExtensionContext,
                         authority();
                         const documents = await capturePublicationSnapshot(root, token);
                         const args = [kind, root, '--output', choice.destination, '--paper', choice.paper];
-                        ['top', 'right', 'bottom', 'left'].forEach((side, index) => {
+                        ['top', 'outer', 'bottom', 'inner'].forEach((side, index) => {
                             args.push(`--margin-${side}`, `${choice.margins.split(',')[index]}mm`);
                         });
                         if (browser) { args.push('--browser', browser); }
@@ -311,6 +312,7 @@ export function registerPublicationCommands(context: vscode.ExtensionContext,
             authority();
             await context.workspaceState.update(key, choice);
             authority();
+            publishing = false;
             const action = await vscode.window.showInformationMessage(`Exported ${choice.destination}`, 'Open Output');
             if (action === 'Open Output') {
                 authority();
@@ -328,9 +330,8 @@ export function registerPublicationCommands(context: vscode.ExtensionContext,
             }
         } finally {
             operation.source.dispose();
-            active = undefined;
-            publishing = false;
-            if (disposed) { output.dispose(); }
+            if (active === operation) { active = undefined; publishing = false; }
+            if (disposed && !active) { output.dispose(); }
         }
     };
     const commands = ([['literate.exportLatex', 'latex'], ['literate.exportPdf', 'pdf']] as const)

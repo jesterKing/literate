@@ -157,11 +157,13 @@ project fails rather than passing vacuously.</p>
 <pre><code><span class="hljs-keyword">const</span> commands = [<span class="hljs-string">'generate'</span>, <span class="hljs-string">'check'</span>, <span class="hljs-string">'inspect'</span>, <span class="hljs-string">'self-check'</span>, <span class="hljs-string">'latex'</span>, <span class="hljs-string">'pdf'</span>];
 <span class="hljs-keyword">const</span> latexMarginOptions = [
     [<span class="hljs-string">'--margin'</span>, <span class="hljs-string">'marginMm'</span>], [<span class="hljs-string">'--margin-top'</span>, <span class="hljs-string">'marginTopMm'</span>], [<span class="hljs-string">'--margin-right'</span>, <span class="hljs-string">'marginRightMm'</span>],
-    [<span class="hljs-string">'--margin-bottom'</span>, <span class="hljs-string">'marginBottomMm'</span>], [<span class="hljs-string">'--margin-left'</span>, <span class="hljs-string">'marginLeftMm'</span>]
+    [<span class="hljs-string">'--margin-bottom'</span>, <span class="hljs-string">'marginBottomMm'</span>], [<span class="hljs-string">'--margin-left'</span>, <span class="hljs-string">'marginLeftMm'</span>],
+    [<span class="hljs-string">'--margin-inner'</span>, <span class="hljs-string">'marginInnerMm'</span>], [<span class="hljs-string">'--margin-outer'</span>, <span class="hljs-string">'marginOuterMm'</span>]
 ] <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span>;
 <span class="hljs-keyword">const</span> latexValueFlags = [<span class="hljs-string">'--output'</span>, <span class="hljs-string">'--paper'</span>, <span class="hljs-string">'--font-manifest'</span>, <span class="hljs-string">'--browser'</span>, ...latexMarginOptions.<span class="hljs-title">map</span>(<span class="hljs-function">(</span><span class="hljs-params">[flag]</span><span class="hljs-function">) =&gt;</span> flag)];
 <span class="hljs-keyword">const</span> latexUsage = <span class="hljs-string">'latex [root] --output path.tex [--paper a4|a5|letter|legal] [--margin 20mm]'</span>
-    + <span class="hljs-string">' [--margin-top Nmm] [--margin-right Nmm] [--margin-bottom Nmm] [--margin-left Nmm] [--font-manifest path.json] [--browser /absolute/path] [--json]'</span>;
+    + <span class="hljs-string">' [--margin-top Nmm] [--margin-right Nmm] [--margin-bottom Nmm] [--margin-left Nmm]'</span>
+    + <span class="hljs-string">' [--margin-inner Nmm] [--margin-outer Nmm] [--font-manifest path.json] [--browser /absolute/path] [--json]'</span>;
 <span class="hljs-keyword">const</span> pdfUsage = latexUsage.<span class="hljs-title">replace</span>(<span class="hljs-string">'latex [root] --output path.tex'</span>, <span class="hljs-string">'pdf [root] --output path.pdf'</span>) + <span class="hljs-string">' [--keep-build]'</span>;
 <span class="hljs-keyword">const</span> usage = <span class="hljs-string">'Usage: node out/cli-entry.js generate|check|inspect|self-check [root] [--json]</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>
     + <span class="hljs-string">`       node out/cli-entry.js </span><span class="hljs-subst">${latexUsage}</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>
@@ -169,7 +171,7 @@ project fails rather than passing vacuously.</p>
     + <span class="hljs-string">'       node out/cli-entry.js &lt;command&gt; --help [--json]</span><span class="hljs-string">\n</span><span class="hljs-string">       node out/cli-entry.js --help [--json]</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>;
 <span class="hljs-keyword">const</span> <span class="hljs-attr">descriptions</span>: <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt; = <span class="hljs-title">Object</span>.<span class="hljs-title">fromEntries</span>([
     [<span class="hljs-string">'generate'</span>, <span class="hljs-string">'Write missing or changed generated files.'</span>],
-    [<span class="hljs-string">'latex'</span>, <span class="hljs-string">'Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving at least an 80 × 100 mm body. Each side overrides --margin; unspecified sides use --margin or 20mm. Fonts resolve from root index.literate SETTINGS. No TeX/book PDF execution. --font-manifest opts into explicit font/license companions. --browser explicitly selects a sandbox-capable system Chromium for Mermaid PDF/SVG assets; no browser download.'</span>],
+    [<span class="hljs-string">'latex'</span>, <span class="hljs-string">'Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving at least an 80 × 100 mm body. Physical left/right produce one-sided pages; inner/outer produce mirrored two-sided pages. Each side overrides --margin; unspecified sides use --margin or 20mm. Fonts resolve from root index.literate SETTINGS. No TeX/book PDF execution. --font-manifest opts into explicit font/license companions. --browser explicitly selects a sandbox-capable system Chromium for Mermaid PDF/SVG assets; no browser download.'</span>],
     [<span class="hljs-string">'pdf'</span>, <span class="hljs-string">'Compile a .pdf book using Pandoc and latexmk/LuaLaTeX on PATH. Shares latex paper, margin, font-manifest and browser options; output is relative to root. Only the PDF is published. --keep-build retains the private build directory on success or compilation failure. TeX/Lua execution is for trusted inputs, not a sandbox. No source/HTML generation or tool downloads.'</span>],
     [<span class="hljs-string">'check'</span>, <span class="hljs-string">'Report missing or stale generated files without writing.'</span>],
     [<span class="hljs-string">'inspect'</span>, <span class="hljs-string">'Report documents, templates, and fragment definitions and dependencies without reading outputs or writing.'</span>],
@@ -534,8 +536,10 @@ to <code>a4</code>, margin to <code>20mm</code>. The existing root <code>index.l
 selects the publication palette through <code>resolveProjectTheme</code>; invalid themes
 report its diagnostics before conversion. Decimal millimetres are the only accepted
 margin unit, subject to the renderer's page/body constraints. <code>--margin-top</code>,
-<code>--margin-right</code>, <code>--margin-bottom</code>, and <code>--margin-left</code> override individual sides;
-each unspecified side falls back to <code>--margin</code>, or <code>20mm</code> when it is omitted.</p>
+<code>--margin-right</code>, <code>--margin-bottom</code>, and <code>--margin-left</code> override physical sides in a
+one-sided book. <code>--margin-inner</code> and <code>--margin-outer</code> instead select mirrored,
+two-sided pages; they cannot be combined with left/right. Each unspecified side
+falls back to <code>--margin</code>, or <code>20mm</code> when it is omitted.</p>
 <p>The renderer automatically resolves font settings from the root <code>index.literate</code>
 SETTINGS through its publication-settings dependency. There are no font CLI flags.
 Export does not install or bundle fonts. The resolved families and the template's
@@ -1055,9 +1059,16 @@ this dependent check when argument errors already prevent execution.</p>
     <span class="hljs-attr">a4</span>: [<span class="hljs-number">210</span>, <span class="hljs-number">297</span>], <span class="hljs-attr">a5</span>: [<span class="hljs-number">148</span>, <span class="hljs-number">210</span>], <span class="hljs-attr">letter</span>: [<span class="hljs-number">215.9</span>, <span class="hljs-number">279.4</span>], <span class="hljs-attr">legal</span>: [<span class="hljs-number">215.9</span>, <span class="hljs-number">355.6</span>]
 };
 <span class="hljs-keyword">if</span> (!response.<span class="hljs-property">errors</span>.<span class="hljs-property">length</span>) {
+    <span class="hljs-keyword">const</span> physical = values.<span class="hljs-title">has</span>(<span class="hljs-string">'--margin-left'</span>) || values.<span class="hljs-title">has</span>(<span class="hljs-string">'--margin-right'</span>);
+    <span class="hljs-keyword">const</span> mirrored = values.<span class="hljs-title">has</span>(<span class="hljs-string">'--margin-inner'</span>) || values.<span class="hljs-title">has</span>(<span class="hljs-string">'--margin-outer'</span>);
+    <span class="hljs-keyword">if</span> (physical &amp;&amp; mirrored) {
+        response.<span class="hljs-property">errors</span>.<span class="hljs-title">push</span>(<span class="hljs-string">'Cannot mix --margin-left/--margin-right with --margin-inner/--margin-outer'</span>);
+    }
     <span class="hljs-keyword">const</span> [width, height] = paperSizes[paper];
     <span class="hljs-keyword">const</span> uniform = latexOptions.<span class="hljs-property">marginMm</span> ?? <span class="hljs-number">20</span>;
-    <span class="hljs-keyword">const</span> horizontal = (latexOptions.<span class="hljs-property">marginLeftMm</span> ?? uniform) + (latexOptions.<span class="hljs-property">marginRightMm</span> ?? uniform);
+    <span class="hljs-keyword">const</span> horizontal = mirrored
+        ? (latexOptions.<span class="hljs-property">marginInnerMm</span> ?? uniform) + (latexOptions.<span class="hljs-property">marginOuterMm</span> ?? uniform)
+        : (latexOptions.<span class="hljs-property">marginLeftMm</span> ?? uniform) + (latexOptions.<span class="hljs-property">marginRightMm</span> ?? uniform);
     <span class="hljs-keyword">const</span> vertical = (latexOptions.<span class="hljs-property">marginTopMm</span> ?? uniform) + (latexOptions.<span class="hljs-property">marginBottomMm</span> ?? uniform);
     <span class="hljs-keyword">if</span> (width - horizontal &lt; <span class="hljs-number">80</span> || height - vertical &lt; <span class="hljs-number">100</span>) {
         response.<span class="hljs-property">errors</span>.<span class="hljs-title">push</span>(<span class="hljs-string">'Margins must leave at least an 80 × 100 mm body for the selected paper'</span>);

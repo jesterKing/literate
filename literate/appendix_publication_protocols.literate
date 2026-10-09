@@ -297,13 +297,16 @@ The shared machine-readable contract for all commands is documented in
 
 ## LaTeX integration contract
 
-Literate owns publication template version 1. This version identifies the emitted
+Literate owns publication template version 3. This version identifies the emitted
 renderer template; it is not a custom-template extension point. The renderer expects
 Pandoc to provide only a body, uses top-level chapters, and disables Pandoc syntax
 highlighting so Literate can preserve fragment-aware syntax and links.
 
-The template targets LuaLaTeX and uses a one-sided KOMA-Script book with controlled
-font, geometry, color, code, image, link, index, and annotation-rail support. Text is
+The template targets LuaLaTeX and uses a controlled KOMA-Script book. Physical
+left/right margins retain one-sided pages. Inner/outer margins select mirrored
+two-sided pages, where the binding and outer edges exchange physical sides after
+each page turn. Font, geometry, color, code, image, link, and index behavior remains
+renderer-owned. Text is
 escaped as data. Logical destinations are encoded again before entering LaTeX; raw
 fragment names, paths, and annotation keys are never interpolated as commands.
 
@@ -311,6 +314,8 @@ Page choices are `a4`, `a5`, `letter`, and `legal`. Margins are decimal millimet
 each from 5 through 50, and must leave at least an 80 × 100 mm body. An annotated
 book reserves a right-hand rail and gap in addition to the author's requested margin,
 so geometry that works for an unannotated book may be rejected for an annotated one.
+Annotation rails currently remain one-sided; combining them with inner/outer margins
+is rejected until their shipout model supports alternating outer edges.
 
 `latex` writes the TeX document and planned companions but never starts TeX. `pdf`
 stages that same plan privately, preflights the compiler tools and packages, checks

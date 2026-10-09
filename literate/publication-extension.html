@@ -179,6 +179,10 @@ Fonts and licenses are optional disk inputs; editor overlays apply only to sourc
 
 </div>
 </div><h2>Workspace and geometry policy</h2>
+<p>The editor asks for top, outer, bottom, and inner margins. Inner is the binding edge:
+it is left on odd right-hand pages and right on even left-hand pages. Outer exchanges
+those physical edges. The extension sends explicit inner/outer CLI options, selecting
+a mirrored two-sided book rather than treating left and right as fixed page edges.</p>
 <p>Recheck trust and workspace membership at asynchronous boundaries. A save dialog's
 initial directory is guidance, not containment enforcement. Each path is checked
 lexically and against disk ancestors, including dangling symlinks. Normal OS
@@ -203,7 +207,7 @@ preflights and protects publication inputs at transaction time.</p>
     <span class="hljs-keyword">const</span> values = parts.<span class="hljs-title">map</span>(<span class="hljs-title">Number</span>);
     <span class="hljs-keyword">if</span> (parts.<span class="hljs-property">length</span> !== <span class="hljs-number">4</span> || parts.<span class="hljs-title">some</span>(<span class="hljs-params">part</span><span class="hljs-function"> =&gt;</span> !<span class="hljs-regexp">/^</span><span class="hljs-regexp">\d</span><span class="hljs-regexp">+(?:</span><span class="hljs-regexp">\.</span><span class="hljs-regexp">\d</span><span class="hljs-regexp">+)?$/</span>.<span class="hljs-title">test</span>(part)) ||
         values.<span class="hljs-title">some</span>(<span class="hljs-params">value</span><span class="hljs-function"> =&gt;</span> !<span class="hljs-title">Number</span>.<span class="hljs-built_in">isFinite</span>(value) || value &lt; <span class="hljs-number">5</span> || value &gt; <span class="hljs-number">50</span>)) {
-        <span class="hljs-keyword">return</span> <span class="hljs-string">'Enter four numbers in mm: top,right,bottom,left (each 5–50).'</span>;
+        <span class="hljs-keyword">return</span> <span class="hljs-string">'Enter four numbers in mm: top,outer,bottom,inner (each 5–50).'</span>;
     }
     <span class="hljs-keyword">const</span> size = papers[paper];
     <span class="hljs-keyword">if</span> (!size || size[<span class="hljs-number">0</span>] - values[<span class="hljs-number">1</span>] - values[<span class="hljs-number">3</span>] &lt; <span class="hljs-number">80</span> || size[<span class="hljs-number">1</span>] - values[<span class="hljs-number">0</span>] - values[<span class="hljs-number">2</span>] &lt; <span class="hljs-number">100</span>) {
@@ -464,7 +468,8 @@ returns, and enforce the save URI's scheme, extension and containment ourselves.
     <span class="hljs-keyword">if</span> (previous &amp;&amp; names.<span class="hljs-title">includes</span>(previous.<span class="hljs-property">paper</span>)) { names.<span class="hljs-title">splice</span>(names.<span class="hljs-title">indexOf</span>(previous.<span class="hljs-property">paper</span>), <span class="hljs-number">1</span>); names.<span class="hljs-title">unshift</span>(previous.<span class="hljs-property">paper</span>); }
     <span class="hljs-keyword">const</span> paper = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showQuickPick</span>(names, { <span class="hljs-attr">placeHolder</span>: <span class="hljs-string">'Publication page size'</span> });
     <span class="hljs-keyword">if</span> (paper === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
-    <span class="hljs-keyword">const</span> margins = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showInputBox</span>({ <span class="hljs-attr">prompt</span>: <span class="hljs-string">'Margins in mm: top,right,bottom,left (5–50 each)'</span>,
+    <span class="hljs-keyword">const</span> margins = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showInputBox</span>({
+        <span class="hljs-attr">prompt</span>: <span class="hljs-string">'Margins in mm: top, outer, bottom, inner/binding (5–50 each)'</span>,
         <span class="hljs-attr">value</span>: previous?.<span class="hljs-property">margins</span> ?? <span class="hljs-string">'20,20,20,20'</span>, <span class="hljs-attr">validateInput</span>: <span class="hljs-params">value</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">validateMargins</span>(paper, value) });
     <span class="hljs-keyword">if</span> (margins === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
     <span class="hljs-keyword">const</span> error = <span class="hljs-title">validateMargins</span>(paper, margins);
@@ -488,7 +493,9 @@ returns, and enforce the save URI's scheme, extension and containment ourselves.
 </div>
 <nav class="fragment-navigation" aria-label="Contributions of publication extension prompts"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" aria-label="Previous contribution of publication extension prompts">Previous</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1" aria-label="Base contribution of publication extension prompts">Base</a></nav>
 </div><h2>Command lifetime</h2>
-<p>The global guard covers prompts, queue waiting, snapshot and helper cleanup.
+<p>The global guard covers prompts, queue waiting, snapshot, helper cleanup, and
+remembering the successful choice. It is released before the optional Open Output
+notification, which is not publication work and must not block another export.
 Each operation owns its cancellation source. Removing its selected workspace folder
 latches authority revocation and cancels the source, even if the folder is re-added.
 The optional bridge parameter isolates process behavior in headless tests.</p>
@@ -539,7 +546,7 @@ are resolved only after a destination has been chosen.</p>
             <span class="hljs-title">cancelled</span>(token);
             <span class="hljs-title">authority</span>();
             <span class="hljs-keyword">const</span> root = <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalRoot</span>(folder);
-            <span class="hljs-keyword">const</span> key = <span class="hljs-string">`literate.publication:</span><span class="hljs-subst">${kind}</span><span class="hljs-string">:</span><span class="hljs-subst">${root}</span><span class="hljs-string">`</span>;
+            <span class="hljs-keyword">const</span> key = <span class="hljs-string">`literate.publication:v2:</span><span class="hljs-subst">${kind}</span><span class="hljs-string">:</span><span class="hljs-subst">${root}</span><span class="hljs-string">`</span>;
             <span class="hljs-keyword">const</span> choice = <span class="hljs-keyword">await</span> <span class="hljs-title">chooseOutput</span>(root, kind, context.<span class="hljs-property">workspaceState</span>.<span class="hljs-property">get</span>&lt;<span class="hljs-title">Choice</span>&gt;(key));
             <span class="hljs-keyword">if</span> (!choice) { <span class="hljs-keyword">return</span>; }
             <span class="hljs-title">cancelled</span>(token);
@@ -573,7 +580,7 @@ the queue on resolution or rejection, never merely on a cancellation request.</p
                         <span class="hljs-title">authority</span>();
                         <span class="hljs-keyword">const</span> documents = <span class="hljs-keyword">await</span> <span class="hljs-title">capturePublicationSnapshot</span>(root, token);
                         <span class="hljs-keyword">const</span> args = [kind, root, <span class="hljs-string">'--output'</span>, choice.<span class="hljs-property">destination</span>, <span class="hljs-string">'--paper'</span>, choice.<span class="hljs-property">paper</span>];
-                        [<span class="hljs-string">'top'</span>, <span class="hljs-string">'right'</span>, <span class="hljs-string">'bottom'</span>, <span class="hljs-string">'left'</span>].<span class="hljs-title">forEach</span>(<span class="hljs-function">(</span><span class="hljs-params">side, index</span><span class="hljs-function">) =&gt;</span> {
+                        [<span class="hljs-string">'top'</span>, <span class="hljs-string">'outer'</span>, <span class="hljs-string">'bottom'</span>, <span class="hljs-string">'inner'</span>].<span class="hljs-title">forEach</span>(<span class="hljs-function">(</span><span class="hljs-params">side, index</span><span class="hljs-function">) =&gt;</span> {
                             args.<span class="hljs-title">push</span>(<span class="hljs-string">`--margin-</span><span class="hljs-subst">${side}</span><span class="hljs-string">`</span>, <span class="hljs-string">`</span><span class="hljs-subst">${choice.margins.split(</span><span class="hljs-string">','</span><span class="hljs-subst">)[index]}</span><span class="hljs-string">mm`</span>);
                         });
                         <span class="hljs-keyword">if</span> (browser) { args.<span class="hljs-title">push</span>(<span class="hljs-string">'--browser'</span>, browser); }
@@ -608,6 +615,7 @@ output without claiming failure or taking further success actions. PDFs open via
 <pre><code>            <span class="hljs-title">authority</span>();
             <span class="hljs-keyword">await</span> context.<span class="hljs-property">workspaceState</span>.<span class="hljs-title">update</span>(key, choice);
             <span class="hljs-title">authority</span>();
+            publishing = <span class="hljs-literal">false</span>;
             <span class="hljs-keyword">const</span> action = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showInformationMessage</span>(<span class="hljs-string">`Exported </span><span class="hljs-subst">${choice.destination}</span><span class="hljs-string">`</span>, <span class="hljs-string">'Open Output'</span>);
             <span class="hljs-keyword">if</span> (action === <span class="hljs-string">'Open Output'</span>) {
                 <span class="hljs-title">authority</span>();
@@ -625,9 +633,8 @@ output without claiming failure or taking further success actions. PDFs open via
             }
         } <span class="hljs-keyword">finally</span> {
             operation.<span class="hljs-property">source</span>.<span class="hljs-title">dispose</span>();
-            active = <span class="hljs-literal">undefined</span>;
-            publishing = <span class="hljs-literal">false</span>;
-            <span class="hljs-keyword">if</span> (disposed) { output.<span class="hljs-title">dispose</span>(); }
+            <span class="hljs-keyword">if</span> (active === operation) { active = <span class="hljs-literal">undefined</span>; publishing = <span class="hljs-literal">false</span>; }
+            <span class="hljs-keyword">if</span> (disposed &amp;&amp; !active) { output.<span class="hljs-title">dispose</span>(); }
         }
     };
 </code></pre>

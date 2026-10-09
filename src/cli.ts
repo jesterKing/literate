@@ -39,11 +39,13 @@ interface CliResponse {
 const commands = ['generate', 'check', 'inspect', 'self-check', 'latex', 'pdf'];
 const latexMarginOptions = [
     ['--margin', 'marginMm'], ['--margin-top', 'marginTopMm'], ['--margin-right', 'marginRightMm'],
-    ['--margin-bottom', 'marginBottomMm'], ['--margin-left', 'marginLeftMm']
+    ['--margin-bottom', 'marginBottomMm'], ['--margin-left', 'marginLeftMm'],
+    ['--margin-inner', 'marginInnerMm'], ['--margin-outer', 'marginOuterMm']
 ] as const;
 const latexValueFlags = ['--output', '--paper', '--font-manifest', '--browser', ...latexMarginOptions.map(([flag]) => flag)];
 const latexUsage = 'latex [root] --output path.tex [--paper a4|a5|letter|legal] [--margin 20mm]'
-    + ' [--margin-top Nmm] [--margin-right Nmm] [--margin-bottom Nmm] [--margin-left Nmm] [--font-manifest path.json] [--browser /absolute/path] [--json]';
+    + ' [--margin-top Nmm] [--margin-right Nmm] [--margin-bottom Nmm] [--margin-left Nmm]'
+    + ' [--margin-inner Nmm] [--margin-outer Nmm] [--font-manifest path.json] [--browser /absolute/path] [--json]';
 const pdfUsage = latexUsage.replace('latex [root] --output path.tex', 'pdf [root] --output path.pdf') + ' [--keep-build]';
 const usage = 'Usage: node out/cli-entry.js generate|check|inspect|self-check [root] [--json]\n'
     + `       node out/cli-entry.js ${latexUsage}\n`
@@ -51,7 +53,7 @@ const usage = 'Usage: node out/cli-entry.js generate|check|inspect|self-check [r
     + '       node out/cli-entry.js <command> --help [--json]\n       node out/cli-entry.js --help [--json]\n';
 const descriptions: Record<string, string> = Object.fromEntries([
     ['generate', 'Write missing or changed generated files.'],
-    ['latex', 'Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving at least an 80 × 100 mm body. Each side overrides --margin; unspecified sides use --margin or 20mm. Fonts resolve from root index.literate SETTINGS. No TeX/book PDF execution. --font-manifest opts into explicit font/license companions. --browser explicitly selects a sandbox-capable system Chromium for Mermaid PDF/SVG assets; no browser download.'],
+    ['latex', 'Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving at least an 80 × 100 mm body. Physical left/right produce one-sided pages; inner/outer produce mirrored two-sided pages. Each side overrides --margin; unspecified sides use --margin or 20mm. Fonts resolve from root index.literate SETTINGS. No TeX/book PDF execution. --font-manifest opts into explicit font/license companions. --browser explicitly selects a sandbox-capable system Chromium for Mermaid PDF/SVG assets; no browser download.'],
     ['pdf', 'Compile a .pdf book using Pandoc and latexmk/LuaLaTeX on PATH. Shares latex paper, margin, font-manifest and browser options; output is relative to root. Only the PDF is published. --keep-build retains the private build directory on success or compilation failure. TeX/Lua execution is for trusted inputs, not a sandbox. No source/HTML generation or tool downloads.'],
     ['check', 'Report missing or stale generated files without writing.'],
     ['inspect', 'Report documents, templates, and fragment definitions and dependencies without reading outputs or writing.'],
@@ -450,9 +452,16 @@ export async function run(args: string[], io: CliIO = defaultIO,
             a4: [210, 297], a5: [148, 210], letter: [215.9, 279.4], legal: [215.9, 355.6]
         };
         if (!response.errors.length) {
+            const physical = values.has('--margin-left') || values.has('--margin-right');
+            const mirrored = values.has('--margin-inner') || values.has('--margin-outer');
+            if (physical && mirrored) {
+                response.errors.push('Cannot mix --margin-left/--margin-right with --margin-inner/--margin-outer');
+            }
             const [width, height] = paperSizes[paper];
             const uniform = latexOptions.marginMm ?? 20;
-            const horizontal = (latexOptions.marginLeftMm ?? uniform) + (latexOptions.marginRightMm ?? uniform);
+            const horizontal = mirrored
+                ? (latexOptions.marginInnerMm ?? uniform) + (latexOptions.marginOuterMm ?? uniform)
+                : (latexOptions.marginLeftMm ?? uniform) + (latexOptions.marginRightMm ?? uniform);
             const vertical = (latexOptions.marginTopMm ?? uniform) + (latexOptions.marginBottomMm ?? uniform);
             if (width - horizontal < 80 || height - vertical < 100) {
                 response.errors.push('Margins must leave at least an 80 × 100 mm body for the selected paper');

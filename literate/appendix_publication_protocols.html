@@ -361,18 +361,23 @@ cancellation arriving after a validated commit does not turn success into failur
 The shared machine-readable contract for all commands is documented in
 <a href="cli.html">Command-line generation</a>.</p>
 <h2>LaTeX integration contract</h2>
-<p>Literate owns publication template version 1. This version identifies the emitted
+<p>Literate owns publication template version 3. This version identifies the emitted
 renderer template; it is not a custom-template extension point. The renderer expects
 Pandoc to provide only a body, uses top-level chapters, and disables Pandoc syntax
 highlighting so Literate can preserve fragment-aware syntax and links.</p>
-<p>The template targets LuaLaTeX and uses a one-sided KOMA-Script book with controlled
-font, geometry, color, code, image, link, index, and annotation-rail support. Text is
+<p>The template targets LuaLaTeX and uses a controlled KOMA-Script book. Physical
+left/right margins retain one-sided pages. Inner/outer margins select mirrored
+two-sided pages, where the binding and outer edges exchange physical sides after
+each page turn. Font, geometry, color, code, image, link, and index behavior remains
+renderer-owned. Text is
 escaped as data. Logical destinations are encoded again before entering LaTeX; raw
 fragment names, paths, and annotation keys are never interpolated as commands.</p>
 <p>Page choices are <code>a4</code>, <code>a5</code>, <code>letter</code>, and <code>legal</code>. Margins are decimal millimetres,
 each from 5 through 50, and must leave at least an 80 × 100 mm body. An annotated
 book reserves a right-hand rail and gap in addition to the author's requested margin,
-so geometry that works for an unannotated book may be rejected for an annotated one.</p>
+so geometry that works for an unannotated book may be rejected for an annotated one.
+Annotation rails currently remain one-sided; combining them with inner/outer margins
+is rejected until their shipout model supports alternating outer edges.</p>
 <p><code>latex</code> writes the TeX document and planned companions but never starts TeX. <code>pdf</code>
 stages that same plan privately, preflights the compiler tools and packages, checks
 reference and annotation-rail convergence, validates bounded PDF bytes, and then

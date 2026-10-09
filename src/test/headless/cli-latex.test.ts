@@ -170,6 +170,21 @@ test('latex applies asymmetric CLI margins with uniform fallback and root font s
     }
 });
 
+test('latex emits mirrored two-sided geometry for inner and outer margins', async t => {
+    const root = fixture(t);
+    write(root, 'index.literate', source);
+    const result = await command([...latex(root), '--margin-top', '18mm', '--margin-outer', '20mm',
+        '--margin-bottom', '22mm', '--margin-inner', '14mm']);
+    assert.equal(result.code, 0, failureText(result.response));
+    const tex = fs.readFileSync(path.join(root, 'books/book.tex'), 'utf8');
+    assert.ok(tex.includes('\\documentclass[fontsize=11pt,twoside,openany]{scrbook}'));
+    assert.ok(tex.includes('top=18mm,outer=20mm,bottom=22mm,inner=14mm'));
+
+    const mixed = await command([...latex(root), '--margin-left', '14mm', '--margin-outer', '20mm']);
+    assert.equal(mixed.code, 2);
+    assert.match(failureText(mixed.response), /Cannot mix/);
+});
+
 test('latex invalid font setting preserves output even when followed by a valid repeated value', async t => {
     const root = fixture(t);
     write(root, 'index.literate', '```SETTINGS\nfont-code=bad/path\nfont-code=Safe Font\n```\n' + source);
