@@ -1,6 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The projection problem</title>
   <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
   <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
   <style>.literate-document {
@@ -137,7 +140,7 @@ book. A projection is not an approximate preview and not a saved generated file.
 uses the same fragment order, expansion rules, escaping, templates, and validation
 policy as generation, while retaining provenance that ordinary generated source
 would lose.</p>
-<pre class="mermaid">
+<pre class="literate-mermaid">
 flowchart TD
     Snapshot[Captured literate project] --&gt; Validate[Validate the complete fragment graph]
     Validate --&gt; Expand[Assemble every source output in memory]
@@ -187,7 +190,7 @@ Literate consequently leaves several kinds of text unmapped:</p>
 <p>The policy is deliberately conservative. An unmapped character does not mean that
 the character is unimportant to the generated program. It means that Literate
 cannot point to an equal, directly editable character in the captured source.</p>
-<pre class="mermaid">
+<pre class="literate-mermaid">
 flowchart LR
     A[Literal source text] --&gt;|equal text| B[Mapped generated segment]
     C[Reference marker] --&gt;|expands to other text| D[No mapping]
@@ -233,7 +236,7 @@ deterministic output and expansion order. That exact occurrence then travels wit
 the request. A returning range is accepted only if it lies inside the same mapping
 object in the same projected file. Equal text elsewhere is not enough, and a newly
 constructed copy of the mapping record is not treated as the original occurrence.</p>
-<pre class="mermaid">
+<pre class="literate-mermaid">
 flowchart TD
     Source[One source interval] --&gt; First[First generated occurrence]
     Source --&gt; Second[Second generated occurrence]
@@ -248,10 +251,10 @@ selection. This model is sufficient for services that only observe code: duplica
 answers can be deduplicated, and an unsafe range can be omitted. A proposed edit is
 more dangerous because changing one source interval affects its other expansions.
 That stricter boundary is the subject of Chapter 22.</p>
-<p><code>projection position helpers</code> converts between UTF-16 positions and absolute
-offsets without losing occurrence identity.</p>
+<p><code>map one exact projection occurrence</code> carries an absolute source offset into its
+selected generated interval and maps only ranges confined to that same occurrence.</p>
 <div class="codefragment">
-<div class="fragmentname" id="c-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073-006c0069007400650072006100740065002f00700072006f006a0065006300740069006f006e005f00700072006f0062006c0065006d002e006c0069007400650072006100740065-1"><span id="f-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073"></span><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073" data-literate-target="f-00700072006f006a0065006300740069006f006e00200070006f0073006900740069006f006e002000680065006c0070006500720073" aria-label="Definition of projection position helpers">&lt;&lt;projection position helpers&gt;&gt;=</a></div>
+<div class="fragmentname" id="c-006d006100700020006f006e0065002000650078006100630074002000700072006f006a0065006300740069006f006e0020006f006300630075007200720065006e00630065-006c0069007400650072006100740065002f00700072006f006a0065006300740069006f006e005f00700072006f0062006c0065006d002e006c0069007400650072006100740065-1"><span id="f-006d006100700020006f006e0065002000650078006100630074002000700072006f006a0065006300740069006f006e0020006f006300630075007200720065006e00630065"></span><a class="literate-tag-name" href="#f-006d006100700020006f006e0065002000650078006100630074002000700072006f006a0065006300740069006f006e0020006f006300630075007200720065006e00630065" data-literate-target="f-006d006100700020006f006e0065002000650078006100630074002000700072006f006a0065006300740069006f006e0020006f006300630075007200720065006e00630065" aria-label="Definition of map one exact projection occurrence">&lt;&lt;map one exact projection occurrence&gt;&gt;=</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">mapSourcePosition</span>(<span class="hljs-params">files: LanguageProjection[], sourcePath: </span><span class="hljs-built_in">string</span><span class="hljs-params">, offset: </span><span class="hljs-built_in">number</span>): <span class="hljs-title">SourceProjectionPosition</span> | <span class="hljs-literal">undefined</span> {
     <span class="hljs-keyword">if</span> (!<span class="hljs-title">Number</span>.<span class="hljs-title">isInteger</span>(offset) || offset &lt; <span class="hljs-number">0</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
@@ -291,9 +294,6 @@ language server and limited proof about where that source came from. The next
 chapter adds the long-lived process that consumes those projected files without
 requiring them to be written to disk.</p>
 </div>
-<script type="module">
-  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
-</script>
+<script defer src="../out/mermaid-preview.js"></script>
 </body>
 </html>

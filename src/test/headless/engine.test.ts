@@ -3,7 +3,7 @@
 import assert = require('node:assert/strict');
 import { test } from 'node:test';
 import { discoveryExcludedDirectories, generateProject, resolveProjectTheme, safeRelativePath, SourceDocument } from '../../engine';
-import { defaultThemeName, getTheme, mermaidTheme, themeCss, themes } from '../../themes';
+import { defaultThemeName, getTheme, themeCss, themes } from '../../themes';
 
 function fence(header: string, content = ''): string {
     return '```' + header + '\n' + content + (content && !content.endsWith('\n') ? '\n' : '') + '```\n';
@@ -208,7 +208,7 @@ test('invalid themes retain exact diagnostic lines, suppress outputs, and preser
     }
 });
 
-test('every canonical theme embeds its CSS and strict Mermaid configuration project-wide', () => {
+test('every canonical theme embeds its CSS and uses the local Mermaid runtime project-wide', () => {
     for (const theme of themes) {
         const files = successful([
             document(fence('SETTINGS', 'theme=' + theme.name) + root('unchanged')),
@@ -219,19 +219,24 @@ test('every canonical theme embeds its CSS and strict Mermaid configuration proj
             assert.ok(file.content.includes('<style>' + themeCss(theme) + '</style>'));
             assert.ok(file.content.includes('<div class="literate-document" data-literate-theme="' + theme.name + '">'));
             assert.ok(!file.content.includes('href="./style.css"'));
-            assert.match(file.content, /mermaid@10\/dist\/mermaid\.esm\.min\.mjs/);
-            const configuration = /mermaid\.initialize\(([^\n]+)\);/.exec(file.content)![1];
-            assert.deepEqual(JSON.parse(configuration), { ...mermaidTheme(theme), startOnLoad: true, securityLevel: 'strict' });
-            assert.ok(!/[<>&\u2028\u2029]/.test(configuration));
+            assert.doesNotMatch(file.content, /<script[^>]+https?:|import\s+[^;]+https?:/);
+            const prefix = file.path.includes('/') ? '../' : './';
+            assert.ok(file.content.includes(`<script defer src="${prefix}out/mermaid-preview.js"></script>`));
         }
-        assert.match(files.find(file => file.path === 'nested/chapter.html')!.content, /<pre class="mermaid">/);
+        assert.match(files.find(file => file.path === 'nested/chapter.html')!.content, /<pre class="literate-mermaid">/);
     }
 });
 
-test('default HTML is self-contained and invalid theme text cannot inject script', () => {
+test('default HTML has accessible metadata, a local runtime, and injection-safe settings', () => {
     const html = successful([document('# Default')])[0].content;
     assert.ok(html.includes('<style>' + themeCss(getTheme(defaultThemeName)!) + '</style>'));
     assert.match(html, /data-literate-theme="rosepine-dawn"/);
+    assert.match(html, /<html lang="en">/);
+    assert.match(html, /<meta charset="utf-8" \/>/);
+    assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1" \/>/);
+    assert.match(html, /<title>Default<\/title>/);
+    assert.match(html, /<script defer src="\.\/out\/mermaid-preview\.js"><\/script>/);
+    assert.doesNotMatch(html, /<script[^>]+https?:|import\s+[^;]+https?:/);
     rejected([document(fence('SETTINGS', 'theme=</script><script>alert(1)</script>') + root('safe'))], /Unknown theme/);
 });
 
@@ -240,9 +245,10 @@ test('explicit THEME slots replace literally and do not duplicate the sheet in C
     const sheet = '<style>' + themeCss(getTheme(defaultThemeName)!) + '</style>';
     const content = '<div class="literate-document" data-literate-theme="rosepine-dawn"><p>Prose [THEME]</p>\n</div>';
     const html = successful([document(text)], {
-        'page.template': '[THEME]|[CONTENT]|[THEME]|[CONTENT]|[AUTHORS]|[CODE]',
+        'page.template': '[TITLE]|[PREVIEW]|[THEME]|[CONTENT]|[THEME]|[CONTENT]|[AUTHORS]|[CODE]',
     })[0].content;
-    assert.equal(html, sheet + '|' + content + '|' + sheet + '|' + content
+    assert.equal(html, 'index.literate|<script defer src="./out/mermaid-preview.js"></script>|'
+        + sheet + '|' + content + '|' + sheet + '|' + content
         + '|<meta name="author" content="[THEME]">|[CODE]');
     assert.equal(output(fence('text: <<main.*>>= result.txt $ template=source.template', '[THEME]'),
         { 'source.template': '[THEME]|[CODE]|[THEME]' }), '[THEME]|[THEME]\n|[THEME]');

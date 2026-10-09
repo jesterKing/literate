@@ -1,6 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Appendix C — Editor integration details</title>
   <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
   <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
   <style>.literate-document {
@@ -729,13 +732,14 @@ snapshot and again before locations are returned.</p>
 
 </div>
 </div><h2>Rename provider</h2>
-<p>Rename uses the shared symbol planner, so only explicit fragment names change.
-Validation rejects ambiguous definitions, collisions and changes to root status
-without touching prose, filenames or generated output.</p>
+<p>Rename uses the shared symbol planner, so only recognized fragment-name ranges
+change. Those ranges include explicit prose mentions as well as declarations and
+references. Validation rejects ambiguous definitions, collisions, and root-status
+changes without touching unrelated prose, filenames, or generated output.</p>
 <p>The provider returns a proposed workspace edit; it does not apply edits or write
 generated files itself. VS Code owns applying the edit. A resulting literate
 content-change event can then trigger the ordinary generation path.</p>
-<pre class="mermaid">
+<pre class="literate-mermaid">
 sequenceDiagram
     participant User as Author
     participant VS as VS Code
@@ -775,7 +779,7 @@ interaction and validation failure visible.</p>
     <span class="hljs-title">constructor</span>(<span class="hljs-keyword">public</span><span class="hljs-params"> </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> repository : FragmentRepository</span>) {}
 
     <span data-literate-explore="f-007000720065007000610072006500200066007200610067006d0065006e0074002000720065006e0061006d0065"><a class="literate-tag-name" href="#f-007000720065007000610072006500200066007200610067006d0065006e0074002000720065006e0061006d0065" data-literate-target="f-007000720065007000610072006500200066007200610067006d0065006e0074002000720065006e0061006d0065" aria-label="Definition of prepare fragment rename">&lt;&lt;prepare fragment rename&gt;&gt;</a></span>
-    <span data-literate-explore="f-0066007200610067006d0065006e0074002000720065006e0061006d0065002000700072006f00760069006400650072"><a class="literate-tag-name" href="#f-0066007200610067006d0065006e0074002000720065006e0061006d0065002000700072006f00760069006400650072" data-literate-target="f-0066007200610067006d0065006e0074002000720065006e0061006d0065002000700072006f00760069006400650072" aria-label="Definition of fragment rename provider">&lt;&lt;fragment rename provider&gt;&gt;</a></span>
+    <span data-literate-explore="f-00700072006f007600690064006500200066007200610067006d0065006e0074002000720065006e0061006d0065002000650064006900740073"><a class="literate-tag-name" href="#f-00700072006f007600690064006500200066007200610067006d0065006e0074002000720065006e0061006d0065002000650064006900740073" data-literate-target="f-00700072006f007600690064006500200066007200610067006d0065006e0074002000720065006e0061006d0065002000650064006900740073" aria-label="Definition of provide fragment rename edits">&lt;&lt;provide fragment rename edits&gt;&gt;</a></span>
 }
 </code></pre>
 
@@ -814,7 +818,7 @@ A no-op plan also verifies that the selected symbol has one base definition.</p>
 preparation. Cancellation discards the whole result, never a partial edit set.
 Planner errors propagate to the editor as actionable rename failures.</p>
 <div class="codefragment">
-<div class="fragmentname" id="c-0066007200610067006d0065006e0074002000720065006e0061006d0065002000700072006f00760069006400650072-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0066007200610067006d0065006e0074002000720065006e0061006d0065002000700072006f00760069006400650072"></span><a class="literate-tag-name" href="#f-0066007200610067006d0065006e0074002000720065006e0061006d0065002000700072006f00760069006400650072" data-literate-target="f-0066007200610067006d0065006e0074002000720065006e0061006d0065002000700072006f00760069006400650072" aria-label="Definition of fragment rename provider">&lt;&lt;fragment rename provider&gt;&gt;=</a></div>
+<div class="fragmentname" id="c-00700072006f007600690064006500200066007200610067006d0065006e0074002000720065006e0061006d0065002000650064006900740073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00700072006f007600690064006500200066007200610067006d0065006e0074002000720065006e0061006d0065002000650064006900740073"></span><a class="literate-tag-name" href="#f-00700072006f007600690064006500200066007200610067006d0065006e0074002000720065006e0061006d0065002000650064006900740073" data-literate-target="f-00700072006f007600690064006500200066007200610067006d0065006e0074002000720065006e0061006d0065002000650064006900740073" aria-label="Definition of provide fragment rename edits">&lt;&lt;provide fragment rename edits&gt;&gt;=</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">public</span> <span class="hljs-keyword">async</span> <span class="hljs-title">provideRenameEdits</span>(<span class="hljs-params">
     </span><span class="hljs-variable">document</span><span class="hljs-params"> : vscode.TextDocument,
@@ -1280,9 +1284,6 @@ function initializePublicationExploration(document) {
     });
 }
 )(document);</script></div>
-<script type="module">
-  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
-</script>
+<script defer src="../out/mermaid-preview.js"></script>
 </body>
 </html>

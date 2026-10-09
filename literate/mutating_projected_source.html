@@ -1,6 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mutating projected source safely</title>
   <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
   <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
   <style>.literate-document {
@@ -136,7 +139,7 @@ by itself.</p>
 only two map safely, applying the two would create a fourth program that neither the
 server nor the author intended. Literate therefore treats the entire action as one
 atomic validation unit.</p>
-<pre class="mermaid">
+<pre class="literate-mermaid">
 flowchart TD
     Reply[Server action reply] --&gt; Explicit{Explicit user invocation?}
     Explicit --&gt;|No| Reject[Offer no action]
@@ -168,10 +171,10 @@ code.</p>
 <p>Only an explicit editor invocation reaches this path. Automatically requested
 actions are rejected before snapshot capture, so background activity cannot turn a
 server suggestion into a source-changing option.</p>
-<p><code>action snapshot</code> records the exact occurrence and source bytes that may authorize
-a later edit.</p>
+<p><code>validate the code action snapshot</code> proves that an already captured context still
+owns one unchanged occurrence before any returned range is mapped.</p>
 <div class="codefragment">
-<div class="fragmentname" id="c-0061006300740069006f006e00200073006e0061007000730068006f0074-006c0069007400650072006100740065002f006d00750074006100740069006e0067005f00700072006f006a00650063007400650064005f0073006f0075007200630065002e006c0069007400650072006100740065-1"><span id="f-0061006300740069006f006e00200073006e0061007000730068006f0074"></span><a class="literate-tag-name" href="#f-0061006300740069006f006e00200073006e0061007000730068006f0074" data-literate-target="f-0061006300740069006f006e00200073006e0061007000730068006f0074" aria-label="Definition of action snapshot">&lt;&lt;action snapshot&gt;&gt;=</a></div>
+<div class="fragmentname" id="c-00760061006c00690064006100740065002000740068006500200063006f0064006500200061006300740069006f006e00200073006e0061007000730068006f0074-006c0069007400650072006100740065002f006d00750074006100740069006e0067005f00700072006f006a00650063007400650064005f0073006f0075007200630065002e006c0069007400650072006100740065-1"><span id="f-00760061006c00690064006100740065002000740068006500200063006f0064006500200061006300740069006f006e00200073006e0061007000730068006f0074"></span><a class="literate-tag-name" href="#f-00760061006c00690064006100740065002000740068006500200063006f0064006500200061006300740069006f006e00200073006e0061007000730068006f0074" data-literate-target="f-00760061006c00690064006100740065002000740068006500200063006f0064006500200061006300740069006f006e00200073006e0061007000730068006f0074" aria-label="Definition of validate the code action snapshot">&lt;&lt;validate the code action snapshot&gt;&gt;=</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">fresh</span>(<span class="hljs-params">context: LanguageCodeActionContext</span>): <span class="hljs-built_in">boolean</span> {
     <span class="hljs-keyword">const</span> { <span class="hljs-variable">document</span>, file, mapping } = context;
@@ -210,7 +213,7 @@ seam, or another generated occurrence.</p>
 projected file used for the request. If that same interval appears twice there,
 changing the single source interval would alter both generated occurrences, while
 the server's edit may describe only one. Literate rejects that ambiguity.</p>
-<pre class="mermaid">
+<pre class="literate-mermaid">
 flowchart LR
     Source[One editable source interval] --&gt; A[Generated occurrence A]
     Source --&gt; B[Generated occurrence B]
@@ -275,9 +278,6 @@ unambiguous order must all agree. Chapter 23 places that proof inside the wider
 editor coordinator that schedules snapshots, sessions, automatic requests, and
 background diagnostics.</p>
 </div>
-<script type="module">
-  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
-</script>
+<script defer src="../out/mermaid-preview.js"></script>
 </body>
 </html>

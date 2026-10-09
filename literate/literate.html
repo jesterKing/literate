@@ -1,6 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Literate Programming</title>
   <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
   <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
   <style>.literate-document {
@@ -175,7 +178,7 @@ program.</p>
 read text and how they report results, not in the fragment language they accept.
 The editor's Markdown preview is a separate presentation path: it does not write
 source files or the generated book.</p>
-<pre class="mermaid">
+<pre class="literate-mermaid">
 flowchart TD
     Author[Edit literate documents] --&gt; Editor[VS Code adapter]
     Author --&gt; Saved[Save documents to disk]
@@ -207,7 +210,7 @@ relationships behind navigation: fragment information holds the unexpanded code
 and its fence tokens, while grabbed states retain the parsed documents. A
 fragment assembled from several documents can have tokens from several states;
 its <code>env</code> points to the first accepted part's document.</p>
-<pre class="mermaid">
+<pre class="literate-mermaid">
 classDiagram
     class FragmentRepository
     class FragmentMap
@@ -458,9 +461,9 @@ property. Each <code>GrabbedStateList</code> is keyed by the full workspace URI.
 
 </div>
 <nav class="fragment-navigation" aria-label="Contributions of fragment repository member variables"><a class="literate-tag-name" href="#c-0066007200610067006d0065006e00740020007200650070006f007300690074006f007200790020006d0065006d0062006500720020007600610072006900610062006c00650073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-3" data-literate-target="c-0066007200610067006d0065006e00740020007200650070006f007300690074006f007200790020006d0065006d0062006500720020007600610072006900610062006c00650073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-3" aria-label="Previous contribution of fragment repository member variables">Previous</a> · <a class="literate-tag-name" href="#c-0066007200610067006d0065006e00740020007200650070006f007300690074006f007200790020006d0065006d0062006500720020007600610072006900610062006c00650073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-1" data-literate-target="c-0066007200610067006d0065006e00740020007200650070006f007300690074006f007200790020006d0065006d0062006500720020007600610072006900610062006c00650073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-1" aria-label="Base contribution of fragment repository member variables">Base</a> · <a class="literate-tag-name" href="#c-0066007200610067006d0065006e00740020007200650070006f007300690074006f007200790020006d0065006d0062006500720020007600610072006900610062006c00650073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-5" data-literate-target="c-0066007200610067006d0065006e00740020007200650070006f007300690074006f007200790020006d0065006d0062006500720020007600610072006900610062006c00650073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-5" aria-label="Next contribution of fragment repository member variables">Next</a></nav>
-</div><p>Finally we need a <code>DiagnosticCollection</code> to be able to keep track of detected
-problems in <strong>literate</strong> projects. TBD: this probably needs to be changed into a
-map of <code>DiagnosticCollection</code>, again with the workspace folder names as keys.</p>
+</div><p>One <code>DiagnosticCollection</code> presents problems from every workspace. Repository
+refresh replaces only the entries owned by the affected workspace, so repairing one
+project does not clear another project's diagnostics.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0066007200610067006d0065006e00740020007200650070006f007300690074006f007200790020006d0065006d0062006500720020007600610072006900610062006c00650073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-5"><a class="literate-tag-name" href="#f-0066007200610067006d0065006e00740020007200650070006f007300690074006f007200790020006d0065006d0062006500720020007600610072006900610062006c00650073" data-literate-target="f-0066007200610067006d0065006e00740020007200650070006f007300690074006f007200790020006d0065006d0062006500720020007600610072006900610062006c00650073" aria-label="Definition of fragment repository member variables">&lt;&lt;fragment repository member variables&gt;&gt;=+</a></div>
 <div class="code">
@@ -634,7 +637,7 @@ This map is not another generator and never supplies generation diagnostics.</p>
 <p>A content-change request follows this sequence. Navigation providers use the
 same refresh path but omit the output-writing branch. The serial queue keeps a
 second request waiting until the first has finished, including its writes.</p>
-<pre class="mermaid">
+<pre class="literate-mermaid">
 sequenceDiagram
     participant VS as VS Code
     participant Repo as Fragment repository
@@ -1442,8 +1445,8 @@ are interested in.</p>
 
 </div>
 <nav class="fragment-navigation" aria-label="Contributions of method to get token at position"><a class="literate-tag-name" href="#c-006d006500740068006f006400200074006f002000670065007400200074006f006b0065006e00200061007400200070006f0073006900740069006f006e-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-5" data-literate-target="c-006d006500740068006f006400200074006f002000670065007400200074006f006b0065006e00200061007400200070006f0073006900740069006f006e-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-5" aria-label="Previous contribution of method to get token at position">Previous</a> · <a class="literate-tag-name" href="#c-006d006500740068006f006400200074006f002000670065007400200074006f006b0065006e00200061007400200070006f0073006900740069006f006e-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-1" data-literate-target="c-006d006500740068006f006400200074006f002000670065007400200074006f006b0065006e00200061007400200070006f0073006900740069006f006e-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-1" aria-label="Base contribution of method to get token at position">Base</a></nav>
-</div><p>The <code>TokenUsage</code> interface helps determining whether we have a token or not.
-TBD: we can probably get rid of this interface and just use a <code>Token</code> directly.</p>
+</div><p><code>TokenUsage</code> gives callers one stable empty value when no Markdown token owns the
+requested position.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0074006f006b0065006e00200075007300610067006500200069006e0074006500720066006100630065-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-1"><span id="f-0074006f006b0065006e00200075007300610067006500200069006e0074006500720066006100630065"></span><a class="literate-tag-name" href="#f-0074006f006b0065006e00200075007300610067006500200069006e0074006500720066006100630065" data-literate-target="f-0074006f006b0065006e00200075007300610067006500200069006e0074006500720066006100630065" aria-label="Definition of token usage interface">&lt;&lt;token usage interface&gt;&gt;=</a></div>
 <div class="code">
@@ -2990,9 +2993,6 @@ function initializePublicationExploration(document) {
     });
 }
 )(document);</script></div>
-<script type="module">
-  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-  mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});
-</script>
+<script defer src="../out/mermaid-preview.js"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@ import hljs from 'highlight.js';
 import { collectAnnotations, PublicationAnnotations } from './publication-annotations';
 import { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAnnotation,
     installScreenTermLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle, renderScreenExploration } from './publication-screen';
-import { defaultThemeName, getTheme, themeCss, mermaidTheme } from './themes';
+import { defaultThemeName, getTheme, themeCss } from './themes';
 
 export interface SourceDocument { path: string; text: string; }
 export interface GenerationDiagnostic { path: string; line: number; column: number; message: string; code?: string; }
@@ -244,17 +244,17 @@ export function resolveProjectTheme(documents: SourceDocument[]): { name: string
 
 /** Replacement values are literal and are never scanned for more placeholders. */
 function substitute(template: string, values: Record<string, string>): string {
-    return template.replace(/\[(CODE|CONTENT|AUTHORS|THEME)\]/g, (match, key: string) =>
+    return template.replace(/\[(CODE|CONTENT|AUTHORS|THEME|TITLE|PREVIEW)\]/g, (match, key: string) =>
         Object.prototype.hasOwnProperty.call(values, key.toLowerCase()) ? values[key.toLowerCase()] : match);
 }
 
-function defaultTemplate(themeName: string): string {
-    const configuration = JSON.stringify({ ...mermaidTheme(getTheme(themeName)!), startOnLoad: true, securityLevel: 'strict' })
-        .replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026')
-        .replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+function defaultTemplate(_themeName: string): string {
     return `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>[TITLE]</title>
   <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
   <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
   [THEME]
@@ -262,10 +262,7 @@ function defaultTemplate(themeName: string): string {
 </head>
 <body>
 [CONTENT]
-<script type="module">
-  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-  mermaid.initialize(${configuration});
-</script>
+[PREVIEW]
 </body>
 </html>`;
 }
@@ -612,7 +609,7 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
         const header = headers.get(token);
         const language = header?.language || token.info.trim().split(/\s+/)[0];
         const code = token.content.replace(/\\<</g, () => '<<');
-        if (!header && language === 'mermaid') { return `<pre class="mermaid">\n${escape(code)}</pre>\n`; }
+        if (!header && language === 'mermaid') { return `<pre class="literate-mermaid">\n${escape(code)}</pre>\n`; }
         const part = screenIndex(publication).tokens.get(env.path)?.get(index);
         const rendered = part ? renderScreenCode(part, publication, 'html')
             : language && hljs.getLanguage(language) ? hljs.highlight(code, { language }).value : escape(code);
@@ -626,14 +623,22 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
     const metaAuthors = authors.split(';').map(author => `<meta name="author" content="${escape(author)}">`).join('');
     const theme = `<style>${themeCss(getTheme(projectTheme.name)!)}${annotations.terms.length || annotations.notes.length ? screenStyle : ''}</style>`;
     for (const path of order) {
+        const documentTokens = tokens.get(path)!;
         const literateScreen = { model: publication, annotations, path, format: 'html' as const };
-        const literateUseTargets = screenTermUseAnchors(tokens.get(path)!, annotations, path);
-            const rendered = md.renderer.render(tokens.get(path)!, md.options, { path, literateScreen, literateUseTargets })
-            + renderScreenIndexes(literateScreen, order)
-                    + renderScreenExploration(publication, path, 'html');
+        const literateUseTargets = screenTermUseAnchors(documentTokens, annotations, path);
+        const rendered = md.renderer.render(documentTokens, md.options, { path, literateScreen, literateUseTargets })
+            + renderScreenIndexes(literateScreen, order) + renderScreenExploration(publication, path, 'html');
         const wrapper = `<div class="literate-document" data-literate-theme="${escape(projectTheme.name)}">${rendered}</div>`;
         const content = htmlTemplate.includes('[THEME]') ? wrapper : theme + wrapper;
-        files.push({ path: safeRelativePath(path.replace(/\.literate$/, '.html'))!, content: substitute(htmlTemplate, { content, authors: metaAuthors, theme }) });
+        const output = safeRelativePath(path.replace(/\.literate$/, '.html'))!;
+        const heading = documentTokens.findIndex(token => token.type === 'heading_open' && token.tag === 'h1');
+        const title = heading >= 0 && documentTokens[heading + 1]?.type === 'inline'
+            ? documentTokens[heading + 1].content.trim() || path : path;
+        const depth = output.split('/').length - 1;
+        const preview = `<script defer src="${'../'.repeat(depth) || './'}out/mermaid-preview.js"></script>`;
+        files.push({ path: output, content: substitute(htmlTemplate, {
+            content, authors: metaAuthors, theme, title: escape(title), preview
+        }) });
     }
     for (const file of files) { file.content = file.content.replace(/\r\n|\r/g, '\n'); }
     return { files, diagnostics, inspection, publication };

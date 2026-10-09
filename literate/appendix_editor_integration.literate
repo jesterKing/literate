@@ -614,9 +614,10 @@ context.subscriptions.push(
 
 ## Rename provider
 
-Rename uses the shared symbol planner, so only explicit fragment names change.
-Validation rejects ambiguous definitions, collisions and changes to root status
-without touching prose, filenames or generated output.
+Rename uses the shared symbol planner, so only recognized fragment-name ranges
+change. Those ranges include explicit prose mentions as well as declarations and
+references. Validation rejects ambiguous definitions, collisions, and root-status
+changes without touching unrelated prose, filenames, or generated output.
 
 The provider returns a proposed workspace edit; it does not apply edits or write
 generated files itself. VS Code owns applying the edit. A resulting literate
@@ -662,7 +663,7 @@ export class LiterateRenameProvider implements vscode.RenameProvider
     constructor(public readonly repository : FragmentRepository) {}
 
     <<prepare fragment rename>>
-    <<fragment rename provider>>
+    <<provide fragment rename edits>>
 }
 ```
 
@@ -698,7 +699,7 @@ The actual request refreshes again: the user may have edited a buffer since
 preparation. Cancellation discards the whole result, never a partial edit set.
 Planner errors propagate to the editor as actionable rename failures.
 
-``` ts : <<fragment rename provider>>=
+``` ts : <<provide fragment rename edits>>=
 public async provideRenameEdits(
     document : vscode.TextDocument,
     position : vscode.Position,

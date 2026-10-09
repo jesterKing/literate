@@ -328,9 +328,9 @@ property. Each `GrabbedStateList` is keyed by the full workspace URI.
 readonly grabbedStateForWorkspaceFolders : Map<string, GrabbedStateList>;
 ```
 
-Finally we need a `DiagnosticCollection` to be able to keep track of detected
-problems in **literate** projects. TBD: this probably needs to be changed into a
-map of `DiagnosticCollection`, again with the workspace folder names as keys.
+One `DiagnosticCollection` presents problems from every workspace. Repository
+refresh replaces only the entries owned by the affected workspace, so repairing one
+project does not clear another project's diagnostics.
 
 ``` ts : <<fragment repository member variables>>=+
 readonly diagnostics : vscode.DiagnosticCollection;
@@ -1231,8 +1231,8 @@ If no hit was found return the `emptyToken`.
 }
 ```
 
-The `TokenUsage` interface helps determining whether we have a token or not.
-TBD: we can probably get rid of this interface and just use a `Token` directly.
+`TokenUsage` gives callers one stable empty value when no Markdown token owns the
+requested position.
 
 ``` ts : <<token usage interface>>=
 interface TokenUsage
