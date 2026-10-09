@@ -560,6 +560,16 @@ async function annotationLatex(document: PandocDocument, project: ParsedProject,
                     notes.push({ target: target(note.target), number: note.number, body });
                     result.push(raw(`\\LitNoteUse{${target(note.target)}}`));
                 } else if (term) {
+                    const first = children.find(child => child.t === 'Para' || child.t === 'Plain');
+                    if (first) {
+                        const summary = await convert({ ...document, blocks: [first] }, conversionOptions);
+                        annotationText(summary);
+                        budget.size += summary.length;
+                        annotationSize(budget.size);
+                        const declaration = budget.terms.find(item => item.target === target(term.target));
+                        if (!declaration) { throw new Error('TERM rail declaration is missing'); }
+                        declaration.summary = summary;
+                    }
                     result.push(raw(`\\par${anchor(term.target)}\\textbf{${tex(term.title)}}\\par`), ...children);
                 } else { result.push({ ...block, c: [block.c[0], children] }); }
             } else { result.push(await ordinary(block, markers)); }

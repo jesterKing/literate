@@ -613,12 +613,14 @@ function ordinaryCode(blocks: PandocBlock[], theme: LiterateTheme): PandocBlock[
 
 ## Annotation destinations and the outer rail
 
-TERM definitions stay in prose. NOTE bodies are converted separately through the
-same trusted Pandoc writer, never flattened to plain strings. RawInline boundaries
-wrap the writer's formatted labels, so each label is emitted exactly once. Body
-links have definition-page references but no rail markers; prose uses get unique
-occurrence identities. Headings with TERM links are rejected by the bridge rather
-than risking marker replay in moving arguments.
+TERM definitions stay in prose. Their first top-level paragraph is also converted
+as a concise rail summary; later paragraphs remain only in the complete definition.
+NOTE bodies are converted separately through the same trusted Pandoc writer, never
+flattened to plain strings. RawInline boundaries wrap the writer's formatted labels,
+so each label is emitted exactly once. Body and summary links have definition-page
+references but no rail markers; prose uses get unique occurrence identities.
+Headings with TERM links are rejected by the bridge rather than risking marker
+replay in moving arguments.
 
 ```ts : <<publication LaTeX annotations>>=
 const conversionOptions: LatexConversionOptions = {
@@ -755,6 +757,16 @@ async function annotationLatex(document: PandocDocument, project: ParsedProject,
                     notes.push({ target: target(note.target), number: note.number, body });
                     result.push(raw(`\\LitNoteUse{${target(note.target)}}`));
                 } else if (term) {
+                    const first = children.find(child => child.t === 'Para' || child.t === 'Plain');
+                    if (first) {
+                        const summary = await convert({ ...document, blocks: [first] }, conversionOptions);
+                        annotationText(summary);
+                        budget.size += summary.length;
+                        annotationSize(budget.size);
+                        const declaration = budget.terms.find(item => item.target === target(term.target));
+                        if (!declaration) { throw new Error('TERM rail declaration is missing'); }
+                        declaration.summary = summary;
+                    }
                     result.push(raw(`\\par${anchor(term.target)}\\textbf{${tex(term.title)}}\\par`), ...children);
                 } else { result.push({ ...block, c: [block.c[0], children] }); }
             } else { result.push(await ordinary(block, markers)); }
@@ -842,11 +854,12 @@ export async function renderLatex(parsed: ParsedProject, options: LatexOptions,
         prepared.document.blocks = ordinaryCode(prepared.document.blocks, checked.theme);
 ```
 
-Empty NOTE bodies skip the body converter: Pandoc's empty stdout is rejected by
-the process adapter, but a numbered empty rail entry is valid. Nonempty notes
-remain sequential (at most 1000 body conversions), preserving fail-fast output
-checks without delimiter protocols. The final book conversion is separate from
-the rail-content budget and retains the converter's existing document limits.
+Empty NOTE bodies and TERM definitions without a top-level paragraph skip their
+body converter: Pandoc's empty stdout is rejected by the process adapter, but an
+empty rail entry is valid. TERM summaries and nonempty notes remain sequential,
+preserving fail-fast output checks without delimiter protocols. The final book
+conversion is separate from the rail-content budget and retains the converter's
+existing document limits.
 
 ```ts : <<publication LaTeX render>>=+
         stage = 'latex-conversion';

@@ -101,7 +101,7 @@ test('inline NOTE bodies and TERM labels retain M6 rail handling', async () => {
         return 'Controlled body';
     });
     assert.deepEqual(result.diagnostics, []);
-    assert.equal(seen.length, 3);
+    assert.equal(seen.length, 4);
     assert.match(result.latex!, /% literate-publication-rail-v1/);
     assert.match(result.latex!, /\\microtypesetup\{protrusion=false\}/);
 });

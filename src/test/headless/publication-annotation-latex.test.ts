@@ -10,7 +10,7 @@ import { createPdfCompiler } from '../../publication-pdf';
 import { collectAssets } from '../../publication-assets';
 
 const parse = (text: string) => parseProject([{ path: 'book.literate', text }]);
-const term = '```TERM alpha "Alpha & beta"\nDefinition *emphasis* and `code`.\n```\n';
+const term = '```TERM alpha "Alpha & beta"\nDefinition *emphasis* and `code`.\n\nA fuller second paragraph.\n```\n';
 const note = '```NOTE\nA **bold** note with [definition](term:alpha).\n\n- first\n- second\n```\n';
 const encode = (value: string) => 'lit-' + value.split('').map(c => c.charCodeAt(0).toString(16).padStart(4, '0')).join('');
 function inlines(values: PandocInline[]): string {
@@ -51,24 +51,32 @@ test('annotations preserve bodies, use labels once, share encoded targets and av
         assert.equal(options.syntaxHighlighting, 'none');
         const text = blocks(document.blocks);
         calls.push(text);
-        return calls.length === 1 ? 'NOTE-SENTINEL ' + text : text;
+        if (calls.length === 1) { return 'TERM-SENTINEL ' + text; }
+        return calls.length === 2 ? 'NOTE-SENTINEL ' + text : text;
     });
     assert.deepEqual(result.diagnostics, []);
     assert.equal(JSON.stringify(project), before);
-    assert.equal(calls.length, 2);
-    assert.match(calls[0], /\\textbf\{bold\}/);
-    assert.match(calls[0], /first[\s\S]*second/);
-    assert.doesNotMatch(calls[0], /\\LitTermUse|\\LitNoteUse/);
-    assert.match(calls[0], /\\hyperref\[lit-[a-f0-9]+\]/);
-    assert.match(calls[0], /\\pageref\*/);
+    assert.equal(calls.length, 3);
+    assert.match(calls[0], /Definition \\emph\{emphasis\}/);
+    assert.doesNotMatch(calls[0], /fuller second paragraph/);
+    assert.match(calls[1], /\\textbf\{bold\}/);
+    assert.match(calls[1], /first[\s\S]*second/);
+    assert.doesNotMatch(calls[0] + calls[1], /\\LitTermUse|\\LitNoteUse/);
+    assert.match(calls[1], /\\hyperref\[lit-[a-f0-9]+\]/);
+    assert.match(calls[1], /\\pageref\*/);
     const latex = result.latex!;
     const destination = encode(project.annotations.terms[0].target);
     assert.ok(latex.includes(`\\label{${destination}}`));
     assert.ok(latex.includes(`\\LitTermUse{lit-use-1}{${destination}}{\\hyperref[${destination}]{\\textbf{Unique label}`));
     assert.equal(latex.split('Unique label').length - 1, 1);
     assert.ok(latex.includes('Definition \\emph{emphasis} and \\LitInlineCode{c\\allowbreak{}o\\allowbreak{}d\\allowbreak{}e}'));
+    assert.match(latex, /TERM-SENTINEL/);
     assert.match(latex, /NOTE-SENTINEL/);
     assert.match(latex, /\\textbf\{Alpha \\& beta\}/);
+    const railTerm = latex.slice(latex.indexOf('\\long\\def\\LitRailBodyA'),
+        latex.indexOf('\\def\\LitRailLabelsA'));
+    assert.match(railTerm, /TERM-SENTINEL/);
+    assert.doesNotMatch(railTerm, /fuller second paragraph/);
     assert.match(latex, /right=50mm/);
     assert.match(latex, /\\marginparwidth\}\{25mm\}/);
     assert.match(latex, /\\marginparsep\}\{5mm\}/);
@@ -305,6 +313,15 @@ for (const output of ['x'.repeat(131073), 'invalid\u0000output']) {
         assert.match(result.diagnostics[0].message, /Invalid or oversized controlled rail/);
     });
 }
+
+test('invalid converted TERM summary stops before later annotations and the book', async () => {
+    const project = parse(term + note);
+    let calls = 0;
+    const result = await renderLatex(project, {}, async () => { calls++; return 'x'.repeat(131073); });
+    assert.equal(calls, 1);
+    assert.equal(result.latex, undefined);
+    assert.match(result.diagnostics[0].message, /Invalid or oversized controlled rail/);
+});
 
 test('converted bodies stop at the cumulative output budget, including encoded metadata', async () => {
     const project = parse('```NOTE\nsmall\n```\n'.repeat(17));
