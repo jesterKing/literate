@@ -185,9 +185,9 @@ uses a separate in-memory overlay on the last discovered membership.</p>
 <p>The repository translates engine diagnostics into one workspace-scoped
 <code>DiagnosticCollection</code>. Replacement is whole-snapshot replacement: repairing a
 project clears obsolete entries, and refreshing one workspace does not clear another.</p>
-<h2><code>grabber.literate</code>: the Markdown parser state bridge</h2>
-<p><a href="grabber.html">The grabber</a> is a small but important bridge between Markdown parsing
-and editor adapters. <code>grabberPlugin</code> installs a Markdown-it core rule named <code>grabit</code>
+<h2>The Markdown parser state bridge</h2>
+<p>The parser-state bridge connects Markdown parsing to editor adapters. <code>grabberPlugin</code>
+installs a Markdown-it core rule named <code>grabit</code>
 before Markdown-it's <code>normalize</code> rule. When the parser receives an environment
 object, that rule stores the current parser <code>StateCore</code> as <code>env.gstate</code>, then returns
 without consuming or rewriting the token stream.</p>
@@ -210,8 +210,8 @@ wrappers while preserving the built-in Markdown pipeline. The contract is narrow
 <li>let the next Markdown-it core rule continue;</li>
 <li>use captured tokens only in combination with current engine-approved identities.</li>
 </ul>
-<p>This is why <code>grabber.literate</code> is best understood as a Markdown parser state bridge,
-not as the source of fragment semantics.</p>
+<p>This bridge is therefore an adapter to parser state, not the source of fragment
+semantics. Its complete implementation appears later in this appendix.</p>
 <h2>Fragment provider registration</h2>
 <p>Fragment-oriented providers register for the Markdown language because <code>.literate</code>
 files use VS Code's built-in Markdown support. Registration is broader than action:
@@ -365,7 +365,7 @@ idempotent because normal deactivation and failure paths may meet the same resou
 <p>For a Markdown preview problem, follow:</p>
 <ol>
 <li>the returned <code>extendMarkdownIt</code> hook;</li>
-<li><code>grabber.literate</code> and <code>env.gstate</code>;</li>
+<li>the parser-state bridge and <code>env.gstate</code>;</li>
 <li>the fence and document wrappers;</li>
 <li>the repository's synchronous preview overlay;</li>
 <li>screen rendering and the relevant browser program.</li>
@@ -374,7 +374,912 @@ idempotent because normal deactivation and failure paths may meet the same resou
 <a href="coordinating_language_features.html">Coordinating language features in the editor</a>,
 then use <a href="appendix_language_server_protocol.html">Appendix E — Language-server protocol details</a>
 for transport and reply contracts.</p>
+<h2>Provider implementation reference</h2>
+<p>The following fragments are the mechanical VS Code adapters behind the symbol
+operations described in Chapter 14. They share the repository and symbol semantics
+already explained above; the code here records exact API conversion and registration.</p>
+<h2>Fragment-name completion provider</h2>
+<p>Fragment names form a project vocabulary, but an author should not have to recall
+every name exactly. The completion adapter participates in Markdown editing and
+responds only after an unmatched opening <code>&lt;&lt;</code>, leaving ordinary prose and projected
+programming-language completion to their own providers.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0072006500670069007300740065007200200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0072006500670069007300740065007200200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e"></span><a class="literate-tag-name" href="#f-0072006500670069007300740065007200200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e" data-literate-target="f-0072006500670069007300740065007200200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e" aria-label="Definition of register fragment name completion">&lt;&lt;register fragment name completion&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> completionItemProvider =
+  vscode.<span class="hljs-property">languages</span>.<span class="hljs-title">registerCompletionItemProvider</span>(<span class="hljs-string">'markdown'</span>, {
+    <span data-literate-explore="f-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073"><a class="literate-tag-name" href="#f-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073" data-literate-target="f-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073" aria-label="Definition of provide fragment name completions">&lt;&lt;provide fragment name completions&gt;&gt;</a></span>
+}, <span class="hljs-string">'&lt;'</span>);
+context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title">push</span>(completionItemProvider);
+</code></pre>
+
 </div>
+</div><h3>Providing completion items</h3>
+<p>Inside an unfinished fragment tag, the provider offers a <code>CompletionItem</code> for
+each known fragment in the project. Elsewhere it returns no fragment suggestions,
+leaving ordinary code completion to the configured language server.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073"></span><a class="literate-tag-name" href="#f-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073" data-literate-target="f-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073" aria-label="Definition of provide fragment name completions">&lt;&lt;provide fragment name completions&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-title">provideCompletionItems</span>(<span class="hljs-params">
+  </span><span class="hljs-variable">document</span><span class="hljs-params"> : vscode.TextDocument,
+  position: vscode.Position
+</span>)
+{
+  <span class="hljs-keyword">const</span> prefix = <span class="hljs-variable">document</span>.<span class="hljs-title">lineAt</span>(position.<span class="hljs-property">line</span>).<span class="hljs-property">text</span>.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, position.<span class="hljs-property">character</span>);
+  <span class="hljs-keyword">if</span> (!<span class="hljs-regexp">/</span><span class="hljs-regexp">\x</span><span class="hljs-regexp">3c</span><span class="hljs-regexp">\x</span><span class="hljs-regexp">3c</span><span class="hljs-regexp">[^&gt;]</span><span class="hljs-regexp">*$/</span>.<span class="hljs-title">test</span>(prefix)) { <span class="hljs-keyword">return</span> []; }
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of provide fragment name completions"><a class="literate-tag-name" href="#c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-2" data-literate-target="c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-2" aria-label="Next contribution of provide fragment name completions">Next</a></nav>
+</div><p><code>begin collecting fragment completions</code> creates the result, while
+<code>require an owning workspace for completion</code> declines documents that do not belong
+to a workspace project.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073" data-literate-target="f-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073" aria-label="Definition of provide fragment name completions">&lt;&lt;provide fragment name completions&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code>  <span data-literate-explore="f-0062006500670069006e00200063006f006c006c0065006300740069006e006700200066007200610067006d0065006e007400200063006f006d0070006c006500740069006f006e0073"><a class="literate-tag-name" href="#f-0062006500670069006e00200063006f006c006c0065006300740069006e006700200066007200610067006d0065006e007400200063006f006d0070006c006500740069006f006e0073" data-literate-target="f-0062006500670069006e00200063006f006c006c0065006300740069006e006700200066007200610067006d0065006e007400200063006f006d0070006c006500740069006f006e0073" aria-label="Definition of begin collecting fragment completions">&lt;&lt;begin collecting fragment completions&gt;&gt;</a></span>
+  <span data-literate-explore="f-007200650071007500690072006500200061006e0020006f0077006e0069006e006700200077006f0072006b0073007000610063006500200066006f007200200063006f006d0070006c006500740069006f006e"><a class="literate-tag-name" href="#f-007200650071007500690072006500200061006e0020006f0077006e0069006e006700200077006f0072006b0073007000610063006500200066006f007200200063006f006d0070006c006500740069006f006e" data-literate-target="f-007200650071007500690072006500200061006e0020006f0077006e0069006e006700200077006f0072006b0073007000610063006500200066006f007200200063006f006d0070006c006500740069006f006e" aria-label="Definition of require an owning workspace for completion">&lt;&lt;require an owning workspace for completion&gt;&gt;</a></span>
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of provide fragment name completions"><a class="literate-tag-name" href="#c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1" aria-label="Previous contribution of provide fragment name completions">Previous</a> · <a class="literate-tag-name" href="#c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1" aria-label="Base contribution of provide fragment name completions">Base</a> · <a class="literate-tag-name" href="#c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-3" data-literate-target="c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-3" aria-label="Next contribution of provide fragment name completions">Next</a></nav>
+</div><p>With project authority established, <code>refresh fragments before completion</code> reads a
+current, read-only repository snapshot.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-3"><a class="literate-tag-name" href="#f-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073" data-literate-target="f-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073" aria-label="Definition of provide fragment name completions">&lt;&lt;provide fragment name completions&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code>  <span data-literate-explore="f-007200650066007200650073006800200066007200610067006d0065006e007400730020006200650066006f0072006500200063006f006d0070006c006500740069006f006e"><a class="literate-tag-name" href="#f-007200650066007200650073006800200066007200610067006d0065006e007400730020006200650066006f0072006500200063006f006d0070006c006500740069006f006e" data-literate-target="f-007200650066007200650073006800200066007200610067006d0065006e007400730020006200650066006f0072006500200063006f006d0070006c006500740069006f006e" aria-label="Definition of refresh fragments before completion">&lt;&lt;refresh fragments before completion&gt;&gt;</a></span>
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of provide fragment name completions"><a class="literate-tag-name" href="#c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-2" data-literate-target="c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-2" aria-label="Previous contribution of provide fragment name completions">Previous</a> · <a class="literate-tag-name" href="#c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1" aria-label="Base contribution of provide fragment name completions">Base</a> · <a class="literate-tag-name" href="#c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-4" data-literate-target="c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-4" aria-label="Next contribution of provide fragment name completions">Next</a></nav>
+</div><p><code>offer each fragment as a completion</code> turns the known family map into editor items.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-4"><a class="literate-tag-name" href="#f-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073" data-literate-target="f-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073" aria-label="Definition of provide fragment name completions">&lt;&lt;provide fragment name completions&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code>  <span data-literate-explore="f-006f00660066006500720020006500610063006800200066007200610067006d0065006e00740020006100730020006100200063006f006d0070006c006500740069006f006e"><a class="literate-tag-name" href="#f-006f00660066006500720020006500610063006800200066007200610067006d0065006e00740020006100730020006100200063006f006d0070006c006500740069006f006e" data-literate-target="f-006f00660066006500720020006500610063006800200066007200610067006d0065006e00740020006100730020006100200063006f006d0070006c006500740069006f006e" aria-label="Definition of offer each fragment as a completion">&lt;&lt;offer each fragment as a completion&gt;&gt;</a></span>
+  <span class="hljs-keyword">return</span> completionItems;
+}
+</code></pre>
+
+</div>
+<nav class="fragment-navigation" aria-label="Contributions of provide fragment name completions"><a class="literate-tag-name" href="#c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-3" data-literate-target="c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-3" aria-label="Previous contribution of provide fragment name completions">Previous</a> · <a class="literate-tag-name" href="#c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1" data-literate-target="c-00700072006f007600690064006500200066007200610067006d0065006e00740020006e0061006d006500200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1" aria-label="Base contribution of provide fragment name completions">Base</a></nav>
+</div><h4>Setting up variables</h4>
+<p>The result is an array of <code>CompletionItem</code> values.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0062006500670069006e00200063006f006c006c0065006300740069006e006700200066007200610067006d0065006e007400200063006f006d0070006c006500740069006f006e0073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0062006500670069006e00200063006f006c006c0065006300740069006e006700200066007200610067006d0065006e007400200063006f006d0070006c006500740069006f006e0073"></span><a class="literate-tag-name" href="#f-0062006500670069006e00200063006f006c006c0065006300740069006e006700200066007200610067006d0065006e007400200063006f006d0070006c006500740069006f006e0073" data-literate-target="f-0062006500670069006e00200063006f006c006c0065006300740069006e006700200066007200610067006d0065006e007400200063006f006d0070006c006500740069006f006e0073" aria-label="Definition of begin collecting fragment completions">&lt;&lt;begin collecting fragment completions&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">let</span> completionItems : <span class="hljs-title">Array</span>&lt;vscode.<span class="hljs-property">CompletionItem</span>&gt; =
+    <span class="hljs-keyword">new</span> <span class="hljs-title">Array</span>&lt;vscode.<span class="hljs-property">CompletionItem</span>&gt;();
+</code></pre>
+
+</div>
+</div><h4>Workspace folder for TextDocument</h4>
+<p>The shared workspace helper identifies the folder that owns the document. Without
+one, no project fragment vocabulary is available and the provider returns no items.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007200650071007500690072006500200061006e0020006f0077006e0069006e006700200077006f0072006b0073007000610063006500200066006f007200200063006f006d0070006c006500740069006f006e-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-007200650071007500690072006500200061006e0020006f0077006e0069006e006700200077006f0072006b0073007000610063006500200066006f007200200063006f006d0070006c006500740069006f006e"></span><a class="literate-tag-name" href="#f-007200650071007500690072006500200061006e0020006f0077006e0069006e006700200077006f0072006b0073007000610063006500200066006f007200200063006f006d0070006c006500740069006f006e" data-literate-target="f-007200650071007500690072006500200061006e0020006f0077006e0069006e006700200077006f0072006b0073007000610063006500200066006f007200200063006f006d0070006c006500740069006f006e" aria-label="Definition of require an owning workspace for completion">&lt;&lt;require an owning workspace for completion&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span> | <span class="hljs-literal">undefined</span> = <span class="hljs-title">determineWorkspaceFolder</span>(<span class="hljs-variable">document</span>);
+<span class="hljs-keyword">if</span>(!workspaceFolder) { <span class="hljs-keyword">return</span> []; }
+</code></pre>
+
+</div>
+</div><h4>Retrieving fragments of project</h4>
+<p>Completion refreshes the fragment repository from current editor buffers before
+reading its map. This uses the same serialized processing queue as generation,
+but the default is read-only: asking for suggestions never writes source or HTML.
+Literate content changes independently request generation, including changes
+beginning with an opening chevron.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007200650066007200650073006800200066007200610067006d0065006e007400730020006200650066006f0072006500200063006f006d0070006c006500740069006f006e-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-007200650066007200650073006800200066007200610067006d0065006e007400730020006200650066006f0072006500200063006f006d0070006c006500740069006f006e"></span><a class="literate-tag-name" href="#f-007200650066007200650073006800200066007200610067006d0065006e007400730020006200650066006f0072006500200063006f006d0070006c006500740069006f006e" data-literate-target="f-007200650066007200650073006800200066007200610067006d0065006e007400730020006200650066006f0072006500200063006f006d0070006c006500740069006f006e" aria-label="Definition of refresh fragments before completion">&lt;&lt;refresh fragments before completion&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">await</span> theOneRepository.<span class="hljs-title">processLiterateFiles</span>(workspaceFolder);
+<span class="hljs-keyword">let</span> fragments = theOneRepository.<span class="hljs-title">getFragments</span>(workspaceFolder).<span class="hljs-property">map</span>;
+</code></pre>
+
+</div>
+</div><h4>Creating the CompletionItems</h4>
+<p>Each known family becomes a reference-kind completion item. Its name is the inserted
+text, while bounded unexpanded source appears as detail so similarly named families
+can be distinguished before selection.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-006f00660066006500720020006500610063006800200066007200610067006d0065006e00740020006100730020006100200063006f006d0070006c006500740069006f006e-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-006f00660066006500720020006500610063006800200066007200610067006d0065006e00740020006100730020006100200063006f006d0070006c006500740069006f006e"></span><a class="literate-tag-name" href="#f-006f00660066006500720020006500610063006800200066007200610067006d0065006e00740020006100730020006100200063006f006d0070006c006500740069006f006e" data-literate-target="f-006f00660066006500720020006500610063006800200066007200610067006d0065006e00740020006100730020006100200063006f006d0070006c006500740069006f006e" aria-label="Definition of offer each fragment as a completion">&lt;&lt;offer each fragment as a completion&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> fragmentName <span class="hljs-keyword">of</span> fragments.<span class="hljs-title">keys</span>())
+{
+  <span class="hljs-keyword">const</span> fragment : <span class="hljs-title">FragmentInformation</span> | <span class="hljs-literal">undefined</span> = fragments.<span class="hljs-title">get</span>(fragmentName);
+  <span class="hljs-keyword">if</span>(!fragment) {
+    <span class="hljs-keyword">continue</span>;
+  }
+  <span class="hljs-keyword">const</span> fragmentCompletion = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">CompletionItem</span>(fragmentName);
+  fragmentCompletion.<span class="hljs-property">detail</span> = fragment.<span class="hljs-property">code</span>;
+  fragmentCompletion.<span class="hljs-property">kind</span> = vscode.<span class="hljs-property">CompletionItemKind</span>.<span class="hljs-property">Reference</span>;
+  completionItems.<span class="hljs-title">push</span>(fragmentCompletion);
+}
+</code></pre>
+
+</div>
+</div><h2>Fragment hover provider</h2>
+<p>Hover lets an author inspect a referenced family's unexpanded source without leaving
+the current explanation. <code>FragmentHoverProvider</code> adapts that read-only lookup to
+VS Code's <code>HoverProvider</code> contract.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0066007200610067006d0065006e007400200068006f007600650072002000700072006f00760069006400650072-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0066007200610067006d0065006e007400200068006f007600650072002000700072006f00760069006400650072"></span><a class="literate-tag-name" href="#f-0066007200610067006d0065006e007400200068006f007600650072002000700072006f00760069006400650072" data-literate-target="f-0066007200610067006d0065006e007400200068006f007600650072002000700072006f00760069006400650072" aria-label="Definition of fragment hover provider">&lt;&lt;fragment hover provider&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">class</span> <span class="hljs-title">FragmentHoverProvider</span> <span class="hljs-keyword">implements</span> vscode.<span class="hljs-property">HoverProvider</span> {
+  <span class="hljs-keyword">readonly</span> fragmentRepository : <span class="hljs-title">FragmentRepository</span>;
+  <span class="hljs-title">constructor</span>(<span class="hljs-params">repository : FragmentRepository</span>)
+  {
+    <span class="hljs-variable">this</span>.<span class="hljs-property">fragmentRepository</span> = repository;
+  }
+  <span data-literate-explore="f-00700072006f007600690064006500200066007200610067006d0065006e007400200068006f007600650072"><a class="literate-tag-name" href="#f-00700072006f007600690064006500200066007200610067006d0065006e007400200068006f007600650072" data-literate-target="f-00700072006f007600690064006500200066007200610067006d0065006e007400200068006f007600650072" aria-label="Definition of provide fragment hover">&lt;&lt;provide fragment hover&gt;&gt;</a></span>
+}
+</code></pre>
+
+</div>
+</div><p>The <code>FragmentHoverProvider</code> implements <code>provideHover</code>. This will create the
+<code>Hover</code> item if under the current cursor position there is a fragment, including
+its opening and closing double chevrons. Refresh is read-only and includes
+unsaved buffers; cancelled requests return no hover.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f007600690064006500200066007200610067006d0065006e007400200068006f007600650072-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00700072006f007600690064006500200066007200610067006d0065006e007400200068006f007600650072"></span><a class="literate-tag-name" href="#f-00700072006f007600690064006500200066007200610067006d0065006e007400200068006f007600650072" data-literate-target="f-00700072006f007600690064006500200066007200610067006d0065006e007400200068006f007600650072" aria-label="Definition of provide fragment hover">&lt;&lt;provide fragment hover&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">public</span> <span class="hljs-keyword">async</span> <span class="hljs-title">provideHover</span>(<span class="hljs-params">
+  </span><span class="hljs-variable">document</span><span class="hljs-params"> : vscode.TextDocument,
+  position : vscode.Position,
+  token: vscode.CancellationToken
+</span>)
+{
+  <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+  <span data-literate-explore="f-007200650071007500690072006500200061006e0020006f0077006e0069006e006700200077006f0072006b0073007000610063006500200066006f007200200068006f007600650072"><a class="literate-tag-name" href="#f-007200650071007500690072006500200061006e0020006f0077006e0069006e006700200077006f0072006b0073007000610063006500200066006f007200200068006f007600650072" data-literate-target="f-007200650071007500690072006500200061006e0020006f0077006e0069006e006700200077006f0072006b0073007000610063006500200066006f007200200068006f007600650072" aria-label="Definition of require an owning workspace for hover">&lt;&lt;require an owning workspace for hover&gt;&gt;</a></span>
+  <span class="hljs-keyword">await</span> <span class="hljs-variable">this</span>.<span class="hljs-property">fragmentRepository</span>.<span class="hljs-title">processLiterateFiles</span>(<span class="hljs-variable">document</span>);
+  <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+  <span data-literate-explore="f-0072006500610064002000740068006500200068006f0076006500720065006400200073006f00750072006300650020006c0069006e0065"><a class="literate-tag-name" href="#f-0072006500610064002000740068006500200068006f0076006500720065006400200073006f00750072006300650020006c0069006e0065" data-literate-target="f-0072006500610064002000740068006500200068006f0076006500720065006400200073006f00750072006300650020006c0069006e0065" aria-label="Definition of read the hovered source line">&lt;&lt;read the hovered source line&gt;&gt;</a></span>
+  <span data-literate-explore="f-00730068006f007700200075006e0065007800700061006e00640065006400200066007200610067006d0065006e007400200073006f0075007200630065"><a class="literate-tag-name" href="#f-00730068006f007700200075006e0065007800700061006e00640065006400200066007200610067006d0065006e007400200073006f0075007200630065" data-literate-target="f-00730068006f007700200075006e0065007800700061006e00640065006400200066007200610067006d0065006e007400200073006f0075007200630065" aria-label="Definition of show unexpanded fragment source">&lt;&lt;show unexpanded fragment source&gt;&gt;</a></span>
+  <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>;
+}
+</code></pre>
+
+</div>
+</div><p>Fragment tags are lexical single-line forms, so hover begins with the current source
+line and the cursor's exact UTF-16 position.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0072006500610064002000740068006500200068006f0076006500720065006400200073006f00750072006300650020006c0069006e0065-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0072006500610064002000740068006500200068006f0076006500720065006400200073006f00750072006300650020006c0069006e0065"></span><a class="literate-tag-name" href="#f-0072006500610064002000740068006500200068006f0076006500720065006400200073006f00750072006300650020006c0069006e0065" data-literate-target="f-0072006500610064002000740068006500200068006f0076006500720065006400200073006f00750072006300650020006c0069006e0065" aria-label="Definition of read the hovered source line">&lt;&lt;read the hovered source line&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> currentLine = <span class="hljs-variable">document</span>.<span class="hljs-title">lineAt</span>(position.<span class="hljs-property">line</span>);
+</code></pre>
+
+</div>
+</div><p>The document must belong to a workspace project before its fragment family can be
+resolved. Otherwise the provider returns no hover.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007200650071007500690072006500200061006e0020006f0077006e0069006e006700200077006f0072006b0073007000610063006500200066006f007200200068006f007600650072-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-007200650071007500690072006500200061006e0020006f0077006e0069006e006700200077006f0072006b0073007000610063006500200066006f007200200068006f007600650072"></span><a class="literate-tag-name" href="#f-007200650071007500690072006500200061006e0020006f0077006e0069006e006700200077006f0072006b0073007000610063006500200066006f007200200068006f007600650072" data-literate-target="f-007200650071007500690072006500200061006e0020006f0077006e0069006e006700200077006f0072006b0073007000610063006500200066006f007200200068006f007600650072" aria-label="Definition of require an owning workspace for hover">&lt;&lt;require an owning workspace for hover&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> workspaceFolder : vscode.<span class="hljs-property">WorkspaceFolder</span> | <span class="hljs-literal">undefined</span> = <span class="hljs-title">determineWorkspaceFolder</span>(<span class="hljs-variable">document</span>);
+<span class="hljs-keyword">if</span>(!workspaceFolder) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+</code></pre>
+
+</div>
+</div><p>An exact non-root occurrence yields a <code>Hover</code> containing the family's unexpanded
+source as a fenced <code>MarkdownString</code>. Definitions, appends, missing occurrences, and
+cancelled requests yield no hover.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00730068006f007700200075006e0065007800700061006e00640065006400200066007200610067006d0065006e007400200073006f0075007200630065-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00730068006f007700200075006e0065007800700061006e00640065006400200066007200610067006d0065006e007400200073006f0075007200630065"></span><a class="literate-tag-name" href="#f-00730068006f007700200075006e0065007800700061006e00640065006400200066007200610067006d0065006e007400200073006f0075007200630065" data-literate-target="f-00730068006f007700200075006e0065007800700061006e00640065006400200066007200610067006d0065006e007400200073006f0075007200630065" aria-label="Definition of show unexpanded fragment source">&lt;&lt;show unexpanded fragment source&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">let</span> fragmentLocation = <span class="hljs-variable">this</span>.<span class="hljs-property">fragmentRepository</span>.<span class="hljs-title">getFragmentTagLocation</span>(<span class="hljs-variable">document</span>, currentLine, position);
+<span class="hljs-keyword">if</span>(fragmentLocation.<span class="hljs-property">valid</span> &amp;&amp; fragmentLocation.<span class="hljs-property">fragment</span> &amp;&amp; !fragmentLocation.<span class="hljs-property">root</span>)
+{
+  <span class="hljs-keyword">let</span> fragment = fragmentLocation.<span class="hljs-property">fragment</span>;
+  <span class="hljs-keyword">let</span> range = fragmentLocation.<span class="hljs-property">range</span>;
+  <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">Hover</span>(
+    <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">MarkdownString</span>(<span class="hljs-string">`~~~ </span><span class="hljs-subst">${fragment.lang}</span><span class="hljs-string">\n</span><span class="hljs-subst">${fragment.code}</span><span class="hljs-string">\n</span><span class="hljs-string">~~~`</span>, <span class="hljs-literal">true</span>),
+    range
+    );
+}
+</code></pre>
+
+</div>
+</div><h2>Definition provider</h2>
+<p>The definition provider maps an exact occurrence to the family's base definition.
+It returns a <code>vscode.Location</code> only after a read-only refresh confirms both the
+occurrence and destination.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0066007200610067006d0065006e007400200064006500660069006e006900740069006f006e002000700072006f00760069006400650072-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0066007200610067006d0065006e007400200064006500660069006e006900740069006f006e002000700072006f00760069006400650072"></span><a class="literate-tag-name" href="#f-0066007200610067006d0065006e007400200064006500660069006e006900740069006f006e002000700072006f00760069006400650072" data-literate-target="f-0066007200610067006d0065006e007400200064006500660069006e006900740069006f006e002000700072006f00760069006400650072" aria-label="Definition of fragment definition provider">&lt;&lt;fragment definition provider&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">class</span> <span class="hljs-title">LiterateDefinitionProvider</span> <span class="hljs-keyword">implements</span> vscode.<span class="hljs-property">DefinitionProvider</span>
+{
+    <span data-literate-explore="f-0063006f006e007300740072007500630074002000740068006500200064006500660069006e006900740069006f006e002000700072006f00760069006400650072"><a class="literate-tag-name" href="#f-0063006f006e007300740072007500630074002000740068006500200064006500660069006e006900740069006f006e002000700072006f00760069006400650072" data-literate-target="f-0063006f006e007300740072007500630074002000740068006500200064006500660069006e006900740069006f006e002000700072006f00760069006400650072" aria-label="Definition of construct the definition provider">&lt;&lt;construct the definition provider&gt;&gt;</a></span>
+    <span data-literate-explore="f-00700072006f00760069006400650020006100200066007200610067006d0065006e007400200064006500660069006e006900740069006f006e"><a class="literate-tag-name" href="#f-00700072006f00760069006400650020006100200066007200610067006d0065006e007400200064006500660069006e006900740069006f006e" data-literate-target="f-00700072006f00760069006400650020006100200066007200610067006d0065006e007400200064006500660069006e006900740069006f006e" aria-label="Definition of provide a fragment definition">&lt;&lt;provide a fragment definition&gt;&gt;</a></span>
+}
+</code></pre>
+
+</div>
+</div><p><code>LiterateDefinitionProvider</code> receives the shared repository as a parameter property.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0063006f006e007300740072007500630074002000740068006500200064006500660069006e006900740069006f006e002000700072006f00760069006400650072-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0063006f006e007300740072007500630074002000740068006500200064006500660069006e006900740069006f006e002000700072006f00760069006400650072"></span><a class="literate-tag-name" href="#f-0063006f006e007300740072007500630074002000740068006500200064006500660069006e006900740069006f006e002000700072006f00760069006400650072" data-literate-target="f-0063006f006e007300740072007500630074002000740068006500200064006500660069006e006900740069006f006e002000700072006f00760069006400650072" aria-label="Definition of construct the definition provider">&lt;&lt;construct the definition provider&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-title">constructor</span>(<span class="hljs-params">
+    </span><span class="hljs-keyword">private</span><span class="hljs-params"> </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> repository : FragmentRepository
+</span>) {}
+</code></pre>
+
+</div>
+</div><p>The provider refreshes a read-only snapshot before lookup and honors cancellation.
+Definition locations use the same exact tag ranges as references and hover.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f00760069006400650020006100200066007200610067006d0065006e007400200064006500660069006e006900740069006f006e-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00700072006f00760069006400650020006100200066007200610067006d0065006e007400200064006500660069006e006900740069006f006e"></span><a class="literate-tag-name" href="#f-00700072006f00760069006400650020006100200066007200610067006d0065006e007400200064006500660069006e006900740069006f006e" data-literate-target="f-00700072006f00760069006400650020006100200066007200610067006d0065006e007400200064006500660069006e006900740069006f006e" aria-label="Definition of provide a fragment definition">&lt;&lt;provide a fragment definition&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">public</span> <span class="hljs-keyword">async</span> provideDefinition
+    (
+        <span class="hljs-variable">document</span> : vscode.<span class="hljs-property">TextDocument</span>,
+        position : vscode.<span class="hljs-property">Position</span>,
+        token : vscode.<span class="hljs-property">CancellationToken</span>
+    )
+{
+    <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">const</span> workspaceFolder = <span class="hljs-title">determineWorkspaceFolder</span>(<span class="hljs-variable">document</span>);
+    <span class="hljs-keyword">if</span>(!workspaceFolder) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">await</span> <span class="hljs-variable">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title">processLiterateFiles</span>(<span class="hljs-variable">document</span>);
+    <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">const</span> fragmentLocation = <span class="hljs-variable">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title">getFragmentTagLocation</span>(
+        <span class="hljs-variable">document</span>,
+        <span class="hljs-variable">document</span>.<span class="hljs-title">lineAt</span>(position),
+        position
+    );
+    <span class="hljs-keyword">if</span>(!fragmentLocation.<span class="hljs-property">valid</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">const</span> definition = <span class="hljs-variable">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title">getFragmentOccurrences</span>(workspaceFolder).<span class="hljs-title">find</span>(
+        <span class="hljs-params">occurrence</span><span class="hljs-function"> =&gt;</span> occurrence.<span class="hljs-property">name</span> === fragmentLocation.<span class="hljs-property">name</span> &amp;&amp; occurrence.<span class="hljs-property">kind</span> === <span class="hljs-string">'definition'</span>
+    );
+    <span class="hljs-keyword">if</span>(!definition || token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">Location</span>(
+        vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title">joinPath</span>(workspaceFolder.<span class="hljs-property">uri</span>, definition.<span class="hljs-property">path</span>),
+        <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">Range</span>(definition.<span class="hljs-property">line</span>, definition.<span class="hljs-property">column</span>, definition.<span class="hljs-property">line</span>, definition.<span class="hljs-property">endColumn</span>)
+    );
+}
+</code></pre>
+
+</div>
+</div><h3>Registering the definition provider</h3>
+<div class="codefragment">
+<div class="fragmentname" id="c-00720065006700690073007400650072002000740068006500200064006500660069006e006900740069006f006e002000700072006f00760069006400650072-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00720065006700690073007400650072002000740068006500200064006500660069006e006900740069006f006e002000700072006f00760069006400650072"></span><a class="literate-tag-name" href="#f-00720065006700690073007400650072002000740068006500200064006500660069006e006900740069006f006e002000700072006f00760069006400650072" data-literate-target="f-00720065006700690073007400650072002000740068006500200064006500660069006e006900740069006f006e002000700072006f00760069006400650072" aria-label="Definition of register the definition provider">&lt;&lt;register the definition provider&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title">push</span>(
+    vscode.<span class="hljs-property">languages</span>.<span class="hljs-title">registerDefinitionProvider</span>(
+        <span class="hljs-string">'markdown'</span>,
+        <span class="hljs-keyword">new</span> <span class="hljs-title">LiterateDefinitionProvider</span>(theOneRepository)
+    )
+);
+</code></pre>
+
+</div>
+</div><h2>Reference provider</h2>
+<p>The reference provider returns semantic uses of the selected family, optionally
+including its declarations according to the editor request.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0066007200610067006d0065006e00740020007200650066006500720065006e00630065002000700072006f00760069006400650072-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0066007200610067006d0065006e00740020007200650066006500720065006e00630065002000700072006f00760069006400650072"></span><a class="literate-tag-name" href="#f-0066007200610067006d0065006e00740020007200650066006500720065006e00630065002000700072006f00760069006400650072" data-literate-target="f-0066007200610067006d0065006e00740020007200650066006500720065006e00630065002000700072006f00760069006400650072" aria-label="Definition of fragment reference provider">&lt;&lt;fragment reference provider&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">class</span> <span class="hljs-title">LiterateReferenceProvider</span> <span class="hljs-keyword">implements</span> vscode.<span class="hljs-property">ReferenceProvider</span>
+{
+    <span data-literate-explore="f-0063006f006e00730074007200750063007400200074006800650020007200650066006500720065006e00630065002000700072006f00760069006400650072"><a class="literate-tag-name" href="#f-0063006f006e00730074007200750063007400200074006800650020007200650066006500720065006e00630065002000700072006f00760069006400650072" data-literate-target="f-0063006f006e00730074007200750063007400200074006800650020007200650066006500720065006e00630065002000700072006f00760069006400650072" aria-label="Definition of construct the reference provider">&lt;&lt;construct the reference provider&gt;&gt;</a></span>
+    <span data-literate-explore="f-00700072006f007600690064006500200066007200610067006d0065006e00740020007200650066006500720065006e006300650073"><a class="literate-tag-name" href="#f-00700072006f007600690064006500200066007200610067006d0065006e00740020007200650066006500720065006e006300650073" data-literate-target="f-00700072006f007600690064006500200066007200610067006d0065006e00740020007200650066006500720065006e006300650073" aria-label="Definition of provide fragment references">&lt;&lt;provide fragment references&gt;&gt;</a></span>
+}
+</code></pre>
+
+</div>
+</div><p><code>LiterateReferenceProvider</code> receives the same shared repository as a parameter
+property.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0063006f006e00730074007200750063007400200074006800650020007200650066006500720065006e00630065002000700072006f00760069006400650072-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0063006f006e00730074007200750063007400200074006800650020007200650066006500720065006e00630065002000700072006f00760069006400650072"></span><a class="literate-tag-name" href="#f-0063006f006e00730074007200750063007400200074006800650020007200650066006500720065006e00630065002000700072006f00760069006400650072" data-literate-target="f-0063006f006e00730074007200750063007400200074006800650020007200650066006500720065006e00630065002000700072006f00760069006400650072" aria-label="Definition of construct the reference provider">&lt;&lt;construct the reference provider&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-title">constructor</span>(<span class="hljs-params">
+    </span><span class="hljs-keyword">private</span><span class="hljs-params"> </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> repository : FragmentRepository
+</span>) {}
+</code></pre>
+
+</div>
+</div><p>The request supplies a document, position, declaration policy, and cancellation
+token. Cancellation is checked before and after refreshing the read-only symbol
+snapshot and again before locations are returned.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00700072006f007600690064006500200066007200610067006d0065006e00740020007200650066006500720065006e006300650073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00700072006f007600690064006500200066007200610067006d0065006e00740020007200650066006500720065006e006300650073"></span><a class="literate-tag-name" href="#f-00700072006f007600690064006500200066007200610067006d0065006e00740020007200650066006500720065006e006300650073" data-literate-target="f-00700072006f007600690064006500200066007200610067006d0065006e00740020007200650066006500720065006e006300650073" aria-label="Definition of provide fragment references">&lt;&lt;provide fragment references&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">public</span> <span class="hljs-keyword">async</span> <span class="hljs-title">provideReferences</span>(<span class="hljs-params">
+    </span><span class="hljs-variable">document</span><span class="hljs-params"> : vscode.TextDocument,
+    position : vscode.Position,
+    context: </span><span class="hljs-params">{ includeDeclaration : </span><span class="hljs-built_in">boolean</span><span class="hljs-params">}</span><span class="hljs-params">,
+    token : vscode.CancellationToken
+</span>)
+{
+    <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">const</span> workspaceFolder = <span class="hljs-title">determineWorkspaceFolder</span>(<span class="hljs-variable">document</span>);
+    <span class="hljs-keyword">if</span>(!workspaceFolder) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">await</span> <span class="hljs-variable">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title">processLiterateFiles</span>(<span class="hljs-variable">document</span>);
+    <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">const</span> fragmentLocation = <span class="hljs-variable">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title">getFragmentTagLocation</span>(
+        <span class="hljs-variable">document</span>,
+        <span class="hljs-variable">document</span>.<span class="hljs-title">lineAt</span>(position),
+        position
+    );
+
+    <span class="hljs-keyword">if</span>(!fragmentLocation.<span class="hljs-property">valid</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">const</span> locations = <span class="hljs-keyword">await</span> <span class="hljs-variable">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title">getReferenceLocations</span>(
+        workspaceFolder,
+        fragmentLocation.<span class="hljs-property">name</span>,
+        context.<span class="hljs-property">includeDeclaration</span>
+    );
+    <span class="hljs-keyword">return</span> token.<span class="hljs-property">isCancellationRequested</span> ? <span class="hljs-literal">null</span> : locations;
+
+}
+</code></pre>
+
+</div>
+</div><h3>Registering the reference provider</h3>
+<div class="codefragment">
+<div class="fragmentname" id="c-0072006500670069007300740065007200200074006800650020007200650066006500720065006e00630065002000700072006f00760069006400650072-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0072006500670069007300740065007200200074006800650020007200650066006500720065006e00630065002000700072006f00760069006400650072"></span><a class="literate-tag-name" href="#f-0072006500670069007300740065007200200074006800650020007200650066006500720065006e00630065002000700072006f00760069006400650072" data-literate-target="f-0072006500670069007300740065007200200074006800650020007200650066006500720065006e00630065002000700072006f00760069006400650072" aria-label="Definition of register the reference provider">&lt;&lt;register the reference provider&gt;&gt;=</a></div>
+<div class="code">
+<pre><code>context.<span class="hljs-property">subscriptions</span>.<span class="hljs-title">push</span>(
+    vscode.<span class="hljs-property">languages</span>.<span class="hljs-title">registerReferenceProvider</span>(
+        <span class="hljs-string">'markdown'</span>,
+        <span class="hljs-keyword">new</span> <span class="hljs-title">LiterateReferenceProvider</span>(theOneRepository)
+    )
+);
+</code></pre>
+
+</div>
+</div><h2>Rename provider</h2>
+<p>Rename uses the shared symbol planner, so only explicit fragment names change.
+Validation rejects ambiguous definitions, collisions and changes to root status
+without touching prose, filenames or generated output.</p>
+<p>The provider returns a proposed workspace edit; it does not apply edits or write
+generated files itself. VS Code owns applying the edit. A resulting literate
+content-change event can then trigger the ordinary generation path.</p>
+<pre class="mermaid">
+sequenceDiagram
+    participant User as Author
+    participant VS as VS Code
+    participant Provider as Rename provider
+    participant Repo as Fragment repository
+    participant Planner as Symbol planner
+    User-&gt;&gt;VS: Rename a fragment
+    VS-&gt;&gt;Provider: Prepare rename at cursor
+    Provider-&gt;&gt;Repo: Refresh from current buffers
+    Repo--&gt;&gt;Provider: Exact occurrence and source snapshot
+    Provider-&gt;&gt;Planner: Validate same-name plan
+    Planner--&gt;&gt;Provider: Unique valid definition
+    Provider--&gt;&gt;VS: Inner-name range and placeholder
+    User-&gt;&gt;VS: Enter new name
+    VS-&gt;&gt;Provider: Request rename edits
+    Provider-&gt;&gt;Repo: Refresh again
+    Provider-&gt;&gt;Planner: Plan rename from fresh sources
+    Note over Planner: Validate names, collisions and Markdown structure
+    alt Valid plan
+        Planner--&gt;&gt;Provider: Name-only edit ranges
+        Provider--&gt;&gt;VS: WorkspaceEdit
+        VS-&gt;&gt;VS: Apply edits to source documents
+        VS-&gt;&gt;Repo: Literate content-change events
+    else Unsafe rename
+        Planner--&gt;&gt;Provider: Validation error
+        Provider--&gt;&gt;VS: Reject rename without partial edits
+    end
+</pre>
+<p>Cancellation and positions that do not identify a defined fragment stop before
+returning edits. Those early exits are omitted here to keep the successful
+interaction and validation failure visible.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-00720065006e0061006d0065002000700072006f0076006900640065007200200063006c006100730073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00720065006e0061006d0065002000700072006f0076006900640065007200200063006c006100730073"></span><a class="literate-tag-name" href="#f-00720065006e0061006d0065002000700072006f0076006900640065007200200063006c006100730073" data-literate-target="f-00720065006e0061006d0065002000700072006f0076006900640065007200200063006c006100730073" aria-label="Definition of rename provider class">&lt;&lt;rename provider class&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">class</span> <span class="hljs-title">LiterateRenameProvider</span> <span class="hljs-keyword">implements</span> vscode.<span class="hljs-property">RenameProvider</span>
+{
+    <span class="hljs-title">constructor</span>(<span class="hljs-keyword">public</span><span class="hljs-params"> </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> repository : FragmentRepository</span>) {}
+
+    <span data-literate-explore="f-007000720065007000610072006500200066007200610067006d0065006e0074002000720065006e0061006d0065"><a class="literate-tag-name" href="#f-007000720065007000610072006500200066007200610067006d0065006e0074002000720065006e0061006d0065" data-literate-target="f-007000720065007000610072006500200066007200610067006d0065006e0074002000720065006e0061006d0065" aria-label="Definition of prepare fragment rename">&lt;&lt;prepare fragment rename&gt;&gt;</a></span>
+    <span data-literate-explore="f-0066007200610067006d0065006e0074002000720065006e0061006d0065002000700072006f00760069006400650072"><a class="literate-tag-name" href="#f-0066007200610067006d0065006e0074002000720065006e0061006d0065002000700072006f00760069006400650072" data-literate-target="f-0066007200610067006d0065006e0074002000720065006e0061006d0065002000700072006f00760069006400650072" aria-label="Definition of fragment rename provider">&lt;&lt;fragment rename provider&gt;&gt;</a></span>
+}
+</code></pre>
+
+</div>
+</div><p>Preparing a rename refreshes the read-only repository from open buffers. The
+shared lookup supplies the inner name range, excluding the tag delimiters.
+A no-op plan also verifies that the selected symbol has one base definition.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000720065007000610072006500200066007200610067006d0065006e0074002000720065006e0061006d0065-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-007000720065007000610072006500200066007200610067006d0065006e0074002000720065006e0061006d0065"></span><a class="literate-tag-name" href="#f-007000720065007000610072006500200066007200610067006d0065006e0074002000720065006e0061006d0065" data-literate-target="f-007000720065007000610072006500200066007200610067006d0065006e0074002000720065006e0061006d0065" aria-label="Definition of prepare fragment rename">&lt;&lt;prepare fragment rename&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">public</span> <span class="hljs-keyword">async</span> <span class="hljs-title">prepareRename</span>(<span class="hljs-params">
+    </span><span class="hljs-variable">document</span><span class="hljs-params"> : vscode.TextDocument,
+    position : vscode.Position,
+    token : vscode.CancellationToken
+</span>)
+{
+    <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">const</span> workspaceFolder = <span class="hljs-title">determineWorkspaceFolder</span>(<span class="hljs-variable">document</span>);
+    <span class="hljs-keyword">if</span>(!workspaceFolder) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">await</span> <span class="hljs-variable">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title">processLiterateFiles</span>(<span class="hljs-variable">document</span>);
+    <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">const</span> location = <span class="hljs-variable">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title">getFragmentTagLocation</span>(
+        <span class="hljs-variable">document</span>, <span class="hljs-variable">document</span>.<span class="hljs-title">lineAt</span>(position.<span class="hljs-property">line</span>), position
+    );
+    <span class="hljs-keyword">if</span>(!location.<span class="hljs-property">valid</span> || !location.<span class="hljs-property">fragment</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-title">planFragmentRename</span>(
+        <span class="hljs-variable">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title">getSourceDocuments</span>(workspaceFolder), location.<span class="hljs-property">name</span>, location.<span class="hljs-property">name</span>
+    );
+    <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">range</span>: location.<span class="hljs-property">rangeExclusive</span>, <span class="hljs-attr">placeholder</span>: location.<span class="hljs-property">name</span> };
+}
+</code></pre>
+
+</div>
+</div><p>The actual request refreshes again: the user may have edited a buffer since
+preparation. Cancellation discards the whole result, never a partial edit set.
+Planner errors propagate to the editor as actionable rename failures.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0066007200610067006d0065006e0074002000720065006e0061006d0065002000700072006f00760069006400650072-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0066007200610067006d0065006e0074002000720065006e0061006d0065002000700072006f00760069006400650072"></span><a class="literate-tag-name" href="#f-0066007200610067006d0065006e0074002000720065006e0061006d0065002000700072006f00760069006400650072" data-literate-target="f-0066007200610067006d0065006e0074002000720065006e0061006d0065002000700072006f00760069006400650072" aria-label="Definition of fragment rename provider">&lt;&lt;fragment rename provider&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">public</span> <span class="hljs-keyword">async</span> <span class="hljs-title">provideRenameEdits</span>(<span class="hljs-params">
+    </span><span class="hljs-variable">document</span><span class="hljs-params"> : vscode.TextDocument,
+    position : vscode.Position,
+    newName : </span><span class="hljs-built_in">string</span><span class="hljs-params">,
+    token : vscode.CancellationToken
+</span>)
+{
+    <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">const</span> workspaceFolder = <span class="hljs-title">determineWorkspaceFolder</span>(<span class="hljs-variable">document</span>);
+    <span class="hljs-keyword">if</span>(!workspaceFolder) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">await</span> <span class="hljs-variable">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title">processLiterateFiles</span>(<span class="hljs-variable">document</span>);
+    <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">const</span> location = <span class="hljs-variable">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title">getFragmentTagLocation</span>(
+        <span class="hljs-variable">document</span>, <span class="hljs-variable">document</span>.<span class="hljs-title">lineAt</span>(position.<span class="hljs-property">line</span>), position
+    );
+    <span class="hljs-keyword">if</span>(!location.<span class="hljs-property">valid</span> || !location.<span class="hljs-property">fragment</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    <span class="hljs-keyword">const</span> plan = <span class="hljs-title">planFragmentRename</span>(
+        <span class="hljs-variable">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title">getSourceDocuments</span>(workspaceFolder), location.<span class="hljs-property">name</span>, newName
+    );
+    <span data-literate-explore="f-0061006400610070007400200066007200610067006d0065006e0074002000720065006e0061006d006500200070006c0061006e"><a class="literate-tag-name" href="#f-0061006400610070007400200066007200610067006d0065006e0074002000720065006e0061006d006500200070006c0061006e" data-literate-target="f-0061006400610070007400200066007200610067006d0065006e0074002000720065006e0061006d006500200070006c0061006e" aria-label="Definition of adapt fragment rename plan">&lt;&lt;adapt fragment rename plan&gt;&gt;</a></span>
+}
+</code></pre>
+
+</div>
+</div><p>Planner paths are canonical workspace-relative source paths. Convert their
+UTF-16 name ranges to editor edits without reading disk or applying changes.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0061006400610070007400200066007200610067006d0065006e0074002000720065006e0061006d006500200070006c0061006e-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0061006400610070007400200066007200610067006d0065006e0074002000720065006e0061006d006500200070006c0061006e"></span><a class="literate-tag-name" href="#f-0061006400610070007400200066007200610067006d0065006e0074002000720065006e0061006d006500200070006c0061006e" data-literate-target="f-0061006400610070007400200066007200610067006d0065006e0074002000720065006e0061006d006500200070006c0061006e" aria-label="Definition of adapt fragment rename plan">&lt;&lt;adapt fragment rename plan&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> workspaceEdit = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">WorkspaceEdit</span>();
+<span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> edit <span class="hljs-keyword">of</span> plan)
+{
+    <span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>; }
+    workspaceEdit.<span class="hljs-title">replace</span>(
+        vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title">joinPath</span>(workspaceFolder.<span class="hljs-property">uri</span>, edit.<span class="hljs-property">path</span>),
+        <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">Range</span>(edit.<span class="hljs-property">line</span>, edit.<span class="hljs-property">startColumn</span>, edit.<span class="hljs-property">line</span>, edit.<span class="hljs-property">endColumn</span>),
+        edit.<span class="hljs-property">newText</span>
+    );
+}
+<span class="hljs-keyword">return</span> token.<span class="hljs-property">isCancellationRequested</span> ? <span class="hljs-literal">null</span> : workspaceEdit;
+</code></pre>
+
+</div>
+</div><h2>Missing-reference code action provider</h2>
+<p>Missing-fragment diagnostics carry a stable code rather than relying on their
+human-readable message. Quick fixes refresh the read-only repository, then
+require an exact unresolved reference in the current source snapshot. Cancelled
+requests and buffers changed during refresh return no actions.</p>
+<p>The edit belongs to the requested document URI, not the active editor. It adds
+an empty definition after the containing, closed top-level fragment fence.
+Unsafe insertion sites (including nested or unclosed fences) are declined rather
+than invoking the active-editor create command. VS Code applies the proposed
+edit; this provider neither applies edits nor generates output. Tilde fences permit
+backticks in fragment names and language identifiers without breaking the header.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0063006f0064006500200061006300740069006f006e002000700072006f0076006900640065007200200063006c006100730073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0063006f0064006500200061006300740069006f006e002000700072006f0076006900640065007200200063006c006100730073"></span><a class="literate-tag-name" href="#f-0063006f0064006500200061006300740069006f006e002000700072006f0076006900640065007200200063006c006100730073" data-literate-target="f-0063006f0064006500200061006300740069006f006e002000700072006f0076006900640065007200200063006c006100730073" aria-label="Definition of code action provider class">&lt;&lt;code action provider class&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">class</span> <span class="hljs-title">LiterateCodeActionProvider</span> <span class="hljs-keyword">implements</span> vscode.<span class="hljs-property">CodeActionProvider</span>
+{
+    <span class="hljs-title">constructor</span>(<span class="hljs-keyword">public</span><span class="hljs-params"> </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> repository : FragmentRepository</span>) {}
+
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">async</span> <span class="hljs-title">provideCodeActions</span>(
+        <span class="hljs-variable">document</span> : vscode.<span class="hljs-property">TextDocument</span>,
+        _ : vscode.<span class="hljs-property">Range</span>,
+        context : vscode.<span class="hljs-property">CodeActionContext</span>,
+        token : vscode.<span class="hljs-property">CancellationToken</span>
+    ) : <span class="hljs-title">Promise</span>&lt;vscode.<span class="hljs-property">CodeAction</span>[]&gt;
+    {
+        <span data-literate-explore="f-0063006f0064006500200061006300740069006f006e00200073006e0061007000730068006f0074002000760061006c00690064006100740069006f006e"><a class="literate-tag-name" href="#f-0063006f0064006500200061006300740069006f006e00200073006e0061007000730068006f0074002000760061006c00690064006100740069006f006e" data-literate-target="f-0063006f0064006500200061006300740069006f006e00200073006e0061007000730068006f0074002000760061006c00690064006100740069006f006e" aria-label="Definition of code action snapshot validation">&lt;&lt;code action snapshot validation&gt;&gt;</a></span>
+        <span class="hljs-keyword">const</span> occurrences = <span class="hljs-variable">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title">getFragmentOccurrences</span>(folder);
+        <span class="hljs-keyword">const</span> <span class="hljs-attr">actions</span>: vscode.<span class="hljs-property">CodeAction</span>[] = [];
+        <span class="hljs-keyword">const</span> offered = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
+        <span class="hljs-keyword">for</span>(<span class="hljs-keyword">const</span> diagnostic <span class="hljs-keyword">of</span> diagnostics)
+        {
+            <span data-literate-explore="f-0063006f0064006500200061006300740069006f006e00200075006e007200650073006f006c0076006500640020007200650066006500720065006e0063006500200061006e006400200069006e00730065007200740069006f006e00200073006900740065"><a class="literate-tag-name" href="#f-0063006f0064006500200061006300740069006f006e00200075006e007200650073006f006c0076006500640020007200650066006500720065006e0063006500200061006e006400200069006e00730065007200740069006f006e00200073006900740065" data-literate-target="f-0063006f0064006500200061006300740069006f006e00200075006e007200650073006f006c0076006500640020007200650066006500720065006e0063006500200061006e006400200069006e00730065007200740069006f006e00200073006900740065" aria-label="Definition of code action unresolved reference and insertion site">&lt;&lt;code action unresolved reference and insertion site&gt;&gt;</a></span>
+            <span data-literate-explore="f-0063006f0064006500200061006300740069006f006e002000700072006f0070006f00730065006400200065006400690074"><a class="literate-tag-name" href="#f-0063006f0064006500200061006300740069006f006e002000700072006f0070006f00730065006400200065006400690074" data-literate-target="f-0063006f0064006500200061006300740069006f006e002000700072006f0070006f00730065006400200065006400690074" aria-label="Definition of code action proposed edit">&lt;&lt;code action proposed edit&gt;&gt;</a></span>
+        }
+        <span class="hljs-keyword">return</span> token.<span class="hljs-property">isCancellationRequested</span> ? [] : actions;
+    }
+}
+</code></pre>
+
+</div>
+</div><h3>Match a stable source snapshot</h3>
+<p>Filter diagnostics before refreshing the repository, then verify both the requested
+buffer and any open copy against the captured text and version. The repository's
+source must agree too: an action derived from stale occurrences could edit the
+wrong range. These checks share the method's scope without adding an async boundary.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0063006f0064006500200061006300740069006f006e00200073006e0061007000730068006f0074002000760061006c00690064006100740069006f006e-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0063006f0064006500200061006300740069006f006e00200073006e0061007000730068006f0074002000760061006c00690064006100740069006f006e"></span><a class="literate-tag-name" href="#f-0063006f0064006500200061006300740069006f006e00200073006e0061007000730068006f0074002000760061006c00690064006100740069006f006e" data-literate-target="f-0063006f0064006500200061006300740069006f006e00200073006e0061007000730068006f0074002000760061006c00690064006100740069006f006e" aria-label="Definition of code action snapshot validation">&lt;&lt;code action snapshot validation&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> diagnostics = context.<span class="hljs-property">diagnostics</span>.<span class="hljs-title">filter</span>(<span class="hljs-params">diag</span><span class="hljs-function"> =&gt;</span>
+    (<span class="hljs-keyword">typeof</span> diag.<span class="hljs-property">code</span> === <span class="hljs-string">'object'</span> ? diag.<span class="hljs-property">code</span>.<span class="hljs-property">value</span> : diag.<span class="hljs-property">code</span>) === <span class="hljs-string">'missing-fragment'</span>);
+<span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span> || !diagnostics.<span class="hljs-property">length</span> ||
+    (context.<span class="hljs-property">only</span> &amp;&amp; !context.<span class="hljs-property">only</span>.<span class="hljs-title">contains</span>(vscode.<span class="hljs-property">CodeActionKind</span>.<span class="hljs-property">QuickFix</span>))) { <span class="hljs-keyword">return</span> []; }
+<span class="hljs-keyword">const</span> folder = <span class="hljs-title">determineWorkspaceFolder</span>(<span class="hljs-variable">document</span>);
+<span class="hljs-keyword">if</span>(!folder) { <span class="hljs-keyword">return</span> []; }
+<span class="hljs-keyword">const</span> version = <span class="hljs-variable">document</span>.<span class="hljs-property">version</span>;
+<span class="hljs-keyword">const</span> text = <span class="hljs-variable">document</span>.<span class="hljs-title">getText</span>();
+<span class="hljs-keyword">await</span> <span class="hljs-variable">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title">processLiterateFiles</span>(<span class="hljs-variable">document</span>);
+<span class="hljs-keyword">if</span>(token.<span class="hljs-property">isCancellationRequested</span> || <span class="hljs-variable">document</span>.<span class="hljs-property">version</span> !== version || <span class="hljs-variable">document</span>.<span class="hljs-title">getText</span>() !== text) { <span class="hljs-keyword">return</span> []; }
+<span class="hljs-keyword">const</span> documentPath = path.<span class="hljs-property">posix</span>.<span class="hljs-title">relative</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>, <span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>);
+<span class="hljs-keyword">const</span> sources = <span class="hljs-variable">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title">getSourceDocuments</span>(folder);
+<span class="hljs-keyword">if</span>(sources.<span class="hljs-title">find</span>(<span class="hljs-params">source</span><span class="hljs-function"> =&gt;</span> source.<span class="hljs-property">path</span> === documentPath)?.<span class="hljs-property">text</span> !== text ||
+    vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">textDocuments</span>.<span class="hljs-title">some</span>(<span class="hljs-params">open</span><span class="hljs-function"> =&gt;</span> open.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>() === <span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>() &amp;&amp;
+        (open.<span class="hljs-property">version</span> !== version || open.<span class="hljs-title">getText</span>() !== text))) { <span class="hljs-keyword">return</span> []; }
+</code></pre>
+
+</div>
+</div><h3>Require an exact reference and a safe insertion site</h3>
+<p>One fix per unresolved name is enough. Wildcard roots and already-defined names
+are not creation candidates. Matching source text guards the diagnostic range;
+checking a closed, top-level fence ensures insertion cannot capture existing prose
+or code. Re-parsing the proposed header protects fragment identity.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0063006f0064006500200061006300740069006f006e00200075006e007200650073006f006c0076006500640020007200650066006500720065006e0063006500200061006e006400200069006e00730065007200740069006f006e00200073006900740065-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0063006f0064006500200061006300740069006f006e00200075006e007200650073006f006c0076006500640020007200650066006500720065006e0063006500200061006e006400200069006e00730065007200740069006f006e00200073006900740065"></span><a class="literate-tag-name" href="#f-0063006f0064006500200061006300740069006f006e00200075006e007200650073006f006c0076006500640020007200650066006500720065006e0063006500200061006e006400200069006e00730065007200740069006f006e00200073006900740065" data-literate-target="f-0063006f0064006500200061006300740069006f006e00200075006e007200650073006f006c0076006500640020007200650066006500720065006e0063006500200061006e006400200069006e00730065007200740069006f006e00200073006900740065" aria-label="Definition of code action unresolved reference and insertion site">&lt;&lt;code action unresolved reference and insertion site&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> reference = occurrences.<span class="hljs-title">find</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> item.<span class="hljs-property">path</span> === documentPath &amp;&amp; item.<span class="hljs-property">kind</span> === <span class="hljs-string">'reference'</span> &amp;&amp;
+    item.<span class="hljs-property">line</span> === diagnostic.<span class="hljs-property">range</span>.<span class="hljs-property">start</span>.<span class="hljs-property">line</span> &amp;&amp; item.<span class="hljs-property">column</span> === diagnostic.<span class="hljs-property">range</span>.<span class="hljs-property">start</span>.<span class="hljs-property">character</span>);
+<span class="hljs-keyword">if</span>(!reference || offered.<span class="hljs-title">has</span>(reference.<span class="hljs-property">name</span>) || reference.<span class="hljs-property">name</span>.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'.*'</span>) ||
+    occurrences.<span class="hljs-title">some</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> item.<span class="hljs-property">name</span> === reference.<span class="hljs-property">name</span> &amp;&amp; item.<span class="hljs-property">kind</span> === <span class="hljs-string">'definition'</span>)) { <span class="hljs-keyword">continue</span>; }
+<span class="hljs-keyword">const</span> range = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">Range</span>(reference.<span class="hljs-property">line</span>, reference.<span class="hljs-property">column</span>, reference.<span class="hljs-property">line</span>, reference.<span class="hljs-property">endColumn</span>);
+<span class="hljs-keyword">if</span>(<span class="hljs-variable">document</span>.<span class="hljs-title">getText</span>(range) !== <span class="hljs-string">`</span><span class="hljs-subst">${OPENING}</span><span class="hljs-subst">${reference.name}</span><span class="hljs-subst">${CLOSING}</span><span class="hljs-string">`</span>) { <span class="hljs-keyword">continue</span>; }
+<span class="hljs-keyword">const</span> usage = <span class="hljs-variable">this</span>.<span class="hljs-property">repository</span>.<span class="hljs-title">getTokenAtPosition</span>(<span class="hljs-variable">document</span>, range).<span class="hljs-property">token</span>;
+<span class="hljs-keyword">if</span>(!usage || usage.<span class="hljs-property">type</span> !== <span class="hljs-string">'fence'</span> || !usage.<span class="hljs-property">map</span> || usage.<span class="hljs-property">level</span> !== <span class="hljs-number">0</span>) { <span class="hljs-keyword">continue</span>; }
+<span class="hljs-keyword">const</span> header = <span class="hljs-title">parseFragmentHeader</span>(usage.<span class="hljs-property">info</span>);
+<span class="hljs-keyword">const</span> closing = <span class="hljs-variable">document</span>.<span class="hljs-title">lineAt</span>(usage.<span class="hljs-property">map</span>[<span class="hljs-number">1</span>] - <span class="hljs-number">1</span>).<span class="hljs-property">text</span>.<span class="hljs-title">trim</span>();
+<span class="hljs-keyword">if</span>(!header || !<span class="hljs-regexp">/^(`{3,}|~{3,})$/</span>.<span class="hljs-title">test</span>(closing) || closing[<span class="hljs-number">0</span>] !== usage.<span class="hljs-property">markup</span>[<span class="hljs-number">0</span>] ||
+    closing.<span class="hljs-property">length</span> &lt; usage.<span class="hljs-property">markup</span>.<span class="hljs-property">length</span>) { <span class="hljs-keyword">continue</span>; }
+<span class="hljs-keyword">const</span> info = <span class="hljs-string">`</span><span class="hljs-subst">${header.language}</span><span class="hljs-string"> : </span><span class="hljs-subst">${OPENING}</span><span class="hljs-subst">${reference.name}</span><span class="hljs-subst">${CLOSING}</span><span class="hljs-string">=`</span>;
+<span class="hljs-keyword">if</span>(<span class="hljs-title">parseFragmentHeader</span>(info)?.<span class="hljs-property">name</span> !== reference.<span class="hljs-property">name</span>) { <span class="hljs-keyword">continue</span>; }
+</code></pre>
+
+</div>
+</div><h3>Offer the edit without applying it</h3>
+<p>Preserve the document's line ending and attach the edit to its URI, even if another
+editor is active. Only a fully constructed action marks a name as offered; VS Code
+retains responsibility for applying the edit and presenting its diagnostic.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0063006f0064006500200061006300740069006f006e002000700072006f0070006f00730065006400200065006400690074-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0063006f0064006500200061006300740069006f006e002000700072006f0070006f00730065006400200065006400690074"></span><a class="literate-tag-name" href="#f-0063006f0064006500200061006300740069006f006e002000700072006f0070006f00730065006400200065006400690074" data-literate-target="f-0063006f0064006500200061006300740069006f006e002000700072006f0070006f00730065006400200065006400690074" aria-label="Definition of code action proposed edit">&lt;&lt;code action proposed edit&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> eol = <span class="hljs-variable">document</span>.<span class="hljs-property">eol</span> === vscode.<span class="hljs-property">EndOfLine</span>.<span class="hljs-property">CRLF</span> ? <span class="hljs-string">'</span><span class="hljs-string">\r</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> : <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>;
+<span class="hljs-keyword">const</span> position = usage.<span class="hljs-property">map</span>[<span class="hljs-number">1</span>] &lt; <span class="hljs-variable">document</span>.<span class="hljs-property">lineCount</span> ? <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">Position</span>(usage.<span class="hljs-property">map</span>[<span class="hljs-number">1</span>], <span class="hljs-number">0</span>)
+    : <span class="hljs-variable">document</span>.<span class="hljs-title">positionAt</span>(text.<span class="hljs-property">length</span>);
+<span class="hljs-keyword">const</span> edit = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">WorkspaceEdit</span>();
+edit.<span class="hljs-title">insert</span>(<span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>, position, <span class="hljs-string">`</span><span class="hljs-subst">${eol}</span><span class="hljs-string">~~~ </span><span class="hljs-subst">${info}</span><span class="hljs-subst">${eol}</span><span class="hljs-string">~~~</span><span class="hljs-subst">${eol}</span><span class="hljs-string">`</span>);
+<span class="hljs-keyword">const</span> action = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">CodeAction</span>(<span class="hljs-string">`Create fragment for </span><span class="hljs-subst">${OPENING}</span><span class="hljs-subst">${reference.name}</span><span class="hljs-subst">${CLOSING}</span><span class="hljs-string">`</span>,
+    vscode.<span class="hljs-property">CodeActionKind</span>.<span class="hljs-property">QuickFix</span>);
+action.<span class="hljs-property">diagnostics</span> = [diagnostic];
+action.<span class="hljs-property">edit</span> = edit;
+actions.<span class="hljs-title">push</span>(action);
+offered.<span class="hljs-title">add</span>(reference.<span class="hljs-property">name</span>);
+</code></pre>
+
+</div>
+</div><h2>Markdown parser-state bridge implementation</h2>
+<p>The <code>grabit</code> core rule captures the current Markdown-it <code>StateCore</code> in the parser
+environment before normalization. Returning <code>false</code> leaves the token stream
+untouched and allows the remaining core rules to continue; later adapters combine
+the captured tokens with engine-approved fragment identities.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0061007300730065006d0062006c006500200074006800650020004d00610072006b0064006f0077006e00200070006100720073006500720020007300740061007400650020006200720069006400670065002e002a-006c0069007400650072006100740065002f0061007000700065006e006400690078005f0065006400690074006f0072005f0069006e0074006500670072006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0061007300730065006d0062006c006500200074006800650020004d00610072006b0064006f0077006e00200070006100720073006500720020007300740061007400650020006200720069006400670065002e002a"></span><a class="literate-tag-name" href="#f-0061007300730065006d0062006c006500200074006800650020004d00610072006b0064006f0077006e00200070006100720073006500720020007300740061007400650020006200720069006400670065002e002a" data-literate-target="f-0061007300730065006d0062006c006500200074006800650020004d00610072006b0064006f0077006e00200070006100720073006500720020007300740061007400650020006200720069006400670065002e002a" aria-label="Definition of assemble the Markdown parser state bridge.*">&lt;&lt;assemble the Markdown parser state bridge.*&gt;&gt;= src/grabber.ts $</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> <span class="hljs-title">MarkdownIt</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">'markdown-it'</span>);
+<span class="hljs-keyword">import</span> <span class="hljs-title">Core</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">'markdown-it/lib/parser_core'</span>);
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">grabberPlugin</span>(<span class="hljs-params">md : MarkdownIt</span>) {
+    <span class="hljs-keyword">const</span> grabit : <span class="hljs-title">Core</span>.<span class="hljs-property">RuleCore</span> = <span class="hljs-params">state</span><span class="hljs-function"> =&gt;</span> {
+        <span class="hljs-keyword">if</span> (state.<span class="hljs-property">env</span>) {
+            state.<span class="hljs-property">env</span>.<span class="hljs-property">gstate</span> = state;
+        }
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;
+    };
+
+    md.<span class="hljs-property">core</span>.<span class="hljs-property">ruler</span>.<span class="hljs-title">before</span>(<span class="hljs-string">'normalize'</span>, <span class="hljs-string">'grabit'</span>, grabit);
+};
+</code></pre>
+
+</div>
+</div><script type="application/json" class="literate-exploration-data">{"version":1,"parts":{},"families":{},"unavailable":"Exploration payload exceeds the one MiB limit."}</script><script>(
+// Closure-free: standalone HTML embeds this source without the module wrapper.
+function initializePublicationExploration(document) {
+    const view = document.defaultView;
+    if (!view || document.__literateExploration) { return; }
+    document.__literateExploration = true;
+    const limits = { payload: 1048576, layers: 8, bytes: 262144, panels: 200, parts: 200, segments: 4096 };
+    const roots = new Map();
+    const controls = new Map();
+    const panels = new Map();
+    const encoder = new view.TextEncoder();
+    const own = (object, key) => object && Object.prototype.hasOwnProperty.call(object, key) ? object[key] : undefined;
+    const record = value => value && typeof value === 'object' && !Array.isArray(value);
+    const identifier = value => typeof value === 'string' && value.length <= 4096 && /^[A-Za-z0-9_-]+$/.test(value);
+    const connected = node => !!node && document.documentElement.contains(node);
+    let usedBytes = 0, serial = 0, focused;
+    const element = (tag, text) => {
+        const node = document.createElement(tag);
+        if (text !== undefined) { node.textContent = text; }
+        return node;
+    };
+    function inPanel(node) {
+        for (let parent = node; parent; parent = parent.parentNode) { if (panels.has(parent)) { return true; } }
+        return false;
+    }
+    function safeHref(href, target, baseline = false) {
+        if (typeof href !== 'string' || href.length > 4096 || /[\s\u0000-\u001f\u007f\\]/.test(href)) { return undefined; }
+        if (identifier(target) && href === '#' + target) { return href; }
+        if (identifier(target) && href.endsWith('#' + target)) {
+            const path = href.slice(0, -target.length - 1);
+            if (path.startsWith('./') && path.endsWith('.html') && path.slice(2).split('/').every(
+                part => /^(?:[A-Za-z0-9_~.!'()*-]|%[0-9a-fA-F]{2})+$/.test(part))) { return href; }
+        }
+        if (/^vscode(?:-insiders)?:\/\/jesterking\.literate\/navigate\/[a-f0-9]{48}\/[a-f0-9]{48}(?:\?[^#]*)?$/.test(href)) { return href; }
+        // HTTPS transport shapes belong to the host. Never authorize one from JSON alone.
+        if (baseline && /^https:\/\//.test(href)) {
+            try {
+                const url = new view.URL(href);
+                if (url.protocol === 'https:' && url.hostname && !url.username && !url.password) { return href; }
+            } catch (_) { /* Invalid URLs remain plain text. */ }
+        }
+        return undefined;
+    }
+    function linkFor(context, model, target) {
+        if (context.links.has(target)) { return context.links.get(target); }
+        return safeHref(own(model.families, target)?.href, target);
+    }
+    function focusWithin(control) {
+        const active = document.activeElement;
+        if (control.button === active || control.panel?.contains(active)) { return true; }
+        return focused?.top === control && (!active || active === document.body || !connected(active));
+    }
+    function close(control) {
+        if (!control.panel) { return; }
+        for (const child of [...control.children]) { destroy(child); }
+        const cost = panels.get(control.panel)?.cost;
+        if (cost !== undefined) { usedBytes -= cost; panels.delete(control.panel); }
+        control.panel.remove(); control.panel = undefined;
+        control.button.setAttribute('aria-expanded', 'false');
+        control.button.removeAttribute('aria-controls');
+        control.note.textContent = '';
+    }
+    function destroy(control) {
+        close(control);
+        controls.delete(control.use);
+        control.parent?.children.delete(control);
+        control.context.controls.delete(control.use);
+        control.button.remove(); control.note.remove();
+    }
+    function restore(request) {
+        if (!request) { return; }
+        const replacement = controls.get(request.use) || [...controls.values()].find(control =>
+            !control.parent && control.target === request.target);
+        const anchor = [request.use.querySelector('a'), request.context.root.querySelector('a'),
+            ...document.querySelectorAll('a')].find(node => connected(node) && node.getAttribute('href'));
+        const destination = replacement?.button || anchor;
+        focused = undefined;
+        if (destination) { destination.focus(); }
+    }
+    // Account for serialized text/attributes without constructing candidate DOM or expanded strings.
+    function escapedCost(text) {
+        if (typeof text !== 'string' || text.length > limits.bytes) { return Infinity; }
+        let cost = encoder.encode(text).length;
+        for (const character of text) {
+            if (character === '&') { cost += 4; }
+            else if (character === '<' || character === '>') { cost += 3; }
+            else if (character === '"' || character === "'") { cost += 5; }
+        }
+        return cost;
+    }
+    function plan(control) {
+        const { model, target, path, context } = control;
+        const family = own(model.families, target);
+        if (model.unavailable) { return { reason: 'Exploration data is unavailable.' }; }
+        if (!identifier(target) || !record(family) || typeof family.name !== 'string' || family.name.length > 1024 || !Array.isArray(family.parts)) {
+            return { reason: 'Fragment is unavailable in this snapshot.' };
+        }
+        if (path.includes(target)) { return { reason: 'Cycle: this fragment is already open on this path.' }; }
+        if (path.length >= limits.layers) { return { reason: 'Exploration is limited to eight layers.' }; }
+        if (panels.size >= limits.panels) { return { reason: 'Exploration panel limit reached; collapse a panel first.' }; }
+        const failure = { reason: 'Exploration DOM budget or contribution limit reached. No code was truncated.' };
+        if (family.parts.length > limits.parts) { return failure; }
+        const parts = [], seen = new Set();
+        let cost = 512 + escapedCost(family.name), count = 0;
+        for (const id of family.parts) {
+            if (!identifier(id) || seen.has(id)) { return failure; }
+            seen.add(id);
+            const segments = own(model.parts, id);
+            if (!Array.isArray(segments) || (count += segments.length) > limits.segments) { return failure; }
+            cost += 96;
+            const entries = [];
+            for (const segment of segments) {
+                if (!record(segment) || typeof segment.text !== 'string') { return failure; }
+                const reference = segment.reference === true;
+                const destination = segment.target === undefined ? '' : segment.target;
+                if (reference && destination !== '' && !identifier(destination)) { return failure; }
+                const href = reference ? linkFor(context, model, destination) : undefined;
+                cost += 96 + escapedCost(segment.text);
+                if (reference) {
+                    cost += 1024 + escapedCost(segment.text.slice(0, 512)) + escapedCost(destination) * 2;
+                    if (href) { cost += escapedCost(href); }
+                }
+                if (cost + usedBytes > limits.bytes) { return failure; }
+                entries.push({ text: segment.text, reference, target: destination, href });
+            }
+            if (cost + usedBytes > limits.bytes) { return failure; }
+            parts.push(entries);
+        }
+        return cost + usedBytes <= limits.bytes ? { name: family.name, parts, cost } : failure;
+    }
+    function open(control) {
+        const accepted = plan(control);
+        if (accepted.reason) { control.note.textContent = accepted.reason + ' Definition links remain available.'; return; }
+        const candidate = element('span');
+        candidate.style.display = 'block';
+        candidate.setAttribute('role', 'group');
+        candidate.setAttribute('aria-label', 'Unexpanded fragment ' + accepted.name);
+        candidate.append(element('span', 'Unexpanded fragment — plain text; explore references separately.\n'));
+        for (const entries of accepted.parts) {
+            const code = element('span'); code.style.whiteSpace = 'pre-wrap';
+            for (const entry of entries) {
+                const text = element(entry.href ? 'a' : 'span', entry.text);
+                if (entry.href) { text.setAttribute('href', entry.href); text.setAttribute('data-literate-target', entry.target); }
+                code.append(text);
+                if (entry.reference) {
+                    text.setAttribute('data-literate-explore', entry.target);
+                    enhance(text, control.context, [...control.path, control.target], control);
+                }
+            }
+            candidate.append(code);
+        }
+        do { candidate.id = 'literate-exploration-' + (++serial); } while (document.getElementById(candidate.id));
+        // Diagnostic metadata is never read back for ownership or accounting.
+        candidate.setAttribute('data-literate-panel-bytes', String(accepted.cost));
+        usedBytes += accepted.cost;
+        panels.set(candidate, { cost: accepted.cost, owner: control });
+        control.panel = candidate;
+        control.note.textContent = ''; control.note.after(candidate);
+        control.button.setAttribute('aria-controls', candidate.id);
+        control.button.setAttribute('aria-expanded', 'true');
+    }
+    function signature(use) {
+        const anchor = use.matches('a') ? use : use.querySelector('a');
+        return [use.getAttribute('data-literate-explore'), use.textContent.slice(0, 512), anchor,
+            anchor?.getAttribute('href'), anchor?.getAttribute('data-literate-target')];
+    }
+    function enhance(use, context, path = [], parent) {
+        const identity = signature(use);
+        const button = element('button', 'Explore fragment'); button.type = 'button';
+        button.setAttribute('aria-label', 'Explore ' + identity[1]);
+        button.setAttribute('aria-expanded', 'false');
+        const note = element('span'); note.setAttribute('role', 'status');
+        use.after(button, note);
+        const control = { use, context, model: context.model, identity, target: identity[0], path,
+            button, note, parent, children: new Set(), panel: undefined };
+        controls.set(use, control);
+        if (parent) { parent.children.add(control); } else { context.controls.set(use, control); }
+        button.addEventListener('click', () => {
+            scan();
+            if (controls.get(use) !== control) { return; }
+            if (control.panel) {
+                if (focusWithin(control)) { button.focus(); }
+                close(control);
+            } else { open(control); }
+        });
+        return control;
+    }
+    function readModel(source) {
+        try {
+            if (source.length > limits.payload || encoder.encode(source).length > limits.payload) { throw new Error('payload limit'); }
+            const model = JSON.parse(source);
+            if (!record(model) || model.version !== 1 || !record(model.parts) || !record(model.families)) { throw new Error('invalid model'); }
+            return model;
+        } catch (_) { return { unavailable: true }; }
+    }
+    function baselineLinks(root) {
+        const links = new Map();
+        for (const anchor of root.querySelectorAll('a')) {
+            if (inPanel(anchor)) { continue; }
+            const target = anchor.getAttribute('data-literate-target');
+            if (!identifier(target)) { continue; }
+            const href = safeHref(anchor.getAttribute('href'), target, true);
+            links.set(target, links.has(target) && links.get(target) !== href ? undefined : href);
+        }
+        return links;
+    }
+    function scan() {
+        let request;
+        const retire = control => {
+            if (focusWithin(control)) { request = control; }
+            destroy(control);
+        };
+        const live = new Set(document.querySelectorAll('.literate-document'));
+        for (const [root, context] of roots) {
+            if (!live.has(root)) {
+                for (const control of [...context.controls.values()]) { retire(control); }
+                roots.delete(root);
+            }
+        }
+        for (const root of live) {
+            const payload = root.querySelector('script.literate-exploration-data[type="application/json"]');
+            let context = roots.get(root);
+            if (!payload) {
+                if (context) { for (const control of [...context.controls.values()]) { retire(control); } roots.delete(root); }
+                continue;
+            }
+            const source = payload.textContent;
+            const links = baselineLinks(root);
+            if (!context) {
+                context = { root, payload, source, links, model: readModel(source), controls: new Map() };
+                roots.set(root, context);
+            } else {
+                const changed = context.payload !== payload || context.source !== source;
+                const relink = links.size !== context.links.size || [...links].some(([key, value]) =>
+                                    !context.links.has(key) || context.links.get(key) !== value);
+                if (changed || relink) { for (const control of [...context.controls.values()]) { retire(control); } }
+                if (changed) { context.model = readModel(source); }
+                Object.assign(context, { payload, source, links });
+            }
+            const uses = new Set([...root.querySelectorAll('[data-literate-explore]')].filter(use => !inPanel(use)));
+            for (const [use, control] of [...context.controls]) {
+                const identity = signature(use);
+                if (!uses.has(use) || control.button.previousSibling !== use || control.note.previousSibling !== control.button
+                    || identity.some((value, index) => value !== control.identity[index])) { retire(control); }
+            }
+            for (const use of uses) { if (!controls.has(use)) { enhance(use, context); } }
+        }
+        for (const control of [...controls.values()]) {
+            if (!control.parent || controls.get(control.use) !== control) { continue; }
+            const identity = signature(control.use);
+            if (!connected(control.use) || control.button.previousSibling !== control.use
+                || identity.some((value, index) => value !== control.identity[index])) {
+                let top = control;
+                while (top.parent) { top = top.parent; }
+                if (focusWithin(top)) { request = top; }
+                close(top);
+            }
+        }
+        for (const [panel, { owner }] of [...panels]) {
+            if (!connected(panel)) {
+                let top = owner;
+                while (top.parent) { top = top.parent; }
+                if (focusWithin(top)) { request = top; }
+                close(owner);
+            }
+        }
+        restore(request);
+    }
+    document.addEventListener('focusin', event => {
+        focused = undefined;
+        for (const control of controls.values()) {
+            if (!control.parent && (control.button === event.target || control.panel?.contains(event.target))) {
+                focused = { top: control }; break;
+            }
+        }
+    });
+    scan();
+    document.addEventListener('DOMContentLoaded', scan);
+    view.addEventListener('vscode.markdown.updateContent', scan);
+    new view.MutationObserver(scan).observe(document.documentElement, {
+        childList: true, characterData: true, subtree: true, attributes: true,
+        attributeFilter: ['data-literate-explore', 'data-literate-target', 'href', 'type', 'class']
+    });
+}
+)(document);</script></div>
 <script type="module">
   import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
   mermaid.initialize({"theme":"base","themeVariables":{"darkMode":false,"background":"#faf4ed","textColor":"#575279","fontFamily":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif","fontSize":"16px","primaryColor":"#EDE1D6","primaryTextColor":"#575279","primaryBorderColor":"#286983","secondaryColor":"#EADCCF","secondaryTextColor":"#575279","secondaryBorderColor":"#56949f","tertiaryColor":"#faf4ed","tertiaryTextColor":"#575279","tertiaryBorderColor":"#b0acb9","lineColor":"#56949f","mainBkg":"#EDE1D6","nodeBorder":"#286983","nodeTextColor":"#575279","clusterBkg":"#EADCCF","clusterBorder":"#b0acb9","titleColor":"#575279","edgeLabelBackground":"#faf4ed","actorBkg":"#EDE1D6","actorBorder":"#286983","actorTextColor":"#575279","actorLineColor":"#b0acb9","signalColor":"#56949f","signalTextColor":"#575279","labelBoxBkgColor":"#EADCCF","labelBoxBorderColor":"#b0acb9","labelTextColor":"#575279","loopTextColor":"#575279","noteBkgColor":"#EADCCF","noteTextColor":"#575279","noteBorderColor":"#ea9d34","activationBkgColor":"#EADCCF","activationBorderColor":"#286983","sequenceNumberColor":"#faf4ed","classText":"#575279","attributeBackgroundColorOdd":"#EDE1D6","attributeBackgroundColorEven":"#EADCCF","relationColor":"#56949f","relationLabelColor":"#575279","relationLabelBackground":"#faf4ed","pie1":"#286983","pie2":"#56949f","pie3":"#ea9d34","pie4":"#b4637a","pie5":"#907aa9","pie6":"#d7827e","pie7":"#ea9d34","pie8":"#908B9D","pie9":"#286983","pie10":"#56949f","pie11":"#907aa9","pie12":"#d7827e","pieTitleTextColor":"#575279","pieSectionTextColor":"#faf4ed","pieLegendTextColor":"#575279","pieStrokeColor":"#faf4ed","pieOuterStrokeColor":"#b0acb9"},"startOnLoad":true,"securityLevel":"strict"});

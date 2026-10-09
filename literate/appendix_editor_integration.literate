@@ -74,10 +74,10 @@ The repository translates engine diagnostics into one workspace-scoped
 `DiagnosticCollection`. Replacement is whole-snapshot replacement: repairing a
 project clears obsolete entries, and refreshing one workspace does not clear another.
 
-## `grabber.literate`: the Markdown parser state bridge
+## The Markdown parser state bridge
 
-[The grabber](grabber.html) is a small but important bridge between Markdown parsing
-and editor adapters. `grabberPlugin` installs a Markdown-it core rule named `grabit`
+The parser-state bridge connects Markdown parsing to editor adapters. `grabberPlugin`
+installs a Markdown-it core rule named `grabit`
 before Markdown-it's `normalize` rule. When the parser receives an environment
 object, that rule stores the current parser `StateCore` as `env.gstate`, then returns
 without consuming or rewriting the token stream.
@@ -103,8 +103,8 @@ wrappers while preserving the built-in Markdown pipeline. The contract is narrow
 - let the next Markdown-it core rule continue;
 - use captured tokens only in combination with current engine-approved identities.
 
-This is why `grabber.literate` is best understood as a Markdown parser state bridge,
-not as the source of fragment semantics.
+This bridge is therefore an adapter to parser state, not the source of fragment
+semantics. Its complete implementation appears later in this appendix.
 
 ## Fragment provider registration
 
@@ -284,7 +284,7 @@ For a fragment-name operation, follow this route:
 For a Markdown preview problem, follow:
 
 1. the returned `extendMarkdownIt` hook;
-2. `grabber.literate` and `env.gstate`;
+2. the parser-state bridge and `env.gstate`;
 3. the fence and document wrappers;
 4. the repository's synchronous preview overlay;
 5. screen rendering and the relevant browser program.
@@ -293,3 +293,580 @@ For mapped programming-language behavior, begin with
 [Coordinating language features in the editor](coordinating_language_features.html),
 then use [Appendix E — Language-server protocol details](appendix_language_server_protocol.html)
 for transport and reply contracts.
+
+## Provider implementation reference
+
+The following fragments are the mechanical VS Code adapters behind the symbol
+operations described in Chapter 14. They share the repository and symbol semantics
+already explained above; the code here records exact API conversion and registration.
+
+## Fragment-name completion provider
+
+Fragment names form a project vocabulary, but an author should not have to recall
+every name exactly. The completion adapter participates in Markdown editing and
+responds only after an unmatched opening `<<`, leaving ordinary prose and projected
+programming-language completion to their own providers.
+
+``` ts : <<register fragment name completion>>=
+const completionItemProvider =
+  vscode.languages.registerCompletionItemProvider('markdown', {
+    <<provide fragment name completions>>
+}, '<');
+context.subscriptions.push(completionItemProvider);
+```
+
+### Providing completion items
+
+Inside an unfinished fragment tag, the provider offers a `CompletionItem` for
+each known fragment in the project. Elsewhere it returns no fragment suggestions,
+leaving ordinary code completion to the configured language server.
+
+``` ts : <<provide fragment name completions>>=
+async provideCompletionItems(
+  document : vscode.TextDocument,
+  position: vscode.Position
+)
+{
+  const prefix = document.lineAt(position.line).text.slice(0, position.character);
+  if (!/\x3c\x3c[^>]*$/.test(prefix)) { return []; }
+```
+
+`begin collecting fragment completions` creates the result, while
+`require an owning workspace for completion` declines documents that do not belong
+to a workspace project.
+
+``` ts : <<provide fragment name completions>>=+
+  <<begin collecting fragment completions>>
+  <<require an owning workspace for completion>>
+```
+
+With project authority established, `refresh fragments before completion` reads a
+current, read-only repository snapshot.
+
+``` ts : <<provide fragment name completions>>=+
+  <<refresh fragments before completion>>
+```
+
+`offer each fragment as a completion` turns the known family map into editor items.
+
+``` ts : <<provide fragment name completions>>=+
+  <<offer each fragment as a completion>>
+  return completionItems;
+}
+```
+
+#### Setting up variables
+
+The result is an array of `CompletionItem` values.
+
+``` ts : <<begin collecting fragment completions>>=
+let completionItems : Array<vscode.CompletionItem> =
+    new Array<vscode.CompletionItem>();
+```
+
+#### Workspace folder for TextDocument
+
+The shared workspace helper identifies the folder that owns the document. Without
+one, no project fragment vocabulary is available and the provider returns no items.
+
+``` ts : <<require an owning workspace for completion>>=
+const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
+if(!workspaceFolder) { return []; }
+```
+
+#### Retrieving fragments of project
+
+Completion refreshes the fragment repository from current editor buffers before
+reading its map. This uses the same serialized processing queue as generation,
+but the default is read-only: asking for suggestions never writes source or HTML.
+Literate content changes independently request generation, including changes
+beginning with an opening chevron.
+
+``` ts : <<refresh fragments before completion>>=
+await theOneRepository.processLiterateFiles(workspaceFolder);
+let fragments = theOneRepository.getFragments(workspaceFolder).map;
+```
+
+#### Creating the CompletionItems
+
+Each known family becomes a reference-kind completion item. Its name is the inserted
+text, while bounded unexpanded source appears as detail so similarly named families
+can be distinguished before selection.
+
+``` ts : <<offer each fragment as a completion>>=
+for(const fragmentName of fragments.keys())
+{
+  const fragment : FragmentInformation | undefined = fragments.get(fragmentName);
+  if(!fragment) {
+    continue;
+  }
+  const fragmentCompletion = new vscode.CompletionItem(fragmentName);
+  fragmentCompletion.detail = fragment.code;
+  fragmentCompletion.kind = vscode.CompletionItemKind.Reference;
+  completionItems.push(fragmentCompletion);
+}
+```
+
+## Fragment hover provider
+
+Hover lets an author inspect a referenced family's unexpanded source without leaving
+the current explanation. `FragmentHoverProvider` adapts that read-only lookup to
+VS Code's `HoverProvider` contract.
+
+``` ts : <<fragment hover provider>>=
+export class FragmentHoverProvider implements vscode.HoverProvider {
+  readonly fragmentRepository : FragmentRepository;
+  constructor(repository : FragmentRepository)
+  {
+    this.fragmentRepository = repository;
+  }
+  <<provide fragment hover>>
+}
+```
+
+The `FragmentHoverProvider` implements `provideHover`. This will create the
+`Hover` item if under the current cursor position there is a fragment, including
+its opening and closing double chevrons. Refresh is read-only and includes
+unsaved buffers; cancelled requests return no hover.
+
+``` ts : <<provide fragment hover>>=
+public async provideHover(
+  document : vscode.TextDocument,
+  position : vscode.Position,
+  token: vscode.CancellationToken
+)
+{
+  if(token.isCancellationRequested) { return null; }
+  <<require an owning workspace for hover>>
+  await this.fragmentRepository.processLiterateFiles(document);
+  if(token.isCancellationRequested) { return null; }
+  <<read the hovered source line>>
+  <<show unexpanded fragment source>>
+  return null;
+}
+```
+
+Fragment tags are lexical single-line forms, so hover begins with the current source
+line and the cursor's exact UTF-16 position.
+
+``` ts : <<read the hovered source line>>=
+const currentLine = document.lineAt(position.line);
+```
+
+The document must belong to a workspace project before its fragment family can be
+resolved. Otherwise the provider returns no hover.
+
+``` ts : <<require an owning workspace for hover>>=
+const workspaceFolder : vscode.WorkspaceFolder | undefined = determineWorkspaceFolder(document);
+if(!workspaceFolder) { return null; }
+```
+
+An exact non-root occurrence yields a `Hover` containing the family's unexpanded
+source as a fenced `MarkdownString`. Definitions, appends, missing occurrences, and
+cancelled requests yield no hover.
+
+``` ts : <<show unexpanded fragment source>>=
+let fragmentLocation = this.fragmentRepository.getFragmentTagLocation(document, currentLine, position);
+if(fragmentLocation.valid && fragmentLocation.fragment && !fragmentLocation.root)
+{
+  let fragment = fragmentLocation.fragment;
+  let range = fragmentLocation.range;
+  return new vscode.Hover(
+    new vscode.MarkdownString(`~~~ ${fragment.lang}\n${fragment.code}\n~~~`, true),
+    range
+    );
+}
+```
+
+
+## Definition provider
+
+The definition provider maps an exact occurrence to the family's base definition.
+It returns a `vscode.Location` only after a read-only refresh confirms both the
+occurrence and destination.
+
+``` ts : <<fragment definition provider>>=
+export class LiterateDefinitionProvider implements vscode.DefinitionProvider
+{
+    <<construct the definition provider>>
+    <<provide a fragment definition>>
+}
+```
+
+`LiterateDefinitionProvider` receives the shared repository as a parameter property.
+
+```  ts  : <<construct the definition provider>>=
+constructor(
+    private readonly repository : FragmentRepository
+) {}
+```
+
+The provider refreshes a read-only snapshot before lookup and honors cancellation.
+Definition locations use the same exact tag ranges as references and hover.
+
+```  ts  : <<provide a fragment definition>>=
+public async provideDefinition
+    (
+        document : vscode.TextDocument,
+        position : vscode.Position,
+        token : vscode.CancellationToken
+    )
+{
+    if(token.isCancellationRequested) { return null; }
+    const workspaceFolder = determineWorkspaceFolder(document);
+    if(!workspaceFolder) { return null; }
+    await this.repository.processLiterateFiles(document);
+    if(token.isCancellationRequested) { return null; }
+    const fragmentLocation = this.repository.getFragmentTagLocation(
+        document,
+        document.lineAt(position),
+        position
+    );
+    if(!fragmentLocation.valid) { return null; }
+    const definition = this.repository.getFragmentOccurrences(workspaceFolder).find(
+        occurrence => occurrence.name === fragmentLocation.name && occurrence.kind === 'definition'
+    );
+    if(!definition || token.isCancellationRequested) { return null; }
+    return new vscode.Location(
+        vscode.Uri.joinPath(workspaceFolder.uri, definition.path),
+        new vscode.Range(definition.line, definition.column, definition.line, definition.endColumn)
+    );
+}
+```
+
+### Registering the definition provider
+
+``` ts : <<register the definition provider>>=
+context.subscriptions.push(
+    vscode.languages.registerDefinitionProvider(
+        'markdown',
+        new LiterateDefinitionProvider(theOneRepository)
+    )
+);
+```
+
+## Reference provider
+
+The reference provider returns semantic uses of the selected family, optionally
+including its declarations according to the editor request.
+
+``` ts : <<fragment reference provider>>=
+export class LiterateReferenceProvider implements vscode.ReferenceProvider
+{
+    <<construct the reference provider>>
+    <<provide fragment references>>
+}
+```
+
+`LiterateReferenceProvider` receives the same shared repository as a parameter
+property.
+
+```  ts  : <<construct the reference provider>>=
+constructor(
+    private readonly repository : FragmentRepository
+) {}
+```
+
+The request supplies a document, position, declaration policy, and cancellation
+token. Cancellation is checked before and after refreshing the read-only symbol
+snapshot and again before locations are returned.
+
+```  ts  : <<provide fragment references>>=
+public async provideReferences(
+    document : vscode.TextDocument,
+    position : vscode.Position,
+    context: { includeDeclaration : boolean},
+    token : vscode.CancellationToken
+)
+{
+    if(token.isCancellationRequested) { return null; }
+    const workspaceFolder = determineWorkspaceFolder(document);
+    if(!workspaceFolder) { return null; }
+    await this.repository.processLiterateFiles(document);
+    if(token.isCancellationRequested) { return null; }
+    const fragmentLocation = this.repository.getFragmentTagLocation(
+        document,
+        document.lineAt(position),
+        position
+    );
+
+    if(!fragmentLocation.valid) { return null; }
+    const locations = await this.repository.getReferenceLocations(
+        workspaceFolder,
+        fragmentLocation.name,
+        context.includeDeclaration
+    );
+    return token.isCancellationRequested ? null : locations;
+
+}
+```
+
+### Registering the reference provider
+
+``` ts : <<register the reference provider>>=
+context.subscriptions.push(
+    vscode.languages.registerReferenceProvider(
+        'markdown',
+        new LiterateReferenceProvider(theOneRepository)
+    )
+);
+```
+
+## Rename provider
+
+Rename uses the shared symbol planner, so only explicit fragment names change.
+Validation rejects ambiguous definitions, collisions and changes to root status
+without touching prose, filenames or generated output.
+
+The provider returns a proposed workspace edit; it does not apply edits or write
+generated files itself. VS Code owns applying the edit. A resulting literate
+content-change event can then trigger the ordinary generation path.
+
+```mermaid
+sequenceDiagram
+    participant User as Author
+    participant VS as VS Code
+    participant Provider as Rename provider
+    participant Repo as Fragment repository
+    participant Planner as Symbol planner
+    User->>VS: Rename a fragment
+    VS->>Provider: Prepare rename at cursor
+    Provider->>Repo: Refresh from current buffers
+    Repo-->>Provider: Exact occurrence and source snapshot
+    Provider->>Planner: Validate same-name plan
+    Planner-->>Provider: Unique valid definition
+    Provider-->>VS: Inner-name range and placeholder
+    User->>VS: Enter new name
+    VS->>Provider: Request rename edits
+    Provider->>Repo: Refresh again
+    Provider->>Planner: Plan rename from fresh sources
+    Note over Planner: Validate names, collisions and Markdown structure
+    alt Valid plan
+        Planner-->>Provider: Name-only edit ranges
+        Provider-->>VS: WorkspaceEdit
+        VS->>VS: Apply edits to source documents
+        VS->>Repo: Literate content-change events
+    else Unsafe rename
+        Planner-->>Provider: Validation error
+        Provider-->>VS: Reject rename without partial edits
+    end
+```
+
+Cancellation and positions that do not identify a defined fragment stop before
+returning edits. Those early exits are omitted here to keep the successful
+interaction and validation failure visible.
+
+``` ts : <<rename provider class>>=
+export class LiterateRenameProvider implements vscode.RenameProvider
+{
+    constructor(public readonly repository : FragmentRepository) {}
+
+    <<prepare fragment rename>>
+    <<fragment rename provider>>
+}
+```
+
+Preparing a rename refreshes the read-only repository from open buffers. The
+shared lookup supplies the inner name range, excluding the tag delimiters.
+A no-op plan also verifies that the selected symbol has one base definition.
+
+``` ts : <<prepare fragment rename>>=
+public async prepareRename(
+    document : vscode.TextDocument,
+    position : vscode.Position,
+    token : vscode.CancellationToken
+)
+{
+    if(token.isCancellationRequested) { return null; }
+    const workspaceFolder = determineWorkspaceFolder(document);
+    if(!workspaceFolder) { return null; }
+    await this.repository.processLiterateFiles(document);
+    if(token.isCancellationRequested) { return null; }
+    const location = this.repository.getFragmentTagLocation(
+        document, document.lineAt(position.line), position
+    );
+    if(!location.valid || !location.fragment) { return null; }
+    planFragmentRename(
+        this.repository.getSourceDocuments(workspaceFolder), location.name, location.name
+    );
+    if(token.isCancellationRequested) { return null; }
+    return { range: location.rangeExclusive, placeholder: location.name };
+}
+```
+
+The actual request refreshes again: the user may have edited a buffer since
+preparation. Cancellation discards the whole result, never a partial edit set.
+Planner errors propagate to the editor as actionable rename failures.
+
+``` ts : <<fragment rename provider>>=
+public async provideRenameEdits(
+    document : vscode.TextDocument,
+    position : vscode.Position,
+    newName : string,
+    token : vscode.CancellationToken
+)
+{
+    if(token.isCancellationRequested) { return null; }
+    const workspaceFolder = determineWorkspaceFolder(document);
+    if(!workspaceFolder) { return null; }
+    await this.repository.processLiterateFiles(document);
+    if(token.isCancellationRequested) { return null; }
+    const location = this.repository.getFragmentTagLocation(
+        document, document.lineAt(position.line), position
+    );
+    if(!location.valid || !location.fragment) { return null; }
+    const plan = planFragmentRename(
+        this.repository.getSourceDocuments(workspaceFolder), location.name, newName
+    );
+    <<adapt fragment rename plan>>
+}
+```
+
+Planner paths are canonical workspace-relative source paths. Convert their
+UTF-16 name ranges to editor edits without reading disk or applying changes.
+
+``` ts : <<adapt fragment rename plan>>=
+const workspaceEdit = new vscode.WorkspaceEdit();
+for(const edit of plan)
+{
+    if(token.isCancellationRequested) { return null; }
+    workspaceEdit.replace(
+        vscode.Uri.joinPath(workspaceFolder.uri, edit.path),
+        new vscode.Range(edit.line, edit.startColumn, edit.line, edit.endColumn),
+        edit.newText
+    );
+}
+return token.isCancellationRequested ? null : workspaceEdit;
+```
+
+## Missing-reference code action provider
+
+Missing-fragment diagnostics carry a stable code rather than relying on their
+human-readable message. Quick fixes refresh the read-only repository, then
+require an exact unresolved reference in the current source snapshot. Cancelled
+requests and buffers changed during refresh return no actions.
+
+The edit belongs to the requested document URI, not the active editor. It adds
+an empty definition after the containing, closed top-level fragment fence.
+Unsafe insertion sites (including nested or unclosed fences) are declined rather
+than invoking the active-editor create command. VS Code applies the proposed
+edit; this provider neither applies edits nor generates output. Tilde fences permit
+backticks in fragment names and language identifiers without breaking the header.
+
+``` ts : <<code action provider class>>=
+export class LiterateCodeActionProvider implements vscode.CodeActionProvider
+{
+    constructor(public readonly repository : FragmentRepository) {}
+
+    public async provideCodeActions(
+        document : vscode.TextDocument,
+        _ : vscode.Range,
+        context : vscode.CodeActionContext,
+        token : vscode.CancellationToken
+    ) : Promise<vscode.CodeAction[]>
+    {
+        <<code action snapshot validation>>
+        const occurrences = this.repository.getFragmentOccurrences(folder);
+        const actions: vscode.CodeAction[] = [];
+        const offered = new Set<string>();
+        for(const diagnostic of diagnostics)
+        {
+            <<code action unresolved reference and insertion site>>
+            <<code action proposed edit>>
+        }
+        return token.isCancellationRequested ? [] : actions;
+    }
+}
+```
+
+### Match a stable source snapshot
+
+Filter diagnostics before refreshing the repository, then verify both the requested
+buffer and any open copy against the captured text and version. The repository's
+source must agree too: an action derived from stale occurrences could edit the
+wrong range. These checks share the method's scope without adding an async boundary.
+
+``` ts : <<code action snapshot validation>>=
+const diagnostics = context.diagnostics.filter(diag =>
+    (typeof diag.code === 'object' ? diag.code.value : diag.code) === 'missing-fragment');
+if(token.isCancellationRequested || !diagnostics.length ||
+    (context.only && !context.only.contains(vscode.CodeActionKind.QuickFix))) { return []; }
+const folder = determineWorkspaceFolder(document);
+if(!folder) { return []; }
+const version = document.version;
+const text = document.getText();
+await this.repository.processLiterateFiles(document);
+if(token.isCancellationRequested || document.version !== version || document.getText() !== text) { return []; }
+const documentPath = path.posix.relative(folder.uri.path, document.uri.path);
+const sources = this.repository.getSourceDocuments(folder);
+if(sources.find(source => source.path === documentPath)?.text !== text ||
+    vscode.workspace.textDocuments.some(open => open.uri.toString() === document.uri.toString() &&
+        (open.version !== version || open.getText() !== text))) { return []; }
+```
+
+### Require an exact reference and a safe insertion site
+
+One fix per unresolved name is enough. Wildcard roots and already-defined names
+are not creation candidates. Matching source text guards the diagnostic range;
+checking a closed, top-level fence ensures insertion cannot capture existing prose
+or code. Re-parsing the proposed header protects fragment identity.
+
+``` ts : <<code action unresolved reference and insertion site>>=
+const reference = occurrences.find(item => item.path === documentPath && item.kind === 'reference' &&
+    item.line === diagnostic.range.start.line && item.column === diagnostic.range.start.character);
+if(!reference || offered.has(reference.name) || reference.name.endsWith('.*') ||
+    occurrences.some(item => item.name === reference.name && item.kind === 'definition')) { continue; }
+const range = new vscode.Range(reference.line, reference.column, reference.line, reference.endColumn);
+if(document.getText(range) !== `${OPENING}${reference.name}${CLOSING}`) { continue; }
+const usage = this.repository.getTokenAtPosition(document, range).token;
+if(!usage || usage.type !== 'fence' || !usage.map || usage.level !== 0) { continue; }
+const header = parseFragmentHeader(usage.info);
+const closing = document.lineAt(usage.map[1] - 1).text.trim();
+if(!header || !/^(`{3,}|~{3,})$/.test(closing) || closing[0] !== usage.markup[0] ||
+    closing.length < usage.markup.length) { continue; }
+const info = `${header.language} : ${OPENING}${reference.name}${CLOSING}=`;
+if(parseFragmentHeader(info)?.name !== reference.name) { continue; }
+```
+
+### Offer the edit without applying it
+
+Preserve the document's line ending and attach the edit to its URI, even if another
+editor is active. Only a fully constructed action marks a name as offered; VS Code
+retains responsibility for applying the edit and presenting its diagnostic.
+
+``` ts : <<code action proposed edit>>=
+const eol = document.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
+const position = usage.map[1] < document.lineCount ? new vscode.Position(usage.map[1], 0)
+    : document.positionAt(text.length);
+const edit = new vscode.WorkspaceEdit();
+edit.insert(document.uri, position, `${eol}~~~ ${info}${eol}~~~${eol}`);
+const action = new vscode.CodeAction(`Create fragment for ${OPENING}${reference.name}${CLOSING}`,
+    vscode.CodeActionKind.QuickFix);
+action.diagnostics = [diagnostic];
+action.edit = edit;
+actions.push(action);
+offered.add(reference.name);
+```
+
+## Markdown parser-state bridge implementation
+
+The `grabit` core rule captures the current Markdown-it `StateCore` in the parser
+environment before normalization. Returning `false` leaves the token stream
+untouched and allows the remaining core rules to continue; later adapters combine
+the captured tokens with engine-approved fragment identities.
+
+```ts : <<assemble the Markdown parser state bridge.*>>= ./src/grabber.ts $
+import MarkdownIt = require('markdown-it');
+import Core = require('markdown-it/lib/parser_core');
+
+export function grabberPlugin(md : MarkdownIt) {
+    const grabit : Core.RuleCore = state => {
+        if (state.env) {
+            state.env.gstate = state;
+        }
+        return false;
+    };
+
+    md.core.ruler.before('normalize', 'grabit', grabit);
+};
+```
