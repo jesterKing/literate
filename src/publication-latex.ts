@@ -1,6 +1,6 @@
 import type { ParsedProject, PublicationContribution, GenerationDiagnostic } from './engine';
 import { preparePandoc, PandocInline } from './publication-pandoc';
-import { publicationRail, RailNote, RailTerm } from './publication-rail';
+import { publicationRail, RailFragment, RailNote, RailTerm } from './publication-rail';
 import { resolvePublicationSettings } from './publication-settings';
 import { checkFontFace, fontFaces, fontFile, PortableFont } from './publication-fonts';
 import type { PublicationSettingsResult } from './publication-settings';
@@ -8,7 +8,7 @@ import type { PandocDocument, PandocBlock, PublicationAsset } from './publicatio
 import { defaultThemeName, getTheme } from './themes';
 import type { LiterateTheme } from './themes';
 import { highlightContribution, syntaxStyle } from './publication-highlight';
-export const publicationTemplateVersion = 4;
+export const publicationTemplateVersion = 5;
 export interface LatexOptions {
     assetPath?: (asset: PublicationAsset) => string;
     theme?: string;
@@ -424,16 +424,28 @@ function contributionBody(data: Highlighted, project: ParsedProject,
             family.target === reference.target && family.name === reference.name)) {
             throw new Error('Unknown highlighted reference destination');
         }
-        output += literal(data, cursor, referencePrefixEnd(data.text, cursor, reference.start), theme);
+        const standalone = reference.placement === 'standalone';
+        output += literal(data, cursor,
+            standalone ? referencePrefixEnd(data.text, cursor, reference.start) : reference.start, theme);
         const command = macroName(definitions.length);
-        const label = '\\textless{}\\textless{}' + nameText(reference.name) +
-            '\\textgreater{}\\textgreater{}';
-        definitions.push(`\\newcommand{\\${command}}{\\par\\begingroup` +
-            '\\leftskip=1.5em\\rightskip=0pt plus 1fil\\parindent=0pt' +
-            '\\fragmentfont\\small\\noindent ' + pageLink(reference.target, label) +
-            '\\par\\endgroup}');
+        if (standalone) {
+            definitions.push(`\\newcommand{\\${command}}{\\par\\begingroup` +
+                '\\fragmentfont\\small\\noindent ' +
+                `\\LitFragmentUse{${target(reference.occurrenceTarget)}}{${target(reference.target)}}\\strut` +
+                '\\par\\endgroup}');
+        } else {
+            const label = '\\textless{}\\textless{}' + nameText(reference.name) +
+                '\\textgreater{}\\textgreater{}';
+            definitions.push(`\\newcommand{\\${command}}{\\par\\begingroup` +
+                '\\leftskip=1.5em\\rightskip=0pt plus 1fil\\parindent=0pt' +
+                '\\fragmentfont\\small\\noindent ' + pageLink(reference.target, label) +
+                '\\par\\endgroup}');
+        }
         output += `\\${command}{}\n`;
-        cursor = reference.end + (data.text[reference.end] === '\n' ? 1 : 0);
+        if (standalone) {
+            const newline = data.text.indexOf('\n', reference.end);
+            cursor = newline < 0 ? data.text.length : newline + 1;
+        } else { cursor = reference.end + (data.text[reference.end] === '\n' ? 1 : 0); }
     }
     return output + literal(data, cursor, data.text.length, theme);
 }
@@ -463,7 +475,7 @@ function annotationInlines(inlines: PandocInline[], markers: boolean, next: () =
 }
 const maximumAnnotationBody = 131072;
 const maximumAnnotationContent = 2 * 1024 * 1024;
-interface AnnotationBudget { terms: RailTerm[]; size: number; }
+interface AnnotationBudget { terms: RailTerm[]; fragments: RailFragment[]; size: number; }
 function annotationText(value: string): void {
     if (typeof value !== 'string' || value.length > maximumAnnotationBody ||
         /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)) {
@@ -477,10 +489,26 @@ function annotationTarget(value: string): string {
     if (4 + value.length * 4 > 8192) { throw new Error('Encoded rail target exceeds 8192 characters'); }
     return target(value);
 }
+function railFragmentFamilies(project: ParsedProject): ParsedProject['publication']['fragments'] {
+    const used = new Set<string>();
+    for (const contribution of project.publication.contributions) {
+        for (const segment of contribution.segments) {
+            if (segment.kind === 'reference' && segment.placement === 'standalone' &&
+                segment.resolution.kind === 'resolved') { used.add(segment.resolution.target); }
+        }
+    }
+    return project.publication.fragments.filter(family => used.has(family.target));
+}
 function annotationBudget(project: ParsedProject): AnnotationBudget {
     const { terms, notes } = project.annotations;
-    if (terms.length > 1000 || notes.length > 1000) {
-        throw new Error('Rail supports at most 1000 terms and 1000 notes');
+    const fragmentFamilies = railFragmentFamilies(project);
+    if (terms.length > 1000 || notes.length > 1000 || fragmentFamilies.length > 1000 ||
+        terms.length + notes.length + fragmentFamilies.length > 3000) {
+        throw new Error('Rail supports at most 1000 terms, notes and fragments, and 3000 declarations total');
+    }
+    const fragmentLabelCount = fragmentFamilies.reduce((sum, family) => sum + family.contributions.length, 0);
+    if (fragmentLabelCount > 10000) {
+        throw new Error('Rail supports at most 10000 fragment contribution labels');
     }
     let sourceSize = 0, size = 0;
     for (const item of [...terms, ...notes]) {
@@ -501,7 +529,15 @@ function annotationBudget(project: ParsedProject): AnnotationBudget {
         size += annotationTarget(note.target).length;
         annotationSize(size + sourceSize);
     }
-    return { terms: declarations, size };
+    const fragments = fragmentFamilies.map(family => {
+        const id = annotationTarget(family.target), title = nameText(family.name);
+        const labels = family.contributions.map(annotationTarget);
+        annotationText(title);
+        size += id.length + title.length + labels.reduce((sum, label) => sum + label.length, 0);
+        annotationSize(size + sourceSize);
+        return { target: id, title, labels };
+    });
+    return { terms: declarations, fragments, size };
 }
 async function annotationLatex(document: PandocDocument, project: ParsedProject,
     convert: LatexConverter, budget: AnnotationBudget, railFontSize: number): Promise<string> {
@@ -546,21 +582,26 @@ async function annotationLatex(document: PandocDocument, project: ParsedProject,
         }
     };
     document.blocks = await walk(document.blocks, true);
-    const terms = budget.terms;
-    if (!terms.length && !notes.length) { return ''; }
+    const terms = budget.terms, fragments = budget.fragments;
+    if (!terms.length && !notes.length && !fragments.length) { return ''; }
     return '% literate-publication-rail-v1\n' +
         '\\setlength{\\marginparwidth}{25mm}\n\\setlength{\\marginparsep}{5mm}\n' +
-        '\\microtypesetup{protrusion=false}\n' + publicationRail(terms, notes, railFontSize);
+        '\\microtypesetup{protrusion=false}\n' + publicationRail(terms, notes, railFontSize, fragments);
 }
 function annotationIndexes(project: ParsedProject): string {
-    let output = '\n\\chapter*{Term index}\n';
-    for (const term of project.annotations.terms) {
-        output += pageLink(term.target, tex(term.title)) + '\\par\n';
+    let output = '';
+    if (project.annotations.terms.length) {
+        output += '\n\\chapter*{Term index}\n';
+        for (const term of project.annotations.terms) {
+            output += pageLink(term.target, tex(term.title)) + '\\par\n';
+        }
     }
-    output += '\n\\chapter*{Fragment index}\n';
-    for (const family of project.publication.fragments) {
-        output += `{\\fragmentfont ${nameText(family.name)}}\\quad ` +
-            family.contributions.map(id => pageLink(id, '')).join(', ') + '\\par\n';
+    if (project.publication.fragments.length) {
+        output += '\n\\chapter*{Fragment index}\n';
+        for (const family of project.publication.fragments) {
+            output += `{\\fragmentfont ${nameText(family.name)}}\\quad ` +
+                family.contributions.map(id => pageLink(id, '')).join(', ') + '\\par\n';
+        }
     }
     return output;
 }
@@ -572,8 +613,9 @@ export async function renderLatex(parsed: ParsedProject, options: LatexOptions,
         if (settings.diagnostics.length) {
             return { diagnostics: [...parsed.diagnostics, ...settings.diagnostics] };
         }
-        const hasAnnotations = !!(parsed.annotations.terms.length || parsed.annotations.notes.length);
-        const checked = checkOptions(options, settings, hasAnnotations);
+        const hasRail = !!(parsed.annotations.terms.length || parsed.annotations.notes.length ||
+            railFragmentFamilies(parsed).length);
+        const checked = checkOptions(options, settings, hasRail);
         const definitions: string[] = [];
         stage = 'latex-preparation';
         const budget = annotationBudget(parsed);
@@ -588,7 +630,7 @@ export async function renderLatex(parsed: ParsedProject, options: LatexOptions,
         const body = await convert(prepared.document, conversionOptions);
         if (typeof body !== 'string') { throw new Error('Converter must return a LaTeX body string'); }
         stage = 'latex-template';
-        return { latex: template(body + (hasAnnotations ? annotationIndexes(parsed) : ''),
+        return { latex: template(body + (hasRail ? annotationIndexes(parsed) : ''),
             checked, definitions, annotations), diagnostics: [] };
     } catch (error) {
         return { diagnostics: [{ path: parsed.documents[0]?.path ?? '', line: 0, column: 0,

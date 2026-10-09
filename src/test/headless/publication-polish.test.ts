@@ -76,8 +76,8 @@ test('inline spaces remain explicit and breakable after Markdown whitespace norm
 test('template identifies its contract and keeps fenced/reference wrapping and default fonts', async () => {
     const { document, latex } = await capture('`InlineCode`\n\n```js\nconst fenced = "' + path + '";\n```\n\n' +
         '```js : <<Caller>>=\n<<Shared>>\n```\n\n```js : <<Shared>>=\nconst shared = 1;\n```');
-    assert.equal(publicationTemplateVersion, 4);
-    assert.ok(latex.startsWith('% Literate publication template v4\n'));
+    assert.equal(publicationTemplateVersion, 5);
+    assert.ok(latex.startsWith('% Literate publication template v5\n'));
     assert.ok(latex.includes('\\documentclass[fontsize=11pt,oneside,openany]{scrbook}'));
     assert.ok(latex.includes('\\newcommand{\\LitCodeSize}{\\fontsize{10pt}{12pt}\\selectfont}'));
     assert.ok(latex.includes('\\DeclareRobustCommand{\\LitInlineCode}[1]{\\texttt{#1}}'));
@@ -119,7 +119,8 @@ test('opt-in real Pandoc fixtures for LuaLaTeX acceptance', { skip: !evidence },
         '```js : <<Caller>>=\n<<Shared>>\n```\n\n```js : <<Shared>>=\nconst shared = 1;\n```';
     for (const paper of ['A4', 'A5'] as const) {
         for (const theme of ['rosepine-dawn', 'hermonica', 'flexoki-light']) {
-            const result = await renderLatex(parse(text), { paper, theme }, async document => {
+            const margins = paper === 'A5' ? { marginLeftMm: 20, marginRightMm: 16 } : {};
+            const result = await renderLatex(parse(text), { paper, theme, ...margins }, async document => {
                 const process = spawnSync('pandoc', ['-f', 'json', '-t', 'latex', '--no-highlight', '--top-level-division=chapter'],
                     { input: JSON.stringify(document), encoding: 'utf8', timeout: 30000 });
                 assert.equal(process.status, 0, process.stderr);

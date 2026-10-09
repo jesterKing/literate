@@ -1,7 +1,10 @@
-export interface RailTerm { target: string; title: string; label: string; }
+export interface RailTerm { target: string; title: string; label: string; summary?: string; }
 export interface RailNote { target: string; number: number; body: string; }
+export interface RailFragment { target: string; title: string; labels: readonly string[]; }
 
 const maximumDeclarations = 1000;
+const maximumTotalDeclarations = 3000;
+const maximumFragmentLabels = 10000;
 const maximumContent = 2 * 1024 * 1024;
 function identifier(value: string): void {
     if (typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9:._-]{0,8191}$/.test(value)) {
@@ -30,24 +33,31 @@ function luaLoader(source: string): string {
 }
 
 /** The caller supplies controlled LaTeX, loads hyperref, and reserves the outer rail. */
-export function publicationRail(terms: readonly RailTerm[], notes: readonly RailNote[], fontSize = 9): string {
+export function publicationRail(terms: readonly RailTerm[], notes: readonly RailNote[], fontSize = 9,
+    fragments: readonly RailFragment[] = []): string {
     if (!Number.isFinite(fontSize) || fontSize < 7 || fontSize > 14) {
         throw new Error('Rail font size must be 7–14 points');
     }
-    if (terms.length > maximumDeclarations || notes.length > maximumDeclarations) {
-        throw new Error('Rail supports at most 1000 terms and 1000 notes');
+    if (terms.length > maximumDeclarations || notes.length > maximumDeclarations ||
+        fragments.length > maximumDeclarations || terms.length + notes.length + fragments.length > maximumTotalDeclarations) {
+        throw new Error('Rail supports at most 1000 terms, notes and fragments, and 3000 declarations total');
     }
     const targets = new Set<string>(), labels = new Set<string>(), numbers = new Set<number>();
-    let size = 0;
-    for (const item of [...terms, ...notes]) {
+    let size = 0, fragmentLabels = 0;
+    for (const item of [...terms, ...notes, ...fragments]) {
         identifier(item.target);
         if (targets.has(item.target)) { throw new Error(`Duplicate rail target: ${item.target}`); }
         targets.add(item.target); size += item.target.length;
     }
+    const addLabel = (label: string): void => {
+        identifier(label);
+        if (labels.has(label)) { throw new Error(`Duplicate rail definition label: ${label}`); }
+        labels.add(label); size += label.length;
+    };
     for (const term of terms) {
-        identifier(term.label); controlledText(term.title);
-        if (labels.has(term.label)) { throw new Error(`Duplicate rail definition label: ${term.label}`); }
-        labels.add(term.label); size += term.label.length + term.title.length;
+        addLabel(term.label); controlledText(term.title);
+        if (term.summary !== undefined) { controlledText(term.summary); }
+        size += term.title.length + (term.summary?.length || 0);
     }
     for (const note of notes) {
         controlledText(note.body);
@@ -56,21 +66,38 @@ export function publicationRail(terms: readonly RailTerm[], notes: readonly Rail
         }
         numbers.add(note.number); size += note.body.length;
     }
+    for (const fragment of fragments) {
+        controlledText(fragment.title);
+        if (!fragment.labels.length) { throw new Error('Rail fragments require at least one contribution label'); }
+        fragmentLabels += fragment.labels.length;
+        if (fragmentLabels > maximumFragmentLabels) {
+            throw new Error('Rail supports at most 10000 fragment contribution labels');
+        }
+        size += fragment.title.length;
+        for (const label of fragment.labels) { addLabel(label); }
+    }
     if (size > maximumContent) { throw new Error('Rail declarations exceed 2 MiB'); }
-    if (!terms.length && !notes.length) { return ''; }
+    if (!terms.length && !notes.length && !fragments.length) { return ''; }
     const declarations = [
-        ...terms.map(term => ({ target: term.target, kind: 'term', number: 0, label: term.label,
-            body: `\\hyperref[${term.label}]{\\textbf{${term.title}}\\space\\pageref*{${term.label}}}` })),
-        ...notes.map(note => ({ ...note, kind: 'note', label: '',
-            body: `\\textbf{${note.number}.}\\space ${note.body}` }))
+        ...terms.map(term => ({ target: term.target, kind: 'term', number: 0, labels: [term.label], padding: 2,
+            body: `\\hyperref[${term.label}]{\\textbf{${term.title}}\\space\\pageref*{${term.label}}}` +
+                (term.summary ? `\\par ${term.summary}` : '') })),
+        ...notes.map(note => ({ ...note, kind: 'note', labels: [] as string[], padding: 2,
+            body: `\\textbf{${note.number}.}\\space ${note.body}` })),
+        ...fragments.map(fragment => ({ target: fragment.target, kind: 'fragment', number: 0,
+            labels: [...fragment.labels], padding: 0.75,
+            body: `\\textbf{${fragment.title}}\\par ` + fragment.labels.map(label =>
+                `\\hyperref[${label}]{\\pageref*{${label}}}`).join(', ') }))
     ];
     const registration = declarations.map((item, index) =>
         `litrail.declare(${index + 1},"${item.target}","${item.kind}",${item.number})`).join('\n');
     const boxes = declarations.map((item, index) => {
         const name = suffix(index);
+        const resolutions = item.labels.map(label => `\\LitRailResolve{${label}}`).join('');
         return `\\expandafter\\newbox\\csname LitRailBox${name}\\endcsname\n` +
             `\\long\\def\\LitRailBody${name}{${item.body}}\n` +
-            `\\AddToHook{begindocument/end}{\\LitRailBuild{${index + 1}}{${name}}{${item.label}}}`;
+            `\\def\\LitRailLabels${name}{${resolutions}}\n` +
+            `\\AddToHook{begindocument/end}{\\LitRailBuild{${index + 1}}{${name}}{${item.padding}}}`;
     }).join('\n');
     return luaLoader(railLua() + '\n' + registration) + '\n' + railTex(fontSize) + '\n' + boxes + '\n';
 }
@@ -92,14 +119,15 @@ function railTex(fontSize: number): string {
   \ifdefined\microtypesetup\microtypesetup{protrusion=false,expansion=false}\fi
   \parindent=0pt\parskip=2pt\raggedright
   \expandafter\global\expandafter\setbox\csname LitRailBox#2\endcsname=\vbox{%
-    \kern2mm\csname LitRailBody#2\endcsname\par\kern2mm}%
-  \def\LitRailResolved{1}\def\LitRailPage{}%
-  \if\relax\detokenize{#3}\relax\else
-    \ifcsname r@#3\endcsname\edef\LitRailPage{\getpagerefnumber{#3}}%
-    \else\def\LitRailResolved{0}\fi
-  \fi
+    \kern#3mm\csname LitRailBody#2\endcsname\par\kern#3mm}%
+  \def\LitRailResolved{1}\def\LitRailPages{}%
+  \def\LitRailResolve##1{%
+    \ifcsname r@##1\endcsname
+      \edef\LitRailPages{\LitRailPages,\getpagerefnumber{##1}}%
+    \else\def\LitRailResolved{0}\fi}%
+  \csname LitRailLabels#2\endcsname
   \directlua{litrail.box(#1,\expandafter\number\csname LitRailBox#2\endcsname,
-    "LitRailBody#2",\LitRailResolved,"\luaescapestring{\LitRailPage}")}%
+    "LitRailBody#2","LitRailLabels#2",\LitRailResolved,"\luaescapestring{\LitRailPages}")}%
   \endgroup}
 \DeclareRobustCommand{\LitTermUse}[3]{%
   \ifLitRailBuilding\directlua{litrail.reject("nested rail marker")}%
@@ -107,6 +135,9 @@ function railTex(fontSize: number): string {
 \DeclareRobustCommand{\LitNoteUse}[1]{%
   \ifLitRailBuilding\directlua{litrail.reject("nested rail marker")}%
   \else\leavevmode\directlua{litrail.use("\luaescapestring{#1}","\luaescapestring{#1}","note")}\fi}
+\DeclareRobustCommand{\LitFragmentUse}[2]{%
+  \ifLitRailBuilding\directlua{litrail.reject("nested rail marker")}%
+  \else\leavevmode\directlua{litrail.use("\luaescapestring{#1}","\luaescapestring{#2}","fragment")}\fi}
 \AddToHook{begindocument/end}{%
   \if@twocolumn\directlua{litrail.reject("two-column rail unsupported")}\fi}
 \AddToHook{shipout/foreground}{%
@@ -142,12 +173,16 @@ end
 local start = assert(io.open(tex.jobname..".litrail", "w"))
 start:write("pending\n"); start:close()
 function R.declare(index,target,kind,number)
+  if index<1 or index>3000 or not validid(target) or
+     (kind~="term" and kind~="note" and kind~="fragment") or
+     (kind=="note" and (number<1 or number>10000)) or (kind~="note" and number~=0) or
+     R.defs[index] or R.targets[target] then fatal("invalid rail declaration"); return end
   R.defs[index]={target=target,kind=kind,number=number}
   R.targets[target]=index
 end
 function R.previous(use,definition,page,x,y)
   if R.finished then return end
-  if #R.old>=10000 or use<1 or use>10000 or definition<1 or definition>2000 or
+  if #R.old>=10000 or use<1 or use>10000 or definition<1 or definition>3000 or
      page<1 or page>100000 then fatal("invalid or excessive auxiliary records"); return end
   local record={use,definition,page,x,y}
   R.old[#R.old+1]=record
@@ -209,14 +244,15 @@ local function audit(box)
   visit(box,0,0)
   return digest(table.concat(trace,"|")),failure
 end
-function R.box(index,number,macro,resolved,page)
+function R.box(index,number,macro,labelsmacro,resolved,pages)
   local d=R.defs[index]
   local b=tex.box[number]
+  if not d or not b then fatal("missing rail declaration box"); return end
   local shape,problem=audit(b)
   d.box=number; d.height=b.height+b.depth; d.width=b.width; d.resolved=resolved==1
   d.problem=problem
   d.fingerprint=digest(table.concat({d.target,d.kind,d.number,token.get_macro(macro),
-    b.width,b.height,b.depth,page,resolved,shape},"|"))
+    token.get_macro(labelsmacro),b.width,b.height,b.depth,pages,resolved,shape},"|"))
 end
 function R.use(id,target,kind)
   local index=R.targets[target]
@@ -305,7 +341,10 @@ function R.ship(page,twoside,oddleft,evenleft,top,body,height,width,separation)
     if item.y<cursor+gap or item.y+item.d.height>top+height then fatal("internal placement bounds violation"); return end
     cursor=item.y+item.d.height
     R.bounds[#R.bounds+1]=table.concat({R.page,item.index,x,item.y,width,item.d.height},",")
-    local destination=item.d.kind=="note" and ("lit-rail-note-"..item.index) or ("lit-rail-term-"..R.page.."-"..item.index)
+    local destination
+    if item.d.kind=="note" then destination="lit-rail-note-"..item.index
+    elseif item.d.kind=="term" then destination="lit-rail-term-"..R.page.."-"..item.index
+    else destination="lit-rail-fragment-"..R.page.."-"..item.index end
     tex.sprint(string.format("\\put(%.8f,%.8f){\\vtop{\\kern0pt\\hbox{\\hypertarget{%s}{\\copy%d}}}}",x/65536,-item.y/65536,destination,item.d.box))
   end
 end

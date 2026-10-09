@@ -2,11 +2,12 @@ import assert = require('node:assert/strict');
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
-import { publicationRail, RailNote, RailTerm } from '../../publication-rail';
+import { publicationRail, RailFragment, RailNote, RailTerm } from '../../publication-rail';
 import { generatedFromBook } from './authoritative-book';
 
 const term: RailTerm = { target: 'annotation-term-0061', title: 'Alpha', label: 'lit-00610062' };
 const note: RailNote = { target: 'annotation-note-0062', number: 1, body: 'An explanation.\\par Another paragraph.' };
+const fragment: RailFragment = { target: 'f-0063', title: 'A fragment', labels: ['c-0063-1', 'c-0063-2'] };
 function runtime(tex: string): string {
     const loader = tex.slice(0, tex.indexOf('\n\\makeatletter'));
     assert.match(loader, /^\\directlua\{assert\(load\(/);
@@ -16,6 +17,7 @@ function runtime(tex: string): string {
 
 test('rail is absent without annotations and does not mutate inputs', () => {
     assert.equal(publicationRail([], []), '');
+    assert.equal(publicationRail([], [], 9, []), '');
     const terms = Object.freeze([Object.freeze({ ...term })]);
     const notes = Object.freeze([Object.freeze({ ...note })]);
     assert.equal(publicationRail(terms, notes), publicationRail([term], [note]));
@@ -27,7 +29,26 @@ test('rail keeps model targets separate from pre-encoded definition labels', () 
     assert.ok(runtime(tex).includes(`litrail.declare(1,"${term.target}","term",0)`));
     assert.ok(runtime(tex).includes(`litrail.declare(2,"${note.target}","note",1)`));
     assert.ok(tex.includes('\\textbf{1.}\\space ' + note.body));
-    assert.ok(tex.includes(`\\LitRailBuild{1}{A}{${term.label}}`));
+    assert.ok(tex.includes(`\\def\\LitRailLabelsA{\\LitRailResolve{${term.label}}}`));
+    assert.ok(tex.includes('\\LitRailBuild{1}{A}{2}'));
+});
+
+test('fragment rows link every contribution and expose a marker-only use command', () => {
+    const tex = publicationRail([], [], 9, [fragment]);
+    const lua = runtime(tex);
+    assert.ok(lua.includes(`litrail.declare(1,"${fragment.target}","fragment",0)`));
+    for (const label of fragment.labels) {
+        assert.ok(tex.includes(`\\LitRailResolve{${label}}`));
+        assert.ok(tex.includes(`\\hyperref[${label}]{\\pageref*{${label}}}`));
+    }
+    assert.ok(tex.includes('\\LitRailBuild{1}{A}{0.75}'));
+    const macro = tex.slice(tex.indexOf('\\DeclareRobustCommand{\\LitFragmentUse}'),
+        tex.indexOf('\\AddToHook{begindocument/end}'));
+    assert.match(macro, /litrail\.use\(/);
+    assert.doesNotMatch(macro, /\\hyperref|\\hyperlink|\\pageref|A fragment/);
+    assert.ok(lua.includes('seen[r[2]]'));
+    assert.ok(lua.includes('d.kind=="note" and seen[r[2]]'));
+    assert.ok(lua.includes('lit-rail-fragment-'));
 });
 
 test('term macro renders its supplied label once without adding an inline link or page number', () => {
@@ -59,6 +80,10 @@ test('rail validates targets, labels, duplicate declarations and note numbers', 
     assert.throws(() => publicationRail([term, term], []), /Duplicate rail target/);
     assert.throws(() => publicationRail([term, { ...term, target: 'other' }], []), /Duplicate rail definition label/);
     assert.throws(() => publicationRail([term], [{ ...note, target: term.target }]), /Duplicate rail target/);
+    assert.throws(() => publicationRail([term], [], 9, [{ ...fragment, target: term.target }]), /Duplicate rail target/);
+    assert.throws(() => publicationRail([term], [], 9,
+        [{ ...fragment, labels: [term.label] }]), /Duplicate rail definition label/);
+    assert.throws(() => publicationRail([], [], 9, [{ ...fragment, labels: [] }]), /at least one/);
     for (const number of [0, -1, 1.5, NaN, Infinity, 10001]) {
         assert.throws(() => publicationRail([], [{ ...note, number }]), /unique integers/);
     }
@@ -66,15 +91,19 @@ test('rail validates targets, labels, duplicate declarations and note numbers', 
 });
 
 test('rail bounds declarations, controlled text and runtime work', () => {
-    assert.throws(() => publicationRail(Array(1001).fill(term), []), /1000 terms/);
-    assert.throws(() => publicationRail([], Array(1001).fill(note)), /1000 notes/);
+    assert.throws(() => publicationRail(Array(1001).fill(term), []), /1000 terms, notes and fragments/);
+    assert.throws(() => publicationRail([], Array(1001).fill(note)), /1000 terms, notes and fragments/);
+    assert.throws(() => publicationRail([], [], 9, Array(1001).fill(fragment)), /1000 terms, notes and fragments/);
+    assert.throws(() => publicationRail([], [], 9, [{ ...fragment,
+        labels: Array.from({ length: 10001 }, (_, index) => `c-${index}`) }]), /10000 fragment/);
     assert.throws(() => publicationRail([{ ...term, title: '\0' }], []), /controlled rail/);
     assert.throws(() => publicationRail([], [{ ...note, body: 'x'.repeat(131073) }]), /controlled rail/);
     assert.throws(() => publicationRail([], Array.from({ length: 17 }, (_,index) => ({
         target: `n-${index}`, number: index + 1, body: 'x'.repeat(131072)
     }))), /2 MiB/);
-    const lua = runtime(publicationRail([term], [note]));
-    for (const limit of ['R.count>=10000', 'R.nodes>500000', 'depth>64', 'page>100000']) {
+    const lua = runtime(publicationRail([term], [note], 9, [fragment]));
+    for (const limit of ['R.count>=10000', 'R.nodes>500000', 'depth>64', 'page>100000',
+        'definition>3000', 'kind~="fragment"', 'token.get_macro(labelsmacro)']) {
         assert.ok(lua.includes(limit), limit);
     }
 });

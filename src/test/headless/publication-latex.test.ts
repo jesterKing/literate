@@ -80,6 +80,22 @@ test('LaTeX links full hanging names, distinct contribution labels and navigatio
     assert.doesNotMatch(latex.slice(latex.indexOf('\\begin{document}')), /\\parbox/);
 });
 
+test('standalone references become marker baselines while inline references stay in the code body', async () => {
+    const project = parse(fence('caller', '  <<leaf>>  \nbefore <<leaf>> after') + fence('leaf', 'value'));
+    const result = await renderLatex(project, {}, convert);
+    assert.deepEqual(result.diagnostics, []);
+    const latex = result.latex!;
+    const first = latex.slice(latex.indexOf('\\newcommand{\\LitReferenceA}'),
+        latex.indexOf('\\newcommand{\\LitReferenceB}'));
+    const second = latex.slice(latex.indexOf('\\newcommand{\\LitReferenceB}'),
+        latex.indexOf('% literate-publication-rail-v1'));
+    assert.match(first, /\\LitFragmentUse\{lit-[a-f0-9]+\}\{lit-[a-f0-9]+\}\\strut/);
+    assert.doesNotMatch(first, /textless|pageref/);
+    assert.doesNotMatch(second, /\\LitFragmentUse/);
+    assert.match(second, /textless[\s\S]*pageref/);
+    assert.match(latex, /literate-publication-rail-v1/);
+});
+
 test('LaTeX moves document anchors after opening headings without mutating parsed input', async () => {
     const project = parse('# Chapter\n\nText');
     const before = JSON.stringify(project);
@@ -175,8 +191,9 @@ test('LaTeX mirrors inner and outer margins across two-sided pages', async () =>
     assert.ok(result.latex!.includes('[a4paper,top=18mm,outer=20mm,bottom=22mm,inner=14mm]{geometry}'));
 });
 
-test('LaTeX reserves the mirrored outer edge for annotation rails', async () => {
-    const result = await renderLatex(parse('```NOTE\nBinding note.\n```\n'),
+test('LaTeX reserves the mirrored outer edge for annotation and fragment rails', async () => {
+    const result = await renderLatex(parse('```NOTE\nBinding note.\n```\n' +
+        fence('caller', '<<leaf>>') + fence('leaf', 'value')),
         { marginInnerMm: 14, marginOuterMm: 20 }, convert);
     assert.deepEqual(result.diagnostics, []);
     assert.ok(result.latex!.includes('\\documentclass[fontsize=11pt,twoside,openany]{scrbook}'));

@@ -151,6 +151,28 @@ test('plain books retain layout and indexes are conditional; annotated fragment 
     }
 });
 
+test('standalone fragment references activate compact rail rows with every contribution page', async () => {
+    const code = '```js : <<caller>>=\n  <<piece>>  \n<<piece>>\n````\n'.replace('````', '```') +
+        '```js : <<piece>>=\nbase\n```\n```js : <<piece>>=+\naddition\n```\n';
+    const project = parse(code);
+    const result = await renderLatex(project, {}, convert);
+    assert.deepEqual(result.diagnostics, []);
+    const latex = result.latex!;
+    assert.match(latex, /right=50mm/);
+    assert.match(latex, /literate-publication-rail-v1/);
+    assert.equal((latex.match(/\\LitFragmentUse\{/g) || []).length, 2,
+        'each standalone source occurrence has one marker');
+    assert.doesNotMatch(latex.slice(latex.indexOf('\\newcommand{\\LitReferenceA}'),
+        latex.indexOf('\\newcommand{\\LitReferenceB}')), /textless|pageref/);
+    const family = project.publication.fragments.find(item => item.name === 'piece')!;
+    for (const contribution of family.contributions) {
+        assert.ok(latex.includes(`\\LitRailResolve{${encode(contribution)}}`));
+        assert.ok(latex.includes(`\\hyperref[${encode(contribution)}]{\\pageref*{${encode(contribution)}}}`));
+    }
+    assert.match(latex, /\\chapter\*\{Fragment index\}/);
+    assert.doesNotMatch(latex, /\\chapter\*\{Term index\}/);
+});
+
 test('nested prose uses get unique source-order markers and body uses never get markers', async () => {
     const project = parse(term + '\n- [one](term:alpha)\n\n  > [two](term:alpha)\n\n- [three](term:alpha)\n');
     const result = await renderLatex(project, {}, convert);
@@ -238,7 +260,7 @@ for (const kind of ['TERM', 'NOTE']) {
         const result = await renderLatex(project, {}, async () => { calls++; return ''; });
         assert.equal(calls, 0);
         assert.equal(result.latex, undefined);
-        assert.match(result.diagnostics[0].message, /at most 1000 terms and 1000 notes/);
+        assert.match(result.diagnostics[0].message, /at most 1000 terms, notes and fragments/);
     });
 }
 

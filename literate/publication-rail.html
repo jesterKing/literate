@@ -125,11 +125,12 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 </head>
 <body>
 <div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Page-local publication annotations</h1>
-<p>A publication rail is one ordered stream of term lookups and numbered explanations.
-It occupies a reserved 25 mm outer column, separated from the body by 5 mm. On
-mirrored pages the column alternates physical sides with the outer edge. Entries remain
-on their reference page: collision resolution moves them vertically, never splits,
-shrinks, or spills them. Impossible stable layouts are errors.</p>
+<p>A publication rail is one ordered stream of term lookups, numbered explanations,
+and fragment references. It occupies a reserved 25 mm outer column, separated from
+the body by 5 mm. On mirrored pages the column alternates physical sides with the
+outer edge. Entries remain on their reference page: collision resolution moves them
+vertically, never splits, shrinks, or spills them. Impossible stable layouts are
+errors.</p>
 <h2>Controlled inputs</h2>
 <p>The caller supplies escaped, controlled LaTeX, not raw author TeX. A term's model
 <code>target</code> and its pre-encoded definition <code>label</code> are distinct identifiers. Titles
@@ -138,10 +139,13 @@ node traversal have explicit limits. No annotations returns an empty preamble.</
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020007200610069006c00200063006f006e007400720061006300740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200063006f006e007400720061006300740073"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c00200063006f006e007400720061006300740073" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200063006f006e007400720061006300740073" aria-label="Definition of publication rail contracts">&lt;&lt;publication rail contracts&gt;&gt;=</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">RailTerm</span> { <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">title</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">label</span>: <span class="hljs-built_in">string</span>; }
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">RailTerm</span> { <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">title</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">label</span>: <span class="hljs-built_in">string</span>; summary?: <span class="hljs-built_in">string</span>; }
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">RailNote</span> { <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">number</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">body</span>: <span class="hljs-built_in">string</span>; }
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">RailFragment</span> { <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">title</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">labels</span>: <span class="hljs-keyword">readonly</span> <span class="hljs-built_in">string</span>[]; }
 
 <span class="hljs-keyword">const</span> maximumDeclarations = <span class="hljs-number">1000</span>;
+<span class="hljs-keyword">const</span> maximumTotalDeclarations = <span class="hljs-number">3000</span>;
+<span class="hljs-keyword">const</span> maximumFragmentLabels = <span class="hljs-number">10000</span>;
 <span class="hljs-keyword">const</span> maximumContent = <span class="hljs-number">2</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>;
 <span class="hljs-keyword">function</span> <span class="hljs-title">identifier</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span> {
     <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> value !== <span class="hljs-string">'string'</span> || !<span class="hljs-regexp">/^</span><span class="hljs-regexp">[A-Za-z0-9]</span><span class="hljs-regexp">[A-Za-z0-9:._-]</span><span class="hljs-regexp">{0,8191}$/</span>.<span class="hljs-title">test</span>(value)) {
@@ -176,29 +180,37 @@ node traversal have explicit limits. No annotations returns an empty preamble.</
 interpretation and a separate asset contract. Each declaration gets a reusable
 box whose contents are typeset after the document auxiliary labels have loaded.
 A term row links its title and final definition page; every note has its own row.
-The selected rail size controls both kinds without changing the chosen font roles.</p>
+A compact fragment row links every contribution page in authored order. The
+selected rail size controls all three kinds without changing the chosen font roles.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020007200610069006c00200061007300730065006d0062006c0079-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200061007300730065006d0062006c0079"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c00200061007300730065006d0062006c0079" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200061007300730065006d0062006c0079" aria-label="Definition of publication rail assembly">&lt;&lt;publication rail assembly&gt;&gt;=</a></div>
 <div class="code">
 <pre><code>
-<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">publicationRail</span>(<span class="hljs-params">terms: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> RailTerm[], notes: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> RailNote[], fontSize = </span><span class="hljs-number">9</span>): <span class="hljs-built_in">string</span> {
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">publicationRail</span>(<span class="hljs-params">terms: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> RailTerm[], notes: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> RailNote[], fontSize = </span><span class="hljs-number">9</span><span class="hljs-params">,
+    fragments: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> RailFragment[] = []</span>): <span class="hljs-built_in">string</span> {
     <span class="hljs-keyword">if</span> (!<span class="hljs-title">Number</span>.<span class="hljs-built_in">isFinite</span>(fontSize) || fontSize &lt; <span class="hljs-number">7</span> || fontSize &gt; <span class="hljs-number">14</span>) {
         <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Rail font size must be 7–14 points'</span>);
     }
-    <span class="hljs-keyword">if</span> (terms.<span class="hljs-property">length</span> &gt; maximumDeclarations || notes.<span class="hljs-property">length</span> &gt; maximumDeclarations) {
-        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Rail supports at most 1000 terms and 1000 notes'</span>);
+    <span class="hljs-keyword">if</span> (terms.<span class="hljs-property">length</span> &gt; maximumDeclarations || notes.<span class="hljs-property">length</span> &gt; maximumDeclarations ||
+        fragments.<span class="hljs-property">length</span> &gt; maximumDeclarations || terms.<span class="hljs-property">length</span> + notes.<span class="hljs-property">length</span> + fragments.<span class="hljs-property">length</span> &gt; maximumTotalDeclarations) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Rail supports at most 1000 terms, notes and fragments, and 3000 declarations total'</span>);
     }
     <span class="hljs-keyword">const</span> targets = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;(), labels = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;(), numbers = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">number</span>&gt;();
-    <span class="hljs-keyword">let</span> size = <span class="hljs-number">0</span>;
-    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> item <span class="hljs-keyword">of</span> [...terms, ...notes]) {
+    <span class="hljs-keyword">let</span> size = <span class="hljs-number">0</span>, fragmentLabels = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> item <span class="hljs-keyword">of</span> [...terms, ...notes, ...fragments]) {
         <span class="hljs-title">identifier</span>(item.<span class="hljs-property">target</span>);
         <span class="hljs-keyword">if</span> (targets.<span class="hljs-title">has</span>(item.<span class="hljs-property">target</span>)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Duplicate rail target: </span><span class="hljs-subst">${item.target}</span><span class="hljs-string">`</span>); }
         targets.<span class="hljs-title">add</span>(item.<span class="hljs-property">target</span>); size += item.<span class="hljs-property">target</span>.<span class="hljs-property">length</span>;
     }
+    <span class="hljs-keyword">const</span> addLabel = (<span class="hljs-attr">label</span>: <span class="hljs-built_in">string</span>): <span class="hljs-params">void</span><span class="hljs-function"> =&gt;</span> {
+        <span class="hljs-title">identifier</span>(label);
+        <span class="hljs-keyword">if</span> (labels.<span class="hljs-title">has</span>(label)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Duplicate rail definition label: </span><span class="hljs-subst">${label}</span><span class="hljs-string">`</span>); }
+        labels.<span class="hljs-title">add</span>(label); size += label.<span class="hljs-property">length</span>;
+    };
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> term <span class="hljs-keyword">of</span> terms) {
-        <span class="hljs-title">identifier</span>(term.<span class="hljs-property">label</span>); <span class="hljs-title">controlledText</span>(term.<span class="hljs-property">title</span>);
-        <span class="hljs-keyword">if</span> (labels.<span class="hljs-title">has</span>(term.<span class="hljs-property">label</span>)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Duplicate rail definition label: </span><span class="hljs-subst">${term.label}</span><span class="hljs-string">`</span>); }
-        labels.<span class="hljs-title">add</span>(term.<span class="hljs-property">label</span>); size += term.<span class="hljs-property">label</span>.<span class="hljs-property">length</span> + term.<span class="hljs-property">title</span>.<span class="hljs-property">length</span>;
+        <span class="hljs-title">addLabel</span>(term.<span class="hljs-property">label</span>); <span class="hljs-title">controlledText</span>(term.<span class="hljs-property">title</span>);
+        <span class="hljs-keyword">if</span> (term.<span class="hljs-property">summary</span> !== <span class="hljs-literal">undefined</span>) { <span class="hljs-title">controlledText</span>(term.<span class="hljs-property">summary</span>); }
+        size += term.<span class="hljs-property">title</span>.<span class="hljs-property">length</span> + (term.<span class="hljs-property">summary</span>?.<span class="hljs-property">length</span> || <span class="hljs-number">0</span>);
     }
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> note <span class="hljs-keyword">of</span> notes) {
         <span class="hljs-title">controlledText</span>(note.<span class="hljs-property">body</span>);
@@ -207,21 +219,38 @@ The selected rail size controls both kinds without changing the chosen font role
         }
         numbers.<span class="hljs-title">add</span>(note.<span class="hljs-property">number</span>); size += note.<span class="hljs-property">body</span>.<span class="hljs-property">length</span>;
     }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> fragment <span class="hljs-keyword">of</span> fragments) {
+        <span class="hljs-title">controlledText</span>(fragment.<span class="hljs-property">title</span>);
+        <span class="hljs-keyword">if</span> (!fragment.<span class="hljs-property">labels</span>.<span class="hljs-property">length</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Rail fragments require at least one contribution label'</span>); }
+        fragmentLabels += fragment.<span class="hljs-property">labels</span>.<span class="hljs-property">length</span>;
+        <span class="hljs-keyword">if</span> (fragmentLabels &gt; maximumFragmentLabels) {
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Rail supports at most 10000 fragment contribution labels'</span>);
+        }
+        size += fragment.<span class="hljs-property">title</span>.<span class="hljs-property">length</span>;
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> label <span class="hljs-keyword">of</span> fragment.<span class="hljs-property">labels</span>) { <span class="hljs-title">addLabel</span>(label); }
+    }
     <span class="hljs-keyword">if</span> (size &gt; maximumContent) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Rail declarations exceed 2 MiB'</span>); }
-    <span class="hljs-keyword">if</span> (!terms.<span class="hljs-property">length</span> &amp;&amp; !notes.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">''</span>; }
+    <span class="hljs-keyword">if</span> (!terms.<span class="hljs-property">length</span> &amp;&amp; !notes.<span class="hljs-property">length</span> &amp;&amp; !fragments.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">''</span>; }
     <span class="hljs-keyword">const</span> declarations = [
-        ...terms.<span class="hljs-title">map</span>(<span class="hljs-params">term</span><span class="hljs-function"> =&gt;</span> ({ <span class="hljs-attr">target</span>: term.<span class="hljs-property">target</span>, <span class="hljs-attr">kind</span>: <span class="hljs-string">'term'</span>, <span class="hljs-attr">number</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">label</span>: term.<span class="hljs-property">label</span>,
-            <span class="hljs-attr">body</span>: <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">hyperref[</span><span class="hljs-subst">${term.label}</span><span class="hljs-string">]{</span><span class="hljs-string">\\</span><span class="hljs-string">textbf{</span><span class="hljs-subst">${term.title}</span><span class="hljs-string">}</span><span class="hljs-string">\\</span><span class="hljs-string">space</span><span class="hljs-string">\\</span><span class="hljs-string">pageref*{</span><span class="hljs-subst">${term.label}</span><span class="hljs-string">}}`</span> })),
-        ...notes.<span class="hljs-title">map</span>(<span class="hljs-params">note</span><span class="hljs-function"> =&gt;</span> ({ ...note, <span class="hljs-attr">kind</span>: <span class="hljs-string">'note'</span>, <span class="hljs-attr">label</span>: <span class="hljs-string">''</span>,
-            <span class="hljs-attr">body</span>: <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">textbf{</span><span class="hljs-subst">${note.</span><span class="hljs-built_in">number</span><span class="hljs-subst">}</span><span class="hljs-string">.}</span><span class="hljs-string">\\</span><span class="hljs-string">space </span><span class="hljs-subst">${note.body}</span><span class="hljs-string">`</span> }))
+        ...terms.<span class="hljs-title">map</span>(<span class="hljs-params">term</span><span class="hljs-function"> =&gt;</span> ({ <span class="hljs-attr">target</span>: term.<span class="hljs-property">target</span>, <span class="hljs-attr">kind</span>: <span class="hljs-string">'term'</span>, <span class="hljs-attr">number</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">labels</span>: [term.<span class="hljs-property">label</span>], <span class="hljs-attr">padding</span>: <span class="hljs-number">2</span>,
+            <span class="hljs-attr">body</span>: <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">hyperref[</span><span class="hljs-subst">${term.label}</span><span class="hljs-string">]{</span><span class="hljs-string">\\</span><span class="hljs-string">textbf{</span><span class="hljs-subst">${term.title}</span><span class="hljs-string">}</span><span class="hljs-string">\\</span><span class="hljs-string">space</span><span class="hljs-string">\\</span><span class="hljs-string">pageref*{</span><span class="hljs-subst">${term.label}</span><span class="hljs-string">}}`</span> +
+                (term.<span class="hljs-property">summary</span> ? <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">par </span><span class="hljs-subst">${term.summary}</span><span class="hljs-string">`</span> : <span class="hljs-string">''</span>) })),
+        ...notes.<span class="hljs-title">map</span>(<span class="hljs-params">note</span><span class="hljs-function"> =&gt;</span> ({ ...note, <span class="hljs-attr">kind</span>: <span class="hljs-string">'note'</span>, <span class="hljs-attr">labels</span>: [] <span class="hljs-keyword">as</span> <span class="hljs-built_in">string</span>[], <span class="hljs-attr">padding</span>: <span class="hljs-number">2</span>,
+            <span class="hljs-attr">body</span>: <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">textbf{</span><span class="hljs-subst">${note.</span><span class="hljs-built_in">number</span><span class="hljs-subst">}</span><span class="hljs-string">.}</span><span class="hljs-string">\\</span><span class="hljs-string">space </span><span class="hljs-subst">${note.body}</span><span class="hljs-string">`</span> })),
+        ...fragments.<span class="hljs-title">map</span>(<span class="hljs-params">fragment</span><span class="hljs-function"> =&gt;</span> ({ <span class="hljs-attr">target</span>: fragment.<span class="hljs-property">target</span>, <span class="hljs-attr">kind</span>: <span class="hljs-string">'fragment'</span>, <span class="hljs-attr">number</span>: <span class="hljs-number">0</span>,
+            <span class="hljs-attr">labels</span>: [...fragment.<span class="hljs-property">labels</span>], <span class="hljs-attr">padding</span>: <span class="hljs-number">0.75</span>,
+            <span class="hljs-attr">body</span>: <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">textbf{</span><span class="hljs-subst">${fragment.title}</span><span class="hljs-string">}</span><span class="hljs-string">\\</span><span class="hljs-string">par `</span> + fragment.<span class="hljs-property">labels</span>.<span class="hljs-title">map</span>(<span class="hljs-params">label</span><span class="hljs-function"> =&gt;</span>
+                <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">hyperref[</span><span class="hljs-subst">${label}</span><span class="hljs-string">]{</span><span class="hljs-string">\\</span><span class="hljs-string">pageref*{</span><span class="hljs-subst">${label}</span><span class="hljs-string">}}`</span>).<span class="hljs-title">join</span>(<span class="hljs-string">', '</span>) }))
     ];
     <span class="hljs-keyword">const</span> registration = declarations.<span class="hljs-title">map</span>(<span class="hljs-function">(</span><span class="hljs-params">item, index</span><span class="hljs-function">) =&gt;</span>
         <span class="hljs-string">`litrail.declare(</span><span class="hljs-subst">${index + </span><span class="hljs-number">1</span><span class="hljs-subst">}</span><span class="hljs-string">,&quot;</span><span class="hljs-subst">${item.target}</span><span class="hljs-string">&quot;,&quot;</span><span class="hljs-subst">${item.kind}</span><span class="hljs-string">&quot;,</span><span class="hljs-subst">${item.</span><span class="hljs-built_in">number</span><span class="hljs-subst">}</span><span class="hljs-string">)`</span>).<span class="hljs-title">join</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>);
     <span class="hljs-keyword">const</span> boxes = declarations.<span class="hljs-title">map</span>(<span class="hljs-function">(</span><span class="hljs-params">item, index</span><span class="hljs-function">) =&gt;</span> {
         <span class="hljs-keyword">const</span> name = <span class="hljs-title">suffix</span>(index);
+        <span class="hljs-keyword">const</span> resolutions = item.<span class="hljs-property">labels</span>.<span class="hljs-title">map</span>(<span class="hljs-params">label</span><span class="hljs-function"> =&gt;</span> <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">LitRailResolve{</span><span class="hljs-subst">${label}</span><span class="hljs-string">}`</span>).<span class="hljs-title">join</span>(<span class="hljs-string">''</span>);
         <span class="hljs-keyword">return</span> <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">expandafter</span><span class="hljs-string">\\</span><span class="hljs-string">newbox</span><span class="hljs-string">\\</span><span class="hljs-string">csname LitRailBox</span><span class="hljs-subst">${name}</span><span class="hljs-string">\\</span><span class="hljs-string">endcsname</span><span class="hljs-string">\n</span><span class="hljs-string">`</span> +
             <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">long</span><span class="hljs-string">\\</span><span class="hljs-string">def</span><span class="hljs-string">\\</span><span class="hljs-string">LitRailBody</span><span class="hljs-subst">${name}</span><span class="hljs-string">{</span><span class="hljs-subst">${item.body}</span><span class="hljs-string">}</span><span class="hljs-string">\n</span><span class="hljs-string">`</span> +
-            <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">AddToHook{begindocument/end}{</span><span class="hljs-string">\\</span><span class="hljs-string">LitRailBuild{</span><span class="hljs-subst">${index + </span><span class="hljs-number">1</span><span class="hljs-subst">}</span><span class="hljs-string">}{</span><span class="hljs-subst">${name}</span><span class="hljs-string">}{</span><span class="hljs-subst">${item.label}</span><span class="hljs-string">}}`</span>;
+            <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">def</span><span class="hljs-string">\\</span><span class="hljs-string">LitRailLabels</span><span class="hljs-subst">${name}</span><span class="hljs-string">{</span><span class="hljs-subst">${resolutions}</span><span class="hljs-string">}</span><span class="hljs-string">\n</span><span class="hljs-string">`</span> +
+            <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">AddToHook{begindocument/end}{</span><span class="hljs-string">\\</span><span class="hljs-string">LitRailBuild{</span><span class="hljs-subst">${index + </span><span class="hljs-number">1</span><span class="hljs-subst">}</span><span class="hljs-string">}{</span><span class="hljs-subst">${name}</span><span class="hljs-string">}{</span><span class="hljs-subst">${item.padding}</span><span class="hljs-string">}}`</span>;
     }).<span class="hljs-title">join</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>);
     <span class="hljs-keyword">return</span> <span class="hljs-title">luaLoader</span>(<span class="hljs-title">railLua</span>() + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + registration) + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + <span class="hljs-title">railTex</span>(fontSize) + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + boxes + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>;
 }
@@ -239,16 +268,19 @@ right margin, while mirrored pages extend the outer margin. Set
 78 mm and must fail; outer 16/inner 20 mm leave a valid 82 mm. Without annotations,
 leave the requested margins unchanged. Disable body microtype protrusion if the full
 5 mm clear gap is required; body overfull diagnostics remain the renderer's concern.</p>
-<p>Emit <code>\phantomsection\label{label}</code> at the definition. A use is
-<code>\LitTermUse{uniqueOccurrenceId}{termTarget}{renderedLabel}</code>: the supplied label,
-including any caller-owned hyperlink/page suffix, appears exactly once. Its
+<p>Emit <code>\phantomsection\label{label}</code> at each definition or contribution. A term use
+is <code>\LitTermUse{uniqueOccurrenceId}{termTarget}{renderedLabel}</code>: the supplied
+label, including any caller-owned hyperlink/page suffix, appears exactly once. Its
 zero-width marker precedes its first glyph. <code>\LitNoteUse{noteTarget}</code> emits the
-number and a marker at the source location. Call each NOTE once. Suppress markers
-in TOC copies, running heads and bookmarks; do not put them in discarded boxes,
-floats, or inside rail bodies. Paragraphs and ordinary lists are supported in notes;
-raw TeX, graphics, nested annotations and arbitrary layout commands are not.</p>
-<p>Pandoc's normal <code>tightlist</code> helper must be available for converted lists. The bounded rail style has approximately 1.2 line spacing, 2 mm vertical padding,
-and controlled list indentation.
+number and a marker at the source location. <code>\LitFragmentUse{occurrenceTarget} {familyTarget}</code> is marker-only; its caller owns the blank code baseline. Call each
+NOTE once. Suppress markers in TOC copies, running heads and bookmarks; do not put
+them in discarded boxes, floats, or inside rail bodies. Paragraphs and ordinary
+lists are supported in notes; raw TeX, graphics, nested annotations and arbitrary
+layout commands are not.</p>
+<p>Pandoc's normal <code>tightlist</code> helper must be available for converted lists. The
+bounded rail style has approximately 1.2 line spacing and controlled list
+indentation. Terms and notes use 2 mm vertical padding; compact fragment rows use
+0.75 mm.
 Microtype protrusion and expansion are disabled inside rail boxes. No new package,
 external Lua companion, shell escape, or margin insertion is required.</p>
 <div class="codefragment">
@@ -271,14 +303,15 @@ external Lua companion, shell escape, or margin insertion is required.</p>
   </span><span class="hljs-string">\i</span><span class="hljs-string">fdefined</span><span class="hljs-string">\m</span><span class="hljs-string">icrotypesetup</span><span class="hljs-string">\m</span><span class="hljs-string">icrotypesetup{protrusion=false,expansion=false}</span><span class="hljs-string">\f</span><span class="hljs-string">i
   </span><span class="hljs-string">\p</span><span class="hljs-string">arindent=0pt</span><span class="hljs-string">\p</span><span class="hljs-string">arskip=2pt</span><span class="hljs-string">\r</span><span class="hljs-string">aggedright
   </span><span class="hljs-string">\e</span><span class="hljs-string">xpandafter</span><span class="hljs-string">\g</span><span class="hljs-string">lobal</span><span class="hljs-string">\e</span><span class="hljs-string">xpandafter</span><span class="hljs-string">\s</span><span class="hljs-string">etbox</span><span class="hljs-string">\c</span><span class="hljs-string">sname LitRailBox#2</span><span class="hljs-string">\e</span><span class="hljs-string">ndcsname=</span><span class="hljs-string">\v</span><span class="hljs-string">box{%
-    </span><span class="hljs-string">\k</span><span class="hljs-string">ern2mm</span><span class="hljs-string">\c</span><span class="hljs-string">sname LitRailBody#2</span><span class="hljs-string">\e</span><span class="hljs-string">ndcsname</span><span class="hljs-string">\p</span><span class="hljs-string">ar</span><span class="hljs-string">\k</span><span class="hljs-string">ern2mm}%
-  </span><span class="hljs-string">\d</span><span class="hljs-string">ef</span><span class="hljs-string">\L</span><span class="hljs-string">itRailResolved{1}</span><span class="hljs-string">\d</span><span class="hljs-string">ef</span><span class="hljs-string">\L</span><span class="hljs-string">itRailPage{}%
-  </span><span class="hljs-string">\i</span><span class="hljs-string">f</span><span class="hljs-string">\r</span><span class="hljs-string">elax</span><span class="hljs-string">\d</span><span class="hljs-string">etokenize{#3}</span><span class="hljs-string">\r</span><span class="hljs-string">elax</span><span class="hljs-string">\e</span><span class="hljs-string">lse
-    </span><span class="hljs-string">\i</span><span class="hljs-string">fcsname r@#3</span><span class="hljs-string">\e</span><span class="hljs-string">ndcsname</span><span class="hljs-string">\e</span><span class="hljs-string">def</span><span class="hljs-string">\L</span><span class="hljs-string">itRailPage{</span><span class="hljs-string">\g</span><span class="hljs-string">etpagerefnumber{#3}}%
-    </span><span class="hljs-string">\e</span><span class="hljs-string">lse</span><span class="hljs-string">\d</span><span class="hljs-string">ef</span><span class="hljs-string">\L</span><span class="hljs-string">itRailResolved{0}</span><span class="hljs-string">\f</span><span class="hljs-string">i
-  </span><span class="hljs-string">\f</span><span class="hljs-string">i
+    </span><span class="hljs-string">\k</span><span class="hljs-string">ern#3mm</span><span class="hljs-string">\c</span><span class="hljs-string">sname LitRailBody#2</span><span class="hljs-string">\e</span><span class="hljs-string">ndcsname</span><span class="hljs-string">\p</span><span class="hljs-string">ar</span><span class="hljs-string">\k</span><span class="hljs-string">ern#3mm}%
+  </span><span class="hljs-string">\d</span><span class="hljs-string">ef</span><span class="hljs-string">\L</span><span class="hljs-string">itRailResolved{1}</span><span class="hljs-string">\d</span><span class="hljs-string">ef</span><span class="hljs-string">\L</span><span class="hljs-string">itRailPages{}%
+  </span><span class="hljs-string">\d</span><span class="hljs-string">ef</span><span class="hljs-string">\L</span><span class="hljs-string">itRailResolve##1{%
+    </span><span class="hljs-string">\i</span><span class="hljs-string">fcsname r@##1</span><span class="hljs-string">\e</span><span class="hljs-string">ndcsname
+      </span><span class="hljs-string">\e</span><span class="hljs-string">def</span><span class="hljs-string">\L</span><span class="hljs-string">itRailPages{</span><span class="hljs-string">\L</span><span class="hljs-string">itRailPages,</span><span class="hljs-string">\g</span><span class="hljs-string">etpagerefnumber{##1}}%
+    </span><span class="hljs-string">\e</span><span class="hljs-string">lse</span><span class="hljs-string">\d</span><span class="hljs-string">ef</span><span class="hljs-string">\L</span><span class="hljs-string">itRailResolved{0}</span><span class="hljs-string">\f</span><span class="hljs-string">i}%
+  </span><span class="hljs-string">\c</span><span class="hljs-string">sname LitRailLabels#2</span><span class="hljs-string">\e</span><span class="hljs-string">ndcsname
   </span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.box(#1,</span><span class="hljs-string">\e</span><span class="hljs-string">xpandafter</span><span class="hljs-string">\n</span><span class="hljs-string">umber</span><span class="hljs-string">\c</span><span class="hljs-string">sname LitRailBox#2</span><span class="hljs-string">\e</span><span class="hljs-string">ndcsname,
-    &quot;LitRailBody#2&quot;,</span><span class="hljs-string">\L</span><span class="hljs-string">itRailResolved,&quot;</span><span class="hljs-string">\l</span><span class="hljs-string">uaescapestring{</span><span class="hljs-string">\L</span><span class="hljs-string">itRailPage}&quot;)}%
+    &quot;LitRailBody#2&quot;,&quot;LitRailLabels#2&quot;,</span><span class="hljs-string">\L</span><span class="hljs-string">itRailResolved,&quot;</span><span class="hljs-string">\l</span><span class="hljs-string">uaescapestring{</span><span class="hljs-string">\L</span><span class="hljs-string">itRailPages}&quot;)}%
   </span><span class="hljs-string">\e</span><span class="hljs-string">ndgroup}
 </span><span class="hljs-string">\D</span><span class="hljs-string">eclareRobustCommand{</span><span class="hljs-string">\L</span><span class="hljs-string">itTermUse}[3]{%
   </span><span class="hljs-string">\i</span><span class="hljs-string">fLitRailBuilding</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.reject(&quot;nested rail marker&quot;)}%
@@ -286,6 +319,9 @@ external Lua companion, shell escape, or margin insertion is required.</p>
 </span><span class="hljs-string">\D</span><span class="hljs-string">eclareRobustCommand{</span><span class="hljs-string">\L</span><span class="hljs-string">itNoteUse}[1]{%
   </span><span class="hljs-string">\i</span><span class="hljs-string">fLitRailBuilding</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.reject(&quot;nested rail marker&quot;)}%
   </span><span class="hljs-string">\e</span><span class="hljs-string">lse</span><span class="hljs-string">\l</span><span class="hljs-string">eavevmode</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.use(&quot;</span><span class="hljs-string">\l</span><span class="hljs-string">uaescapestring{#1}&quot;,&quot;</span><span class="hljs-string">\l</span><span class="hljs-string">uaescapestring{#1}&quot;,&quot;note&quot;)}</span><span class="hljs-string">\f</span><span class="hljs-string">i}
+</span><span class="hljs-string">\D</span><span class="hljs-string">eclareRobustCommand{</span><span class="hljs-string">\L</span><span class="hljs-string">itFragmentUse}[2]{%
+  </span><span class="hljs-string">\i</span><span class="hljs-string">fLitRailBuilding</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.reject(&quot;nested rail marker&quot;)}%
+  </span><span class="hljs-string">\e</span><span class="hljs-string">lse</span><span class="hljs-string">\l</span><span class="hljs-string">eavevmode</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.use(&quot;</span><span class="hljs-string">\l</span><span class="hljs-string">uaescapestring{#1}&quot;,&quot;</span><span class="hljs-string">\l</span><span class="hljs-string">uaescapestring{#2}&quot;,&quot;fragment&quot;)}</span><span class="hljs-string">\f</span><span class="hljs-string">i}
 </span><span class="hljs-string">\A</span><span class="hljs-string">ddToHook{begindocument/end}{%
   </span><span class="hljs-string">\i</span><span class="hljs-string">f@twocolumn</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.reject(&quot;two-column rail unsupported&quot;)}</span><span class="hljs-string">\f</span><span class="hljs-string">i}
 </span><span class="hljs-string">\A</span><span class="hljs-string">ddToHook{shipout/foreground}{%
@@ -332,12 +368,16 @@ end
 local start = assert(io.open(tex.jobname..&quot;.litrail&quot;, &quot;w&quot;))
 start:write(&quot;pending</span><span class="hljs-string">\n</span><span class="hljs-string">&quot;); start:close()
 function R.declare(index,target,kind,number)
+  if index&lt;1 or index&gt;3000 or not validid(target) or
+     (kind~=&quot;term&quot; and kind~=&quot;note&quot; and kind~=&quot;fragment&quot;) or
+     (kind==&quot;note&quot; and (number&lt;1 or number&gt;10000)) or (kind~=&quot;note&quot; and number~=0) or
+     R.defs[index] or R.targets[target] then fatal(&quot;invalid rail declaration&quot;); return end
   R.defs[index]={target=target,kind=kind,number=number}
   R.targets[target]=index
 end
 function R.previous(use,definition,page,x,y)
   if R.finished then return end
-  if #R.old&gt;=10000 or use&lt;1 or use&gt;10000 or definition&lt;1 or definition&gt;2000 or
+  if #R.old&gt;=10000 or use&lt;1 or use&gt;10000 or definition&lt;1 or definition&gt;3000 or
      page&lt;1 or page&gt;100000 then fatal(&quot;invalid or excessive auxiliary records&quot;); return end
   local record={use,definition,page,x,y}
   R.old[#R.old+1]=record
@@ -427,14 +467,15 @@ identity, dimensions, page, macro content, and reference-resolution state.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-007200650063006f0072006400200061006e0020006100750064006900740065006400200061006e006e006f0074006100740069006f006e00200062006f0078-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007200650063006f0072006400200061006e0020006100750064006900740065006400200061006e006e006f0074006100740069006f006e00200062006f0078"></span><a class="literate-tag-name" href="#f-007200650063006f0072006400200061006e0020006100750064006900740065006400200061006e006e006f0074006100740069006f006e00200062006f0078" data-literate-target="f-007200650063006f0072006400200061006e0020006100750064006900740065006400200061006e006e006f0074006100740069006f006e00200062006f0078" aria-label="Definition of record an audited annotation box">&lt;&lt;record an audited annotation box&gt;&gt;=</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">function</span> R.<span class="hljs-title">box</span>(index,<span class="hljs-built_in">number</span>,macro,resolved,page)
+<pre><code><span class="hljs-keyword">function</span> R.<span class="hljs-title">box</span>(index,<span class="hljs-built_in">number</span>,macro,labelsmacro,resolved,pages)
   local d=R.<span class="hljs-property">defs</span>[index]
   local b=tex.<span class="hljs-property">box</span>[<span class="hljs-built_in">number</span>]
+  <span class="hljs-keyword">if</span> not d or not b then <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;missing rail declaration box&quot;</span>); <span class="hljs-keyword">return</span> end
   local shape,problem=<span class="hljs-title">audit</span>(b)
   d.<span class="hljs-property">box</span>=<span class="hljs-built_in">number</span>; d.<span class="hljs-property">height</span>=b.<span class="hljs-property">height</span>+b.<span class="hljs-property">depth</span>; d.<span class="hljs-property">width</span>=b.<span class="hljs-property">width</span>; d.<span class="hljs-property">resolved</span>=resolved==<span class="hljs-number">1</span>
   d.<span class="hljs-property">problem</span>=problem
   d.<span class="hljs-property">fingerprint</span>=<span class="hljs-title">digest</span>(table.<span class="hljs-title">concat</span>({d.<span class="hljs-property">target</span>,d.<span class="hljs-property">kind</span>,d.<span class="hljs-property">number</span>,token.<span class="hljs-title">get_macro</span>(macro),
-    b.<span class="hljs-property">width</span>,b.<span class="hljs-property">height</span>,b.<span class="hljs-property">depth</span>,page,resolved,shape},<span class="hljs-string">&quot;|&quot;</span>))
+    token.<span class="hljs-title">get_macro</span>(labelsmacro),b.<span class="hljs-property">width</span>,b.<span class="hljs-property">height</span>,b.<span class="hljs-property">depth</span>,pages,resolved,shape},<span class="hljs-string">&quot;|&quot;</span>))
 end
 </code></pre>
 
@@ -469,8 +510,9 @@ end
 
 </div>
 </div><p>Sort by shipped reading position, with source encounter order breaking ties. A
-term's first use supplies its preferred position; further uses on that page do
-not create rows. Notes stay distinct and share the same ordering and cursor.</p>
+A term or fragment's first use supplies its preferred position; further uses of
+the same declaration on that page do not create rows. Notes stay distinct and
+share the same ordering and cursor.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020007200610069006c0020007000610067006500200065006e00740072006900650073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020007200610069006c0020007000610067006500200065006e00740072006900650073"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c0020007000610067006500200065006e00740072006900650073" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c0020007000610067006500200065006e00740072006900650073" aria-label="Definition of publication rail page entries">&lt;&lt;publication rail page entries&gt;&gt;=</a></div>
 <div class="code">
@@ -554,7 +596,10 @@ its predecessor and the rail.</p>
     <span class="hljs-keyword">if</span> item.<span class="hljs-property">y</span>&lt;cursor+gap or item.<span class="hljs-property">y</span>+item.<span class="hljs-property">d</span>.<span class="hljs-property">height</span>&gt;top+height then <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;internal placement bounds violation&quot;</span>); <span class="hljs-keyword">return</span> end
     cursor=item.<span class="hljs-property">y</span>+item.<span class="hljs-property">d</span>.<span class="hljs-property">height</span>
     R.<span class="hljs-property">bounds</span>[#R.<span class="hljs-property">bounds</span>+<span class="hljs-number">1</span>]=table.<span class="hljs-title">concat</span>({R.<span class="hljs-property">page</span>,item.<span class="hljs-property">index</span>,x,item.<span class="hljs-property">y</span>,width,item.<span class="hljs-property">d</span>.<span class="hljs-property">height</span>},<span class="hljs-string">&quot;,&quot;</span>)
-    local destination=item.<span class="hljs-property">d</span>.<span class="hljs-property">kind</span>==<span class="hljs-string">&quot;note&quot;</span> and (<span class="hljs-string">&quot;lit-rail-note-&quot;</span>..<span class="hljs-property">item</span>.<span class="hljs-property">index</span>) or (<span class="hljs-string">&quot;lit-rail-term-&quot;</span>..<span class="hljs-property">R</span>.<span class="hljs-property">page</span>..<span class="hljs-string">&quot;-&quot;</span>..<span class="hljs-property">item</span>.<span class="hljs-property">index</span>)
+    local destination
+    <span class="hljs-keyword">if</span> item.<span class="hljs-property">d</span>.<span class="hljs-property">kind</span>==<span class="hljs-string">&quot;note&quot;</span> then destination=<span class="hljs-string">&quot;lit-rail-note-&quot;</span>..<span class="hljs-property">item</span>.<span class="hljs-property">index</span>
+    elseif item.<span class="hljs-property">d</span>.<span class="hljs-property">kind</span>==<span class="hljs-string">&quot;term&quot;</span> then destination=<span class="hljs-string">&quot;lit-rail-term-&quot;</span>..<span class="hljs-property">R</span>.<span class="hljs-property">page</span>..<span class="hljs-string">&quot;-&quot;</span>..<span class="hljs-property">item</span>.<span class="hljs-property">index</span>
+    <span class="hljs-keyword">else</span> destination=<span class="hljs-string">&quot;lit-rail-fragment-&quot;</span>..<span class="hljs-property">R</span>.<span class="hljs-property">page</span>..<span class="hljs-string">&quot;-&quot;</span>..<span class="hljs-property">item</span>.<span class="hljs-property">index</span> end
     tex.<span class="hljs-title">sprint</span>(<span class="hljs-built_in">string</span>.<span class="hljs-title">format</span>(<span class="hljs-string">&quot;</span><span class="hljs-string">\\</span><span class="hljs-string">put(%.8f,%.8f){</span><span class="hljs-string">\\</span><span class="hljs-string">vtop{</span><span class="hljs-string">\\</span><span class="hljs-string">kern0pt</span><span class="hljs-string">\\</span><span class="hljs-string">hbox{</span><span class="hljs-string">\\</span><span class="hljs-string">hypertarget{%s}{</span><span class="hljs-string">\\</span><span class="hljs-string">copy%d}}}}&quot;</span>,x/<span class="hljs-number">65536</span>,-item.<span class="hljs-property">y</span>/<span class="hljs-number">65536</span>,destination,item.<span class="hljs-property">d</span>.<span class="hljs-property">box</span>))
   end
 end
@@ -571,7 +616,7 @@ error. No certificate can become stable after a rail error.</p>
 and its final unresolved-reference/rerun check. The job-owned <code>.litrail</code> file must
 start with <code>stable &lt;digest&gt;</code> before release; it then reports counts and rectangles
 as <code>bounds page,definitionIndex,x,y,width,height</code> in integer scaled points. Indices
-follow terms then notes. A compiler integrating this module should require this
+follow terms, notes, then fragments. A compiler integrating this module should require this
 certificate in addition to its normal log checks, never publish provisional PDFs,
 and retain the five-repeat limit. Exported TeX must also be built to convergence.</p>
 <div class="codefragment">
