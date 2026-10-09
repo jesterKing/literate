@@ -395,11 +395,12 @@ Inspect `literate/publication-annotations.literate` before changing the contract
   link character. Token/child indexes select the actual parsed link. Unique TERM
   identities derive from exact keys; NOTE identities derive from source location,
   separately from their encounter-order numbers.
-- `publicationRail(terms, notes)` accepts `RailTerm { target, title, label }` and
-  `RailNote { target, number, body }`. Titles/bodies must already be escaped,
-  controlled LaTeX, never raw author TeX. Empty arrays return an empty preamble.
-  The adapters enforce source-body and rendered-content limits before publication;
-  the rail independently bounds declarations, identifiers and controlled text.
+- `publicationRail(terms, notes, fontSize?)` accepts `RailTerm { target, title,
+  label }` and `RailNote { target, number, body }`. Titles/bodies must already be
+  escaped, controlled LaTeX, never raw author TeX. Empty arrays return an empty
+  preamble. Rail size defaults to 9 pt and is bounded to 7–14 pt. The adapters
+  enforce source-body and rendered-content limits before publication; the rail
+  independently bounds declarations, identifiers and controlled text.
 
 Regressions must cover exact explicit links (not heuristic word matching), duplicate,
 missing and ambiguous keys, rejected body tokens, and intentional export rejection
@@ -407,8 +408,9 @@ of heading term links to prevent marker replay. Keep TERM prose definitions,
 page-local deduplicated title/page lookups, Term index entries and numbered NOTE
 bodies separate. Verify root-only screen indexes, both indexes only for annotated
 projects, safe unresolved preview links, dirty-buffer navigation and unchanged
-unannotated output. Rail tests must check actual page-position convergence,
-non-overlap and stable horizontal/vertical overflow rejection, never splitting,
+unannotated output. Rail tests must check odd-right/even-left physical outer-edge
+placement, actual page-position convergence, non-overlap and stable horizontal or
+vertical overflow rejection, never splitting,
 shrinking or moving entries to another page to hide failure.
 
 The recorded full suite in `out/m6-tests-final.log` reports **1,245 passed,

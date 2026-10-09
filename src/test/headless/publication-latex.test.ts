@@ -175,12 +175,14 @@ test('LaTeX mirrors inner and outer margins across two-sided pages', async () =>
     assert.ok(result.latex!.includes('[a4paper,top=18mm,outer=20mm,bottom=22mm,inner=14mm]{geometry}'));
 });
 
-test('LaTeX rejects mirrored margins while annotation rails remain one-sided', async () => {
+test('LaTeX reserves the mirrored outer edge for annotation rails', async () => {
     const result = await renderLatex(parse('```NOTE\nBinding note.\n```\n'),
         { marginInnerMm: 14, marginOuterMm: 20 }, convert);
-    assert.equal(result.latex, undefined);
-    assert.equal(result.diagnostics[0].code, 'latex-options');
-    assert.match(result.diagnostics[0].message, /annotation rails/);
+    assert.deepEqual(result.diagnostics, []);
+    assert.ok(result.latex!.includes('\\documentclass[fontsize=11pt,twoside,openany]{scrbook}'));
+    assert.ok(result.latex!.includes('outer=50mm'));
+    assert.ok(result.latex!.includes('inner=14mm'));
+    assert.ok(result.latex!.includes('\\ReadonlyShipoutCounter'));
 });
 
 test('LaTeX validates opposite-side sums and keeps inclusive margin bounds', async () => {

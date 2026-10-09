@@ -13,16 +13,16 @@ This is typography selection, **not font bundling**. There is no filesystem acce
 font lookup, global installation, or runtime dependency. Renderers remain
 responsible for applying the selected families, sizes, and ligature policy. In
 particular, `off` calls for disabling `calt` (`-calt`), verified for the actual D2
-font, rather than merely disabling `liga`. Body and code sizes are TeX points;
-diagram size is a CSS-pixel input to the isolated Mermaid renderer.
+font, rather than merely disabling `liga`. Body, code, and rail sizes are TeX
+points; diagram size is a CSS-pixel input to the isolated Mermaid renderer.
 
 
 ## Public contract
 
 All five families are resolved strings. Omitted notes inherit the final selected
-body family, whereas fragments default independently to Monofur. Three numeric
-roles retain compatibility defaults and their renderer-specific units: body and
-block code use TeX points, while Mermaid uses CSS pixels. Diagnostics here describe
+body family, whereas fragments default independently to Monofur. Four numeric
+roles retain compatibility defaults and their renderer-specific units: body, block
+code, and the publication rail use TeX points, while Mermaid uses CSS pixels. Diagnostics here describe
 settings only: they do not copy `project.diagnostics`. Callers must
 still gate rendering on source diagnostics through preparation (`preparePandoc`);
 a settings result alone is not permission to render. Source NUL rejection belongs
@@ -42,11 +42,13 @@ export interface PublicationFontSizes {
     body: number;
     code: number;
     diagram: number;
+    rail: number;
 }
 export const publicationFontSizeBounds = {
     body: { minimum: 8, maximum: 24, defaultValue: 11 },
     code: { minimum: 6, maximum: 24, defaultValue: 10 },
-    diagram: { minimum: 8, maximum: 48, defaultValue: 16 }
+    diagram: { minimum: 8, maximum: 48, defaultValue: 16 },
+    rail: { minimum: 7, maximum: 14, defaultValue: 9 }
 } as const;
 export interface PublicationSettingsResult {
     fonts: PublicationFonts;
@@ -71,7 +73,8 @@ export function resolvePublicationSettings(project: ParsedProject): PublicationS
     const fontSizes: PublicationFontSizes = {
         body: publicationFontSizeBounds.body.defaultValue,
         code: publicationFontSizeBounds.code.defaultValue,
-        diagram: publicationFontSizeBounds.diagram.defaultValue
+        diagram: publicationFontSizeBounds.diagram.defaultValue,
+        rail: publicationFontSizeBounds.rail.defaultValue
     };
     let codeLigatures = true;
     let explicitNote = false;
@@ -80,7 +83,7 @@ export function resolvePublicationSettings(project: ParsedProject): PublicationS
     for (const token of document?.tokens ?? []) {
         if (token.type !== 'fence' || token.info.trim() !== 'SETTINGS') { continue; }
         token.content.split('\n').forEach((line: string, index: number) => {
-            const match = /^\s*(font-body|font-heading|font-code|font-fragment|font-note|font-code-ligatures|font-size-body|font-size-code|font-size-diagram)\s*=(.*)$/.exec(line);
+            const match = /^\s*(font-body|font-heading|font-code|font-fragment|font-note|font-code-ligatures|font-size-body|font-size-code|font-size-diagram|font-size-rail)\s*=(.*)$/.exec(line);
             if (!match) { return; }
             const key = match[1];
             const value = match[2].trim();

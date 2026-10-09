@@ -136,13 +136,13 @@ requiring synthesis for the default code comments.</p>
 font lookup, global installation, or runtime dependency. Renderers remain
 responsible for applying the selected families, sizes, and ligature policy. In
 particular, <code>off</code> calls for disabling <code>calt</code> (<code>-calt</code>), verified for the actual D2
-font, rather than merely disabling <code>liga</code>. Body and code sizes are TeX points;
-diagram size is a CSS-pixel input to the isolated Mermaid renderer.</p>
+font, rather than merely disabling <code>liga</code>. Body, code, and rail sizes are TeX
+points; diagram size is a CSS-pixel input to the isolated Mermaid renderer.</p>
 <h2>Public contract</h2>
 <p>All five families are resolved strings. Omitted notes inherit the final selected
-body family, whereas fragments default independently to Monofur. Three numeric
-roles retain compatibility defaults and their renderer-specific units: body and
-block code use TeX points, while Mermaid uses CSS pixels. Diagnostics here describe
+body family, whereas fragments default independently to Monofur. Four numeric
+roles retain compatibility defaults and their renderer-specific units: body, block
+code, and the publication rail use TeX points, while Mermaid uses CSS pixels. Diagnostics here describe
 settings only: they do not copy <code>project.diagnostics</code>. Callers must
 still gate rendering on source diagnostics through preparation (<code>preparePandoc</code>);
 a settings result alone is not permission to render. Source NUL rejection belongs
@@ -163,11 +163,13 @@ to the existing parser, before Markdown can replace NUL with a replacement glyph
     <span class="hljs-attr">body</span>: <span class="hljs-built_in">number</span>;
     <span class="hljs-attr">code</span>: <span class="hljs-built_in">number</span>;
     <span class="hljs-attr">diagram</span>: <span class="hljs-built_in">number</span>;
+    <span class="hljs-attr">rail</span>: <span class="hljs-built_in">number</span>;
 }
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">const</span> publicationFontSizeBounds = {
     <span class="hljs-attr">body</span>: { <span class="hljs-attr">minimum</span>: <span class="hljs-number">8</span>, <span class="hljs-attr">maximum</span>: <span class="hljs-number">24</span>, <span class="hljs-attr">defaultValue</span>: <span class="hljs-number">11</span> },
     <span class="hljs-attr">code</span>: { <span class="hljs-attr">minimum</span>: <span class="hljs-number">6</span>, <span class="hljs-attr">maximum</span>: <span class="hljs-number">24</span>, <span class="hljs-attr">defaultValue</span>: <span class="hljs-number">10</span> },
-    <span class="hljs-attr">diagram</span>: { <span class="hljs-attr">minimum</span>: <span class="hljs-number">8</span>, <span class="hljs-attr">maximum</span>: <span class="hljs-number">48</span>, <span class="hljs-attr">defaultValue</span>: <span class="hljs-number">16</span> }
+    <span class="hljs-attr">diagram</span>: { <span class="hljs-attr">minimum</span>: <span class="hljs-number">8</span>, <span class="hljs-attr">maximum</span>: <span class="hljs-number">48</span>, <span class="hljs-attr">defaultValue</span>: <span class="hljs-number">16</span> },
+    <span class="hljs-attr">rail</span>: { <span class="hljs-attr">minimum</span>: <span class="hljs-number">7</span>, <span class="hljs-attr">maximum</span>: <span class="hljs-number">14</span>, <span class="hljs-attr">defaultValue</span>: <span class="hljs-number">9</span> }
 } <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span>;
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationSettingsResult</span> {
     <span class="hljs-attr">fonts</span>: <span class="hljs-title">PublicationFonts</span>;
@@ -193,7 +195,8 @@ reparsing source or treating ordinary code blocks as settings.</p>
     <span class="hljs-keyword">const</span> <span class="hljs-attr">fontSizes</span>: <span class="hljs-title">PublicationFontSizes</span> = {
         <span class="hljs-attr">body</span>: publicationFontSizeBounds.<span class="hljs-property">body</span>.<span class="hljs-property">defaultValue</span>,
         <span class="hljs-attr">code</span>: publicationFontSizeBounds.<span class="hljs-property">code</span>.<span class="hljs-property">defaultValue</span>,
-        <span class="hljs-attr">diagram</span>: publicationFontSizeBounds.<span class="hljs-property">diagram</span>.<span class="hljs-property">defaultValue</span>
+        <span class="hljs-attr">diagram</span>: publicationFontSizeBounds.<span class="hljs-property">diagram</span>.<span class="hljs-property">defaultValue</span>,
+        <span class="hljs-attr">rail</span>: publicationFontSizeBounds.<span class="hljs-property">rail</span>.<span class="hljs-property">defaultValue</span>
     };
     <span class="hljs-keyword">let</span> codeLigatures = <span class="hljs-literal">true</span>;
     <span class="hljs-keyword">let</span> explicitNote = <span class="hljs-literal">false</span>;
@@ -202,7 +205,7 @@ reparsing source or treating ordinary code blocks as settings.</p>
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> <span class="hljs-variable">document</span>?.<span class="hljs-property">tokens</span> ?? []) {
         <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> !== <span class="hljs-string">'fence'</span> || token.<span class="hljs-property">info</span>.<span class="hljs-title">trim</span>() !== <span class="hljs-string">'SETTINGS'</span>) { <span class="hljs-keyword">continue</span>; }
         token.<span class="hljs-property">content</span>.<span class="hljs-title">split</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>).<span class="hljs-title">forEach</span>(<span class="hljs-function">(</span><span class="hljs-params">line: </span><span class="hljs-built_in">string</span><span class="hljs-params">, index: </span><span class="hljs-built_in">number</span><span class="hljs-function">) =&gt;</span> {
-            <span class="hljs-keyword">const</span> match = <span class="hljs-regexp">/^</span><span class="hljs-regexp">\s</span><span class="hljs-regexp">*(font-body|font-heading|font-code|font-fragment|font-note|font-code-ligatures|font-size-body|font-size-code|font-size-diagram)</span><span class="hljs-regexp">\s</span><span class="hljs-regexp">*=(.*)$/</span>.<span class="hljs-title">exec</span>(line);
+            <span class="hljs-keyword">const</span> match = <span class="hljs-regexp">/^</span><span class="hljs-regexp">\s</span><span class="hljs-regexp">*(font-body|font-heading|font-code|font-fragment|font-note|font-code-ligatures|font-size-body|font-size-code|font-size-diagram|font-size-rail)</span><span class="hljs-regexp">\s</span><span class="hljs-regexp">*=(.*)$/</span>.<span class="hljs-title">exec</span>(line);
             <span class="hljs-keyword">if</span> (!match) { <span class="hljs-keyword">return</span>; }
             <span class="hljs-keyword">const</span> key = match[<span class="hljs-number">1</span>];
             <span class="hljs-keyword">const</span> value = match[<span class="hljs-number">2</span>].<span class="hljs-title">trim</span>();

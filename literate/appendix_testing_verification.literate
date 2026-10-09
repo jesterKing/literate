@@ -372,7 +372,7 @@ const defaults: PublicationFonts = {
     body: 'Latin Modern Roman', heading: 'Monofur Nerd Font',
     code: 'Lilex Nerd Font', fragment: 'Monofur Nerd Font', note: 'Latin Modern Roman'
 };
-const sizeDefaults: PublicationFontSizes = { body: 11, code: 10, diagram: 16 };
+const sizeDefaults: PublicationFontSizes = { body: 11, code: 10, diagram: 16, rail: 9 };
 const fence = (content: string, info = 'SETTINGS') => '```' + info + '\n' + content + '\n```\n';
 function resolve(text: string, path = 'index.literate'): PublicationSettingsResult {
     const project = parseProject([{ path, text }]);
@@ -475,12 +475,12 @@ previous valid choice.
 ```ts : <<publication settings validation tests>>=+
 test('publication font sizes are bounded decimal values with explicit units', () => {
     const selected = resolve(fence('font-size-body=8\nfont-size-body=12.5\n' +
-        'font-size-code=6.25\nfont-size-diagram=48'));
-    assert.deepEqual(selected.fontSizes, { body: 12.5, code: 6.25, diagram: 48 });
+        'font-size-code=6.25\nfont-size-diagram=48\nfont-size-rail=7.5'));
+    assert.deepEqual(selected.fontSizes, { body: 12.5, code: 6.25, diagram: 48, rail: 7.5 });
     assert.deepEqual(selected.diagnostics, []);
 
     for (const [role, minimum, maximum] of [
-        ['body', 8, 24], ['code', 6, 24], ['diagram', 8, 48]
+        ['body', 8, 24], ['code', 6, 24], ['diagram', 8, 48], ['rail', 7, 14]
     ] as const) {
         for (const value of [String(minimum - 0.01), String(maximum + 0.01),
             '12pt', '1e1', '+10', '-10', '10.123', 'NaN', '']) {

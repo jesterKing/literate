@@ -238,6 +238,7 @@ font-note
 font-size-body
 font-size-code
 font-size-diagram
+font-size-rail
 font-code-ligatures
 </code></pre>
 <p>The family values are trimmed ASCII names from one to one hundred characters,
@@ -247,8 +248,8 @@ exactly <code>on</code> or <code>off</code>. Settings are read only from root <c
 fences; the last valid value wins, while every invalid occurrence remains a
 diagnostic. If <code>font-note</code> is omitted, it inherits the final body family.</p>
 <p>The size values are bounded decimals with at most two fractional digits. Body size
-accepts 8–24 TeX points, block code accepts 6–24 TeX points, and Mermaid accepts
-8–48 CSS pixels. The units are renderer contracts and are not written in the setting
+accepts 8–24 TeX points, block code accepts 6–24 TeX points, Mermaid accepts
+8–48 CSS pixels, and the publication rail accepts 7–14 TeX points. The units are renderer contracts and are not written in the setting
 value. A diagram's configured size controls browser layout; print placement preserves
 its natural vector size and shrinks it only when page bounds require that.</p>
 <p>An optional font manifest turns selected families into portable companions. Its
@@ -361,7 +362,7 @@ cancellation arriving after a validated commit does not turn success into failur
 The shared machine-readable contract for all commands is documented in
 <a href="cli.html">Command-line generation</a>.</p>
 <h2>LaTeX integration contract</h2>
-<p>Literate owns publication template version 3. This version identifies the emitted
+<p>Literate owns publication template version 4. This version identifies the emitted
 renderer template; it is not a custom-template extension point. The renderer expects
 Pandoc to provide only a body, uses top-level chapters, and disables Pandoc syntax
 highlighting so Literate can preserve fragment-aware syntax and links.</p>
@@ -374,10 +375,11 @@ escaped as data. Logical destinations are encoded again before entering LaTeX; r
 fragment names, paths, and annotation keys are never interpolated as commands.</p>
 <p>Page choices are <code>a4</code>, <code>a5</code>, <code>letter</code>, and <code>legal</code>. Margins are decimal millimetres,
 each from 5 through 50, and must leave at least an 80 × 100 mm body. An annotated
-book reserves a right-hand rail and gap in addition to the author's requested margin,
+book reserves an outer rail and gap in addition to the author's requested margin,
 so geometry that works for an unannotated book may be rejected for an annotated one.
-Annotation rails currently remain one-sided; combining them with inner/outer margins
-is rejected until their shipout model supports alternating outer edges.</p>
+Annotation rails follow the physical outer edge. Odd pages place the reserved column
+on the right and even mirrored pages place it on the left; physical shipout order,
+not a resettable logical page number, determines the side.</p>
 <p><code>latex</code> writes the TeX document and planned companions but never starts TeX. <code>pdf</code>
 stages that same plan privately, preflights the compiler tools and packages, checks
 reference and annotation-rail convergence, validates bounded PDF bytes, and then

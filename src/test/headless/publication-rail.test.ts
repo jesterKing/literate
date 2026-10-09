@@ -74,12 +74,20 @@ test('rail bounds declarations, controlled text and runtime work', () => {
         target: `n-${index}`, number: index + 1, body: 'x'.repeat(131072)
     }))), /2 MiB/);
     const lua = runtime(publicationRail([term], [note]));
-    for (const limit of ['R.count>=10000', 'R.nodes>500000', 'depth>64', 'R.page>100000']) {
+    for (const limit of ['R.count>=10000', 'R.nodes>500000', 'depth>64', 'page>100000']) {
         assert.ok(lua.includes(limit), limit);
     }
 });
 
-test('rail uses one absolute-page stream with stable-state errors and a release certificate', () => {
+test('rail font size is bounded and controls explicit point size and leading', () => {
+    assert.ok(publicationRail([term], [], 9).includes('\\fontsize{9pt}{10.8pt}'));
+    assert.ok(publicationRail([term], [], 12.5).includes('\\fontsize{12.5pt}{15pt}'));
+    for (const value of [6.99, 14.01, NaN, Infinity]) {
+        assert.throws(() => publicationRail([term], [], value), /7–14 points/);
+    }
+});
+
+test('rail uses physical shipout parity with stable-state errors and a release certificate', () => {
     const tex = publicationRail([term], [note]);
     const lua = runtime(tex);
     for (const part of ['pdf.getpos()', 'seen[r[2]]', 'table.sort(records', 'item.d.height',
@@ -89,6 +97,13 @@ test('rail uses one absolute-page stream with stable-state errors and a release 
     }
     assert.match(lua, /if hash==R\.oldhash and #R\.problems>0 then fatal/);
     assert.ok(tex.includes('\\AddToHook{enddocument/afterlastpage}'));
+    assert.ok(tex.includes('\\ReadonlyShipoutCounter'));
+    assert.ok(tex.includes('\\oddsidemargin'));
+    assert.ok(tex.includes('\\evensidemargin'));
+    assert.doesNotMatch(tex, /two-sided rail unsupported|\\value\{page\}|\\thepage/);
+    assert.ok(lua.includes('page~=R.page+1'));
+    assert.ok(lua.includes('twoside==1 and page%2==0'));
+    assert.ok(lua.includes('evenleft-separation-width'));
     assert.ok(tex.includes('\\immediate\\write\\@auxout'));
     assert.ok(lua.includes('Rerun to get rail membership, dimensions and references right'));
     assert.ok(lua.includes('width-tex.sp("25mm")'));

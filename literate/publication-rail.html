@@ -126,7 +126,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 <body>
 <div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Page-local publication annotations</h1>
 <p>A publication rail is one ordered stream of term lookups and numbered explanations.
-It occupies a reserved 25 mm column, separated from the body by 5 mm. Entries remain
+It occupies a reserved 25 mm outer column, separated from the body by 5 mm. On
+mirrored pages the column alternates physical sides with the outer edge. Entries remain
 on their reference page: collision resolution moves them vertically, never splits,
 shrinks, or spills them. Impossible stable layouts are errors.</p>
 <h2>Controlled inputs</h2>
@@ -174,12 +175,16 @@ node traversal have explicit limits. No annotations returns an empty preamble.</
 </div><p>Fixed trusted Lua is embedded as ASCII character codes, avoiding TeX catcode
 interpretation and a separate asset contract. Each declaration gets a reusable
 box whose contents are typeset after the document auxiliary labels have loaded.
-A term row links its title and final definition page; every note has its own row.</p>
+A term row links its title and final definition page; every note has its own row.
+The selected rail size controls both kinds without changing the chosen font roles.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020007200610069006c00200061007300730065006d0062006c0079-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200061007300730065006d0062006c0079"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c00200061007300730065006d0062006c0079" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200061007300730065006d0062006c0079" aria-label="Definition of publication rail assembly">&lt;&lt;publication rail assembly&gt;&gt;=</a></div>
 <div class="code">
 <pre><code>
-<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">publicationRail</span>(<span class="hljs-params">terms: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> RailTerm[], notes: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> RailNote[]</span>): <span class="hljs-built_in">string</span> {
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">publicationRail</span>(<span class="hljs-params">terms: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> RailTerm[], notes: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> RailNote[], fontSize = </span><span class="hljs-number">9</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">Number</span>.<span class="hljs-built_in">isFinite</span>(fontSize) || fontSize &lt; <span class="hljs-number">7</span> || fontSize &gt; <span class="hljs-number">14</span>) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Rail font size must be 7–14 points'</span>);
+    }
     <span class="hljs-keyword">if</span> (terms.<span class="hljs-property">length</span> &gt; maximumDeclarations || notes.<span class="hljs-property">length</span> &gt; maximumDeclarations) {
         <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Rail supports at most 1000 terms and 1000 notes'</span>);
     }
@@ -218,7 +223,7 @@ A term row links its title and final definition page; every note has its own row
             <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">long</span><span class="hljs-string">\\</span><span class="hljs-string">def</span><span class="hljs-string">\\</span><span class="hljs-string">LitRailBody</span><span class="hljs-subst">${name}</span><span class="hljs-string">{</span><span class="hljs-subst">${item.body}</span><span class="hljs-string">}</span><span class="hljs-string">\n</span><span class="hljs-string">`</span> +
             <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">AddToHook{begindocument/end}{</span><span class="hljs-string">\\</span><span class="hljs-string">LitRailBuild{</span><span class="hljs-subst">${index + </span><span class="hljs-number">1</span><span class="hljs-subst">}</span><span class="hljs-string">}{</span><span class="hljs-subst">${name}</span><span class="hljs-string">}{</span><span class="hljs-subst">${item.label}</span><span class="hljs-string">}}`</span>;
     }).<span class="hljs-title">join</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>);
-    <span class="hljs-keyword">return</span> <span class="hljs-title">luaLoader</span>(<span class="hljs-title">railLua</span>() + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + registration) + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + <span class="hljs-title">railTex</span>() + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + boxes + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>;
+    <span class="hljs-keyword">return</span> <span class="hljs-title">luaLoader</span>(<span class="hljs-title">railLua</span>() + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + registration) + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + <span class="hljs-title">railTex</span>(fontSize) + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + boxes + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>;
 }
 
 </code></pre>
@@ -226,12 +231,13 @@ A term row links its title and final definition page; every note has its own row
 </div>
 </div><h2>Renderer integration</h2>
 <p>Load this preamble once, after <code>fontspec</code>, the <code>notefont</code> family, <code>hyperref</code>, and
-any <code>microtype</code> setup. Use one-sided, single-column <code>scrbook</code>. When annotations
-exist, the renderer must reserve <code>right = originalRight + 30 mm</code>, set
+any <code>microtype</code> setup. Use single-column <code>scrbook</code>. When annotations exist, the
+renderer must reserve 30 mm beyond the body: on one-sided pages this extends the
+right margin, while mirrored pages extend the outer margin. Set
 <code>marginparwidth=25mm</code> and <code>marginparsep=5mm</code>, and reject a reduced body below
 80 by 100 mm. Do not also use geometry's <code>includemp</code>. A5 default margins leave
-78 mm and must fail; left 16/right 20 mm leave a valid 82 mm. Without annotations,
-leave today's margins unchanged. Disable body microtype protrusion if the full
+78 mm and must fail; outer 16/inner 20 mm leave a valid 82 mm. Without annotations,
+leave the requested margins unchanged. Disable body microtype protrusion if the full
 5 mm clear gap is required; body overfull diagnostics remain the renderer's concern.</p>
 <p>Emit <code>\phantomsection\label{label}</code> at the definition. A use is
 <code>\LitTermUse{uniqueOccurrenceId}{termTarget}{renderedLabel}</code>: the supplied label,
@@ -241,14 +247,16 @@ number and a marker at the source location. Call each NOTE once. Suppress marker
 in TOC copies, running heads and bookmarks; do not put them in discarded boxes,
 floats, or inside rail bodies. Paragraphs and ordinary lists are supported in notes;
 raw TeX, graphics, nested annotations and arbitrary layout commands are not.</p>
-<p>Pandoc's normal <code>tightlist</code> helper must be available for converted lists. The fixed
-9/11 pt note style has 2 mm vertical padding and controlled list indentation.
+<p>Pandoc's normal <code>tightlist</code> helper must be available for converted lists. The bounded rail style has approximately 1.2 line spacing, 2 mm vertical padding,
+and controlled list indentation.
 Microtype protrusion and expansion are disabled inside rail boxes. No new package,
 external Lua companion, shell escape, or margin insertion is required.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020007200610069006c0020005400650058-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020007200610069006c0020005400650058"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c0020005400650058" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c0020005400650058" aria-label="Definition of publication rail TeX">&lt;&lt;publication rail TeX&gt;&gt;=</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">railTex</span>(): <span class="hljs-built_in">string</span> {
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">railTex</span>(<span class="hljs-params">fontSize: </span><span class="hljs-built_in">number</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">const</span> size = <span class="hljs-title">String</span>(<span class="hljs-title">Number</span>(fontSize.<span class="hljs-title">toFixed</span>(<span class="hljs-number">2</span>)));
+    <span class="hljs-keyword">const</span> leading = <span class="hljs-title">String</span>(<span class="hljs-title">Number</span>((fontSize * <span class="hljs-number">1.2</span>).<span class="hljs-title">toFixed</span>(<span class="hljs-number">2</span>)));
     <span class="hljs-keyword">return</span> <span class="hljs-title">String</span>.<span class="hljs-property">raw</span><span class="hljs-string">`</span><span class="hljs-string">\m</span><span class="hljs-string">akeatletter
 </span><span class="hljs-string">\n</span><span class="hljs-string">ewif</span><span class="hljs-string">\i</span><span class="hljs-string">fLitRailBuilding
 </span><span class="hljs-string">\n</span><span class="hljs-string">ewcommand{</span><span class="hljs-string">\L</span><span class="hljs-string">itRailPrevious}[5]{</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.previous(#1,#2,#3,#4,#5)}}
@@ -259,7 +267,7 @@ external Lua companion, shell escape, or margin insertion is required.</p>
   </span><span class="hljs-string">\b</span><span class="hljs-string">egingroup</span><span class="hljs-string">\L</span><span class="hljs-string">itRailBuildingtrue
   </span><span class="hljs-string">\h</span><span class="hljs-string">size=</span><span class="hljs-string">\m</span><span class="hljs-string">arginparwidth</span><span class="hljs-string">\l</span><span class="hljs-string">inewidth=</span><span class="hljs-string">\h</span><span class="hljs-string">size</span><span class="hljs-string">\c</span><span class="hljs-string">olumnwidth=</span><span class="hljs-string">\h</span><span class="hljs-string">size</span><span class="hljs-string">\t</span><span class="hljs-string">extwidth=</span><span class="hljs-string">\h</span><span class="hljs-string">size
   </span><span class="hljs-string">\@</span><span class="hljs-string">totalleftmargin=0pt</span><span class="hljs-string">\l</span><span class="hljs-string">eftmargini=14pt</span><span class="hljs-string">\l</span><span class="hljs-string">eftmarginii=12pt</span><span class="hljs-string">\l</span><span class="hljs-string">abelsep=3pt
-  </span><span class="hljs-string">\n</span><span class="hljs-string">otefont</span><span class="hljs-string">\f</span><span class="hljs-string">ontsize{9}{11}</span><span class="hljs-string">\s</span><span class="hljs-string">electfont
+  </span><span class="hljs-string">\n</span><span class="hljs-string">otefont</span><span class="hljs-string">\f</span><span class="hljs-string">ontsize{</span><span class="hljs-subst">${size}</span><span class="hljs-string">pt}{</span><span class="hljs-subst">${leading}</span><span class="hljs-string">pt}</span><span class="hljs-string">\s</span><span class="hljs-string">electfont
   </span><span class="hljs-string">\i</span><span class="hljs-string">fdefined</span><span class="hljs-string">\m</span><span class="hljs-string">icrotypesetup</span><span class="hljs-string">\m</span><span class="hljs-string">icrotypesetup{protrusion=false,expansion=false}</span><span class="hljs-string">\f</span><span class="hljs-string">i
   </span><span class="hljs-string">\p</span><span class="hljs-string">arindent=0pt</span><span class="hljs-string">\p</span><span class="hljs-string">arskip=2pt</span><span class="hljs-string">\r</span><span class="hljs-string">aggedright
   </span><span class="hljs-string">\e</span><span class="hljs-string">xpandafter</span><span class="hljs-string">\g</span><span class="hljs-string">lobal</span><span class="hljs-string">\e</span><span class="hljs-string">xpandafter</span><span class="hljs-string">\s</span><span class="hljs-string">etbox</span><span class="hljs-string">\c</span><span class="hljs-string">sname LitRailBox#2</span><span class="hljs-string">\e</span><span class="hljs-string">ndcsname=</span><span class="hljs-string">\v</span><span class="hljs-string">box{%
@@ -279,12 +287,13 @@ external Lua companion, shell escape, or margin insertion is required.</p>
   </span><span class="hljs-string">\i</span><span class="hljs-string">fLitRailBuilding</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.reject(&quot;nested rail marker&quot;)}%
   </span><span class="hljs-string">\e</span><span class="hljs-string">lse</span><span class="hljs-string">\l</span><span class="hljs-string">eavevmode</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.use(&quot;</span><span class="hljs-string">\l</span><span class="hljs-string">uaescapestring{#1}&quot;,&quot;</span><span class="hljs-string">\l</span><span class="hljs-string">uaescapestring{#1}&quot;,&quot;note&quot;)}</span><span class="hljs-string">\f</span><span class="hljs-string">i}
 </span><span class="hljs-string">\A</span><span class="hljs-string">ddToHook{begindocument/end}{%
-  </span><span class="hljs-string">\i</span><span class="hljs-string">f@twoside</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.reject(&quot;two-sided rail unsupported; use oneside&quot;)}</span><span class="hljs-string">\f</span><span class="hljs-string">i
   </span><span class="hljs-string">\i</span><span class="hljs-string">f@twocolumn</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.reject(&quot;two-column rail unsupported&quot;)}</span><span class="hljs-string">\f</span><span class="hljs-string">i}
 </span><span class="hljs-string">\A</span><span class="hljs-string">ddToHook{shipout/foreground}{%
   </span><span class="hljs-string">\s</span><span class="hljs-string">etlength</span><span class="hljs-subst">${</span><span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">unitlength'</span><span class="hljs-subst">}</span><span class="hljs-string">{1pt}%
   </span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.ship(
-    </span><span class="hljs-string">\n</span><span class="hljs-string">umber</span><span class="hljs-string">\d</span><span class="hljs-string">imexpr1in+</span><span class="hljs-string">\h</span><span class="hljs-string">offset+</span><span class="hljs-string">\o</span><span class="hljs-string">ddsidemargin+</span><span class="hljs-string">\t</span><span class="hljs-string">extwidth+</span><span class="hljs-string">\m</span><span class="hljs-string">arginparsep</span><span class="hljs-string">\r</span><span class="hljs-string">elax,
+    </span><span class="hljs-string">\n</span><span class="hljs-string">umber</span><span class="hljs-string">\R</span><span class="hljs-string">eadonlyShipoutCounter,</span><span class="hljs-string">\i</span><span class="hljs-string">f@twoside 1</span><span class="hljs-string">\e</span><span class="hljs-string">lse 0</span><span class="hljs-string">\f</span><span class="hljs-string">i,
+    </span><span class="hljs-string">\n</span><span class="hljs-string">umber</span><span class="hljs-string">\d</span><span class="hljs-string">imexpr1in+</span><span class="hljs-string">\h</span><span class="hljs-string">offset+</span><span class="hljs-string">\o</span><span class="hljs-string">ddsidemargin</span><span class="hljs-string">\r</span><span class="hljs-string">elax,
+    </span><span class="hljs-string">\n</span><span class="hljs-string">umber</span><span class="hljs-string">\d</span><span class="hljs-string">imexpr1in+</span><span class="hljs-string">\h</span><span class="hljs-string">offset+</span><span class="hljs-string">\e</span><span class="hljs-string">vensidemargin</span><span class="hljs-string">\r</span><span class="hljs-string">elax,
     </span><span class="hljs-string">\n</span><span class="hljs-string">umber</span><span class="hljs-string">\d</span><span class="hljs-string">imexpr1in+</span><span class="hljs-string">\v</span><span class="hljs-string">offset+</span><span class="hljs-string">\t</span><span class="hljs-string">opmargin+</span><span class="hljs-string">\h</span><span class="hljs-string">eadheight+</span><span class="hljs-string">\h</span><span class="hljs-string">eadsep</span><span class="hljs-string">\r</span><span class="hljs-string">elax,
     </span><span class="hljs-string">\n</span><span class="hljs-string">umber</span><span class="hljs-string">\t</span><span class="hljs-string">extwidth,</span><span class="hljs-string">\n</span><span class="hljs-string">umber</span><span class="hljs-string">\t</span><span class="hljs-string">extheight,</span><span class="hljs-string">\n</span><span class="hljs-string">umber</span><span class="hljs-string">\m</span><span class="hljs-string">arginparwidth,</span><span class="hljs-string">\n</span><span class="hljs-string">umber</span><span class="hljs-string">\m</span><span class="hljs-string">arginparsep)}}
 </span><span class="hljs-string">\A</span><span class="hljs-string">ddToHook{enddocument/afterlastpage}{</span><span class="hljs-string">\d</span><span class="hljs-string">irectlua{litrail.finish()}}
@@ -489,22 +498,37 @@ end
 
 </div>
 </div><p>The main text origin determines the rail, so asymmetric margins and different top
-margins need no hardcoded offsets. Measure all entries before emitting any overlay.
-A forward sweep respects preferred positions; a backward sweep resolves bottom
-collisions. Each final rectangle is checked against its predecessor and the rail.</p>
+margins need no hardcoded offsets. The absolute shipout counter selects the physical
+outer edge: odd pages place the rail after the body, while even two-sided pages place
+it before the body. Logical page labels and counters never decide parity. Measure all
+entries before emitting any overlay. A forward sweep respects preferred positions;
+a backward sweep resolves bottom collisions. Each final rectangle is checked against
+its predecessor and the rail.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020007200610069006c00200070006c006100630065006d0065006e0074-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d007200610069006c002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200070006c006100630065006d0065006e0074"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020007200610069006c00200070006c006100630065006d0065006e0074" data-literate-target="f-007000750062006c00690063006100740069006f006e0020007200610069006c00200070006c006100630065006d0065006e0074" aria-label="Definition of publication rail placement">&lt;&lt;publication rail placement&gt;&gt;=</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">function</span> R.<span class="hljs-title">ship</span>(x,top,body,height,width,separation)
+<pre><code><span class="hljs-keyword">function</span> R.<span class="hljs-title">ship</span>(page,twoside,oddleft,evenleft,top,body,height,width,separation)
   <span class="hljs-keyword">if</span> R.<span class="hljs-property">failed</span> then <span class="hljs-keyword">return</span> end
-  R.<span class="hljs-property">page</span>=R.<span class="hljs-property">page</span>+<span class="hljs-number">1</span>
-  <span class="hljs-keyword">if</span> R.<span class="hljs-property">page</span>&gt;<span class="hljs-number">100000</span> then <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;page budget exceeds 100000&quot;</span>); <span class="hljs-keyword">return</span> end
-  <span class="hljs-keyword">if</span> math.<span class="hljs-title">abs</span>(width-tex.<span class="hljs-title">sp</span>(<span class="hljs-string">&quot;25mm&quot;</span>))&gt;<span class="hljs-number">1</span> or math.<span class="hljs-title">abs</span>(separation-tex.<span class="hljs-title">sp</span>(<span class="hljs-string">&quot;5mm&quot;</span>))&gt;<span class="hljs-number">1</span> or
-     body&lt;tex.<span class="hljs-title">sp</span>(<span class="hljs-string">&quot;80mm&quot;</span>) or height&lt;tex.<span class="hljs-title">sp</span>(<span class="hljs-string">&quot;100mm&quot;</span>) or x&lt;<span class="hljs-number">0</span> or top&lt;<span class="hljs-number">0</span> or
-     x+width&gt;tex.<span class="hljs-property">pagewidth</span> or top+height&gt;tex.<span class="hljs-property">pageheight</span> then
-    <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;invalid geometry: require 25 mm rail, 5 mm gap, 80 x 100 mm body inside the page&quot;</span>); <span class="hljs-keyword">return</span>
+  <span class="hljs-keyword">if</span> page~=R.<span class="hljs-property">page</span>+<span class="hljs-number">1</span> then <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;nonsequential physical shipout&quot;</span>); <span class="hljs-keyword">return</span> end
+  <span class="hljs-keyword">if</span> page&gt;<span class="hljs-number">100000</span> then <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;page budget exceeds 100000&quot;</span>); <span class="hljs-keyword">return</span> end
+  <span class="hljs-keyword">if</span> twoside~=<span class="hljs-number">0</span> and twoside~=<span class="hljs-number">1</span> then <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;invalid page-side mode&quot;</span>); <span class="hljs-keyword">return</span> end
+  R.<span class="hljs-property">page</span>=page
+  local oddx=oddleft+body+separation
+  local evenx=evenleft-separation-width
+  local left=twoside==<span class="hljs-number">1</span> and page%<span class="hljs-number">2</span>==<span class="hljs-number">0</span>
+  local bodyx=left and evenleft or oddleft
+  local x=left and evenx or oddx
+  local <span class="hljs-keyword">function</span> <span class="hljs-title">valid</span>(<span class="hljs-params">candidateBody,candidateRail</span>)
+    <span class="hljs-keyword">return</span> candidateBody&gt;=<span class="hljs-number">0</span> and candidateBody+body&lt;=tex.<span class="hljs-property">pagewidth</span> and candidateRail&gt;=<span class="hljs-number">0</span>
+      and candidateRail+width&lt;=tex.<span class="hljs-property">pagewidth</span>
   end
-  R.<span class="hljs-property">pages</span>[#R.<span class="hljs-property">pages</span>+<span class="hljs-number">1</span>]=table.<span class="hljs-title">concat</span>({R.<span class="hljs-property">page</span>,x,top,body,height,width,separation,tex.<span class="hljs-property">pagewidth</span>,tex.<span class="hljs-property">pageheight</span>},<span class="hljs-string">&quot;,&quot;</span>)
+  <span class="hljs-keyword">if</span> math.<span class="hljs-title">abs</span>(width-tex.<span class="hljs-title">sp</span>(<span class="hljs-string">&quot;25mm&quot;</span>))&gt;<span class="hljs-number">1</span> or math.<span class="hljs-title">abs</span>(separation-tex.<span class="hljs-title">sp</span>(<span class="hljs-string">&quot;5mm&quot;</span>))&gt;<span class="hljs-number">1</span> or
+     body&lt;tex.<span class="hljs-title">sp</span>(<span class="hljs-string">&quot;80mm&quot;</span>) or height&lt;tex.<span class="hljs-title">sp</span>(<span class="hljs-string">&quot;100mm&quot;</span>) or top&lt;<span class="hljs-number">0</span> or top+height&gt;tex.<span class="hljs-property">pageheight</span> or
+     not <span class="hljs-title">valid</span>(oddleft,oddx) or (twoside==<span class="hljs-number">1</span> and not <span class="hljs-title">valid</span>(evenleft,evenx)) then
+    <span class="hljs-title">fatal</span>(<span class="hljs-string">&quot;invalid geometry: require 25 mm outer rail, 5 mm gap, 80 x 100 mm body inside the page&quot;</span>); <span class="hljs-keyword">return</span>
+  end
+  R.<span class="hljs-property">pages</span>[#R.<span class="hljs-property">pages</span>+<span class="hljs-number">1</span>]=table.<span class="hljs-title">concat</span>({R.<span class="hljs-property">page</span>,twoside,bodyx,x,top,body,height,width,separation,
+    tex.<span class="hljs-property">pagewidth</span>,tex.<span class="hljs-property">pageheight</span>},<span class="hljs-string">&quot;,&quot;</span>)
   local items=<span class="hljs-title">itemsFor</span>(R.<span class="hljs-property">page</span>)
   local needed=math.<span class="hljs-title">max</span>(<span class="hljs-number">0</span>,#items-<span class="hljs-number">1</span>)*gap
   local failed=<span class="hljs-literal">false</span>

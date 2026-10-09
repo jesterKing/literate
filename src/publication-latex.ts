@@ -8,7 +8,7 @@ import type { PandocDocument, PandocBlock, PublicationAsset } from './publicatio
 import { defaultThemeName, getTheme } from './themes';
 import type { LiterateTheme } from './themes';
 import { highlightContribution, syntaxStyle } from './publication-highlight';
-export const publicationTemplateVersion = 3;
+export const publicationTemplateVersion = 4;
 export interface LatexOptions {
     assetPath?: (asset: PublicationAsset) => string;
     theme?: string;
@@ -40,7 +40,7 @@ interface CheckedOptions {
     theme: LiterateTheme; paper: string; geometry: string; sides: 'oneside' | 'twoside';
     bodyFont: string; headingFont: string; codeFont: string;
     fragmentFont: string; noteFont: string; codeLigatures: boolean;
-    bodyFontSize: number; codeFontSize: number;
+    bodyFontSize: number; codeFontSize: number; railFontSize: number;
     portableFonts?: Record<string, PortableFont>;
 }
 function fontName(value: string): string {
@@ -64,7 +64,6 @@ function checkOptions(options: LatexOptions, settings: PublicationSettingsResult
     if (twoSided && physical.some(value => value !== undefined)) {
         throw new Error('Cannot mix left/right margins with inner/outer margins');
     }
-    if (twoSided && rail) { throw new Error('Inner/outer margins are not supported with annotation rails'); }
     const top = options.marginTopMm ?? margin, bottom = options.marginBottomMm ?? margin;
     const first = (twoSided ? options.marginOuterMm : options.marginRightMm) ?? margin;
     const second = (twoSided ? options.marginInnerMm : options.marginLeftMm) ?? margin;
@@ -75,7 +74,7 @@ function checkOptions(options: LatexOptions, settings: PublicationSettingsResult
     }
     const sides = twoSided ? 'twoside' : 'oneside';
     const geometry = twoSided
-        ? `top=${top}mm,outer=${first}mm,bottom=${bottom}mm,inner=${second}mm`
+        ? `top=${top}mm,outer=${first + (rail ? 30 : 0)}mm,bottom=${bottom}mm,inner=${second}mm`
         : rail || physical.some(value => value !== undefined)
             || options.marginTopMm !== undefined || options.marginBottomMm !== undefined
             ? `top=${top}mm,right=${first + (rail ? 30 : 0)}mm,bottom=${bottom}mm,left=${second}mm`
@@ -84,6 +83,7 @@ function checkOptions(options: LatexOptions, settings: PublicationSettingsResult
     if (typeof codeLigatures !== 'boolean') { throw new Error('Code ligatures must be boolean'); }
     return { theme, paper: paper[0], geometry, sides, codeLigatures, portableFonts: options.portableFonts,
         bodyFontSize: settings.fontSizes.body, codeFontSize: settings.fontSizes.code,
+        railFontSize: settings.fontSizes.rail,
         bodyFont: fontName(options.bodyFont ?? settings.fonts.body),
         headingFont: fontName(options.headingFont ?? settings.fonts.heading),
         codeFont: fontName(options.codeFont ?? settings.fonts.code),
@@ -504,7 +504,7 @@ function annotationBudget(project: ParsedProject): AnnotationBudget {
     return { terms: declarations, size };
 }
 async function annotationLatex(document: PandocDocument, project: ParsedProject,
-    convert: LatexConverter, budget: AnnotationBudget): Promise<string> {
+    convert: LatexConverter, budget: AnnotationBudget, railFontSize: number): Promise<string> {
     const notes: RailNote[] = [];
     let occurrence = 0;
     const next = (): string => `lit-use-${++occurrence}`;
@@ -550,7 +550,7 @@ async function annotationLatex(document: PandocDocument, project: ParsedProject,
     if (!terms.length && !notes.length) { return ''; }
     return '% literate-publication-rail-v1\n' +
         '\\setlength{\\marginparwidth}{25mm}\n\\setlength{\\marginparsep}{5mm}\n' +
-        '\\microtypesetup{protrusion=false}\n' + publicationRail(terms, notes);
+        '\\microtypesetup{protrusion=false}\n' + publicationRail(terms, notes, railFontSize);
 }
 function annotationIndexes(project: ParsedProject): string {
     let output = '\n\\chapter*{Term index}\n';
@@ -583,7 +583,8 @@ export async function renderLatex(parsed: ParsedProject, options: LatexOptions,
         if (!prepared.document) { return { diagnostics: prepared.diagnostics }; }
         prepared.document.blocks = ordinaryCode(prepared.document.blocks, checked.theme);
         stage = 'latex-conversion';
-        const annotations = await annotationLatex(prepared.document, parsed, convert, budget);
+        const annotations = await annotationLatex(prepared.document, parsed, convert, budget,
+            checked.railFontSize);
         const body = await convert(prepared.document, conversionOptions);
         if (typeof body !== 'string') { throw new Error('Converter must return a LaTeX body string'); }
         stage = 'latex-template';

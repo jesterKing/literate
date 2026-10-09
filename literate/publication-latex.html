@@ -158,7 +158,7 @@ cross the template boundary.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020004c00610054006500580020004100500049-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006c0061007400650078002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e0020004c00610054006500580020004100500049"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020004c00610054006500580020004100500049" data-literate-target="f-007000750062006c00690063006100740069006f006e0020004c00610054006500580020004100500049" aria-label="Definition of publication LaTeX API">&lt;&lt;publication LaTeX API&gt;&gt;=</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">const</span> publicationTemplateVersion = <span class="hljs-number">3</span>;
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">const</span> publicationTemplateVersion = <span class="hljs-number">4</span>;
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">LatexOptions</span> {
     assetPath?: <span class="hljs-function">(</span><span class="hljs-params">asset: PublicationAsset</span><span class="hljs-function">) =&gt;</span> <span class="hljs-built_in">string</span>;
     theme?: <span class="hljs-built_in">string</span>;
@@ -200,7 +200,7 @@ one fifth larger. Inline code remains part of the surrounding prose line.</p>
     <span class="hljs-attr">theme</span>: <span class="hljs-title">LiterateTheme</span>; <span class="hljs-attr">paper</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">geometry</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">sides</span>: <span class="hljs-string">'oneside'</span> | <span class="hljs-string">'twoside'</span>;
     <span class="hljs-attr">bodyFont</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">headingFont</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">codeFont</span>: <span class="hljs-built_in">string</span>;
     <span class="hljs-attr">fragmentFont</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">noteFont</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">codeLigatures</span>: <span class="hljs-built_in">boolean</span>;
-    <span class="hljs-attr">bodyFontSize</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">codeFontSize</span>: <span class="hljs-built_in">number</span>;
+    <span class="hljs-attr">bodyFontSize</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">codeFontSize</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">railFontSize</span>: <span class="hljs-built_in">number</span>;
     portableFonts?: <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">PortableFont</span>&gt;;
 }
 </code></pre>
@@ -213,10 +213,10 @@ leaving at least 80 mm width and 100 mm height after subtracting opposite sides.
 Physical left/right options retain one-sided output. Inner/outer options select a
 two-sided book whose binding and outer margins exchange physical edges on even
 pages; the two models cannot be mixed.</p>
-<p>The current annotation rail remains one-sided because its shipout coordinates are
-right-edge specific. Mirrored margins therefore reject annotated books rather than
-placing notes at the binding. In one-sided annotated output, the 25 mm rail and
-5 mm gap are added to the requested right margin. A5 default margins leave 78 mm
+<p>The annotation rail follows the physical outer edge. Mirrored output adds its 25 mm
+column and 5 mm gap to the requested outer margin; one-sided output adds the same
+reserve to the right margin. The absolute shipout page, not a resettable logical page
+number, chooses the side. A5 default margins leave 78 mm
 and fail; top/right/bottom/left 18/16/22/20 leave 82 mm and pass. Body protrusion
 is disabled to keep the full gap clear.
 Family names deliberately exclude fontspec options, paths, and TeX metacharacters.</p>
@@ -249,7 +249,6 @@ Invalid root settings remain errors even when an option overrides that role.</p>
     <span class="hljs-keyword">if</span> (twoSided &amp;&amp; physical.<span class="hljs-title">some</span>(<span class="hljs-params">value</span><span class="hljs-function"> =&gt;</span> value !== <span class="hljs-literal">undefined</span>)) {
         <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Cannot mix left/right margins with inner/outer margins'</span>);
     }
-    <span class="hljs-keyword">if</span> (twoSided &amp;&amp; rail) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Inner/outer margins are not supported with annotation rails'</span>); }
     <span class="hljs-keyword">const</span> top = options.<span class="hljs-property">marginTopMm</span> ?? margin, bottom = options.<span class="hljs-property">marginBottomMm</span> ?? margin;
     <span class="hljs-keyword">const</span> first = (twoSided ? options.<span class="hljs-property">marginOuterMm</span> : options.<span class="hljs-property">marginRightMm</span>) ?? margin;
     <span class="hljs-keyword">const</span> second = (twoSided ? options.<span class="hljs-property">marginInnerMm</span> : options.<span class="hljs-property">marginLeftMm</span>) ?? margin;
@@ -260,7 +259,7 @@ Invalid root settings remain errors even when an option overrides that role.</p>
     }
     <span class="hljs-keyword">const</span> sides = twoSided ? <span class="hljs-string">'twoside'</span> : <span class="hljs-string">'oneside'</span>;
     <span class="hljs-keyword">const</span> geometry = twoSided
-        ? <span class="hljs-string">`top=</span><span class="hljs-subst">${top}</span><span class="hljs-string">mm,outer=</span><span class="hljs-subst">${first}</span><span class="hljs-string">mm,bottom=</span><span class="hljs-subst">${bottom}</span><span class="hljs-string">mm,inner=</span><span class="hljs-subst">${second}</span><span class="hljs-string">mm`</span>
+        ? <span class="hljs-string">`top=</span><span class="hljs-subst">${top}</span><span class="hljs-string">mm,outer=</span><span class="hljs-subst">${first + (rail ? </span><span class="hljs-number">30</span><span class="hljs-subst"> : </span><span class="hljs-number">0</span><span class="hljs-subst">)}</span><span class="hljs-string">mm,bottom=</span><span class="hljs-subst">${bottom}</span><span class="hljs-string">mm,inner=</span><span class="hljs-subst">${second}</span><span class="hljs-string">mm`</span>
         : rail || physical.<span class="hljs-title">some</span>(<span class="hljs-params">value</span><span class="hljs-function"> =&gt;</span> value !== <span class="hljs-literal">undefined</span>)
             || options.<span class="hljs-property">marginTopMm</span> !== <span class="hljs-literal">undefined</span> || options.<span class="hljs-property">marginBottomMm</span> !== <span class="hljs-literal">undefined</span>
             ? <span class="hljs-string">`top=</span><span class="hljs-subst">${top}</span><span class="hljs-string">mm,right=</span><span class="hljs-subst">${first + (rail ? </span><span class="hljs-number">30</span><span class="hljs-subst"> : </span><span class="hljs-number">0</span><span class="hljs-subst">)}</span><span class="hljs-string">mm,bottom=</span><span class="hljs-subst">${bottom}</span><span class="hljs-string">mm,left=</span><span class="hljs-subst">${second}</span><span class="hljs-string">mm`</span>
@@ -278,6 +277,7 @@ Defaults come only from the shared settings resolver, not a second catalogue.</p
     <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> codeLigatures !== <span class="hljs-string">'boolean'</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Code ligatures must be boolean'</span>); }
     <span class="hljs-keyword">return</span> { theme, <span class="hljs-attr">paper</span>: paper[<span class="hljs-number">0</span>], geometry, sides, codeLigatures, <span class="hljs-attr">portableFonts</span>: options.<span class="hljs-property">portableFonts</span>,
         <span class="hljs-attr">bodyFontSize</span>: settings.<span class="hljs-property">fontSizes</span>.<span class="hljs-property">body</span>, <span class="hljs-attr">codeFontSize</span>: settings.<span class="hljs-property">fontSizes</span>.<span class="hljs-property">code</span>,
+        <span class="hljs-attr">railFontSize</span>: settings.<span class="hljs-property">fontSizes</span>.<span class="hljs-property">rail</span>,
         <span class="hljs-attr">bodyFont</span>: <span class="hljs-title">fontName</span>(options.<span class="hljs-property">bodyFont</span> ?? settings.<span class="hljs-property">fonts</span>.<span class="hljs-property">body</span>),
         <span class="hljs-attr">headingFont</span>: <span class="hljs-title">fontName</span>(options.<span class="hljs-property">headingFont</span> ?? settings.<span class="hljs-property">fonts</span>.<span class="hljs-property">heading</span>),
         <span class="hljs-attr">codeFont</span>: <span class="hljs-title">fontName</span>(options.<span class="hljs-property">codeFont</span> ?? settings.<span class="hljs-property">fonts</span>.<span class="hljs-property">code</span>),
@@ -787,7 +787,7 @@ Empty documents and documents starting with prose keep their original Div anchor
 
 </div>
 <nav class="fragment-navigation" aria-label="Contributions of publication LaTeX code"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e0020004c006100540065005800200063006f00640065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006c0061007400650078002e006c0069007400650072006100740065-5" data-literate-target="c-007000750062006c00690063006100740069006f006e0020004c006100540065005800200063006f00640065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006c0061007400650078002e006c0069007400650072006100740065-5" aria-label="Previous contribution of publication LaTeX code">Previous</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e0020004c006100540065005800200063006f00640065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006c0061007400650078002e006c0069007400650072006100740065-1" data-literate-target="c-007000750062006c00690063006100740069006f006e0020004c006100540065005800200063006f00640065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006c0061007400650078002e006c0069007400650072006100740065-1" aria-label="Base contribution of publication LaTeX code">Base</a> · <a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e0020004c006100540065005800200063006f00640065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006c0061007400650078002e006c0069007400650072006100740065-7" data-literate-target="c-007000750062006c00690063006100740069006f006e0020004c006100540065005800200063006f00640065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006c0061007400650078002e006c0069007400650072006100740065-7" aria-label="Next contribution of publication LaTeX code">Next</a></nav>
-</div><h2>Annotation destinations and the right rail</h2>
+</div><h2>Annotation destinations and the outer rail</h2>
 <p>TERM definitions stay in prose. NOTE bodies are converted separately through the
 same trusted Pandoc writer, never flattened to plain strings. RawInline boundaries
 wrap the writer's formatted labels, so each label is emitted exactly once. Body
@@ -896,7 +896,7 @@ commands. Every body has already passed full validation before conversion starts
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020004c006100540065005800200061006e006e006f0074006100740069006f006e0073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006c0061007400650078002e006c0069007400650072006100740065-4"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020004c006100540065005800200061006e006e006f0074006100740069006f006e0073" data-literate-target="f-007000750062006c00690063006100740069006f006e0020004c006100540065005800200061006e006e006f0074006100740069006f006e0073" aria-label="Definition of publication LaTeX annotations">&lt;&lt;publication LaTeX annotations&gt;&gt;=+</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">annotationLatex</span>(<span class="hljs-variable">document</span><span class="hljs-params">: PandocDocument, project: ParsedProject,
-    convert: LatexConverter, budget: AnnotationBudget</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">string</span>&gt; {
+    convert: LatexConverter, budget: AnnotationBudget, railFontSize: </span><span class="hljs-built_in">number</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">string</span>&gt; {
     <span class="hljs-keyword">const</span> <span class="hljs-attr">notes</span>: <span class="hljs-title">RailNote</span>[] = [];
     <span class="hljs-keyword">let</span> occurrence = <span class="hljs-number">0</span>;
     <span class="hljs-keyword">const</span> next = (): <span class="hljs-params">string</span><span class="hljs-function"> =&gt;</span> <span class="hljs-string">`lit-use-</span><span class="hljs-subst">${++occurrence}</span><span class="hljs-string">`</span>;
@@ -952,7 +952,7 @@ comment emitted here; escaped author text cannot manufacture that preamble line.
     <span class="hljs-keyword">if</span> (!terms.<span class="hljs-property">length</span> &amp;&amp; !notes.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">''</span>; }
     <span class="hljs-keyword">return</span> <span class="hljs-string">'% literate-publication-rail-v1</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> +
         <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">setlength{</span><span class="hljs-string">\\</span><span class="hljs-string">marginparwidth}{25mm}</span><span class="hljs-string">\n</span><span class="hljs-string">\\</span><span class="hljs-string">setlength{</span><span class="hljs-string">\\</span><span class="hljs-string">marginparsep}{5mm}</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> +
-        <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">microtypesetup{protrusion=false}</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + <span class="hljs-title">publicationRail</span>(terms, notes);
+        <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">microtypesetup{protrusion=false}</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + <span class="hljs-title">publicationRail</span>(terms, notes, railFontSize);
 }
 </code></pre>
 
@@ -1017,7 +1017,8 @@ the rail-content budget and retains the converter's existing document limits.</p
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020004c0061005400650058002000720065006e006400650072-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006c0061007400650078002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020004c0061005400650058002000720065006e006400650072" data-literate-target="f-007000750062006c00690063006100740069006f006e0020004c0061005400650058002000720065006e006400650072" aria-label="Definition of publication LaTeX render">&lt;&lt;publication LaTeX render&gt;&gt;=+</a></div>
 <div class="code">
 <pre><code>        stage = <span class="hljs-string">'latex-conversion'</span>;
-        <span class="hljs-keyword">const</span> annotations = <span class="hljs-keyword">await</span> <span class="hljs-title">annotationLatex</span>(prepared.<span class="hljs-property">document</span>, parsed, convert, budget);
+        <span class="hljs-keyword">const</span> annotations = <span class="hljs-keyword">await</span> <span class="hljs-title">annotationLatex</span>(prepared.<span class="hljs-property">document</span>, parsed, convert, budget,
+            checked.<span class="hljs-property">railFontSize</span>);
         <span class="hljs-keyword">const</span> body = <span class="hljs-keyword">await</span> <span class="hljs-title">convert</span>(prepared.<span class="hljs-property">document</span>, conversionOptions);
         <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> body !== <span class="hljs-string">'string'</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Converter must return a LaTeX body string'</span>); }
         stage = <span class="hljs-string">'latex-template'</span>;

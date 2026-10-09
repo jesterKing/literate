@@ -78,6 +78,18 @@ test('annotations preserve bodies, use labels once, share encoded targets and av
     assert.doesNotMatch(latex.slice(latex.indexOf('\\chapter*{Term index}')), /\\LitTermUse|\\LitNoteUse/);
 });
 
+test('mirrored annotation rail uses the outer edge and configured rail size', async () => {
+    const project = parseProject([{ path: 'index.literate', text:
+        '```SETTINGS\nfont-size-rail=10\n```\n# Book\n\n```NOTE\nMirrored note.\n```\n' }]);
+    const result = await renderLatex(project, { marginInnerMm: 14, marginOuterMm: 20 }, convert);
+    assert.deepEqual(result.diagnostics, []);
+    assert.ok(result.latex!.includes('\\documentclass[fontsize=11pt,twoside,openany]{scrbook}'));
+    assert.ok(result.latex!.includes('outer=50mm'));
+    assert.ok(result.latex!.includes('inner=14mm'));
+    assert.ok(result.latex!.includes('\\fontsize{10pt}{12pt}\\selectfont'));
+    assert.ok(result.latex!.includes('\\ReadonlyShipoutCounter'));
+});
+
 for (const invalid of [
     '```TERM bad unquoted\nbody\n```',
     term + term,

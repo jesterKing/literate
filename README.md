@@ -455,10 +455,10 @@ annotations retain their previous output and geometry: no new indexes or rail.
 
 ### Print geometry and failure policy
 
-Annotated books reserve a **25 mm right-hand rail plus a 5 mm gap**, always on the
-right in one-sided layout. The requested outer page margins are preserved: the
-body's right edge moves left by **30 mm** (internally its right margin increases
-by 30 mm). The reduced body must still be at least **80 × 100 mm**.
+Annotated books reserve a **25 mm outer rail plus a 5 mm gap**. It appears on the
+right of odd pages and the left of even mirrored pages. The requested outer page
+margin is preserved beyond the rail: the body moves inward by **30 mm** (internally
+the one-sided right or mirrored outer margin increases by 30 mm). The reduced body must still be at least **80 × 100 mm**.
 
 - A5 with default 20 mm margins leaves `148 - 20 - 20 - 30 = 78 mm`: rejected.
 - A5 with top/right/bottom/left **18/16/22/20 mm** leaves an **82 × 170 mm** body:
@@ -610,6 +610,7 @@ font-note=Latin Modern Roman
 font-size-body=11
 font-size-code=10
 font-size-diagram=16
+font-size-rail=9
 font-code-ligatures=on
 ```
 ````
@@ -624,8 +625,9 @@ Lilex has native regular, bold, italic and bold-italic faces, so default code
 comments use real italics rather than synthetic slant.
 
 `font-size-body` accepts 8–24 TeX points, `font-size-code` accepts 6–24 TeX
-points for block code, and `font-size-diagram` accepts 8–48 CSS pixels for
-Mermaid layout. Values are plain decimals with at most two fractional digits;
+points for block code, `font-size-diagram` accepts 8–48 CSS pixels for Mermaid
+layout, and `font-size-rail` accepts 7–14 TeX points with approximately 1.2 line
+spacing. Values are plain decimals with at most two fractional digits;
 do not include units. Diagram vectors retain their natural print size and are
 only reduced when they exceed the available width or page height.
 

@@ -1,7 +1,8 @@
 # Page-local publication annotations
 
 A publication rail is one ordered stream of term lookups and numbered explanations.
-It occupies a reserved 25 mm column, separated from the body by 5 mm. Entries remain
+It occupies a reserved 25 mm outer column, separated from the body by 5 mm. On
+mirrored pages the column alternates physical sides with the outer edge. Entries remain
 on their reference page: collision resolution moves them vertically, never splits,
 shrinks, or spills them. Impossible stable layouts are errors.
 
@@ -51,10 +52,14 @@ Fixed trusted Lua is embedded as ASCII character codes, avoiding TeX catcode
 interpretation and a separate asset contract. Each declaration gets a reusable
 box whose contents are typeset after the document auxiliary labels have loaded.
 A term row links its title and final definition page; every note has its own row.
+The selected rail size controls both kinds without changing the chosen font roles.
 
 ```ts : <<publication rail assembly>>=
-/** The caller supplies controlled LaTeX, loads hyperref, and reserves the right rail. */
-export function publicationRail(terms: readonly RailTerm[], notes: readonly RailNote[]): string {
+/** The caller supplies controlled LaTeX, loads hyperref, and reserves the outer rail. */
+export function publicationRail(terms: readonly RailTerm[], notes: readonly RailNote[], fontSize = 9): string {
+    if (!Number.isFinite(fontSize) || fontSize < 7 || fontSize > 14) {
+        throw new Error('Rail font size must be 7–14 points');
+    }
     if (terms.length > maximumDeclarations || notes.length > maximumDeclarations) {
         throw new Error('Rail supports at most 1000 terms and 1000 notes');
     }
@@ -93,7 +98,7 @@ export function publicationRail(terms: readonly RailTerm[], notes: readonly Rail
             `\\long\\def\\LitRailBody${name}{${item.body}}\n` +
             `\\AddToHook{begindocument/end}{\\LitRailBuild{${index + 1}}{${name}}{${item.label}}}`;
     }).join('\n');
-    return luaLoader(railLua() + '\n' + registration) + '\n' + railTex() + '\n' + boxes + '\n';
+    return luaLoader(railLua() + '\n' + registration) + '\n' + railTex(fontSize) + '\n' + boxes + '\n';
 }
 
 ```
@@ -101,12 +106,13 @@ export function publicationRail(terms: readonly RailTerm[], notes: readonly Rail
 ## Renderer integration
 
 Load this preamble once, after `fontspec`, the `notefont` family, `hyperref`, and
-any `microtype` setup. Use one-sided, single-column `scrbook`. When annotations
-exist, the renderer must reserve `right = originalRight + 30 mm`, set
+any `microtype` setup. Use single-column `scrbook`. When annotations exist, the
+renderer must reserve 30 mm beyond the body: on one-sided pages this extends the
+right margin, while mirrored pages extend the outer margin. Set
 `marginparwidth=25mm` and `marginparsep=5mm`, and reject a reduced body below
 80 by 100 mm. Do not also use geometry's `includemp`. A5 default margins leave
-78 mm and must fail; left 16/right 20 mm leave a valid 82 mm. Without annotations,
-leave today's margins unchanged. Disable body microtype protrusion if the full
+78 mm and must fail; outer 16/inner 20 mm leave a valid 82 mm. Without annotations,
+leave the requested margins unchanged. Disable body microtype protrusion if the full
 5 mm clear gap is required; body overfull diagnostics remain the renderer's concern.
 
 Emit `\phantomsection\label{label}` at the definition. A use is
@@ -118,13 +124,15 @@ in TOC copies, running heads and bookmarks; do not put them in discarded boxes,
 floats, or inside rail bodies. Paragraphs and ordinary lists are supported in notes;
 raw TeX, graphics, nested annotations and arbitrary layout commands are not.
 
-Pandoc's normal `tightlist` helper must be available for converted lists. The fixed
-9/11 pt note style has 2 mm vertical padding and controlled list indentation.
+Pandoc's normal `tightlist` helper must be available for converted lists. The bounded rail style has approximately 1.2 line spacing, 2 mm vertical padding,
+and controlled list indentation.
 Microtype protrusion and expansion are disabled inside rail boxes. No new package,
 external Lua companion, shell escape, or margin insertion is required.
 
 ```ts : <<publication rail TeX>>=
-function railTex(): string {
+function railTex(fontSize: number): string {
+    const size = String(Number(fontSize.toFixed(2)));
+    const leading = String(Number((fontSize * 1.2).toFixed(2)));
     return String.raw`\makeatletter
 \newif\ifLitRailBuilding
 \newcommand{\LitRailPrevious}[5]{\directlua{litrail.previous(#1,#2,#3,#4,#5)}}
@@ -135,7 +143,7 @@ function railTex(): string {
   \begingroup\LitRailBuildingtrue
   \hsize=\marginparwidth\linewidth=\hsize\columnwidth=\hsize\textwidth=\hsize
   \@totalleftmargin=0pt\leftmargini=14pt\leftmarginii=12pt\labelsep=3pt
-  \notefont\fontsize{9}{11}\selectfont
+  \notefont\fontsize{${size}pt}{${leading}pt}\selectfont
   \ifdefined\microtypesetup\microtypesetup{protrusion=false,expansion=false}\fi
   \parindent=0pt\parskip=2pt\raggedright
   \expandafter\global\expandafter\setbox\csname LitRailBox#2\endcsname=\vbox{%
@@ -155,12 +163,13 @@ function railTex(): string {
   \ifLitRailBuilding\directlua{litrail.reject("nested rail marker")}%
   \else\leavevmode\directlua{litrail.use("\luaescapestring{#1}","\luaescapestring{#1}","note")}\fi}
 \AddToHook{begindocument/end}{%
-  \if@twoside\directlua{litrail.reject("two-sided rail unsupported; use oneside")}\fi
   \if@twocolumn\directlua{litrail.reject("two-column rail unsupported")}\fi}
 \AddToHook{shipout/foreground}{%
   \setlength${'\\unitlength'}{1pt}%
   \directlua{litrail.ship(
-    \number\dimexpr1in+\hoffset+\oddsidemargin+\textwidth+\marginparsep\relax,
+    \number\ReadonlyShipoutCounter,\if@twoside 1\else 0\fi,
+    \number\dimexpr1in+\hoffset+\oddsidemargin\relax,
+    \number\dimexpr1in+\hoffset+\evensidemargin\relax,
     \number\dimexpr1in+\voffset+\topmargin+\headheight+\headsep\relax,
     \number\textwidth,\number\textheight,\number\marginparwidth,\number\marginparsep)}}
 \AddToHook{enddocument/afterlastpage}{\directlua{litrail.finish()}}
@@ -353,21 +362,36 @@ end
 ```
 
 The main text origin determines the rail, so asymmetric margins and different top
-margins need no hardcoded offsets. Measure all entries before emitting any overlay.
-A forward sweep respects preferred positions; a backward sweep resolves bottom
-collisions. Each final rectangle is checked against its predecessor and the rail.
+margins need no hardcoded offsets. The absolute shipout counter selects the physical
+outer edge: odd pages place the rail after the body, while even two-sided pages place
+it before the body. Logical page labels and counters never decide parity. Measure all
+entries before emitting any overlay. A forward sweep respects preferred positions;
+a backward sweep resolves bottom collisions. Each final rectangle is checked against
+its predecessor and the rail.
 
 ```ts : <<publication rail placement>>=
-function R.ship(x,top,body,height,width,separation)
+function R.ship(page,twoside,oddleft,evenleft,top,body,height,width,separation)
   if R.failed then return end
-  R.page=R.page+1
-  if R.page>100000 then fatal("page budget exceeds 100000"); return end
-  if math.abs(width-tex.sp("25mm"))>1 or math.abs(separation-tex.sp("5mm"))>1 or
-     body<tex.sp("80mm") or height<tex.sp("100mm") or x<0 or top<0 or
-     x+width>tex.pagewidth or top+height>tex.pageheight then
-    fatal("invalid geometry: require 25 mm rail, 5 mm gap, 80 x 100 mm body inside the page"); return
+  if page~=R.page+1 then fatal("nonsequential physical shipout"); return end
+  if page>100000 then fatal("page budget exceeds 100000"); return end
+  if twoside~=0 and twoside~=1 then fatal("invalid page-side mode"); return end
+  R.page=page
+  local oddx=oddleft+body+separation
+  local evenx=evenleft-separation-width
+  local left=twoside==1 and page%2==0
+  local bodyx=left and evenleft or oddleft
+  local x=left and evenx or oddx
+  local function valid(candidateBody,candidateRail)
+    return candidateBody>=0 and candidateBody+body<=tex.pagewidth and candidateRail>=0
+      and candidateRail+width<=tex.pagewidth
   end
-  R.pages[#R.pages+1]=table.concat({R.page,x,top,body,height,width,separation,tex.pagewidth,tex.pageheight},",")
+  if math.abs(width-tex.sp("25mm"))>1 or math.abs(separation-tex.sp("5mm"))>1 or
+     body<tex.sp("80mm") or height<tex.sp("100mm") or top<0 or top+height>tex.pageheight or
+     not valid(oddleft,oddx) or (twoside==1 and not valid(evenleft,evenx)) then
+    fatal("invalid geometry: require 25 mm outer rail, 5 mm gap, 80 x 100 mm body inside the page"); return
+  end
+  R.pages[#R.pages+1]=table.concat({R.page,twoside,bodyx,x,top,body,height,width,separation,
+    tex.pagewidth,tex.pageheight},",")
   local items=itemsFor(R.page)
   local needed=math.max(0,#items-1)*gap
   local failed=false

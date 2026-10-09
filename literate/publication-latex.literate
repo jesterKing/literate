@@ -31,7 +31,7 @@ TeX. It is not a custom-template API; only validated layout, palette and font op
 cross the template boundary.
 
 ```ts : <<publication LaTeX API>>=
-export const publicationTemplateVersion = 3;
+export const publicationTemplateVersion = 4;
 export interface LatexOptions {
     assetPath?: (asset: PublicationAsset) => string;
     theme?: string;
@@ -70,7 +70,7 @@ interface CheckedOptions {
     theme: LiterateTheme; paper: string; geometry: string; sides: 'oneside' | 'twoside';
     bodyFont: string; headingFont: string; codeFont: string;
     fragmentFont: string; noteFont: string; codeLigatures: boolean;
-    bodyFontSize: number; codeFontSize: number;
+    bodyFontSize: number; codeFontSize: number; railFontSize: number;
     portableFonts?: Record<string, PortableFont>;
 }
 ```
@@ -82,10 +82,10 @@ Physical left/right options retain one-sided output. Inner/outer options select 
 two-sided book whose binding and outer margins exchange physical edges on even
 pages; the two models cannot be mixed.
 
-The current annotation rail remains one-sided because its shipout coordinates are
-right-edge specific. Mirrored margins therefore reject annotated books rather than
-placing notes at the binding. In one-sided annotated output, the 25 mm rail and
-5 mm gap are added to the requested right margin. A5 default margins leave 78 mm
+The annotation rail follows the physical outer edge. Mirrored output adds its 25 mm
+column and 5 mm gap to the requested outer margin; one-sided output adds the same
+reserve to the right margin. The absolute shipout page, not a resettable logical page
+number, chooses the side. A5 default margins leave 78 mm
 and fail; top/right/bottom/left 18/16/22/20 leave 82 mm and pass. Body protrusion
 is disabled to keep the full gap clear.
 Family names deliberately exclude fontspec options, paths, and TeX metacharacters.
@@ -118,7 +118,6 @@ function checkOptions(options: LatexOptions, settings: PublicationSettingsResult
     if (twoSided && physical.some(value => value !== undefined)) {
         throw new Error('Cannot mix left/right margins with inner/outer margins');
     }
-    if (twoSided && rail) { throw new Error('Inner/outer margins are not supported with annotation rails'); }
     const top = options.marginTopMm ?? margin, bottom = options.marginBottomMm ?? margin;
     const first = (twoSided ? options.marginOuterMm : options.marginRightMm) ?? margin;
     const second = (twoSided ? options.marginInnerMm : options.marginLeftMm) ?? margin;
@@ -129,7 +128,7 @@ function checkOptions(options: LatexOptions, settings: PublicationSettingsResult
     }
     const sides = twoSided ? 'twoside' : 'oneside';
     const geometry = twoSided
-        ? `top=${top}mm,outer=${first}mm,bottom=${bottom}mm,inner=${second}mm`
+        ? `top=${top}mm,outer=${first + (rail ? 30 : 0)}mm,bottom=${bottom}mm,inner=${second}mm`
         : rail || physical.some(value => value !== undefined)
             || options.marginTopMm !== undefined || options.marginBottomMm !== undefined
             ? `top=${top}mm,right=${first + (rail ? 30 : 0)}mm,bottom=${bottom}mm,left=${second}mm`
@@ -144,6 +143,7 @@ Defaults come only from the shared settings resolver, not a second catalogue.
     if (typeof codeLigatures !== 'boolean') { throw new Error('Code ligatures must be boolean'); }
     return { theme, paper: paper[0], geometry, sides, codeLigatures, portableFonts: options.portableFonts,
         bodyFontSize: settings.fontSizes.body, codeFontSize: settings.fontSizes.code,
+        railFontSize: settings.fontSizes.rail,
         bodyFont: fontName(options.bodyFont ?? settings.fonts.body),
         headingFont: fontName(options.headingFont ?? settings.fonts.heading),
         codeFont: fontName(options.codeFont ?? settings.fonts.code),
@@ -596,7 +596,7 @@ function ordinaryCode(blocks: PandocBlock[], theme: LiterateTheme): PandocBlock[
 }
 ```
 
-## Annotation destinations and the right rail
+## Annotation destinations and the outer rail
 
 TERM definitions stay in prose. NOTE bodies are converted separately through the
 same trusted Pandoc writer, never flattened to plain strings. RawInline boundaries
@@ -696,7 +696,7 @@ commands. Every body has already passed full validation before conversion starts
 
 ```ts : <<publication LaTeX annotations>>=+
 async function annotationLatex(document: PandocDocument, project: ParsedProject,
-    convert: LatexConverter, budget: AnnotationBudget): Promise<string> {
+    convert: LatexConverter, budget: AnnotationBudget, railFontSize: number): Promise<string> {
     const notes: RailNote[] = [];
     let occurrence = 0;
     const next = (): string => `lit-use-${++occurrence}`;
@@ -749,7 +749,7 @@ comment emitted here; escaped author text cannot manufacture that preamble line.
     if (!terms.length && !notes.length) { return ''; }
     return '% literate-publication-rail-v1\n' +
         '\\setlength{\\marginparwidth}{25mm}\n\\setlength{\\marginparsep}{5mm}\n' +
-        '\\microtypesetup{protrusion=false}\n' + publicationRail(terms, notes);
+        '\\microtypesetup{protrusion=false}\n' + publicationRail(terms, notes, railFontSize);
 }
 ```
 
@@ -805,7 +805,8 @@ the rail-content budget and retains the converter's existing document limits.
 
 ```ts : <<publication LaTeX render>>=+
         stage = 'latex-conversion';
-        const annotations = await annotationLatex(prepared.document, parsed, convert, budget);
+        const annotations = await annotationLatex(prepared.document, parsed, convert, budget,
+            checked.railFontSize);
         const body = await convert(prepared.document, conversionOptions);
         if (typeof body !== 'string') { throw new Error('Converter must return a LaTeX body string'); }
         stage = 'latex-template';

@@ -29,8 +29,11 @@ function luaLoader(source: string): string {
     return '\\directlua{assert(load(table.concat({' + chunks.join(',\n') + '}),"literate-rail"))()}';
 }
 
-/** The caller supplies controlled LaTeX, loads hyperref, and reserves the right rail. */
-export function publicationRail(terms: readonly RailTerm[], notes: readonly RailNote[]): string {
+/** The caller supplies controlled LaTeX, loads hyperref, and reserves the outer rail. */
+export function publicationRail(terms: readonly RailTerm[], notes: readonly RailNote[], fontSize = 9): string {
+    if (!Number.isFinite(fontSize) || fontSize < 7 || fontSize > 14) {
+        throw new Error('Rail font size must be 7–14 points');
+    }
     if (terms.length > maximumDeclarations || notes.length > maximumDeclarations) {
         throw new Error('Rail supports at most 1000 terms and 1000 notes');
     }
@@ -69,10 +72,12 @@ export function publicationRail(terms: readonly RailTerm[], notes: readonly Rail
             `\\long\\def\\LitRailBody${name}{${item.body}}\n` +
             `\\AddToHook{begindocument/end}{\\LitRailBuild{${index + 1}}{${name}}{${item.label}}}`;
     }).join('\n');
-    return luaLoader(railLua() + '\n' + registration) + '\n' + railTex() + '\n' + boxes + '\n';
+    return luaLoader(railLua() + '\n' + registration) + '\n' + railTex(fontSize) + '\n' + boxes + '\n';
 }
 
-function railTex(): string {
+function railTex(fontSize: number): string {
+    const size = String(Number(fontSize.toFixed(2)));
+    const leading = String(Number((fontSize * 1.2).toFixed(2)));
     return String.raw`\makeatletter
 \newif\ifLitRailBuilding
 \newcommand{\LitRailPrevious}[5]{\directlua{litrail.previous(#1,#2,#3,#4,#5)}}
@@ -83,7 +88,7 @@ function railTex(): string {
   \begingroup\LitRailBuildingtrue
   \hsize=\marginparwidth\linewidth=\hsize\columnwidth=\hsize\textwidth=\hsize
   \@totalleftmargin=0pt\leftmargini=14pt\leftmarginii=12pt\labelsep=3pt
-  \notefont\fontsize{9}{11}\selectfont
+  \notefont\fontsize{${size}pt}{${leading}pt}\selectfont
   \ifdefined\microtypesetup\microtypesetup{protrusion=false,expansion=false}\fi
   \parindent=0pt\parskip=2pt\raggedright
   \expandafter\global\expandafter\setbox\csname LitRailBox#2\endcsname=\vbox{%
@@ -103,12 +108,13 @@ function railTex(): string {
   \ifLitRailBuilding\directlua{litrail.reject("nested rail marker")}%
   \else\leavevmode\directlua{litrail.use("\luaescapestring{#1}","\luaescapestring{#1}","note")}\fi}
 \AddToHook{begindocument/end}{%
-  \if@twoside\directlua{litrail.reject("two-sided rail unsupported; use oneside")}\fi
   \if@twocolumn\directlua{litrail.reject("two-column rail unsupported")}\fi}
 \AddToHook{shipout/foreground}{%
   \setlength${'\\unitlength'}{1pt}%
   \directlua{litrail.ship(
-    \number\dimexpr1in+\hoffset+\oddsidemargin+\textwidth+\marginparsep\relax,
+    \number\ReadonlyShipoutCounter,\if@twoside 1\else 0\fi,
+    \number\dimexpr1in+\hoffset+\oddsidemargin\relax,
+    \number\dimexpr1in+\hoffset+\evensidemargin\relax,
     \number\dimexpr1in+\voffset+\topmargin+\headheight+\headsep\relax,
     \number\textwidth,\number\textheight,\number\marginparwidth,\number\marginparsep)}}
 \AddToHook{enddocument/afterlastpage}{\directlua{litrail.finish()}}
@@ -252,16 +258,28 @@ local function itemsFor(page)
   end
   return items
 end
-function R.ship(x,top,body,height,width,separation)
+function R.ship(page,twoside,oddleft,evenleft,top,body,height,width,separation)
   if R.failed then return end
-  R.page=R.page+1
-  if R.page>100000 then fatal("page budget exceeds 100000"); return end
-  if math.abs(width-tex.sp("25mm"))>1 or math.abs(separation-tex.sp("5mm"))>1 or
-     body<tex.sp("80mm") or height<tex.sp("100mm") or x<0 or top<0 or
-     x+width>tex.pagewidth or top+height>tex.pageheight then
-    fatal("invalid geometry: require 25 mm rail, 5 mm gap, 80 x 100 mm body inside the page"); return
+  if page~=R.page+1 then fatal("nonsequential physical shipout"); return end
+  if page>100000 then fatal("page budget exceeds 100000"); return end
+  if twoside~=0 and twoside~=1 then fatal("invalid page-side mode"); return end
+  R.page=page
+  local oddx=oddleft+body+separation
+  local evenx=evenleft-separation-width
+  local left=twoside==1 and page%2==0
+  local bodyx=left and evenleft or oddleft
+  local x=left and evenx or oddx
+  local function valid(candidateBody,candidateRail)
+    return candidateBody>=0 and candidateBody+body<=tex.pagewidth and candidateRail>=0
+      and candidateRail+width<=tex.pagewidth
   end
-  R.pages[#R.pages+1]=table.concat({R.page,x,top,body,height,width,separation,tex.pagewidth,tex.pageheight},",")
+  if math.abs(width-tex.sp("25mm"))>1 or math.abs(separation-tex.sp("5mm"))>1 or
+     body<tex.sp("80mm") or height<tex.sp("100mm") or top<0 or top+height>tex.pageheight or
+     not valid(oddleft,oddx) or (twoside==1 and not valid(evenleft,evenx)) then
+    fatal("invalid geometry: require 25 mm outer rail, 5 mm gap, 80 x 100 mm body inside the page"); return
+  end
+  R.pages[#R.pages+1]=table.concat({R.page,twoside,bodyx,x,top,body,height,width,separation,
+    tex.pagewidth,tex.pageheight},",")
   local items=itemsFor(R.page)
   local needed=math.max(0,#items-1)*gap
   local failed=false

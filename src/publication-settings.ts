@@ -11,11 +11,13 @@ export interface PublicationFontSizes {
     body: number;
     code: number;
     diagram: number;
+    rail: number;
 }
 export const publicationFontSizeBounds = {
     body: { minimum: 8, maximum: 24, defaultValue: 11 },
     code: { minimum: 6, maximum: 24, defaultValue: 10 },
-    diagram: { minimum: 8, maximum: 48, defaultValue: 16 }
+    diagram: { minimum: 8, maximum: 48, defaultValue: 16 },
+    rail: { minimum: 7, maximum: 14, defaultValue: 9 }
 } as const;
 export interface PublicationSettingsResult {
     fonts: PublicationFonts;
@@ -31,7 +33,8 @@ export function resolvePublicationSettings(project: ParsedProject): PublicationS
     const fontSizes: PublicationFontSizes = {
         body: publicationFontSizeBounds.body.defaultValue,
         code: publicationFontSizeBounds.code.defaultValue,
-        diagram: publicationFontSizeBounds.diagram.defaultValue
+        diagram: publicationFontSizeBounds.diagram.defaultValue,
+        rail: publicationFontSizeBounds.rail.defaultValue
     };
     let codeLigatures = true;
     let explicitNote = false;
@@ -40,7 +43,7 @@ export function resolvePublicationSettings(project: ParsedProject): PublicationS
     for (const token of document?.tokens ?? []) {
         if (token.type !== 'fence' || token.info.trim() !== 'SETTINGS') { continue; }
         token.content.split('\n').forEach((line: string, index: number) => {
-            const match = /^\s*(font-body|font-heading|font-code|font-fragment|font-note|font-code-ligatures|font-size-body|font-size-code|font-size-diagram)\s*=(.*)$/.exec(line);
+            const match = /^\s*(font-body|font-heading|font-code|font-fragment|font-note|font-code-ligatures|font-size-body|font-size-code|font-size-diagram|font-size-rail)\s*=(.*)$/.exec(line);
             if (!match) { return; }
             const key = match[1];
             const value = match[2].trim();
