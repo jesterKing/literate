@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.16.0
+
+* Rewrite and restructure the book with a stronger prose-first narrative.
+* Add page-aware PDF rails for terms, notes, and explicit `<<name>>[rail]` uses.
+* Improve HTML and PDF fragment typography, comment elision, and export reporting.
+
 ## 0.15.0
 
 * LSP-based editor capabilities: hover, completion, signature, rename ( #5 )
