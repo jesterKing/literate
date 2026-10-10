@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Several publications in one workspace</title>
+  <meta name="description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <meta property="og:description" content="A Literate Program written with the Literate Programming vscode extension by Nathan 'jesterKing' Letwory and contributors" />
+  <style>.literate-document {
+--literate-background: #faf4ed;
+--literate-surface: #EDE1D6;
+--literate-surface-raised: #EADCCF;
+--literate-text: #575279;
+--literate-muted: #908B9D;
+--literate-border: #b0acb9;
+--literate-accent: #286983;
+--literate-information: #56949f;
+--literate-warning: #ea9d34;
+--literate-danger: #b4637a;
+--literate-purple: #907aa9;
+--literate-cyan: #d7827e;
+--literate-yellow: #ea9d34;
+    display: block;
+    box-sizing: border-box;
+    color-scheme: light;
+    width: 100%;
+    max-width: 80rem;
+    min-width: 0;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: var(--literate-background);
+    color: var(--literate-text);
+    font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow-wrap: anywhere;
+}
+.literate-document *, .literate-document *::before, .literate-document *::after { box-sizing: border-box; }
+.literate-document h1, .literate-document h2, .literate-document h3,
+.literate-document h4, .literate-document h5, .literate-document h6 {
+    color: var(--literate-text); line-height: 1.25; margin: 1.5em 0 .65em; font-weight: 650;
+}
+.literate-document h1 { font-size: 2.25em; }
+.literate-document h2 { font-size: 1.75em; border-bottom: 1px solid var(--literate-border); padding-bottom: .3em; }
+.literate-document h3 { font-size: 1.4em; }
+.literate-document h4 { font-size: 1.15em; }
+.literate-document h5, .literate-document h6 { font-size: 1em; }
+.literate-document p, .literate-document ul, .literate-document ol, .literate-document dl { margin: 0 0 1em; }
+.literate-document ul { list-style: disc; padding-left: 1.75em; }
+.literate-document ol { list-style: decimal; padding-left: 1.75em; }
+.literate-document li { margin: .25em 0; }
+.literate-document li::before { content: none; }
+.literate-document dt { font-weight: 600; }
+.literate-document dd { margin: 0 0 .75em 1.5em; }
+.literate-document a { color: var(--literate-information); text-decoration: underline; text-underline-offset: .15em; }
+.literate-document a:hover { color: var(--literate-accent); }
+.literate-document a:focus-visible { outline: 2px solid var(--literate-accent); outline-offset: 3px; }
+.literate-document strong { font-weight: 700; }
+.literate-document em { font-style: italic; }
+.literate-document hr { border: 0; border-top: 1px solid var(--literate-border); margin: 2em 0; }
+.literate-document blockquote { margin: 1em 0; padding: .75em 1em; border-left: .25em solid var(--literate-accent); background: var(--literate-surface); }
+.literate-document pre, .literate-document code, .literate-document kbd, .literate-document samp,
+.literate-document .fragmentname { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.literate-document code, .literate-document kbd, .literate-document samp { background: var(--literate-surface); color: var(--literate-text); padding: .15em .3em; border-radius: .2em; font-size: .9em; }
+.literate-document pre { background: var(--literate-surface); color: var(--literate-text); padding: 1em; margin: 1em 0; border: 1px solid var(--literate-border); border-radius: .35em; overflow: auto; white-space: pre; overflow-wrap: normal; line-height: 1.5; }
+.literate-document pre code { padding: 0; border: 0; background: transparent; font-size: inherit; }
+.literate-document .codefragment { margin: 1.5em 0; padding: 1em; border: 1px solid var(--literate-border); border-radius: .35em; background: var(--literate-surface); color: var(--literate-text); }
+.literate-document .codefragment pre { border: 0; }
+.literate-document .fragmentname { color: var(--literate-accent); overflow-wrap: anywhere; }
+.literate-document .fragmentuse, .literate-document .literate-tag-name { color: var(--literate-purple); font-style: italic; }
+.literate-document .code, .literate-document code div { color: var(--literate-text); }
+.literate-document .code pre { margin: .5em 0; }
+.literate-document .codefragment > div + div { margin-top: .75em; }
+.literate-document [class*="hljs-"] { color: var(--literate-text); background: transparent; }
+.literate-document .hljs, .literate-document .hljs-subst { color: var(--literate-text); background: var(--literate-surface); }
+.literate-document .hljs-keyword, .literate-document .hljs-selector-tag, .literate-document .hljs-literal { color: var(--literate-purple); }
+.literate-document .hljs-string, .literate-document .hljs-regexp, .literate-document .hljs-addition { color: var(--literate-accent); }
+.literate-document .hljs-number, .literate-document .hljs-symbol, .literate-document .hljs-bullet { color: var(--literate-warning); }
+.literate-document .hljs-title, .literate-document .hljs-section, .literate-document .hljs-built_in, .literate-document .hljs-type { color: var(--literate-information); }
+.literate-document .hljs-attr, .literate-document .hljs-attribute, .literate-document .hljs-variable, .literate-document .hljs-template-variable { color: var(--literate-cyan); }
+.literate-document .hljs-comment, .literate-document .hljs-quote { color: var(--literate-muted); font-style: italic; }
+.literate-document .hljs-meta, .literate-document .hljs-doctag { color: var(--literate-yellow); }
+.literate-document .hljs-deletion, .literate-document .hljs-name { color: var(--literate-danger); }
+.literate-document .hljs-link { color: var(--literate-information); text-decoration: underline; }
+.literate-document .hljs-emphasis { font-style: italic; }
+.literate-document .hljs-strong { font-weight: bold; }
+.literate-document table { display: block; max-width: 100%; overflow: auto; border-collapse: collapse; margin: 1em 0; font-variant-numeric: tabular-nums; }
+.literate-document th, .literate-document td { border: 1px solid var(--literate-border); padding: .5em .8em; text-align: left; }
+.literate-document th { background: var(--literate-surface-raised); font-weight: 650; }
+.literate-document tr:nth-child(even) { background: var(--literate-surface); }
+.literate-document caption { color: var(--literate-muted); padding: .5em; text-align: left; }
+.literate-document img, .literate-document video { max-width: 100%; height: auto; }
+.literate-document figure { margin: 1.5em 0; }
+.literate-document figcaption { color: var(--literate-muted); }
+.literate-document .mermaid, .literate-document .literate-mermaid { display: block; overflow: auto; padding: 1em; background: var(--literate-background); color: var(--literate-text); text-align: center; }
+.literate-document .mermaid svg, .literate-document .literate-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+.literate-document .literate-mermaid[role="alert"] { color: var(--literate-danger); text-align: left; white-space: pre-wrap; }
+@media (max-width: 40rem) {
+    .literate-document { padding: 1rem; }
+    .literate-document h1 { font-size: 1.8em; }
+    .literate-document .codefragment { padding: .5em; }
+}
+/*!
+nvim-base16.lua is a library for modifying themes with Lua
+Copyright © 2019 Ashkan Kiani
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+.literate-document .literate-annotation { margin-block: 1em; padding: .6em 1em; border-inline-start: .2em solid currentColor; }
+.literate-document .literate-annotation-title { font-weight: bold; }
+.literate-document .literate-note { border-inline-start-style: dotted; }
+.literate-document .literate-term-unresolved { text-decoration: underline dotted; }
+.literate-document .literate-screen-index { margin-block-start: 2em; }</style>
+  <meta name="author" content="Nathan 'jesterKing' Letwory">
+</head>
+<body>
+<div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Several publications in one workspace</h1>
+<p>A workspace used to imply one project. That default remains useful, but it cannot
+represent a series of independent books: recursive discovery would combine every
+fragment below the workspace root into one graph. Series support therefore begins
+with an explicit boundary model, before adding commands or cross-publication links.</p>
+<p>The workspace manifest is data, not executable configuration. It names independent
+publication roots and enough metadata for hosts to present and publish them. The
+engine inside each root remains unchanged: paths, settings, fragments, templates,
+and outputs are still relative to that selected project.</p>
+<h2>Public contracts</h2>
+<p>The fixed manifest name makes discovery deterministic. A resolved entry retains
+normalized workspace-relative paths. Optional author fields receive conservative
+defaults so the first schema can describe both a minimal project and a publication
+with a declared title, entry document, and PDF destination.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0077006f0072006b00730070006100630065002000700072006f006a00650063007400200063006f006e007400720061006300740073-006c0069007400650072006100740065002f0077006f0072006b00730070006100630065005f00700072006f006a0065006300740073002e006c0069007400650072006100740065-1"><span id="f-0077006f0072006b00730070006100630065002000700072006f006a00650063007400200063006f006e007400720061006300740073"></span><a class="literate-tag-name" href="#f-0077006f0072006b00730070006100630065002000700072006f006a00650063007400200063006f006e007400720061006300740073" data-literate-target="f-0077006f0072006b00730070006100630065002000700072006f006a00650063007400200063006f006e007400720061006300740073" aria-label="Definition of workspace project contracts">&lt;&lt;workspace project contracts&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">import</span> { safeRelativePath } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">const</span> publicationWorkspaceManifest = <span class="hljs-string">'literate-workspace.json'</span>;
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationProject</span> {
+    <span class="hljs-attr">id</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">title</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">root</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">entry</span>: <span class="hljs-built_in">string</span>;
+    pdf?: <span class="hljs-built_in">string</span>;
+}
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationWorkspace</span> {
+    <span class="hljs-attr">schemaVersion</span>: <span class="hljs-number">1</span>;
+    <span class="hljs-attr">publications</span>: <span class="hljs-title">PublicationProject</span>[];
+}
+</code></pre>
+
+</div>
+</div><h2>Validate bounded data</h2>
+<p>JSON parsing is only the first boundary. The accepted value must be a plain object
+with exactly the documented fields. IDs are short portable keys; titles reject
+control characters; paths use the engine's existing portable path policy.
+Publication roots cannot overlap because recursive discovery in either root must
+never absorb another project. PDF destinations are workspace-relative and unique.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0077006f0072006b00730070006100630065002000700072006f006a006500630074002000760061006c00690064006100740069006f006e-006c0069007400650072006100740065002f0077006f0072006b00730070006100630065005f00700072006f006a0065006300740073002e006c0069007400650072006100740065-1"><span id="f-0077006f0072006b00730070006100630065002000700072006f006a006500630074002000760061006c00690064006100740069006f006e"></span><a class="literate-tag-name" href="#f-0077006f0072006b00730070006100630065002000700072006f006a006500630074002000760061006c00690064006100740069006f006e" data-literate-target="f-0077006f0072006b00730070006100630065002000700072006f006a006500630074002000760061006c00690064006100740069006f006e" aria-label="Definition of workspace project validation">&lt;&lt;workspace project validation&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">const</span> identifier = <span class="hljs-regexp">/^</span><span class="hljs-regexp">[a-z0-9]</span><span class="hljs-regexp">[a-z0-9._-]</span><span class="hljs-regexp">{0,99}$/</span>;
+<span class="hljs-keyword">const</span> <span class="hljs-built_in">object</span> = (<span class="hljs-attr">value</span>: <span class="hljs-built_in">unknown</span>): value is <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">unknown</span>&gt; =&gt;
+    !!value &amp;&amp; <span class="hljs-keyword">typeof</span> value === <span class="hljs-string">'object'</span> &amp;&amp; !<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(value) &amp;&amp;
+    <span class="hljs-title">Object</span>.<span class="hljs-title">getPrototypeOf</span>(value) === <span class="hljs-title">Object</span>.<span class="hljs-keyword">prototype</span>;
+
+<span class="hljs-keyword">function</span> <span class="hljs-title">fields</span>(<span class="hljs-params">value: Record&lt;</span><span class="hljs-built_in">string</span><span class="hljs-params">, </span><span class="hljs-built_in">unknown</span><span class="hljs-params">&gt;, allowed: </span><span class="hljs-keyword">readonly</span><span class="hljs-params"> </span><span class="hljs-built_in">string</span><span class="hljs-params">[], label: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">const</span> extra = <span class="hljs-title">Object</span>.<span class="hljs-title">keys</span>(value).<span class="hljs-title">filter</span>(<span class="hljs-params">key</span><span class="hljs-function"> =&gt;</span> !allowed.<span class="hljs-title">includes</span>(key));
+    <span class="hljs-keyword">if</span> (extra.<span class="hljs-property">length</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> has unknown field: </span><span class="hljs-subst">${extra[</span><span class="hljs-number">0</span><span class="hljs-subst">]}</span><span class="hljs-string">`</span>); }
+}
+
+<span class="hljs-keyword">function</span> <span class="hljs-title">text</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">unknown</span><span class="hljs-params">, label: </span><span class="hljs-built_in">string</span><span class="hljs-params">, maximum: </span><span class="hljs-built_in">number</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> value !== <span class="hljs-string">'string'</span> || !value || value.<span class="hljs-property">length</span> &gt; maximum || <span class="hljs-regexp">/</span><span class="hljs-regexp">[</span><span class="hljs-regexp">\x</span><span class="hljs-regexp">00-</span><span class="hljs-regexp">\x</span><span class="hljs-regexp">1f</span><span class="hljs-regexp">\x</span><span class="hljs-regexp">7f]</span><span class="hljs-regexp">/</span>.<span class="hljs-title">test</span>(value)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> must be a nonempty string of at most </span><span class="hljs-subst">${maximum}</span><span class="hljs-string"> characters`</span>);
+    }
+    <span class="hljs-keyword">return</span> value;
+}
+
+<span class="hljs-keyword">function</span> <span class="hljs-title">projectPath</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">unknown</span><span class="hljs-params">, label: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">const</span> input = <span class="hljs-title">text</span>(value, label, <span class="hljs-number">1024</span>);
+    <span class="hljs-keyword">const</span> normalized = <span class="hljs-title">safeRelativePath</span>(input);
+    <span class="hljs-keyword">if</span> (!normalized) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> is not a safe relative path: </span><span class="hljs-subst">${input}</span><span class="hljs-string">`</span>); }
+    <span class="hljs-keyword">return</span> normalized;
+}
+
+<span class="hljs-keyword">function</span> <span class="hljs-title">collision</span>(<span class="hljs-params">left: </span><span class="hljs-built_in">string</span><span class="hljs-params">, right: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">boolean</span> {
+    <span class="hljs-keyword">const</span> a = left.<span class="hljs-title">toLowerCase</span>(), b = right.<span class="hljs-title">toLowerCase</span>();
+    <span class="hljs-keyword">return</span> a === b || a.<span class="hljs-title">startsWith</span>(b + <span class="hljs-string">'/'</span>) || b.<span class="hljs-title">startsWith</span>(a + <span class="hljs-string">'/'</span>);
+}
+</code></pre>
+
+</div>
+</div><p>Parsing copies accepted values into fresh records. This prevents callers from
+retaining mutable JSON objects as configuration state. Encounter order remains the
+manifest's publication order and is used by selectors and future project pickers.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0077006f0072006b00730070006100630065002000700072006f006a006500630074002000760061006c00690064006100740069006f006e-006c0069007400650072006100740065002f0077006f0072006b00730070006100630065005f00700072006f006a0065006300740073002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-0077006f0072006b00730070006100630065002000700072006f006a006500630074002000760061006c00690064006100740069006f006e" data-literate-target="f-0077006f0072006b00730070006100630065002000700072006f006a006500630074002000760061006c00690064006100740069006f006e" aria-label="Definition of workspace project validation">&lt;&lt;workspace project validation&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">parsePublicationWorkspace</span>(<span class="hljs-params">source: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">PublicationWorkspace</span> {
+    <span class="hljs-keyword">if</span> (source.<span class="hljs-property">length</span> &gt; <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Workspace manifest exceeds 1 MiB'</span>); }
+    <span class="hljs-keyword">let</span> <span class="hljs-attr">parsed</span>: <span class="hljs-built_in">unknown</span>;
+    <span class="hljs-keyword">try</span> { parsed = <span class="hljs-title">JSON</span>.<span class="hljs-title">parse</span>(source); }
+    <span class="hljs-keyword">catch</span> (error) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Invalid workspace manifest JSON: </span><span class="hljs-subst">${error </span><span class="hljs-keyword">instanceof</span><span class="hljs-subst"> </span><span class="hljs-built_in">Error</span><span class="hljs-subst"> ? error.message : </span><span class="hljs-built_in">String</span><span class="hljs-subst">(error)}</span><span class="hljs-string">`</span>); }
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">object</span>(parsed)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Workspace manifest must be an object'</span>); }
+    <span class="hljs-title">fields</span>(parsed, [<span class="hljs-string">'schemaVersion'</span>, <span class="hljs-string">'publications'</span>], <span class="hljs-string">'Workspace manifest'</span>);
+    <span class="hljs-keyword">if</span> (parsed.<span class="hljs-property">schemaVersion</span> !== <span class="hljs-number">1</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Workspace manifest schemaVersion must be 1'</span>); }
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(parsed.<span class="hljs-property">publications</span>) || !parsed.<span class="hljs-property">publications</span>.<span class="hljs-property">length</span> || parsed.<span class="hljs-property">publications</span>.<span class="hljs-property">length</span> &gt; <span class="hljs-number">1000</span>) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Workspace manifest publications must contain 1 to 1000 entries'</span>);
+    }
+    <span class="hljs-keyword">const</span> publications = parsed.<span class="hljs-property">publications</span>.<span class="hljs-title">map</span>((value, index): <span class="hljs-params">PublicationProject</span><span class="hljs-function"> =&gt;</span> {
+        <span class="hljs-keyword">const</span> label = <span class="hljs-string">`Publication </span><span class="hljs-subst">${index + </span><span class="hljs-number">1</span><span class="hljs-subst">}</span><span class="hljs-string">`</span>;
+        <span class="hljs-keyword">if</span> (!<span class="hljs-title">object</span>(value)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> must be an object`</span>); }
+        <span class="hljs-title">fields</span>(value, [<span class="hljs-string">'id'</span>, <span class="hljs-string">'title'</span>, <span class="hljs-string">'root'</span>, <span class="hljs-string">'entry'</span>, <span class="hljs-string">'pdf'</span>], label);
+        <span class="hljs-keyword">const</span> id = <span class="hljs-title">text</span>(value.<span class="hljs-property">id</span>, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> id`</span>, <span class="hljs-number">100</span>);
+        <span class="hljs-keyword">if</span> (!identifier.<span class="hljs-title">test</span>(id)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> id is invalid: </span><span class="hljs-subst">${id}</span><span class="hljs-string">`</span>); }
+        <span class="hljs-keyword">const</span> root = <span class="hljs-title">projectPath</span>(value.<span class="hljs-property">root</span>, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> root`</span>);
+        <span class="hljs-keyword">const</span> title = value.<span class="hljs-property">title</span> === <span class="hljs-literal">undefined</span> ? id : <span class="hljs-title">text</span>(value.<span class="hljs-property">title</span>, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> title`</span>, <span class="hljs-number">200</span>);
+        <span class="hljs-keyword">const</span> entry = value.<span class="hljs-property">entry</span> === <span class="hljs-literal">undefined</span> ? <span class="hljs-string">'index.literate'</span> : <span class="hljs-title">projectPath</span>(value.<span class="hljs-property">entry</span>, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> entry`</span>);
+        <span class="hljs-keyword">const</span> pdf = value.<span class="hljs-property">pdf</span> === <span class="hljs-literal">undefined</span> ? <span class="hljs-literal">undefined</span> : <span class="hljs-title">projectPath</span>(value.<span class="hljs-property">pdf</span>, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> pdf`</span>);
+        <span class="hljs-keyword">if</span> (!entry.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'.literate'</span>)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> entry must end in .literate`</span>); }
+        <span class="hljs-keyword">if</span> (pdf !== <span class="hljs-literal">undefined</span> &amp;&amp; !pdf.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'.pdf'</span>)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> pdf must end in .pdf`</span>); }
+        <span class="hljs-keyword">return</span> { id, title, root, entry, ...(pdf === <span class="hljs-literal">undefined</span> ? {} : { pdf }) };
+    });
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = <span class="hljs-number">0</span>; index &lt; publications.<span class="hljs-property">length</span>; index++) {
+        <span class="hljs-keyword">const</span> current = publications[index];
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> earlier = <span class="hljs-number">0</span>; earlier &lt; index; earlier++) {
+            <span class="hljs-keyword">const</span> previous = publications[earlier];
+            <span class="hljs-keyword">if</span> (current.<span class="hljs-property">id</span>.<span class="hljs-title">toLowerCase</span>() === previous.<span class="hljs-property">id</span>.<span class="hljs-title">toLowerCase</span>()) {
+                <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Publication id conflicts with </span><span class="hljs-subst">${previous.id}</span><span class="hljs-string">: </span><span class="hljs-subst">${current.id}</span><span class="hljs-string">`</span>);
+            }
+            <span class="hljs-keyword">if</span> (<span class="hljs-title">collision</span>(current.<span class="hljs-property">root</span>, previous.<span class="hljs-property">root</span>)) {
+                <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Publication root overlaps </span><span class="hljs-subst">${previous.root}</span><span class="hljs-string">: </span><span class="hljs-subst">${current.root}</span><span class="hljs-string">`</span>);
+            }
+            <span class="hljs-keyword">if</span> (current.<span class="hljs-property">pdf</span> &amp;&amp; previous.<span class="hljs-property">pdf</span> &amp;&amp; current.<span class="hljs-property">pdf</span>.<span class="hljs-title">toLowerCase</span>() === previous.<span class="hljs-property">pdf</span>.<span class="hljs-title">toLowerCase</span>()) {
+                <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Publication PDF conflicts with </span><span class="hljs-subst">${previous.pdf}</span><span class="hljs-string">: </span><span class="hljs-subst">${current.pdf}</span><span class="hljs-string">`</span>);
+            }
+        }
+    }
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">schemaVersion</span>: <span class="hljs-number">1</span>, publications };
+}
+</code></pre>
+
+</div>
+</div><h2>Select one isolated project</h2>
+<p>A manifest with one project needs no extra selector. A series with several projects
+requires an explicit ID unless a host can select by active source path. Errors list
+the available IDs so command-line and editor users can recover without inspecting
+internal state.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-0077006f0072006b00730070006100630065002000700072006f006a006500630074002000730065006c0065006300740069006f006e-006c0069007400650072006100740065002f0077006f0072006b00730070006100630065005f00700072006f006a0065006300740073002e006c0069007400650072006100740065-1"><span id="f-0077006f0072006b00730070006100630065002000700072006f006a006500630074002000730065006c0065006300740069006f006e"></span><a class="literate-tag-name" href="#f-0077006f0072006b00730070006100630065002000700072006f006a006500630074002000730065006c0065006300740069006f006e" data-literate-target="f-0077006f0072006b00730070006100630065002000700072006f006a006500630074002000730065006c0065006300740069006f006e" aria-label="Definition of workspace project selection">&lt;&lt;workspace project selection&gt;&gt;=</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">selectPublication</span>(<span class="hljs-params">workspace: PublicationWorkspace, id?: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">PublicationProject</span> {
+    <span class="hljs-keyword">if</span> (id === <span class="hljs-literal">undefined</span>) {
+        <span class="hljs-keyword">if</span> (workspace.<span class="hljs-property">publications</span>.<span class="hljs-property">length</span> === <span class="hljs-number">1</span>) { <span class="hljs-keyword">return</span> workspace.<span class="hljs-property">publications</span>[<span class="hljs-number">0</span>]; }
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Select a publication: </span><span class="hljs-subst">${workspace.publications.map(item =&gt; item.id).join(</span><span class="hljs-string">', '</span><span class="hljs-subst">)}</span><span class="hljs-string">`</span>);
+    }
+    <span class="hljs-keyword">const</span> selected = workspace.<span class="hljs-property">publications</span>.<span class="hljs-title">find</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> item.<span class="hljs-property">id</span> === id);
+    <span class="hljs-keyword">if</span> (!selected) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Unknown publication </span><span class="hljs-subst">${id}</span><span class="hljs-string">; available publications: </span><span class="hljs-subst">${workspace.publications.map(item =&gt; item.id).join(</span><span class="hljs-string">', '</span><span class="hljs-subst">)}</span><span class="hljs-string">`</span>);
+    }
+    <span class="hljs-keyword">return</span> selected;
+}
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">publicationForPath</span>(<span class="hljs-params">workspace: PublicationWorkspace,
+    workspacePath: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">PublicationProject</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">const</span> normalized = <span class="hljs-title">safeRelativePath</span>(workspacePath);
+    <span class="hljs-keyword">if</span> (!normalized) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">return</span> workspace.<span class="hljs-property">publications</span>.<span class="hljs-title">find</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> normalized === item.<span class="hljs-property">root</span> || normalized.<span class="hljs-title">startsWith</span>(item.<span class="hljs-property">root</span> + <span class="hljs-string">'/'</span>));
+}
+</code></pre>
+
+</div>
+</div><p>This module deliberately performs no filesystem access. CLI and editor adapters
+must canonicalize the workspace, read the fixed manifest safely, verify selected
+roots on disk, and only then discover project inputs. Keeping those effects in the
+hosts lets the same strict selection policy serve saved CLI input and unsaved editor
+snapshots.</p>
+</div>
+<script defer src="../out/mermaid-preview.js"></script>
+</body>
+</html>

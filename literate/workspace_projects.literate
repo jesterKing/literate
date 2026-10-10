@@ -1,0 +1,159 @@
+# Several publications in one workspace
+
+A workspace used to imply one project. That default remains useful, but it cannot
+represent a series of independent books: recursive discovery would combine every
+fragment below the workspace root into one graph. Series support therefore begins
+with an explicit boundary model, before adding commands or cross-publication links.
+
+The workspace manifest is data, not executable configuration. It names independent
+publication roots and enough metadata for hosts to present and publish them. The
+engine inside each root remains unchanged: paths, settings, fragments, templates,
+and outputs are still relative to that selected project.
+
+## Public contracts
+
+The fixed manifest name makes discovery deterministic. A resolved entry retains
+normalized workspace-relative paths. Optional author fields receive conservative
+defaults so the first schema can describe both a minimal project and a publication
+with a declared title, entry document, and PDF destination.
+
+```ts : <<workspace project contracts>>=
+import { safeRelativePath } from './engine';
+
+export const publicationWorkspaceManifest = 'literate-workspace.json';
+
+export interface PublicationProject {
+    id: string;
+    title: string;
+    root: string;
+    entry: string;
+    pdf?: string;
+}
+
+export interface PublicationWorkspace {
+    schemaVersion: 1;
+    publications: PublicationProject[];
+}
+```
+
+## Validate bounded data
+
+JSON parsing is only the first boundary. The accepted value must be a plain object
+with exactly the documented fields. IDs are short portable keys; titles reject
+control characters; paths use the engine's existing portable path policy.
+Publication roots cannot overlap because recursive discovery in either root must
+never absorb another project. PDF destinations are workspace-relative and unique.
+
+```ts : <<workspace project validation>>=
+const identifier = /^[a-z0-9][a-z0-9._-]{0,99}$/;
+const object = (value: unknown): value is Record<string, unknown> =>
+    !!value && typeof value === 'object' && !Array.isArray(value) &&
+    Object.getPrototypeOf(value) === Object.prototype;
+
+function fields(value: Record<string, unknown>, allowed: readonly string[], label: string): void {
+    const extra = Object.keys(value).filter(key => !allowed.includes(key));
+    if (extra.length) { throw new Error(`${label} has unknown field: ${extra[0]}`); }
+}
+
+function text(value: unknown, label: string, maximum: number): string {
+    if (typeof value !== 'string' || !value || value.length > maximum || /[\x00-\x1f\x7f]/.test(value)) {
+        throw new Error(`${label} must be a nonempty string of at most ${maximum} characters`);
+    }
+    return value;
+}
+
+function projectPath(value: unknown, label: string): string {
+    const input = text(value, label, 1024);
+    const normalized = safeRelativePath(input);
+    if (!normalized) { throw new Error(`${label} is not a safe relative path: ${input}`); }
+    return normalized;
+}
+
+function collision(left: string, right: string): boolean {
+    const a = left.toLowerCase(), b = right.toLowerCase();
+    return a === b || a.startsWith(b + '/') || b.startsWith(a + '/');
+}
+```
+
+Parsing copies accepted values into fresh records. This prevents callers from
+retaining mutable JSON objects as configuration state. Encounter order remains the
+manifest's publication order and is used by selectors and future project pickers.
+
+```ts : <<workspace project validation>>=+
+export function parsePublicationWorkspace(source: string): PublicationWorkspace {
+    if (source.length > 1024 * 1024) { throw new Error('Workspace manifest exceeds 1 MiB'); }
+    let parsed: unknown;
+    try { parsed = JSON.parse(source); }
+    catch (error) { throw new Error(`Invalid workspace manifest JSON: ${error instanceof Error ? error.message : String(error)}`); }
+    if (!object(parsed)) { throw new Error('Workspace manifest must be an object'); }
+    fields(parsed, ['schemaVersion', 'publications'], 'Workspace manifest');
+    if (parsed.schemaVersion !== 1) { throw new Error('Workspace manifest schemaVersion must be 1'); }
+    if (!Array.isArray(parsed.publications) || !parsed.publications.length || parsed.publications.length > 1000) {
+        throw new Error('Workspace manifest publications must contain 1 to 1000 entries');
+    }
+    const publications = parsed.publications.map((value, index): PublicationProject => {
+        const label = `Publication ${index + 1}`;
+        if (!object(value)) { throw new Error(`${label} must be an object`); }
+        fields(value, ['id', 'title', 'root', 'entry', 'pdf'], label);
+        const id = text(value.id, `${label} id`, 100);
+        if (!identifier.test(id)) { throw new Error(`${label} id is invalid: ${id}`); }
+        const root = projectPath(value.root, `${label} root`);
+        const title = value.title === undefined ? id : text(value.title, `${label} title`, 200);
+        const entry = value.entry === undefined ? 'index.literate' : projectPath(value.entry, `${label} entry`);
+        const pdf = value.pdf === undefined ? undefined : projectPath(value.pdf, `${label} pdf`);
+        if (!entry.endsWith('.literate')) { throw new Error(`${label} entry must end in .literate`); }
+        if (pdf !== undefined && !pdf.endsWith('.pdf')) { throw new Error(`${label} pdf must end in .pdf`); }
+        return { id, title, root, entry, ...(pdf === undefined ? {} : { pdf }) };
+    });
+    for (let index = 0; index < publications.length; index++) {
+        const current = publications[index];
+        for (let earlier = 0; earlier < index; earlier++) {
+            const previous = publications[earlier];
+            if (current.id.toLowerCase() === previous.id.toLowerCase()) {
+                throw new Error(`Publication id conflicts with ${previous.id}: ${current.id}`);
+            }
+            if (collision(current.root, previous.root)) {
+                throw new Error(`Publication root overlaps ${previous.root}: ${current.root}`);
+            }
+            if (current.pdf && previous.pdf && current.pdf.toLowerCase() === previous.pdf.toLowerCase()) {
+                throw new Error(`Publication PDF conflicts with ${previous.pdf}: ${current.pdf}`);
+            }
+        }
+    }
+    return { schemaVersion: 1, publications };
+}
+```
+
+## Select one isolated project
+
+A manifest with one project needs no extra selector. A series with several projects
+requires an explicit ID unless a host can select by active source path. Errors list
+the available IDs so command-line and editor users can recover without inspecting
+internal state.
+
+```ts : <<workspace project selection>>=
+export function selectPublication(workspace: PublicationWorkspace, id?: string): PublicationProject {
+    if (id === undefined) {
+        if (workspace.publications.length === 1) { return workspace.publications[0]; }
+        throw new Error(`Select a publication: ${workspace.publications.map(item => item.id).join(', ')}`);
+    }
+    const selected = workspace.publications.find(item => item.id === id);
+    if (!selected) {
+        throw new Error(`Unknown publication ${id}; available publications: ${workspace.publications.map(item => item.id).join(', ')}`);
+    }
+    return selected;
+}
+
+export function publicationForPath(workspace: PublicationWorkspace,
+    workspacePath: string): PublicationProject | undefined {
+    const normalized = safeRelativePath(workspacePath);
+    if (!normalized) { return undefined; }
+    return workspace.publications.find(item => normalized === item.root || normalized.startsWith(item.root + '/'));
+}
+```
+
+This module deliberately performs no filesystem access. CLI and editor adapters
+must canonicalize the workspace, read the fixed manifest safely, verify selected
+roots on disk, and only then discover project inputs. Keeping those effects in the
+hosts lets the same strict selection policy serve saved CLI input and unsaved editor
+snapshots.
