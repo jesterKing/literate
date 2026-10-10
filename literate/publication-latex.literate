@@ -452,31 +452,25 @@ function mergeStyles(data: Highlighted, theme: LiterateTheme): void {
 ```
 
 Family destinations live on base definitions; each contribution also has its own
-label. Previous/next links point at contribution pages, not merely the family.
-The heading requests room for its start and code, but no entire code block is boxed.
+label. Contribution blocks add no previous, base, or next chrome. A scoped left
+margin indents the fragment heading, code, and embedded references together. The
+heading requests room for its start and code, but no entire code block is boxed.
 
 ```ts : <<publication LaTeX contributions>>=
 function contribution(part: PublicationContribution, project: ParsedProject,
     theme: LiterateTheme, definitions: string[]): PandocBlock[] {
     const family = project.publication.fragments.find(item => item.target === part.fragmentTarget);
     if (!family) { throw new Error('Contribution has no fragment family'); }
-    const position = family.contributions.indexOf(part.target);
-    if (position < 0) { throw new Error('Contribution is absent from its family'); }
+    if (!family.contributions.includes(part.target)) { throw new Error('Contribution is absent from its family'); }
     const data = highlightContribution(part);
     validateHighlight(data);
     mergeStyles(data, theme);
-    let output = '\\par\\Needspace{5\\baselineskip}\n' + anchor(part.target);
+    let output = '\\par\\Needspace{5\\baselineskip}\n\\begingroup\n' +
+        '\\leftskip=1.5em\\rightskip=0pt plus 1fil\\parindent=0pt\\fvset{xleftmargin=1.5em}\n' + anchor(part.target);
     if (part.kind === 'definition') { output += anchor(family.target); }
     output += `{\\fragmentfont\\raggedright\\color{publicationAccent} ${nameText(family.name)}` +
         `\\enspace\\ensuremath{${part.kind === 'definition' ? '\\equiv' : '+\\equiv'}}\\par}\n`;
-    const navigation: string[] = [];
-    if (position > 0) { navigation.push(pageLink(family.contributions[position - 1], 'Previous ')); }
-    if (part.kind === 'append') { navigation.push(pageLink(family.target, 'Base ')); }
-    if (position + 1 < family.contributions.length) {
-        navigation.push(pageLink(family.contributions[position + 1], 'Next '));
-    }
-    if (navigation.length) { output += `{\\notefont\\small ${navigation.join('\\quad ')}\\par}\n`; }
-    output += contributionBody(data, project, theme, definitions);
+    output += contributionBody(data, project, theme, definitions) + '\\par\\endgroup\n';
     return [{ t: 'RawBlock', c: ['latex', output] }];
 }
 ```

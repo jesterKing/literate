@@ -38,12 +38,8 @@ export function screenIndex(model: PublicationModel, annotations?: PublicationAn
 function buildScreenIndex(model: PublicationModel, annotations?: PublicationAnnotations) {
     const families = new Map(model.fragments.map(family => [family.target, family]));
     const parts = new Map(model.contributions.map(part => [part.target, part]));
-    const ordinals = new Map<string, number>();
     const tokens = new Map<string, Map<number, PublicationContribution>>();
     const lines = new Map<string, Map<number, PublicationContribution>>();
-    for (const family of model.fragments) {
-        family.contributions.forEach((target, index) => ordinals.set(target, index));
-    }
     for (const part of model.contributions) {
         for (const [map, key] of [[tokens, part.tokenIndex], [lines, part.definition.line]] as const) {
             if (!map.has(part.definition.path)) { map.set(part.definition.path, new Map()); }
@@ -87,7 +83,7 @@ function buildScreenIndex(model: PublicationModel, annotations?: PublicationAnno
                 explorationTargets.get(path)!.add(target);
             }
         }
-    return { families, parts, ordinals, tokens, lines, targets, annotationLines, annotationTargets,
+    return { families, parts, tokens, lines, targets, annotationLines, annotationTargets,
         termReferences, fragmentReferences, explorationTargets };
 }
 export function previewLanguage(language: string): string {
@@ -161,25 +157,8 @@ export function renderScreenContribution(part: PublicationContribution, model: P
     const familyAnchor = base.target === part.target ? `<span id="${family.target}"${source}></span>` : '';
     const heading = screenLink(screenHref(part.definition.path, base.definition.path, family.target, format, destination),
         `Definition of ${family.name}`, label, family.target);
-    const navigation = screenNavigation(part, model, format, destination);
     return `<div class="codefragment">\n<div class="fragmentname${format === 'preview' ? ' code-line' : ''}" id="${part.target}"${format === 'preview' ? ` data-line="${part.definition.line}"` : ''}>${familyAnchor}${heading}</div>\n`
-        + `<div class="code">\n${code}\n</div>\n${navigation}</div>`;
-}
-function screenNavigation(part: PublicationContribution, model: PublicationModel, format: ScreenFormat,
-    destination?: PreviewDestination): string {
-    const lookup = screenIndex(model);
-    const family = lookup.families.get(part.fragmentTarget)!;
-    const index = lookup.ordinals.get(part.target)!;
-    const items: [string, string | undefined][] = [
-        ['Previous', family.contributions[index - 1]], ['Base', family.contributions[0]],
-        ['Next', family.contributions[index + 1]]
-    ];
-    const links = items.filter(([, target]) => target && target !== part.target).map(([label, target]) => {
-        const destinationPart = lookup.parts.get(target!)!;
-        return screenLink(screenHref(part.definition.path, destinationPart.definition.path, destinationPart.target, format, destination),
-            `${label} contribution of ${family.name}`, label, destinationPart.target);
-    });
-    return links.length ? `<nav class="fragment-navigation" aria-label="${escapeHtml('Contributions of ' + family.name)}">${links.join(' · ')}</nav>\n` : '';
+        + `<div class="code">\n${code}\n</div>\n</div>`;
 }
 export interface ScreenAnnotationContext {
     model: PublicationModel; annotations: PublicationAnnotations; path: string;

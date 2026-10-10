@@ -240,17 +240,14 @@ for (const prefix of ['', 'Extra prose.\n\n']) {
                 const pages = new Map(inputs.map(doc => [doc.path, format === 'html'
                     ? generated.files.find(file => file.path === doc.path.replace('.literate', '.html'))!.content
                     : p.md.render(doc.text, { currentDocument: p.f.document(doc.path, doc.text).uri })]));
-                assert.ok(pages.get('defs.literate')!.includes(`href="#${secondA}"`));
                 if (format === 'html') {
                     assert.ok(pages.get('index.literate')!.includes(`href="./defs.html#${familyA}"`));
-                    assert.ok(pages.get('defs.literate')!.includes(`href="./more.html#${thirdA}"`));
-                    assert.ok(pages.get('more.literate')!.includes(`href="./defs.html#${baseA}"`));
                 } else {
                     for (const page of pages.values()) { assert.doesNotMatch(page, /#L\d+/); }
                     assert.match(pages.get('index.literate')!, /href="vscode:\/\/jesterking\.literate\/navigate\/[a-f0-9]{48}\/[a-f0-9]{48}\?windowId%3D1"/);
                 }
-                for (const label of ['Previous', 'Base', 'Next']) {
-                    assert.ok([...pages.values()].some(html => html.includes(`aria-label="${label} contribution of a/b"`)));
+                for (const page of pages.values()) {
+                    assert.doesNotMatch(page, /fragment-navigation|Previous contribution|Base contribution|Next contribution/);
                 }
                 for (const [path, html] of pages) {
                     assert.doesNotMatch(html, /onclick=|tabindex="-1"/);
@@ -636,22 +633,15 @@ test('capability budget bounds resolution and retention without remint loops', a
         assert.equal(p.f.externalUris.length, 4096);
     } finally { p.dispose(); }
 });
-test('cross-document labels and Previous/Base/Next controls select accepted contributions', async () => {
+test('cross-document declaration labels select accepted contributions', async () => {
     const p = await navigationFixture();
     try {
-        for (const [name, target, line, destination] of [
-            ['defs.literate', thirdA, 2, 'more.literate'],
-            ['more.literate', familyA, 4, 'defs.literate'],
-            ['more.literate', baseA, 4, 'defs.literate'],
-            ['more.literate', secondA, 10, 'defs.literate']
-        ] as const) {
-            const doc = documents().find(value => value.path === name)!;
-            const html = p.md.render(doc.text, { currentDocument: p.f.document(doc.path, doc.text).uri });
-            await p.f.navigate(capabilityHref(html, target));
-            const opened = p.f.opened[p.f.opened.length - 1];
-            assert.equal(opened.document.uri.toString(), p.f.uri(destination));
-            assert.equal(opened.selection.start.line, line);
-        }
+        const doc = documents().find(value => value.path === 'more.literate')!;
+        const html = p.md.render(doc.text, { currentDocument: p.f.document(doc.path, doc.text).uri });
+        await p.f.navigate(capabilityHref(html, familyA));
+        const opened = p.f.opened[p.f.opened.length - 1];
+        assert.equal(opened.document.uri.toString(), p.f.uri('defs.literate'));
+        assert.equal(opened.selection.start.line, 4);
     } finally { p.dispose(); }
 });
 test('capabilities retain workspace identity and untrusted activation mints none', async () => {

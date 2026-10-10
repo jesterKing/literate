@@ -2231,22 +2231,19 @@ for (const prefix of ['', 'Extra prose.\n\n']) {
 }
 ```
 
-Accessible names identify both direction and family. Definition and reference
-links use the family ID, whereas contribution controls address individual parts.
-The HTML decoder in this fixture only encounters controlled attribute values.
+Definition and reference links use the family ID. Contribution blocks deliberately
+add no previous, base, or next controls. The HTML decoder in this fixture only
+encounters controlled attribute values.
 
 ```ts : <<screen assert destinations>>=
-assert.ok(pages.get('defs.literate')!.includes(`href="#${secondA}"`));
 if (format === 'html') {
     assert.ok(pages.get('index.literate')!.includes(`href="./defs.html#${familyA}"`));
-    assert.ok(pages.get('defs.literate')!.includes(`href="./more.html#${thirdA}"`));
-    assert.ok(pages.get('more.literate')!.includes(`href="./defs.html#${baseA}"`));
 } else {
     for (const page of pages.values()) { assert.doesNotMatch(page, /#L\d+/); }
     assert.match(pages.get('index.literate')!, /href="vscode:\/\/jesterking\.literate\/navigate\/[a-f0-9]{48}\/[a-f0-9]{48}\?windowId%3D1"/);
 }
-for (const label of ['Previous', 'Base', 'Next']) {
-    assert.ok([...pages.values()].some(html => html.includes(`aria-label="${label} contribution of a/b"`)));
+for (const page of pages.values()) {
+    assert.doesNotMatch(page, /fragment-navigation|Previous contribution|Base contribution|Next contribution/);
 }
 <<screen assert link identity>>
 ```
@@ -2809,27 +2806,20 @@ async function hostCapability(document) {
 }
 ```
 
-The same adapter serves code uses, declaration labels and contribution controls.
-Resolve each cross-document control through the registered handler and compare
-against its independently known source line, not merely its displayed href.
+The same adapter serves code uses and declaration labels. Resolve a cross-document
+label through the registered handler and compare against its independently known
+source line, not merely its displayed href.
 
 ```ts : <<screen capability controls regression>>=
-test('cross-document labels and Previous/Base/Next controls select accepted contributions', async () => {
+test('cross-document declaration labels select accepted contributions', async () => {
     const p = await navigationFixture();
     try {
-        for (const [name, target, line, destination] of [
-            ['defs.literate', thirdA, 2, 'more.literate'],
-            ['more.literate', familyA, 4, 'defs.literate'],
-            ['more.literate', baseA, 4, 'defs.literate'],
-            ['more.literate', secondA, 10, 'defs.literate']
-        ] as const) {
-            const doc = documents().find(value => value.path === name)!;
-            const html = p.md.render(doc.text, { currentDocument: p.f.document(doc.path, doc.text).uri });
-            await p.f.navigate(capabilityHref(html, target));
-            const opened = p.f.opened[p.f.opened.length - 1];
-            assert.equal(opened.document.uri.toString(), p.f.uri(destination));
-            assert.equal(opened.selection.start.line, line);
-        }
+        const doc = documents().find(value => value.path === 'more.literate')!;
+        const html = p.md.render(doc.text, { currentDocument: p.f.document(doc.path, doc.text).uri });
+        await p.f.navigate(capabilityHref(html, familyA));
+        const opened = p.f.opened[p.f.opened.length - 1];
+        assert.equal(opened.document.uri.toString(), p.f.uri('defs.literate'));
+        assert.equal(opened.selection.start.line, 4);
     } finally { p.dispose(); }
 });
 ```

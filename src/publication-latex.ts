@@ -397,23 +397,16 @@ function contribution(part: PublicationContribution, project: ParsedProject,
     theme: LiterateTheme, definitions: string[]): PandocBlock[] {
     const family = project.publication.fragments.find(item => item.target === part.fragmentTarget);
     if (!family) { throw new Error('Contribution has no fragment family'); }
-    const position = family.contributions.indexOf(part.target);
-    if (position < 0) { throw new Error('Contribution is absent from its family'); }
+    if (!family.contributions.includes(part.target)) { throw new Error('Contribution is absent from its family'); }
     const data = highlightContribution(part);
     validateHighlight(data);
     mergeStyles(data, theme);
-    let output = '\\par\\Needspace{5\\baselineskip}\n' + anchor(part.target);
+    let output = '\\par\\Needspace{5\\baselineskip}\n\\begingroup\n' +
+        '\\leftskip=1.5em\\rightskip=0pt plus 1fil\\parindent=0pt\\fvset{xleftmargin=1.5em}\n' + anchor(part.target);
     if (part.kind === 'definition') { output += anchor(family.target); }
     output += `{\\fragmentfont\\raggedright\\color{publicationAccent} ${nameText(family.name)}` +
         `\\enspace\\ensuremath{${part.kind === 'definition' ? '\\equiv' : '+\\equiv'}}\\par}\n`;
-    const navigation: string[] = [];
-    if (position > 0) { navigation.push(pageLink(family.contributions[position - 1], 'Previous ')); }
-    if (part.kind === 'append') { navigation.push(pageLink(family.target, 'Base ')); }
-    if (position + 1 < family.contributions.length) {
-        navigation.push(pageLink(family.contributions[position + 1], 'Next '));
-    }
-    if (navigation.length) { output += `{\\notefont\\small ${navigation.join('\\quad ')}\\par}\n`; }
-    output += contributionBody(data, project, theme, definitions);
+    output += contributionBody(data, project, theme, definitions) + '\\par\\endgroup\n';
     return [{ t: 'RawBlock', c: ['latex', output] }];
 }
 function fragmentPageLink(family: ParsedProject['publication']['fragments'][number], label: string): string {

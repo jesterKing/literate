@@ -60,7 +60,7 @@ test('root settings independently select body and block-code point sizes', async
     assert.ok(result.latex!.includes('\\fontsize{8.25pt}{9.9pt}\\selectfont'));
 });
 
-test('LaTeX links full hanging names, distinct contribution labels and navigation', async () => {
+test('LaTeX links full hanging names and indents contribution blocks', async () => {
     const name = 'AccumulateWeightedRadiance'.repeat(6);
     const project = parse(fence('caller', `before <<${name}>> after`) + fence(name, 'base') + fence(name, 'addition', '+'));
     const before = JSON.stringify(project);
@@ -71,7 +71,8 @@ test('LaTeX links full hanging names, distinct contribution labels and navigatio
     assert.ok(latex.includes(Array.from(name).join('\\allowbreak{}')));
     assert.match(latex, /\\newcommand\{\\LitReferenceA\}\{\\par\\begingroup/);
     assert.match(latex, /\\textsuperscript\{\\notefont \\hyperref\[[^\]]+\]\{\\pageref\*/);
-    assert.match(latex, /Previous /); assert.match(latex, /Next /); assert.match(latex, /Base /);
+    assert.doesNotMatch(latex, /Previous |Next |Base /);
+    assert.match(latex, /\\begingroup\s*\\leftskip=1\.5em\\rightskip=0pt plus 1fil\\parindent=0pt\\fvset\{xleftmargin=1\.5em\}/);
     assert.match(latex, /\\ensuremath\{\+\\equiv\}/);
     const labels = [...latex.matchAll(/\\label\{([^}]+)\}/g)].map(match => match[1]);
     assert.equal(labels.length, 5); assert.equal(new Set(labels).size, 5);
@@ -227,7 +228,7 @@ test('LaTeX root settings select independent font roles and their command sites'
         '\\newfontfamily\\fragmentfont{Fragment}', '\\newfontfamily\\notefont{Note}',
         ']{Code}', '\\setkomafont{disposition}{\\headingfont',
         '\\setkomafont{pageheadfoot}{\\notefont', '\\setkomafont{footnote}{\\notefont}',
-        '{\\notefont\\small ', '\\fragmentfont\\small\\noindent',
+        '\\fragmentfont\\small\\noindent',
         '\\fragmentfont\\raggedright', 'RawFeature={-calt}']) {
         assert.ok(result.latex?.includes(expected), expected);
     }

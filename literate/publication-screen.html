@@ -239,42 +239,19 @@ The host fence keeps its original token map and attributes as well.</p>
     <span class="hljs-keyword">const</span> familyAnchor = base.<span class="hljs-property">target</span> === part.<span class="hljs-property">target</span> ? <span class="hljs-string">`&lt;span id=&quot;</span><span class="hljs-subst">${family.target}</span><span class="hljs-string">&quot;</span><span class="hljs-subst">${source}</span><span class="hljs-string">&gt;&lt;/span&gt;`</span> : <span class="hljs-string">''</span>;
     <span class="hljs-keyword">const</span> heading = <span class="hljs-title">screenLink</span>(<span class="hljs-title">screenHref</span>(part.<span class="hljs-property">definition</span>.<span class="hljs-property">path</span>, base.<span class="hljs-property">definition</span>.<span class="hljs-property">path</span>, family.<span class="hljs-property">target</span>, format, destination),
         <span class="hljs-string">`Definition of </span><span class="hljs-subst">${family.name}</span><span class="hljs-string">`</span>, label, family.<span class="hljs-property">target</span>);
-    <span class="hljs-keyword">const</span> navigation = <span class="hljs-title">screenNavigation</span>(part, model, format, destination);
     <span class="hljs-keyword">return</span> <span class="hljs-string">`&lt;div class=&quot;codefragment&quot;&gt;</span><span class="hljs-string">\n</span><span class="hljs-string">&lt;div class=&quot;fragmentname</span><span class="hljs-subst">${format === </span><span class="hljs-string">'preview'</span><span class="hljs-subst"> ? </span><span class="hljs-string">' code-line'</span><span class="hljs-subst"> : </span><span class="hljs-string">''</span><span class="hljs-subst">}</span><span class="hljs-string">&quot; id=&quot;</span><span class="hljs-subst">${part.target}</span><span class="hljs-string">&quot;</span><span class="hljs-subst">${format === </span><span class="hljs-string">'preview'</span><span class="hljs-subst"> ? </span><span class="hljs-string">` data-line=&quot;</span><span class="hljs-subst">${part.definition.line}</span><span class="hljs-string">&quot;`</span><span class="hljs-subst"> : </span><span class="hljs-string">''</span><span class="hljs-subst">}</span><span class="hljs-string">&gt;</span><span class="hljs-subst">${familyAnchor}</span><span class="hljs-subst">${heading}</span><span class="hljs-string">&lt;/div&gt;</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>
-        + <span class="hljs-string">`&lt;div class=&quot;code&quot;&gt;</span><span class="hljs-string">\n</span><span class="hljs-subst">${code}</span><span class="hljs-string">\n</span><span class="hljs-string">&lt;/div&gt;</span><span class="hljs-string">\n</span><span class="hljs-subst">${navigation}</span><span class="hljs-string">&lt;/div&gt;`</span>;
+        + <span class="hljs-string">`&lt;div class=&quot;code&quot;&gt;</span><span class="hljs-string">\n</span><span class="hljs-subst">${code}</span><span class="hljs-string">\n</span><span class="hljs-string">&lt;/div&gt;</span><span class="hljs-string">\n</span><span class="hljs-string">&lt;/div&gt;`</span>;
 }
 </code></pre>
 
 </div>
-</div><p>Navigation stays outside the code so it cannot change copied code or indentation.
-Native anchors are keyboard-focusable and carry descriptive accessible names.
-Contribution anchors retain source mapping for the current preview. Cross-document
-controls share the same capability adapter as uses and declaration labels.</p>
-<div class="codefragment">
-<div class="fragmentname" id="c-00730063007200650065006e00200063006f006e0074007200690062007500740069006f006e0020006e0061007600690067006100740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1"><span id="f-00730063007200650065006e00200063006f006e0074007200690062007500740069006f006e0020006e0061007600690067006100740069006f006e"></span><a class="literate-tag-name" href="#f-00730063007200650065006e00200063006f006e0074007200690062007500740069006f006e0020006e0061007600690067006100740069006f006e" data-literate-target="f-00730063007200650065006e00200063006f006e0074007200690062007500740069006f006e0020006e0061007600690067006100740069006f006e" aria-label="Definition of screen contribution navigation">&lt;&lt;screen contribution navigation&gt;&gt;=</a></div>
-<div class="code">
-<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">screenNavigation</span>(<span class="hljs-params">part: PublicationContribution, model: PublicationModel, format: ScreenFormat,
-    destination?: PreviewDestination</span>): <span class="hljs-built_in">string</span> {
-    <span class="hljs-keyword">const</span> lookup = <span class="hljs-title">screenIndex</span>(model);
-    <span class="hljs-keyword">const</span> family = lookup.<span class="hljs-property">families</span>.<span class="hljs-title">get</span>(part.<span class="hljs-property">fragmentTarget</span>)!;
-    <span class="hljs-keyword">const</span> index = lookup.<span class="hljs-property">ordinals</span>.<span class="hljs-title">get</span>(part.<span class="hljs-property">target</span>)!;
-    <span class="hljs-keyword">const</span> <span class="hljs-attr">items</span>: [<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>][] = [
-        [<span class="hljs-string">'Previous'</span>, family.<span class="hljs-property">contributions</span>[index - <span class="hljs-number">1</span>]], [<span class="hljs-string">'Base'</span>, family.<span class="hljs-property">contributions</span>[<span class="hljs-number">0</span>]],
-        [<span class="hljs-string">'Next'</span>, family.<span class="hljs-property">contributions</span>[index + <span class="hljs-number">1</span>]]
-    ];
-    <span class="hljs-keyword">const</span> links = items.<span class="hljs-title">filter</span>(<span class="hljs-function">(</span><span class="hljs-params">[, target]</span><span class="hljs-function">) =&gt;</span> target &amp;&amp; target !== part.<span class="hljs-property">target</span>).<span class="hljs-title">map</span>(<span class="hljs-function">(</span><span class="hljs-params">[label, target]</span><span class="hljs-function">) =&gt;</span> {
-        <span class="hljs-keyword">const</span> destinationPart = lookup.<span class="hljs-property">parts</span>.<span class="hljs-title">get</span>(target!)!;
-        <span class="hljs-keyword">return</span> <span class="hljs-title">screenLink</span>(<span class="hljs-title">screenHref</span>(part.<span class="hljs-property">definition</span>.<span class="hljs-property">path</span>, destinationPart.<span class="hljs-property">definition</span>.<span class="hljs-property">path</span>, destinationPart.<span class="hljs-property">target</span>, format, destination),
-            <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> contribution of </span><span class="hljs-subst">${family.name}</span><span class="hljs-string">`</span>, label, destinationPart.<span class="hljs-property">target</span>);
-    });
-    <span class="hljs-keyword">return</span> links.<span class="hljs-property">length</span> ? <span class="hljs-string">`&lt;nav class=&quot;fragment-navigation&quot; aria-label=&quot;</span><span class="hljs-subst">${escapeHtml(</span><span class="hljs-string">'Contributions of '</span><span class="hljs-subst"> + family.name)}</span><span class="hljs-string">&quot;&gt;</span><span class="hljs-subst">${links.join(</span><span class="hljs-string">' · '</span><span class="hljs-subst">)}</span><span class="hljs-string">&lt;/nav&gt;</span><span class="hljs-string">\n</span><span class="hljs-string">`</span> : <span class="hljs-string">''</span>;
-}
-</code></pre>
-
-</div>
-</div><p>Immutable publication snapshots are indexed once and weakly cached, so references,
-contribution navigation and adapter lookups do not rescan the project. A fresh
-parse creates a fresh snapshot; the weak cache does not retain closed projects.
+</div><p>Native anchors are keyboard-focusable and carry descriptive accessible names.
+Contribution anchors retain source mapping for the current preview. Fragment
+references and declaration labels provide direct semantic navigation; contribution
+blocks add no previous, base, or next chrome.</p>
+<p>Immutable publication snapshots are indexed once and weakly cached, so references
+and adapter lookups do not rescan the project. A fresh parse creates a fresh
+snapshot; the weak cache does not retain closed projects.
 Nested document maps avoid path/key delimiter collisions.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1"><span id="f-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078"></span><a class="literate-tag-name" href="#f-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078" data-literate-target="f-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078" aria-label="Definition of screen model index">&lt;&lt;screen model index&gt;&gt;=</a></div>
@@ -294,21 +271,16 @@ Nested document maps avoid path/key delimiter collisions.</p>
 </code></pre>
 
 </div>
-<nav class="fragment-navigation" aria-label="Contributions of screen model index"><a class="literate-tag-name" href="#c-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-2" data-literate-target="c-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-2" aria-label="Next contribution of screen model index">Next</a></nav>
-</div><p>Build each lookup in one pass over families and contributions. Ordinals avoid an
-<code>indexOf</code> scan for every Previous/Next control; adapters share token and line maps.</p>
+</div><p>Build each lookup in one pass over families and contributions. Adapters share token
+and line maps.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078" data-literate-target="f-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078" aria-label="Definition of screen model index">&lt;&lt;screen model index&gt;&gt;=+</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">buildScreenIndex</span>(<span class="hljs-params">model: PublicationModel, annotations?: PublicationAnnotations</span>) {
     <span class="hljs-keyword">const</span> families = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>(model.<span class="hljs-property">fragments</span>.<span class="hljs-title">map</span>(<span class="hljs-params">family</span><span class="hljs-function"> =&gt;</span> [family.<span class="hljs-property">target</span>, family]));
     <span class="hljs-keyword">const</span> parts = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>(model.<span class="hljs-property">contributions</span>.<span class="hljs-title">map</span>(<span class="hljs-params">part</span><span class="hljs-function"> =&gt;</span> [part.<span class="hljs-property">target</span>, part]));
-    <span class="hljs-keyword">const</span> ordinals = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">number</span>&gt;();
     <span class="hljs-keyword">const</span> tokens = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">number</span>, <span class="hljs-title">PublicationContribution</span>&gt;&gt;();
     <span class="hljs-keyword">const</span> lines = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">number</span>, <span class="hljs-title">PublicationContribution</span>&gt;&gt;();
-    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> family <span class="hljs-keyword">of</span> model.<span class="hljs-property">fragments</span>) {
-        family.<span class="hljs-property">contributions</span>.<span class="hljs-title">forEach</span>(<span class="hljs-function">(</span><span class="hljs-params">target, index</span><span class="hljs-function">) =&gt;</span> ordinals.<span class="hljs-title">set</span>(target, index));
-    }
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> part <span class="hljs-keyword">of</span> model.<span class="hljs-property">contributions</span>) {
         <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [map, key] <span class="hljs-keyword">of</span> [[tokens, part.<span class="hljs-property">tokenIndex</span>], [lines, part.<span class="hljs-property">definition</span>.<span class="hljs-property">line</span>]] <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span>) {
             <span class="hljs-keyword">if</span> (!map.<span class="hljs-title">has</span>(part.<span class="hljs-property">definition</span>.<span class="hljs-property">path</span>)) { map.<span class="hljs-title">set</span>(part.<span class="hljs-property">definition</span>.<span class="hljs-property">path</span>, <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>()); }
@@ -317,13 +289,12 @@ Nested document maps avoid path/key delimiter collisions.</p>
     }
     <span data-literate-explore="f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e00200069006e006400650078"><a class="literate-tag-name" href="#f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e00200069006e006400650078" data-literate-target="f-00730063007200650065006e00200061006e006e006f0074006100740069006f006e00200069006e006400650078" aria-label="Definition of screen annotation index">&lt;&lt;screen annotation index&gt;&gt;</a></span>
     <span data-literate-explore="f-00730063007200650065006e002000720065007600650072007300650020007200650066006500720065006e006300650073"><a class="literate-tag-name" href="#f-00730063007200650065006e002000720065007600650072007300650020007200650066006500720065006e006300650073" data-literate-target="f-00730063007200650065006e002000720065007600650072007300650020007200650066006500720065006e006300650073" aria-label="Definition of screen reverse references">&lt;&lt;screen reverse references&gt;&gt;</a></span>
-    <span class="hljs-keyword">return</span> { families, parts, ordinals, tokens, lines, targets, annotationLines, annotationTargets,
+    <span class="hljs-keyword">return</span> { families, parts, tokens, lines, targets, annotationLines, annotationTargets,
         termReferences, fragmentReferences, explorationTargets };
 }
 </code></pre>
 
 </div>
-<nav class="fragment-navigation" aria-label="Contributions of screen model index"><a class="literate-tag-name" href="#c-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1" data-literate-target="c-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1" aria-label="Previous contribution of screen model index">Previous</a> · <a class="literate-tag-name" href="#c-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1" data-literate-target="c-00730063007200650065006e0020006d006f00640065006c00200069006e006400650078-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1" aria-label="Base contribution of screen model index">Base</a></nav>
 </div><p>Annotations extend the common destination map without changing publication parts.
 Use locations remain explicit model data, including links inside annotation bodies.</p>
 <div class="codefragment">
