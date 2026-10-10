@@ -151,12 +151,21 @@ title, entry document, and PDF destination.</p>
 
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">const</span> publicationWorkspaceManifest = <span class="hljs-string">'literate-workspace.json'</span>;
 
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationMargins</span> {
+    <span class="hljs-attr">top</span>: <span class="hljs-built_in">number</span>;
+    <span class="hljs-attr">outer</span>: <span class="hljs-built_in">number</span>;
+    <span class="hljs-attr">bottom</span>: <span class="hljs-built_in">number</span>;
+    <span class="hljs-attr">inner</span>: <span class="hljs-built_in">number</span>;
+}
+
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationProject</span> {
     <span class="hljs-attr">id</span>: <span class="hljs-built_in">string</span>;
     <span class="hljs-attr">title</span>: <span class="hljs-built_in">string</span>;
     <span class="hljs-attr">root</span>: <span class="hljs-built_in">string</span>;
     <span class="hljs-attr">entry</span>: <span class="hljs-built_in">string</span>;
     pdf?: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">paper</span>: <span class="hljs-string">'a4'</span> | <span class="hljs-string">'a5'</span> | <span class="hljs-string">'letter'</span> | <span class="hljs-string">'legal'</span>;
+    <span class="hljs-attr">margins</span>: <span class="hljs-title">PublicationMargins</span>;
 }
 
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationWorkspace</span> {
@@ -220,6 +229,35 @@ another project. PDF destinations are manifest-relative and unique.</p>
     <span class="hljs-keyword">return</span> components.<span class="hljs-title">join</span>(<span class="hljs-string">'/'</span>);
 }
 
+<span class="hljs-keyword">const</span> <span class="hljs-attr">paperSizes</span>: <span class="hljs-title">Record</span>&lt;<span class="hljs-title">PublicationProject</span>[<span class="hljs-string">'paper'</span>], [<span class="hljs-built_in">number</span>, <span class="hljs-built_in">number</span>]&gt; = {
+    <span class="hljs-attr">a4</span>: [<span class="hljs-number">210</span>, <span class="hljs-number">297</span>], <span class="hljs-attr">a5</span>: [<span class="hljs-number">148</span>, <span class="hljs-number">210</span>], <span class="hljs-attr">letter</span>: [<span class="hljs-number">215.9</span>, <span class="hljs-number">279.4</span>], <span class="hljs-attr">legal</span>: [<span class="hljs-number">215.9</span>, <span class="hljs-number">355.6</span>]
+};
+
+<span class="hljs-keyword">function</span> <span class="hljs-title">publicationPaper</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">unknown</span><span class="hljs-params">, label: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">PublicationProject</span>[<span class="hljs-string">'paper'</span>] {
+    <span class="hljs-keyword">const</span> paper = value === <span class="hljs-literal">undefined</span> ? <span class="hljs-string">'a4'</span> : <span class="hljs-title">text</span>(value, label, <span class="hljs-number">20</span>);
+    <span class="hljs-keyword">if</span> (!(paper <span class="hljs-keyword">in</span> paperSizes)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> must be a4, a5, letter or legal`</span>); }
+    <span class="hljs-keyword">return</span> paper <span class="hljs-keyword">as</span> <span class="hljs-title">PublicationProject</span>[<span class="hljs-string">'paper'</span>];
+}
+
+<span class="hljs-keyword">function</span> <span class="hljs-title">publicationMargins</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">unknown</span><span class="hljs-params">, paper: PublicationProject[</span><span class="hljs-string">'paper'</span><span class="hljs-params">], label: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">PublicationMargins</span> {
+    <span class="hljs-keyword">if</span> (value === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">top</span>: <span class="hljs-number">20</span>, <span class="hljs-attr">outer</span>: <span class="hljs-number">20</span>, <span class="hljs-attr">bottom</span>: <span class="hljs-number">20</span>, <span class="hljs-attr">inner</span>: <span class="hljs-number">20</span> }; }
+    <span class="hljs-keyword">if</span> (!<span class="hljs-title">object</span>(value)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> must be an object`</span>); }
+    <span class="hljs-title">fields</span>(value, [<span class="hljs-string">'top'</span>, <span class="hljs-string">'outer'</span>, <span class="hljs-string">'bottom'</span>, <span class="hljs-string">'inner'</span>], label);
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">margins</span>: <span class="hljs-title">PublicationMargins</span> = { <span class="hljs-attr">top</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">outer</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">bottom</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">inner</span>: <span class="hljs-number">0</span> };
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> side <span class="hljs-keyword">of</span> [<span class="hljs-string">'top'</span>, <span class="hljs-string">'outer'</span>, <span class="hljs-string">'bottom'</span>, <span class="hljs-string">'inner'</span>] <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span>) {
+        <span class="hljs-keyword">const</span> margin = value[side];
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> margin !== <span class="hljs-string">'number'</span> || !<span class="hljs-title">Number</span>.<span class="hljs-built_in">isFinite</span>(margin) || margin &lt; <span class="hljs-number">5</span> || margin &gt; <span class="hljs-number">50</span>) {
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> </span><span class="hljs-subst">${side}</span><span class="hljs-string"> must be a number from 5 to 50 mm`</span>);
+        }
+        margins[side] = margin;
+    }
+    <span class="hljs-keyword">const</span> [width, height] = paperSizes[paper];
+    <span class="hljs-keyword">if</span> (width - margins.<span class="hljs-property">outer</span> - margins.<span class="hljs-property">inner</span> &lt; <span class="hljs-number">80</span> || height - margins.<span class="hljs-property">top</span> - margins.<span class="hljs-property">bottom</span> &lt; <span class="hljs-number">100</span>) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> must leave at least an 80 × 100 mm body for </span><span class="hljs-subst">${paper}</span><span class="hljs-string">`</span>);
+    }
+    <span class="hljs-keyword">return</span> margins;
+}
+
 <span class="hljs-keyword">function</span> <span class="hljs-title">collision</span>(<span class="hljs-params">left: </span><span class="hljs-built_in">string</span><span class="hljs-params">, right: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">boolean</span> {
     <span class="hljs-keyword">const</span> a = left.<span class="hljs-title">toLowerCase</span>(), b = right.<span class="hljs-title">toLowerCase</span>();
     <span class="hljs-keyword">return</span> a === b || a.<span class="hljs-title">startsWith</span>(b + <span class="hljs-string">'/'</span>) || b.<span class="hljs-title">startsWith</span>(a + <span class="hljs-string">'/'</span>);
@@ -247,16 +285,18 @@ manifest's publication order and is used by selectors and future project pickers
     <span class="hljs-keyword">const</span> publications = parsed.<span class="hljs-property">publications</span>.<span class="hljs-title">map</span>((value, index): <span class="hljs-params">PublicationProject</span><span class="hljs-function"> =&gt;</span> {
         <span class="hljs-keyword">const</span> label = <span class="hljs-string">`Publication </span><span class="hljs-subst">${index + </span><span class="hljs-number">1</span><span class="hljs-subst">}</span><span class="hljs-string">`</span>;
         <span class="hljs-keyword">if</span> (!<span class="hljs-title">object</span>(value)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> must be an object`</span>); }
-        <span class="hljs-title">fields</span>(value, [<span class="hljs-string">'id'</span>, <span class="hljs-string">'title'</span>, <span class="hljs-string">'root'</span>, <span class="hljs-string">'entry'</span>, <span class="hljs-string">'pdf'</span>], label);
+        <span class="hljs-title">fields</span>(value, [<span class="hljs-string">'id'</span>, <span class="hljs-string">'title'</span>, <span class="hljs-string">'root'</span>, <span class="hljs-string">'entry'</span>, <span class="hljs-string">'pdf'</span>, <span class="hljs-string">'paper'</span>, <span class="hljs-string">'margins'</span>], label);
         <span class="hljs-keyword">const</span> id = <span class="hljs-title">text</span>(value.<span class="hljs-property">id</span>, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> id`</span>, <span class="hljs-number">100</span>);
         <span class="hljs-keyword">if</span> (!identifier.<span class="hljs-title">test</span>(id)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> id is invalid: </span><span class="hljs-subst">${id}</span><span class="hljs-string">`</span>); }
         <span class="hljs-keyword">const</span> root = <span class="hljs-title">manifestPath</span>(value.<span class="hljs-property">root</span>, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> root`</span>);
         <span class="hljs-keyword">const</span> title = value.<span class="hljs-property">title</span> === <span class="hljs-literal">undefined</span> ? id : <span class="hljs-title">text</span>(value.<span class="hljs-property">title</span>, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> title`</span>, <span class="hljs-number">200</span>);
         <span class="hljs-keyword">const</span> entry = value.<span class="hljs-property">entry</span> === <span class="hljs-literal">undefined</span> ? <span class="hljs-string">'index.literate'</span> : <span class="hljs-title">projectPath</span>(value.<span class="hljs-property">entry</span>, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> entry`</span>);
         <span class="hljs-keyword">const</span> pdf = value.<span class="hljs-property">pdf</span> === <span class="hljs-literal">undefined</span> ? <span class="hljs-literal">undefined</span> : <span class="hljs-title">manifestPath</span>(value.<span class="hljs-property">pdf</span>, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> pdf`</span>);
+        <span class="hljs-keyword">const</span> paper = <span class="hljs-title">publicationPaper</span>(value.<span class="hljs-property">paper</span>, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> paper`</span>);
+        <span class="hljs-keyword">const</span> margins = <span class="hljs-title">publicationMargins</span>(value.<span class="hljs-property">margins</span>, paper, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> margins`</span>);
         <span class="hljs-keyword">if</span> (!entry.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'.literate'</span>)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> entry must end in .literate`</span>); }
         <span class="hljs-keyword">if</span> (pdf !== <span class="hljs-literal">undefined</span> &amp;&amp; !pdf.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'.pdf'</span>)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> pdf must end in .pdf`</span>); }
-        <span class="hljs-keyword">return</span> { id, title, root, entry, ...(pdf === <span class="hljs-literal">undefined</span> ? {} : { pdf }) };
+        <span class="hljs-keyword">return</span> { id, title, root, entry, ...(pdf === <span class="hljs-literal">undefined</span> ? {} : { pdf }), paper, margins };
     });
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = <span class="hljs-number">0</span>; index &lt; publications.<span class="hljs-property">length</span>; index++) {
         <span class="hljs-keyword">const</span> current = publications[index];

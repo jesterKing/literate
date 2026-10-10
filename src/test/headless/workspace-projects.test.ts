@@ -4,7 +4,8 @@ import { parsePublicationWorkspace, publicationForPath, selectPublication } from
 
 const manifest = (publications: unknown[]) => JSON.stringify({ schemaVersion: 1, publications });
 const project = (id: string, root = id) => ({ id, title: `Book ${id}`, root,
-    entry: 'index.literate', pdf: `publications/${id}.pdf` });
+    entry: 'index.literate', pdf: `publications/${id}.pdf`, paper: 'a4',
+    margins: { top: 20, outer: 20, bottom: 20, inner: 20 } });
 
 test('workspace manifests retain ordered normalized publication metadata', () => {
     const parsed = parsePublicationWorkspace(manifest([
@@ -13,7 +14,8 @@ test('workspace manifests retain ordered normalized publication metadata', () =>
     ]));
     assert.deepEqual(parsed, { schemaVersion: 1, publications: [
         project('python', '../books/python'),
-        { id: 'zig', title: 'zig', root: '../books/zig', entry: 'index.literate' }
+        { id: 'zig', title: 'zig', root: '../books/zig', entry: 'index.literate', paper: 'a4',
+            margins: { top: 20, outer: 20, bottom: 20, inner: 20 } }
     ] });
     assert.equal(selectPublication(parsed, 'zig').root, '../books/zig');
     assert.equal(publicationForPath(parsed, '../books/python/chapter.literate')?.id, 'python');
@@ -41,6 +43,10 @@ for (const [name, source, message] of [
     ['backslash root', manifest([project('one', '..\\one')]), /not a portable manifest-relative path/],
     ['invalid entry', manifest([{ ...project('one'), entry: 'README.md' }]), /entry must end in .literate/],
     ['invalid PDF', manifest([{ ...project('one'), pdf: 'book.tex' }]), /pdf must end in .pdf/],
+    ['invalid paper', manifest([{ ...project('one'), paper: 'a3' }]), /paper must be/],
+    ['incomplete margins', manifest([{ ...project('one'), margins: { top: 20 } }]), /outer must be/],
+    ['small margin', manifest([{ ...project('one'), margins: { top: 4, outer: 20, bottom: 20, inner: 20 } }]), /top must be/],
+    ['small body', manifest([{ ...project('one'), paper: 'a5', margins: { top: 20, outer: 35, bottom: 20, inner: 35 } }]), /80 × 100 mm body/],
     ['duplicate id', manifest([project('one'), project('one', 'two')]), /id conflicts/],
     ['duplicate root', manifest([project('one', 'books/a'), project('two', 'BOOKS/A')]), /root overlaps/],
     ['nested root', manifest([project('one', 'books'), project('two', 'books/two')]), /root overlaps/],
@@ -48,6 +54,14 @@ for (const [name, source, message] of [
 ] as const) {
     test(`workspace manifest rejects ${name}`, () => assert.throws(() => parsePublicationWorkspace(source), message));
 }
+
+test('workspace manifests retain explicit publication geometry', () => {
+    const parsed = parsePublicationWorkspace(manifest([{
+        ...project('one'), paper: 'letter', margins: { top: 15, outer: 50, bottom: 25, inner: 10 }
+    }]));
+    assert.equal(parsed.publications[0].paper, 'letter');
+    assert.deepEqual(parsed.publications[0].margins, { top: 15, outer: 50, bottom: 25, inner: 10 });
+});
 
 test('workspace manifests normalize parent-relative roots and outputs', () => {
     const parsed = parsePublicationWorkspace(manifest([

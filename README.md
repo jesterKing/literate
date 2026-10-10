@@ -359,10 +359,12 @@ folder:
 Publication IDs use lowercase letters, digits, dots, underscores, and
 hyphens. Roots are portable directories relative to the manifest and
 may not overlap. Parent-relative roots such as `../books/one` support a
-manifest kept in a sibling `series` directory. Optional `entry` and
-`pdf` fields name the project-relative entry document and
-manifest-relative PDF destination; they default to `index.literate`
-and no declared PDF.
+manifest kept in a sibling `series` directory. Optional `entry` and `pdf` fields name the project-relative entry
+document and manifest-relative PDF destination; they default to
+`index.literate` and no declared PDF. Optional `paper` is `a4`, `a5`,
+`letter`, or `legal`. Optional `margins` supplies numeric `top`,
+`outer`, `bottom`, and `inner` millimetres; all four fields are required
+when the object is present. Paper and margins default to A4 and 20 mm.
 
 Select one project before discovery with `--publication`:
 

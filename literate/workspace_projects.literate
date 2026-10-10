@@ -24,12 +24,21 @@ import { safeRelativePath } from './engine';
 
 export const publicationWorkspaceManifest = 'literate-workspace.json';
 
+export interface PublicationMargins {
+    top: number;
+    outer: number;
+    bottom: number;
+    inner: number;
+}
+
 export interface PublicationProject {
     id: string;
     title: string;
     root: string;
     entry: string;
     pdf?: string;
+    paper: 'a4' | 'a5' | 'letter' | 'legal';
+    margins: PublicationMargins;
 }
 
 export interface PublicationWorkspace {
@@ -92,6 +101,35 @@ function manifestPath(value: unknown, label: string): string {
     return components.join('/');
 }
 
+const paperSizes: Record<PublicationProject['paper'], [number, number]> = {
+    a4: [210, 297], a5: [148, 210], letter: [215.9, 279.4], legal: [215.9, 355.6]
+};
+
+function publicationPaper(value: unknown, label: string): PublicationProject['paper'] {
+    const paper = value === undefined ? 'a4' : text(value, label, 20);
+    if (!(paper in paperSizes)) { throw new Error(`${label} must be a4, a5, letter or legal`); }
+    return paper as PublicationProject['paper'];
+}
+
+function publicationMargins(value: unknown, paper: PublicationProject['paper'], label: string): PublicationMargins {
+    if (value === undefined) { return { top: 20, outer: 20, bottom: 20, inner: 20 }; }
+    if (!object(value)) { throw new Error(`${label} must be an object`); }
+    fields(value, ['top', 'outer', 'bottom', 'inner'], label);
+    const margins: PublicationMargins = { top: 0, outer: 0, bottom: 0, inner: 0 };
+    for (const side of ['top', 'outer', 'bottom', 'inner'] as const) {
+        const margin = value[side];
+        if (typeof margin !== 'number' || !Number.isFinite(margin) || margin < 5 || margin > 50) {
+            throw new Error(`${label} ${side} must be a number from 5 to 50 mm`);
+        }
+        margins[side] = margin;
+    }
+    const [width, height] = paperSizes[paper];
+    if (width - margins.outer - margins.inner < 80 || height - margins.top - margins.bottom < 100) {
+        throw new Error(`${label} must leave at least an 80 × 100 mm body for ${paper}`);
+    }
+    return margins;
+}
+
 function collision(left: string, right: string): boolean {
     const a = left.toLowerCase(), b = right.toLowerCase();
     return a === b || a.startsWith(b + '/') || b.startsWith(a + '/');
@@ -117,16 +155,18 @@ export function parsePublicationWorkspace(source: string): PublicationWorkspace 
     const publications = parsed.publications.map((value, index): PublicationProject => {
         const label = `Publication ${index + 1}`;
         if (!object(value)) { throw new Error(`${label} must be an object`); }
-        fields(value, ['id', 'title', 'root', 'entry', 'pdf'], label);
+        fields(value, ['id', 'title', 'root', 'entry', 'pdf', 'paper', 'margins'], label);
         const id = text(value.id, `${label} id`, 100);
         if (!identifier.test(id)) { throw new Error(`${label} id is invalid: ${id}`); }
         const root = manifestPath(value.root, `${label} root`);
         const title = value.title === undefined ? id : text(value.title, `${label} title`, 200);
         const entry = value.entry === undefined ? 'index.literate' : projectPath(value.entry, `${label} entry`);
         const pdf = value.pdf === undefined ? undefined : manifestPath(value.pdf, `${label} pdf`);
+        const paper = publicationPaper(value.paper, `${label} paper`);
+        const margins = publicationMargins(value.margins, paper, `${label} margins`);
         if (!entry.endsWith('.literate')) { throw new Error(`${label} entry must end in .literate`); }
         if (pdf !== undefined && !pdf.endsWith('.pdf')) { throw new Error(`${label} pdf must end in .pdf`); }
-        return { id, title, root, entry, ...(pdf === undefined ? {} : { pdf }) };
+        return { id, title, root, entry, ...(pdf === undefined ? {} : { pdf }), paper, margins };
     });
     for (let index = 0; index < publications.length; index++) {
         const current = publications[index];
