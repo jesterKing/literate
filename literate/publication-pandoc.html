@@ -120,7 +120,11 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-</style>
+.literate-document .literate-annotation { margin-block: 1em; padding: .6em 1em; border-inline-start: .2em solid currentColor; }
+.literate-document .literate-annotation-title { font-weight: bold; }
+.literate-document .literate-note { border-inline-start-style: dotted; }
+.literate-document .literate-term-unresolved { text-decoration: underline dotted; }
+.literate-document .literate-screen-index { margin-block-start: 2em; }</style>
   <meta name="author" content="Nathan 'jesterKing' Letwory">
 </head>
 <body>
@@ -533,14 +537,17 @@ engine's tokens or attributes.</p>
 </div><h2>Reading inline tokens</h2>
 <p>The inline reader consumes matching pairs recursively. Ordinary text is split
 into Pandoc words and spaces; HTML- or TeX-looking text is still ordinary text.
-Code spans preserve their exact token content. Literal code is not scanned for
-fragment references. The nesting limit turns excessively nested input into a
-source diagnostic before JavaScript recursion becomes unsafe.</p>
+Semantic fragment-use tokens become controlled links carrying occurrence and rail
+metadata. Recognition happens before Markdown escapes are consumed, but excludes
+code spans, code blocks, raw HTML, existing links, and escaped openers. The nesting
+limit turns excessively nested input into a source diagnostic before JavaScript
+recursion becomes unsafe.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200069006e006c0069006e00650020007200650061006400650072-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00700061006e0064006f0063002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200069006e006c0069006e00650020007200650061006400650072"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200069006e006c0069006e00650020007200650061006400650072" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200069006e006c0069006e00650020007200650061006400650072" aria-label="Definition of publication Pandoc inline reader">&lt;&lt;publication Pandoc inline reader&gt;&gt;=</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">interface</span> <span class="hljs-title">InlineReader</span> {
     <span class="hljs-attr">annotations</span>: <span class="hljs-title">PublicationAnnotations</span>;
+    <span class="hljs-attr">publication</span>: <span class="hljs-title">ParsedProject</span>[<span class="hljs-string">'publication'</span>];
     <span class="hljs-attr">document</span>: <span class="hljs-title">ParsedDocument</span>;
     <span class="hljs-attr">tokens</span>: <span class="hljs-keyword">readonly</span> <span class="hljs-title">Token</span>[];
     <span class="hljs-attr">index</span>: <span class="hljs-built_in">number</span>;
@@ -582,6 +589,7 @@ JavaScript argument per word and exceed the runtime's argument limit.</p>
         <span class="hljs-keyword">case</span> <span class="hljs-string">'text'</span>:
                     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> inline <span class="hljs-keyword">of</span> <span class="hljs-title">textInlines</span>(token.<span class="hljs-property">content</span>)) { result.<span class="hljs-title">push</span>(inline); }
                     <span class="hljs-keyword">break</span>;
+        <span class="hljs-keyword">case</span> <span class="hljs-string">'literate_fragment_use'</span>: result.<span class="hljs-title">push</span>(<span class="hljs-title">readFragmentUse</span>(reader, token)); <span class="hljs-keyword">break</span>;
         <span class="hljs-keyword">case</span> <span class="hljs-string">'code_inline'</span>: result.<span class="hljs-title">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">'Code'</span>, <span class="hljs-attr">c</span>: [<span class="hljs-title">emptyAttributes</span>(), token.<span class="hljs-property">content</span>] }); <span class="hljs-keyword">break</span>;
         <span class="hljs-keyword">case</span> <span class="hljs-string">'softbreak'</span>: result.<span class="hljs-title">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">'SoftBreak'</span> }); <span class="hljs-keyword">break</span>;
         <span class="hljs-keyword">case</span> <span class="hljs-string">'hardbreak'</span>: result.<span class="hljs-title">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">'LineBreak'</span> }); <span class="hljs-keyword">break</span>;
@@ -601,7 +609,19 @@ the public document and all renderer callbacks.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200069006e006c0069006e00650020007200650061006400650072-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00700061006e0064006f0063002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200069006e006c0069006e00650020007200650061006400650072" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200069006e006c0069006e00650020007200650061006400650072" aria-label="Definition of publication Pandoc inline reader">&lt;&lt;publication Pandoc inline reader&gt;&gt;=+</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">readLink</span>(<span class="hljs-params">reader: InlineReader, token: Token, depth: </span><span class="hljs-built_in">number</span>): <span class="hljs-title">PandocInline</span> {
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">readFragmentUse</span>(<span class="hljs-params">reader: InlineReader, token: Token</span>): <span class="hljs-title">PandocInline</span> {
+    <span class="hljs-keyword">const</span> name = <span class="hljs-title">String</span>(token.<span class="hljs-property">meta</span>?.<span class="hljs-property">name</span> || <span class="hljs-string">''</span>);
+    <span class="hljs-keyword">const</span> family = reader.<span class="hljs-property">publication</span>.<span class="hljs-property">fragments</span>.<span class="hljs-title">find</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> item.<span class="hljs-property">name</span> === name);
+    <span class="hljs-keyword">const</span> occurrence = <span class="hljs-title">String</span>(token.<span class="hljs-property">meta</span>?.<span class="hljs-property">occurrenceTarget</span> || <span class="hljs-string">''</span>);
+    <span class="hljs-keyword">const</span> annotation = token.<span class="hljs-property">meta</span>?.<span class="hljs-property">annotation</span> === <span class="hljs-string">'rail'</span> ? <span class="hljs-string">'rail'</span> : <span class="hljs-string">'none'</span>;
+    <span class="hljs-keyword">if</span> (!family || !occurrence) {
+        <span class="hljs-title">report</span>(reader.<span class="hljs-property">diagnostics</span>, reader.<span class="hljs-property">at</span>, <span class="hljs-string">'missing-fragment'</span>, <span class="hljs-string">`Missing fragment referenced from prose: </span><span class="hljs-subst">${name}</span><span class="hljs-string">`</span>);
+    }
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">t</span>: <span class="hljs-string">'Link'</span>, <span class="hljs-attr">c</span>: [[<span class="hljs-string">''</span>, [<span class="hljs-string">'lit-fragment-use'</span>], [
+        [<span class="hljs-string">'data-target'</span>, family?.<span class="hljs-property">target</span> || <span class="hljs-string">''</span>], [<span class="hljs-string">'data-occurrence'</span>, occurrence], [<span class="hljs-string">'data-annotation'</span>, annotation]
+    ]], <span class="hljs-title">textInlines</span>(token.<span class="hljs-property">content</span>), [<span class="hljs-string">'#'</span> + (family?.<span class="hljs-property">target</span> || <span class="hljs-string">''</span>), <span class="hljs-string">''</span>]] };
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title">readLink</span>(<span class="hljs-params">reader: InlineReader, token: Token, depth: </span><span class="hljs-built_in">number</span>): <span class="hljs-title">PandocInline</span> {
     <span class="hljs-keyword">const</span> original = token.<span class="hljs-title">attrGet</span>(<span class="hljs-string">'href'</span>) ?? <span class="hljs-string">''</span>;
     <span class="hljs-keyword">const</span> term = original.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'term:'</span>);
     <span class="hljs-keyword">const</span> resolved = term ? <span class="hljs-title">resolveTermHref</span>(reader.<span class="hljs-property">annotations</span>, original) : <span class="hljs-literal">undefined</span>;
@@ -628,6 +648,7 @@ cursor, preserving nesting and authored order across each contribution.</p>
 <div class="code">
 <pre><code><span class="hljs-keyword">interface</span> <span class="hljs-title">BlockReader</span> {
     <span class="hljs-attr">annotations</span>: <span class="hljs-title">PublicationAnnotations</span>;
+    <span class="hljs-attr">publication</span>: <span class="hljs-title">ParsedProject</span>[<span class="hljs-string">'publication'</span>];
     annotationBody?: <span class="hljs-built_in">boolean</span>;
     <span class="hljs-attr">document</span>: <span class="hljs-title">ParsedDocument</span>;
     <span class="hljs-attr">index</span>: <span class="hljs-built_in">number</span>;
@@ -726,7 +747,8 @@ would introduce a different interpretation of escaping and links.</p>
     }
     reader.<span class="hljs-property">index</span>++;
     <span class="hljs-keyword">const</span> result = <span class="hljs-title">readInlines</span>({ <span class="hljs-attr">document</span>: reader.<span class="hljs-property">document</span>, <span class="hljs-attr">tokens</span>: token.<span class="hljs-property">children</span> ?? [],
-        <span class="hljs-attr">index</span>: <span class="hljs-number">0</span>, at, <span class="hljs-attr">targets</span>: reader.<span class="hljs-property">targets</span>, <span class="hljs-attr">diagnostics</span>: reader.<span class="hljs-property">diagnostics</span>, <span class="hljs-attr">annotations</span>: reader.<span class="hljs-property">annotations</span> });
+        <span class="hljs-attr">index</span>: <span class="hljs-number">0</span>, at, <span class="hljs-attr">targets</span>: reader.<span class="hljs-property">targets</span>, <span class="hljs-attr">diagnostics</span>: reader.<span class="hljs-property">diagnostics</span>,
+        <span class="hljs-attr">annotations</span>: reader.<span class="hljs-property">annotations</span>, <span class="hljs-attr">publication</span>: reader.<span class="hljs-property">publication</span> });
     <span class="hljs-keyword">if</span> (reader.<span class="hljs-property">document</span>.<span class="hljs-property">tokens</span>[reader.<span class="hljs-property">index</span>]?.<span class="hljs-property">type</span> === stop) { reader.<span class="hljs-property">index</span>++; }
     <span class="hljs-keyword">else</span> { <span class="hljs-title">report</span>(reader.<span class="hljs-property">diagnostics</span>, at, <span class="hljs-string">'invalid-markdown-structure'</span>, <span class="hljs-string">`Expected </span><span class="hljs-subst">${stop}</span><span class="hljs-string">`</span>); }
     <span class="hljs-keyword">return</span> result;
@@ -736,10 +758,14 @@ would introduce a different interpretation of escaping and links.</p>
     <span class="hljs-keyword">if</span> (!level) {
         <span class="hljs-title">report</span>(reader.<span class="hljs-property">diagnostics</span>, <span class="hljs-title">tokenLocation</span>(reader.<span class="hljs-property">document</span>, token), <span class="hljs-string">'invalid-markdown-structure'</span>, <span class="hljs-string">'Invalid heading level'</span>);
     }
-    <span class="hljs-keyword">if</span> (reader.<span class="hljs-property">document</span>.<span class="hljs-property">tokens</span>[reader.<span class="hljs-property">index</span>]?.<span class="hljs-property">children</span>?.<span class="hljs-title">some</span>(<span class="hljs-params">child</span><span class="hljs-function"> =&gt;</span>
-        child.<span class="hljs-property">type</span> === <span class="hljs-string">'link_open'</span> &amp;&amp; child.<span class="hljs-title">attrGet</span>(<span class="hljs-string">'href'</span>)?.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'term:'</span>))) {
+    <span class="hljs-keyword">const</span> headingChildren = reader.<span class="hljs-property">document</span>.<span class="hljs-property">tokens</span>[reader.<span class="hljs-property">index</span>]?.<span class="hljs-property">children</span> || [];
+    <span class="hljs-keyword">if</span> (headingChildren.<span class="hljs-title">some</span>(<span class="hljs-params">child</span><span class="hljs-function"> =&gt;</span> child.<span class="hljs-property">type</span> === <span class="hljs-string">'link_open'</span> &amp;&amp; child.<span class="hljs-title">attrGet</span>(<span class="hljs-string">'href'</span>)?.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'term:'</span>))) {
         <span class="hljs-title">report</span>(reader.<span class="hljs-property">diagnostics</span>, <span class="hljs-title">tokenLocation</span>(reader.<span class="hljs-property">document</span>, token), <span class="hljs-string">'annotation-heading'</span>,
             <span class="hljs-string">'TERM links in headings are unsupported: use a prose link below the heading to avoid moving rail markers'</span>);
+    }
+    <span class="hljs-keyword">if</span> (headingChildren.<span class="hljs-title">some</span>(<span class="hljs-params">child</span><span class="hljs-function"> =&gt;</span> child.<span class="hljs-property">type</span> === <span class="hljs-string">'literate_fragment_use'</span> &amp;&amp; child.<span class="hljs-property">meta</span>?.<span class="hljs-property">annotation</span> === <span class="hljs-string">'rail'</span>)) {
+        <span class="hljs-title">report</span>(reader.<span class="hljs-property">diagnostics</span>, <span class="hljs-title">tokenLocation</span>(reader.<span class="hljs-property">document</span>, token), <span class="hljs-string">'annotation-heading'</span>,
+            <span class="hljs-string">'Rail fragment references in headings are unsupported: use a prose reference below the heading'</span>);
     }
     <span class="hljs-keyword">const</span> id = reader.<span class="hljs-property">targets</span>.<span class="hljs-title">get</span>(reader.<span class="hljs-property">document</span>.<span class="hljs-property">path</span>)!.<span class="hljs-property">tokens</span>.<span class="hljs-title">get</span>(token)!;
     <span class="hljs-keyword">return</span> { <span class="hljs-attr">t</span>: <span class="hljs-string">'Header'</span>, <span class="hljs-attr">c</span>: [level, [id, [], []], <span class="hljs-title">readTextBlock</span>(reader, token)] };

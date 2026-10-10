@@ -416,31 +416,34 @@ function contribution(part: PublicationContribution, project: ParsedProject,
     output += contributionBody(data, project, theme, definitions);
     return [{ t: 'RawBlock', c: ['latex', output] }];
 }
+function fragmentPageLink(family: ParsedProject['publication']['fragments'][number], label: string): string {
+    if (!family.contributions.length) { throw new Error('Referenced fragment has no contributions'); }
+    const pages = family.contributions.map(id => {
+        const destination = target(id);
+        return `\\hyperref[${destination}]{\\pageref*{${destination}}}`;
+    }).join(',\\allowbreak{} ');
+    return `\\hyperref[${target(family.contributions[0])}]{${label}}` +
+        `\\textsuperscript{\\notefont ${pages}}`;
+}
 function contributionBody(data: Highlighted, project: ParsedProject,
     theme: LiterateTheme, definitions: string[]): string {
     let cursor = 0, output = '';
     for (const reference of data.references) {
-        if (!project.publication.fragments.some(family =>
-            family.target === reference.target && family.name === reference.name)) {
-            throw new Error('Unknown highlighted reference destination');
-        }
+        const family = project.publication.fragments.find(item =>
+            item.target === reference.target && item.name === reference.name);
+        if (!family) { throw new Error('Unknown highlighted reference destination'); }
         const standalone = reference.placement === 'standalone';
         output += literal(data, cursor,
             standalone ? referencePrefixEnd(data.text, cursor, reference.start) : reference.start, theme);
         const command = macroName(definitions.length);
-        if (standalone) {
-            definitions.push(`\\newcommand{\\${command}}{\\par\\begingroup` +
-                '\\fragmentfont\\small\\noindent ' +
-                `\\LitFragmentUse{${target(reference.occurrenceTarget)}}{${target(reference.target)}}\\strut` +
-                '\\par\\endgroup}');
-        } else {
-            const label = '\\textless{}\\textless{}' + nameText(reference.name) +
-                '\\textgreater{}\\textgreater{}';
-            definitions.push(`\\newcommand{\\${command}}{\\par\\begingroup` +
-                '\\leftskip=1.5em\\rightskip=0pt plus 1fil\\parindent=0pt' +
-                '\\fragmentfont\\small\\noindent ' + pageLink(reference.target, label) +
-                '\\par\\endgroup}');
-        }
+        const label = '\\textless{}\\textless{}' + nameText(reference.name) +
+            '\\textgreater{}\\textgreater{}';
+        const marker = reference.annotation === 'rail' ?
+            `\\LitFragmentUse{${target(reference.occurrenceTarget)}}{${target(reference.target)}}` : '';
+        definitions.push(`\\newcommand{\\${command}}{\\par\\begingroup` +
+            (standalone ? '' : '\\leftskip=1.5em\\rightskip=0pt plus 1fil\\parindent=0pt') +
+            '\\fragmentfont\\small\\noindent ' + marker + fragmentPageLink(family, label) +
+            '\\par\\endgroup}');
         output += `\\${command}{}\n`;
         if (standalone) {
             const newline = data.text.indexOf('\n', reference.end);
@@ -457,10 +460,21 @@ const conversionOptions: LatexConversionOptions = {
     standalone: false, syntaxHighlighting: 'none', topLevelDivision: 'chapter'
 };
 function rawInline(value: string): PandocInline { return { t: 'RawInline', c: ['latex', value] }; }
-function annotationInlines(inlines: PandocInline[], markers: boolean, next: () => string): PandocInline[] {
+function annotationInlines(inlines: PandocInline[], project: ParsedProject,
+    markers: boolean, next: () => string): PandocInline[] {
     return inlines.flatMap((inline): PandocInline[] => {
         if (inline.t === 'Link') {
-            const label = annotationInlines(inline.c[1], markers, next);
+            const label = annotationInlines(inline.c[1], project, markers, next);
+            if (inline.c[0][1].includes('lit-fragment-use')) {
+                const values = new Map(inline.c[0][2]);
+                const family = project.publication.fragments.find(item => item.target === values.get('data-target'));
+                if (!family) { throw new Error('Prose fragment reference family is missing'); }
+                const marker = markers && values.get('data-annotation') === 'rail' ?
+                    `\\LitFragmentUse{${target(values.get('data-occurrence') || '')}}{${target(family.target)}}` : '';
+                const name = '\\textless{}\\textless{}' + nameText(family.name) +
+                    '\\textgreater{}\\textgreater{}';
+                return [rawInline(marker + fragmentPageLink(family, name))];
+            }
             if (!inline.c[0][1].includes('lit-term-use')) { return [{ ...inline, c: [inline.c[0], label, inline.c[2]] }]; }
             const id = target(inline.c[2][0].slice(1));
             const opening = (markers ? `\\LitTermUse{${next()}}{${id}}{` : '') + `\\hyperref[${id}]{`;
@@ -468,7 +482,7 @@ function annotationInlines(inlines: PandocInline[], markers: boolean, next: () =
             return [rawInline(opening), ...label, rawInline(closing)];
         }
         if (inline.t === 'Emph' || inline.t === 'Strong' || inline.t === 'Strikeout') {
-            return [{ ...inline, c: annotationInlines(inline.c, markers, next) }];
+            return [{ ...inline, c: annotationInlines(inline.c, project, markers, next) }];
         }
         return [inline];
     });
@@ -493,8 +507,13 @@ function railFragmentFamilies(project: ParsedProject): ParsedProject['publicatio
     const used = new Set<string>();
     for (const contribution of project.publication.contributions) {
         for (const segment of contribution.segments) {
-            if (segment.kind === 'reference' && segment.placement === 'standalone' &&
+            if (segment.kind === 'reference' && segment.annotation === 'rail' &&
                 segment.resolution.kind === 'resolved') { used.add(segment.resolution.target); }
+        }
+    }
+    for (const reference of project.publication.proseReferences || []) {
+        if (reference.annotation === 'rail' && reference.resolution.kind === 'resolved') {
+            used.add(reference.resolution.target);
         }
     }
     return project.publication.fragments.filter(family => used.has(family.target));
@@ -583,7 +602,9 @@ async function annotationLatex(document: PandocDocument, project: ParsedProject,
     };
     const ordinary = async (block: PandocBlock, markers: boolean): Promise<PandocBlock> => {
         switch (block.t) {
-            case 'Para': case 'Plain': return { ...block, c: annotationInlines(block.c, markers, next) };
+            case 'Para': case 'Plain': return { ...block, c: annotationInlines(block.c, project, markers, next) };
+            case 'Header': return { ...block,
+                c: [block.c[0], block.c[1], annotationInlines(block.c[2], project, markers, next)] };
             case 'BlockQuote': return { ...block, c: await walk(block.c, markers) };
             case 'BulletList': return { ...block, c: await items(block.c, markers) };
             case 'OrderedList': return { ...block,

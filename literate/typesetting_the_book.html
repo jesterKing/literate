@@ -120,7 +120,11 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-</style>
+.literate-document .literate-annotation { margin-block: 1em; padding: .6em 1em; border-inline-start: .2em solid currentColor; }
+.literate-document .literate-annotation-title { font-weight: bold; }
+.literate-document .literate-note { border-inline-start-style: dotted; }
+.literate-document .literate-term-unresolved { text-decoration: underline dotted; }
+.literate-document .literate-screen-index { margin-block-start: 2em; }</style>
   <meta name="author" content="Nathan 'jesterKing' Letwory">
 </head>
 <body>
@@ -153,6 +157,9 @@ reserve includes both rail width and the gap separating it from prose. On a page
 210 mm wide, 20 mm left and right margins plus a 30 mm rail reserve leave a 140 mm
 body: <code>210 - 20 - 20 - 30 = 140</code>. Height is similarly
 <code>H_body = H - T - B</code>, using top and bottom margins.</p>
+<aside class="literate-annotation literate-note" id="annotation-note-006c0069007400650072006100740065002f007400790070006500730065007400740069006e0067005f007400680065005f0062006f006f006b002e006c0069007400650072006100740065-39-0"><div class="literate-annotation-title">Note 6</div><p>On A5 paper the same arithmetic is less forgiving: <code>148 - 20 - 16 - 30 = 82</code>
+mm. That leaves only two millimetres above Literate's minimum body width.</p>
+</aside>
 <p>The renderer validates margins and requires a minimum body in both dimensions.
 This catches combinations that are individually plausible but collectively leave
 no readable page. Geometry validation occurs before conversion because no prose
@@ -169,6 +176,10 @@ body-font override.</p>
 but can also make literal character sequences harder to inspect. The renderer
 therefore treats the choice as a checked boolean and can disable contextual
 substitutions without accepting arbitrary font feature strings.</p>
+<aside class="literate-annotation literate-note" id="annotation-note-006c0069007400650072006100740065002f007400790070006500730065007400740069006e0067005f007400680065005f0062006f006f006b002e006c0069007400650072006100740065-65-0"><div class="literate-annotation-title">Note 7</div><p>Ligatures can turn character pairs such as <code>!=</code> or <code>=&gt;</code> into a single visual shape.
+That may be attractive in everyday editing, but a printed explanation sometimes
+benefits more from showing the literal characters plainly.</p>
+</aside>
 <p>Portable font companions, when present, provide explicit regular, bold, italic, and
 bold-italic faces. Without companions, family names select installed fonts. In both
 modes, author text cannot inject paths or font options through a family name.</p>
@@ -181,10 +192,14 @@ cannot place TeX syntax inside a command argument.</p>
 discretionary break opportunities between characters, allowing line wrapping
 without changing the semantic name or destination. Names that exceed the renderer's
 explicit bound fail instead of being silently abbreviated.</p>
-<p>References use the family target, while individual contribution destinations remain
+<p>References in prose and named code contributions use the family identity, while
+individual contribution destinations supply linked page suffixes and remain
 available for navigation and indexes. The visible fragment spelling stays intact;
-the printed link and page reference are presentation around that spelling, not a
-replacement for it.</p>
+printed links and page references are presentation around that spelling, not a
+replacement for it. An immediate <code>[rail]</code> suffix explicitly requests a second,
+page-local presentation and is consumed before generation. Prose recognition stays
+inside ordinary Markdown text, excluding code, raw HTML, existing links, and
+backslash-escaped openers.</p>
 <h2>Code needs full context</h2>
 <p>Syntax highlighting works best when a highlighter sees a complete contribution.
 Highlighting each literal segment separately would lose language context around
@@ -220,8 +235,11 @@ Pandoc process and its time and output bounds.</p>
 <h2>Annotations require page-time knowledge</h2>
 <p>A term definition stays in the prose. A term use can link back to that definition
 and display its page. A note use becomes a numbered marker whose body belongs in the
-outer rail. Unlike ordinary links, rail placement depends on the physical page and
-the vertical position produced by TeX.</p>
+outer rail. A fragment reference in prose or code always remains visible with
+linked contribution pages; only an explicitly annotated <code>&lt;&lt;name&gt;&gt;[rail]</code> use also
+creates a fragment rail marker. Plain references may appear in headings, while
+annotated heading uses fail before conversion. Unlike ordinary links, rail
+placement depends on the physical page and the vertical position produced by TeX.</p>
 <pre class="literate-mermaid">
 sequenceDiagram
     participant Body as Typeset body
@@ -229,7 +247,7 @@ sequenceDiagram
     participant Rail as Annotation rail
     participant Ship as Page shipout
 
-    Body-&gt;&gt;Marks: Record term uses and note positions
+    Body-&gt;&gt;Marks: Record term, note, and selected fragment uses
     Marks-&gt;&gt;Rail: Supply physical-page membership and coordinates
     Rail-&gt;&gt;Rail: Place ordered entries without overlap
     Rail-&gt;&gt;Ship: Release a stable page
@@ -238,8 +256,9 @@ sequenceDiagram
 placement. Late page nodes report where material actually landed. The diagram omits
 auxiliary-file details; the important requirement is that the final build certifies
 stable placement.</p>
-<p>Within a page, the rail preserves one ordered stream of term uses and notes. It
-tries to place each entry near its recorded position; forward and reverse packing
+<p>Within a page, the rail preserves one ordered stream of term uses, notes, and
+explicitly selected fragment uses. It tries to place each entry near its recorded
+position; forward and reverse packing
 may move entries up or down to avoid overlap and keep the complete stream inside
 the page. If the page cannot accommodate the required material, the build must fail
 or rerun rather than quietly overlap or discard an annotation.</p>

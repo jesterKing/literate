@@ -15,14 +15,15 @@ function checkRanges(documents: SourceDocument[]): void {
     }
 }
 
-test('shared scanner preserves repeated literal names, escapes and operator-free ranges', () => {
-    const text = '😀 <<a>>=+ <<a>>+ \\<<a>> <<a b>> <<"$&$`\'">>';
+test('shared scanner preserves tag-only ranges and exact rail annotations', () => {
+    const text = '😀 <<a>>=+ <<a>>[rail]+ \\<<a>>[rail] <<a b>>[Rail] <<"$&$`\'">>[rail]';
     const tags = scanFragmentTags(text);
-    assert.deepEqual(tags.map(tag => [tag.name, tag.modifier]), [
-        ['a', '=+'], ['a', '+'], ['a b', undefined], ['"$&$`\'"', undefined]
+    assert.deepEqual(tags.map(tag => [tag.name, tag.annotation, tag.modifier]), [
+        ['a', undefined, '=+'], ['a', 'rail', '+'], ['a b', undefined, undefined],
+        ['"$&$`\'"', 'rail', undefined]
     ]);
     for (const tag of tags) { assert.equal(text.slice(tag.start, tag.end), `<<${tag.name}>>`); }
-    assert.deepEqual(scanFragmentTags('<<>> <<bad\nname>> \\<<skip>>'), []);
+    assert.deepEqual(scanFragmentTags('<<>> <<bad\nname>> \\<<skip>>[rail]'), []);
 });
 
 test('shared header grammar anchors the tag rather than a repeated substring', () => {

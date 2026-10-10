@@ -8,11 +8,12 @@ in the displayed text, not source coordinates or Unicode code-point counts.
 
 ## Display first, syntax second
 
-Only literal segments decode escaped openers. Reference text remains unchanged,
-including authored whitespace in the name. Accumulating display lengths maps
-references after unescaping without rescanning them into accidental references.
-The bridge normally rejects missing targets and modifiers; this API also rejects
-them when called independently. Invalid segment reconstruction fails closed.
+Only literal segments decode escaped openers. Reference display text retains the
+tag and authored name while removing the recognized `[rail]` metadata suffix.
+Accumulating display lengths maps references after unescaping without rescanning
+them into accidental references. The bridge normally rejects missing targets and
+modifiers; this API also rejects them when called independently. Invalid segment
+reconstruction fails closed.
 
 ```ts : <<publication highlighting contract>>=
 import hljs from 'highlight.js';
@@ -25,7 +26,7 @@ export interface HighlightedContribution {
     text: string;
     spans: SyntaxSpan[];
     references: { start: number; end: number; name: string; target: string;
-        occurrenceTarget: string; placement: 'standalone' | 'inline' }[];
+        occurrenceTarget: string; placement: 'standalone' | 'inline'; annotation: 'none' | 'rail' }[];
 }
 ```
 
@@ -54,9 +55,15 @@ function displayContribution(part: PublicationContribution, screen: boolean): Hi
             if (segment.placement !== 'standalone' && segment.placement !== 'inline') {
                 throw new Error('Publication reference placement is invalid: ' + segment.name);
             }
-            if (segment.start !== rawOffset || segment.end + (segment.modifier?.length || 0) !== rawOffset + text.length) {
+            if (segment.annotation !== 'none' && segment.annotation !== 'rail') {
+                throw new Error('Publication reference annotation is invalid: ' + segment.name);
+            }
+            const annotationLength = segment.annotation === 'rail' ? '[rail]'.length : 0;
+            if (segment.start !== rawOffset || segment.end + annotationLength +
+                (segment.modifier?.length || 0) !== rawOffset + text.length) {
                 throw new Error('Publication reference offsets do not match segment text');
             }
+            text = part.content.slice(segment.start, segment.end) + (segment.modifier || '');
 ```
 
 Joining raw segments must recover the contribution; joining displayed segments
@@ -66,7 +73,8 @@ instead defines the new coordinate space. No syntax decision affects this map.
             if (segment.resolution.kind === 'resolved') {
                 references.push({ start: offset, end: offset + text.length,
                     name: segment.name, target: segment.resolution.target,
-                    occurrenceTarget: segment.occurrenceTarget, placement: segment.placement });
+                    occurrenceTarget: segment.occurrenceTarget, placement: segment.placement,
+                    annotation: segment.annotation });
             }
         }
         chunks.push(text);

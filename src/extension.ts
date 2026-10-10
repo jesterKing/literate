@@ -20,8 +20,10 @@ import { randomBytes } from 'crypto';
 import { parseProject, discoveryExcludedDirectories, generateProject, resolveProjectTheme, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection } from './engine';
 import { collectFragmentOccurrences, planFragmentRename, FragmentOccurrence } from './symbols';
 import { defaultThemeName } from './themes';
+import { installFragmentReferenceSyntax } from './engine';
 import { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAnnotation,
-  installScreenTermLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle, renderScreenExploration } from './publication-screen';
+  installScreenTermLinks, installScreenFragmentLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle,
+  renderScreenExploration } from './publication-screen';
 import { registerPublicationCommands } from './publication-extension';
 import { registerLanguageFeatures, LanguageSnapshot } from './language-features';
 
@@ -312,7 +314,9 @@ function previewThemeName(documents: SourceDocument[]): string {
 }
 
 function installPreviewDocument(md: MarkdownIt, repository: FragmentRepository, navigation: PreviewNavigation): void {
+  installFragmentReferenceSyntax(md);
   installScreenTermLinks(md);
+  installScreenFragmentLinks(md);
   const sources = new WeakMap<Token[], string>();
   md.core.ruler.before('normalize', 'literate_preview_source', state => { sources.set(state.tokens, state.src); });
   const originalRender = md.renderer.render;

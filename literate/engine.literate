@@ -44,11 +44,13 @@ test-runtime directories.
 
 ```ts : <<engine interfaces and dependencies>>=
 import MarkdownIt = require('markdown-it');
+import StateInline = require('markdown-it/lib/rules_inline/state_inline');
 import Token = require('markdown-it/lib/token');
 import hljs from 'highlight.js';
 import { collectAnnotations, PublicationAnnotations } from './publication-annotations';
 import { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAnnotation,
-    installScreenTermLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle, renderScreenExploration } from './publication-screen';
+    installScreenTermLinks, installScreenFragmentLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle,
+    renderScreenExploration } from './publication-screen';
 import { defaultThemeName, getTheme, themeCss } from './themes';
 
 export interface SourceDocument { path: string; text: string; }
@@ -87,10 +89,15 @@ No Markdown tokens or renderer-specific destinations cross this boundary.
 
 ```ts : <<engine interfaces and dependencies>>=+
 export interface PublicationLocation { path: string; line: number; column: number; }
+export interface PublicationProseReference {
+    name: string; occurrenceTarget: string; annotation: 'none' | 'rail'; at: PublicationLocation;
+    resolution: { kind: 'resolved'; target: string } | { kind: 'missing' };
+}
 export interface PublicationModel {
     documents: { path: string; contributions: string[] }[];
     fragments: { name: string; target: string; contributions: string[] }[];
     contributions: PublicationContribution[];
+    proseReferences?: PublicationProseReference[];
 }
 export interface PublicationContribution {
     target: string;
@@ -106,19 +113,20 @@ export interface PublicationContribution {
 
 Content and segment text retain Markdown-normalized code, including escapes.
 Joining segment text reconstructs content exactly. Reference offsets are UTF-16
-positions within that content; `end` excludes any definition operator, matching
-the scanner. Reference text includes that operator when present. Each reference
-has a stable occurrence target within its accepted contribution and records whether
-it occupies a line by itself, apart from spaces or tabs. Source locations are
-zero-based UTF-16 coordinates, not visual columns. A missing target is data, not a
-new diagnostic; expansion remains responsible for validation.
+positions within that content; `end` excludes a rail annotation and any definition
+operator, matching the tag-only scanner range. Reference text includes recognized
+suffixes. Each reference has a stable occurrence target within its accepted
+contribution, records whether it occupies a line by itself apart from spaces or
+tabs, and carries the author's explicit rail choice. Source locations are zero-based
+UTF-16 coordinates, not visual columns. A missing target is data, not a new
+diagnostic; expansion remains responsible for validation.
 
 ```ts : <<engine interfaces and dependencies>>=+
 export type PublicationSegment =
     | { kind: 'text'; text: string }
     | { kind: 'reference'; text: string; name: string;
         start: number; end: number; at: PublicationLocation; modifier?: string;
-        occurrenceTarget: string; placement: 'standalone' | 'inline';
+        occurrenceTarget: string; placement: 'standalone' | 'inline'; annotation: 'none' | 'rail';
         resolution: { kind: 'resolved'; target: string } | { kind: 'missing' } };
 ```
 
@@ -309,24 +317,56 @@ function sourceNulDiagnostic(document: SourceDocument): GenerationDiagnostic | u
 
 ## Shared lexical contracts for editor symbols
 
-The scanner returns whole-tag UTF-16 ranges, excluding reference operators.
-Escaped openers are consumed by the same regex as real tags, so generation and
-editor tools cannot disagree about whether a tag is a dependency. Operators
-remain available to generation for diagnostics, without entering rename ranges.
+The scanner returns whole-tag UTF-16 ranges, excluding rail annotations and
+reference operators. Escaped openers are consumed by the same regex as real tags,
+so generation and editor tools cannot disagree about whether a tag is a dependency.
+An immediate, case-sensitive `[rail]` is occurrence metadata; generation consumes
+it without writing it to output. Operators remain available for diagnostics, while
+neither suffix enters rename ranges.
 
 ```ts : <<engine shared fragment scanning>>=
-export interface FragmentTag { name: string; start: number; end: number; modifier?: string; }
+export interface FragmentTag {
+    name: string; start: number; end: number; annotation?: 'rail'; modifier?: string;
+}
 
 export function scanFragmentTags(text: string): FragmentTag[] {
     const tags: FragmentTag[] = [];
-    const pattern = /\\\<<|\<<([^<>\r\n]+)>>(=\+?|\+)?/g;
+    const pattern = /\\\<<|\<<([^<>\r\n]+)>>(\[rail\])?(=\+?|\+)?/g;
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(text))) {
         if (match[1] === undefined) { continue; }
         tags.push({ name: match[1], start: match.index,
-            end: match.index + match[1].length + 4, modifier: match[2] });
+            end: match.index + match[1].length + 4,
+            ...(match[2] === undefined ? {} : { annotation: 'rail' as const }),
+            ...(match[3] === undefined ? {} : { modifier: match[3] }) });
     }
     return tags;
+}
+
+function insideMarkdownLink(state: StateInline): boolean {
+    let depth = 0;
+    for (const token of state.tokens) {
+        if (token.type === 'link_open') { depth++; }
+        else if (token.type === 'link_close') { depth--; }
+    }
+    return depth > 0;
+}
+
+/** Install semantic prose fragment uses without scanning code, HTML, or existing links. */
+export function installFragmentReferenceSyntax(md: MarkdownIt): void {
+    md.inline.ruler.before('text', 'literate_fragment_reference', (state, silent) => {
+        if (state.src.charCodeAt(state.pos) !== 0x3c || insideMarkdownLink(state)) { return false; }
+        const tag = scanFragmentTags(state.src.slice(state.pos))[0];
+        if (!tag || tag.start !== 0 || tag.modifier !== undefined) { return false; }
+        const end = tag.end + (tag.annotation === 'rail' ? '[rail]'.length : 0);
+        if (!silent) {
+            const use = state.push('literate_fragment_use', '', 0);
+            use.content = state.src.slice(state.pos, state.pos + tag.end);
+            use.meta = { name: tag.name, annotation: tag.annotation || 'none' };
+        }
+        state.pos += end;
+        return true;
+    });
 }
 ```
 
@@ -586,6 +626,7 @@ function collectProject(documents: SourceDocument[], policy?: CollectionPolicy) 
         diagnostics.push({ ...location, message, ...(code === undefined ? {} : { code }) });
     };
     const md = new MarkdownIt();
+    installFragmentReferenceSyntax(md);
     const sources = new Map<string, SourceDocument>();
     const sourceKeys = new Set<string>();
     <<engine accept source inputs>>
@@ -880,7 +921,7 @@ changes the graph used for expansion or the tokens used for HTML rendering.
         fragments: Array.from(fragments.keys(), name => ({
             name, target: 'f-' + publicationEncode(name), contributions: []
         })),
-        contributions: []
+        contributions: [], proseReferences: []
     };
     const publicationDocuments = new Map(publication.documents.map(document => [document.path, document]));
     const publicationFamilies = new Map(publication.fragments.map(fragment => [fragment.name, fragment]));
@@ -914,19 +955,20 @@ for (const { header, part, tokenIndex } of accepted) {
 ```
 
 Segment the original normalized body before unescaping or highlighting. The
-shared scanner excludes escaped openers. Operators belong to reference text,
-while `end` retains the scanner's tag-only boundary; advancing past the operator
-prevents duplicating it in the next literal segment. A reference is standalone
-only when spaces or tabs are its sole companions on the line. Its one-based
-ordinal is local to the accepted contribution, so prose and line-number changes do
-not alter its identity. Empty bodies need no segments.
+shared scanner excludes escaped openers. Rail annotations and operators belong to
+raw reference text, while `end` retains the scanner's tag-only boundary; advancing
+past both suffixes prevents duplicating them in the next literal segment. A
+reference is standalone only when spaces or tabs are its sole companions after the
+complete recognized syntax. Its one-based ordinal is local to the accepted
+contribution, so prose and line-number changes do not alter its identity. Empty
+bodies need no segments.
 
 ```ts : <<engine segment publication content>>=
 let cursor = 0;
-for (const { name, start, end, modifier, at } of references(part)) {
+for (const { name, start, end, annotation, modifier, at } of references(part)) {
     if (start > cursor) { segments.push({ kind: 'text', text: part.content.slice(cursor, start) }); }
     const familyTarget = publicationFamilies.get(name)?.target;
-    const textEnd = end + (modifier?.length || 0);
+    const textEnd = end + (annotation === 'rail' ? '[rail]'.length : 0) + (modifier?.length || 0);
     const lineStart = part.content.lastIndexOf('\n', start - 1) + 1;
     const newline = part.content.indexOf('\n', textEnd);
     const lineEnd = newline < 0 ? part.content.length : newline;
@@ -935,7 +977,7 @@ for (const { name, start, end, modifier, at } of references(part)) {
     segments.push({
         kind: 'reference', text: part.content.slice(start, textEnd), name, start, end, at,
         occurrenceTarget: `${target}-r-${++referenceOrdinal}`, placement,
-        ...(modifier === undefined ? {} : { modifier }),
+        annotation: annotation || 'none', ...(modifier === undefined ? {} : { modifier }),
         resolution: familyTarget === undefined ? { kind: 'missing' } : { kind: 'resolved', target: familyTarget }
     });
     cursor = textEnd;
@@ -945,11 +987,32 @@ if (cursor < part.content.length) { segments.push({ kind: 'text', text: part.con
 
 ### Finish the shared snapshot before expansion
 
-Contribution token indexes select exactly the accepted fences. Keeping the token
-stream intact also preserves nested container boundaries and every rejected fence
-without inferring a second acceptance policy from headers.
+Semantic prose tokens are already separated from code spans, code blocks, raw HTML,
+and existing links by Markdown. Resolve those tokens against the same family model
+as contribution references. Missing prose targets remain data so generation and
+tolerant screens still work; strict publication reports them. Occurrence identities
+follow canonical document and token order rather than rendered output.
 
 ```ts : <<engine finish shared collection>>=
+    let proseOrdinal = 0;
+    for (const path of order) {
+        const documentTokens = tokens.get(path)!;
+        for (const token of documentTokens) {
+            for (const child of token.children || []) {
+                if (child.type !== 'literate_fragment_use') { continue; }
+                const name = String(child.meta?.name || '');
+                const familyTarget = publicationFamilies.get(name)?.target;
+                const reference: PublicationProseReference = {
+                    name, occurrenceTarget: `p-${publicationEncode(path)}-${++proseOrdinal}`,
+                    annotation: child.meta?.annotation === 'rail' ? 'rail' : 'none',
+                    at: { path, line: token.map?.[0] ?? 0, column: 0 },
+                    resolution: familyTarget === undefined ? { kind: 'missing' } :
+                        { kind: 'resolved', target: familyTarget }
+                };
+                child.meta = reference; publication.proseReferences!.push(reference);
+            }
+        }
+    }
     const parsedDocuments: ParsedDocument[] = order.map(path => {
         const documentTokens = tokens.get(path)!;
         const targets = new Map(publicationDocuments.get(path)!.contributions.map(target => {
@@ -1095,7 +1158,8 @@ finish, preserving diagnostic ordering as well as output ordering.
                 const replacement = (yield reference).replace(/\n$/, '');
                 const indent = /[ \t]*$/.exec(reference.prefix)?.[0] || '';
                 content += replacement.replace(/\n/g, () => '\n' + indent);
-                cursor = reference.end + (reference.modifier?.length || 0);
+                cursor = reference.end + (reference.annotation === 'rail' ? '[rail]'.length : 0) +
+                    (reference.modifier?.length || 0);
             }
             content += part.content.slice(cursor);
         }
@@ -1213,6 +1277,7 @@ HTML-only: hiding highlighted comments never changes the tangled source bytes.
 ```ts : <<engine install fence renderer>>=
 const annotations = collected.parsed.annotations;
 installScreenTermLinks(md);
+installScreenFragmentLinks(md);
 md.renderer.rules.fence = (fenceTokens: Token[], index: number, _options, env) => {
     const token = fenceTokens[index];
     if (token.info.trim() === 'SETTINGS') { return ''; }

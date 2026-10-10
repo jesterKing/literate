@@ -218,6 +218,20 @@ function sanitizeAnnotationTokens(tokens: Token[]): Token[] {
     }
     return tokens;
 }
+export function installScreenFragmentLinks(md: MarkdownIt): void {
+    md.renderer.rules.literate_fragment_use = (tokens, index, _options, env) => {
+        const token = tokens[index];
+        const context = env?.literateScreen as ScreenAnnotationContext | undefined;
+        const name = String(token.meta?.name || '');
+        const family = context?.model.fragments.find(item => item.name === name);
+        const lookup = context && screenIndex(context.model, context.annotations);
+        const base = lookup?.parts.get(family?.contributions[0] || '');
+        const href = context && family && base ? screenHref(context.path, base.definition.path,
+            family.target, context.format, context.destination) : undefined;
+        return family ? screenLink(href, `Definition of ${name}`, token.content, family.target) :
+            escapeHtml(token.content);
+    };
+}
 export function installScreenTermLinks(md: MarkdownIt): void {
     const open = md.renderer.rules.link_open, close = md.renderer.rules.link_close;
     const destination = (href: string, context?: ScreenAnnotationContext) => {

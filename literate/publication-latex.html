@@ -120,7 +120,11 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-</style>
+.literate-document .literate-annotation { margin-block: 1em; padding: .6em 1em; border-inline-start: .2em solid currentColor; }
+.literate-document .literate-annotation-title { font-weight: bold; }
+.literate-document .literate-note { border-inline-start-style: dotted; }
+.literate-document .literate-term-unresolved { text-decoration: underline dotted; }
+.literate-document .literate-screen-index { margin-block-start: 2em; }</style>
   <meta name="author" content="Nathan 'jesterKing' Letwory">
 </head>
 <body>
@@ -659,41 +663,44 @@ The heading requests room for its start and code, but no entire code block is bo
 
 </div>
 <nav class="fragment-navigation" aria-label="Contributions of publication LaTeX contributions"><a class="literate-tag-name" href="#c-007000750062006c00690063006100740069006f006e0020004c006100540065005800200063006f006e0074007200690062007500740069006f006e0073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006c0061007400650078002e006c0069007400650072006100740065-2" data-literate-target="c-007000750062006c00690063006100740069006f006e0020004c006100540065005800200063006f006e0074007200690062007500740069006f006e0073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006c0061007400650078002e006c0069007400650072006100740065-2" aria-label="Next contribution of publication LaTeX contributions">Next</a></nav>
-</div><p>Inline reference names remain complete, with superscript family-definition pages.
-A standalone reference moves to the outer rail and leaves one marker baseline in
-the code, preserving vertical correspondence without repeating the name. The
-highlighter cannot invent a destination: returned names and targets are checked
-against the publication families. The existing bridge independently validates
-source references, missing targets, modifiers, and cycles before calling this
-renderer.</p>
+</div><p>Every reference name remains complete in the code body, with linked superscript
+pages for all contributions in its family. An explicit <code>[rail]</code> annotation adds a
+page-local marker without replacing that visible body reference. Placement controls
+only whether the body reference occupies its own hanging line. The highlighter
+cannot invent a destination: returned names and targets are checked against the
+publication families. The existing bridge independently validates source
+references, missing targets, modifiers, and cycles before calling this renderer.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020004c006100540065005800200063006f006e0074007200690062007500740069006f006e0073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006c0061007400650078002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020004c006100540065005800200063006f006e0074007200690062007500740069006f006e0073" data-literate-target="f-007000750062006c00690063006100740069006f006e0020004c006100540065005800200063006f006e0074007200690062007500740069006f006e0073" aria-label="Definition of publication LaTeX contributions">&lt;&lt;publication LaTeX contributions&gt;&gt;=+</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">contributionBody</span>(<span class="hljs-params">data: Highlighted, project: ParsedProject,
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">fragmentPageLink</span>(<span class="hljs-params">family: ParsedProject[</span><span class="hljs-string">'publication'</span><span class="hljs-params">][</span><span class="hljs-string">'fragments'</span><span class="hljs-params">][</span><span class="hljs-built_in">number</span><span class="hljs-params">], label: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">if</span> (!family.<span class="hljs-property">contributions</span>.<span class="hljs-property">length</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Referenced fragment has no contributions'</span>); }
+    <span class="hljs-keyword">const</span> pages = family.<span class="hljs-property">contributions</span>.<span class="hljs-title">map</span>(<span class="hljs-params">id</span><span class="hljs-function"> =&gt;</span> {
+        <span class="hljs-keyword">const</span> destination = <span class="hljs-title">target</span>(id);
+        <span class="hljs-keyword">return</span> <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">hyperref[</span><span class="hljs-subst">${destination}</span><span class="hljs-string">]{</span><span class="hljs-string">\\</span><span class="hljs-string">pageref*{</span><span class="hljs-subst">${destination}</span><span class="hljs-string">}}`</span>;
+    }).<span class="hljs-title">join</span>(<span class="hljs-string">',</span><span class="hljs-string">\\</span><span class="hljs-string">allowbreak{} '</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">hyperref[</span><span class="hljs-subst">${target(family.contributions[</span><span class="hljs-number">0</span><span class="hljs-subst">])}</span><span class="hljs-string">]{</span><span class="hljs-subst">${label}</span><span class="hljs-string">}`</span> +
+        <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">textsuperscript{</span><span class="hljs-string">\\</span><span class="hljs-string">notefont </span><span class="hljs-subst">${pages}</span><span class="hljs-string">}`</span>;
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title">contributionBody</span>(<span class="hljs-params">data: Highlighted, project: ParsedProject,
     theme: LiterateTheme, definitions: </span><span class="hljs-built_in">string</span><span class="hljs-params">[]</span>): <span class="hljs-built_in">string</span> {
     <span class="hljs-keyword">let</span> cursor = <span class="hljs-number">0</span>, output = <span class="hljs-string">''</span>;
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> reference <span class="hljs-keyword">of</span> data.<span class="hljs-property">references</span>) {
-        <span class="hljs-keyword">if</span> (!project.<span class="hljs-property">publication</span>.<span class="hljs-property">fragments</span>.<span class="hljs-title">some</span>(<span class="hljs-params">family</span><span class="hljs-function"> =&gt;</span>
-            family.<span class="hljs-property">target</span> === reference.<span class="hljs-property">target</span> &amp;&amp; family.<span class="hljs-property">name</span> === reference.<span class="hljs-property">name</span>)) {
-            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Unknown highlighted reference destination'</span>);
-        }
+        <span class="hljs-keyword">const</span> family = project.<span class="hljs-property">publication</span>.<span class="hljs-property">fragments</span>.<span class="hljs-title">find</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span>
+            item.<span class="hljs-property">target</span> === reference.<span class="hljs-property">target</span> &amp;&amp; item.<span class="hljs-property">name</span> === reference.<span class="hljs-property">name</span>);
+        <span class="hljs-keyword">if</span> (!family) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Unknown highlighted reference destination'</span>); }
         <span class="hljs-keyword">const</span> standalone = reference.<span class="hljs-property">placement</span> === <span class="hljs-string">'standalone'</span>;
         output += <span class="hljs-title">literal</span>(data, cursor,
             standalone ? <span class="hljs-title">referencePrefixEnd</span>(data.<span class="hljs-property">text</span>, cursor, reference.<span class="hljs-property">start</span>) : reference.<span class="hljs-property">start</span>, theme);
         <span class="hljs-keyword">const</span> command = <span class="hljs-title">macroName</span>(definitions.<span class="hljs-property">length</span>);
-        <span class="hljs-keyword">if</span> (standalone) {
-            definitions.<span class="hljs-title">push</span>(<span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">newcommand{</span><span class="hljs-string">\\</span><span class="hljs-subst">${command}</span><span class="hljs-string">}{</span><span class="hljs-string">\\</span><span class="hljs-string">par</span><span class="hljs-string">\\</span><span class="hljs-string">begingroup`</span> +
-                <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">fragmentfont</span><span class="hljs-string">\\</span><span class="hljs-string">small</span><span class="hljs-string">\\</span><span class="hljs-string">noindent '</span> +
-                <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">LitFragmentUse{</span><span class="hljs-subst">${target(reference.occurrenceTarget)}</span><span class="hljs-string">}{</span><span class="hljs-subst">${target(reference.target)}</span><span class="hljs-string">}</span><span class="hljs-string">\\</span><span class="hljs-string">strut`</span> +
-                <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">par</span><span class="hljs-string">\\</span><span class="hljs-string">endgroup}'</span>);
-        } <span class="hljs-keyword">else</span> {
-            <span class="hljs-keyword">const</span> label = <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">textless{}</span><span class="hljs-string">\\</span><span class="hljs-string">textless{}'</span> + <span class="hljs-title">nameText</span>(reference.<span class="hljs-property">name</span>) +
-                <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">textgreater{}</span><span class="hljs-string">\\</span><span class="hljs-string">textgreater{}'</span>;
-            definitions.<span class="hljs-title">push</span>(<span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">newcommand{</span><span class="hljs-string">\\</span><span class="hljs-subst">${command}</span><span class="hljs-string">}{</span><span class="hljs-string">\\</span><span class="hljs-string">par</span><span class="hljs-string">\\</span><span class="hljs-string">begingroup`</span> +
-                <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">leftskip=1.5em</span><span class="hljs-string">\\</span><span class="hljs-string">rightskip=0pt plus 1fil</span><span class="hljs-string">\\</span><span class="hljs-string">parindent=0pt'</span> +
-                <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">fragmentfont</span><span class="hljs-string">\\</span><span class="hljs-string">small</span><span class="hljs-string">\\</span><span class="hljs-string">noindent '</span> + <span class="hljs-title">pageLink</span>(reference.<span class="hljs-property">target</span>, label) +
-                <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">par</span><span class="hljs-string">\\</span><span class="hljs-string">endgroup}'</span>);
-        }
+        <span class="hljs-keyword">const</span> label = <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">textless{}</span><span class="hljs-string">\\</span><span class="hljs-string">textless{}'</span> + <span class="hljs-title">nameText</span>(reference.<span class="hljs-property">name</span>) +
+            <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">textgreater{}</span><span class="hljs-string">\\</span><span class="hljs-string">textgreater{}'</span>;
+        <span class="hljs-keyword">const</span> marker = reference.<span class="hljs-property">annotation</span> === <span class="hljs-string">'rail'</span> ?
+            <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">LitFragmentUse{</span><span class="hljs-subst">${target(reference.occurrenceTarget)}</span><span class="hljs-string">}{</span><span class="hljs-subst">${target(reference.target)}</span><span class="hljs-string">}`</span> : <span class="hljs-string">''</span>;
+        definitions.<span class="hljs-title">push</span>(<span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">newcommand{</span><span class="hljs-string">\\</span><span class="hljs-subst">${command}</span><span class="hljs-string">}{</span><span class="hljs-string">\\</span><span class="hljs-string">par</span><span class="hljs-string">\\</span><span class="hljs-string">begingroup`</span> +
+            (standalone ? <span class="hljs-string">''</span> : <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">leftskip=1.5em</span><span class="hljs-string">\\</span><span class="hljs-string">rightskip=0pt plus 1fil</span><span class="hljs-string">\\</span><span class="hljs-string">parindent=0pt'</span>) +
+            <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">fragmentfont</span><span class="hljs-string">\\</span><span class="hljs-string">small</span><span class="hljs-string">\\</span><span class="hljs-string">noindent '</span> + marker + <span class="hljs-title">fragmentPageLink</span>(family, label) +
+            <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">par</span><span class="hljs-string">\\</span><span class="hljs-string">endgroup}'</span>);
         output += <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-subst">${command}</span><span class="hljs-string">{}</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>;
         <span class="hljs-keyword">if</span> (standalone) {
             <span class="hljs-keyword">const</span> newline = data.<span class="hljs-property">text</span>.<span class="hljs-title">indexOf</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>, reference.<span class="hljs-property">end</span>);
@@ -709,7 +716,8 @@ renderer.</p>
 </div><p>Each generated reference paragraph supplies its own terminating line break.
 Standalone placement discards indentation and trailing horizontal whitespace, then
 consumes its one source newline; earlier authored blank lines remain intact. Inline
-placement preserves both surrounding slices and retains the visible hanging name.</p>
+placement preserves both surrounding slices. Both retain the complete visible tag
+and linked contribution pages.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e0020004c006100540065005800200063006f006e0074007200690062007500740069006f006e0073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006c0061007400650078002e006c0069007400650072006100740065-3"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e0020004c006100540065005800200063006f006e0074007200690062007500740069006f006e0073" data-literate-target="f-007000750062006c00690063006100740069006f006e0020004c006100540065005800200063006f006e0074007200690062007500740069006f006e0073" aria-label="Definition of publication LaTeX contributions">&lt;&lt;publication LaTeX contributions&gt;&gt;=+</a></div>
 <div class="code">
@@ -818,10 +826,21 @@ replay in moving arguments.</p>
     <span class="hljs-attr">standalone</span>: <span class="hljs-literal">false</span>, <span class="hljs-attr">syntaxHighlighting</span>: <span class="hljs-string">'none'</span>, <span class="hljs-attr">topLevelDivision</span>: <span class="hljs-string">'chapter'</span>
 };
 <span class="hljs-keyword">function</span> <span class="hljs-title">rawInline</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">PandocInline</span> { <span class="hljs-keyword">return</span> { <span class="hljs-attr">t</span>: <span class="hljs-string">'RawInline'</span>, <span class="hljs-attr">c</span>: [<span class="hljs-string">'latex'</span>, value] }; }
-<span class="hljs-keyword">function</span> <span class="hljs-title">annotationInlines</span>(<span class="hljs-params">inlines: PandocInline[], markers: </span><span class="hljs-built_in">boolean</span><span class="hljs-params">, next: </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">string</span>): <span class="hljs-title">PandocInline</span>[] {
+<span class="hljs-keyword">function</span> <span class="hljs-title">annotationInlines</span>(<span class="hljs-params">inlines: PandocInline[], project: ParsedProject,
+    markers: </span><span class="hljs-built_in">boolean</span><span class="hljs-params">, next: </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">string</span>): <span class="hljs-title">PandocInline</span>[] {
     <span class="hljs-keyword">return</span> inlines.<span class="hljs-title">flatMap</span>((inline): <span class="hljs-title">PandocInline</span>[] =&gt; {
         <span class="hljs-keyword">if</span> (inline.<span class="hljs-property">t</span> === <span class="hljs-string">'Link'</span>) {
-            <span class="hljs-keyword">const</span> label = <span class="hljs-title">annotationInlines</span>(inline.<span class="hljs-property">c</span>[<span class="hljs-number">1</span>], markers, next);
+            <span class="hljs-keyword">const</span> label = <span class="hljs-title">annotationInlines</span>(inline.<span class="hljs-property">c</span>[<span class="hljs-number">1</span>], project, markers, next);
+            <span class="hljs-keyword">if</span> (inline.<span class="hljs-property">c</span>[<span class="hljs-number">0</span>][<span class="hljs-number">1</span>].<span class="hljs-title">includes</span>(<span class="hljs-string">'lit-fragment-use'</span>)) {
+                <span class="hljs-keyword">const</span> values = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>(inline.<span class="hljs-property">c</span>[<span class="hljs-number">0</span>][<span class="hljs-number">2</span>]);
+                <span class="hljs-keyword">const</span> family = project.<span class="hljs-property">publication</span>.<span class="hljs-property">fragments</span>.<span class="hljs-title">find</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> item.<span class="hljs-property">target</span> === values.<span class="hljs-title">get</span>(<span class="hljs-string">'data-target'</span>));
+                <span class="hljs-keyword">if</span> (!family) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Prose fragment reference family is missing'</span>); }
+                <span class="hljs-keyword">const</span> marker = markers &amp;&amp; values.<span class="hljs-title">get</span>(<span class="hljs-string">'data-annotation'</span>) === <span class="hljs-string">'rail'</span> ?
+                    <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">LitFragmentUse{</span><span class="hljs-subst">${target(values.get(</span><span class="hljs-string">'data-occurrence'</span><span class="hljs-subst">) || </span><span class="hljs-string">''</span><span class="hljs-subst">)}</span><span class="hljs-string">}{</span><span class="hljs-subst">${target(family.target)}</span><span class="hljs-string">}`</span> : <span class="hljs-string">''</span>;
+                <span class="hljs-keyword">const</span> name = <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">textless{}</span><span class="hljs-string">\\</span><span class="hljs-string">textless{}'</span> + <span class="hljs-title">nameText</span>(family.<span class="hljs-property">name</span>) +
+                    <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">textgreater{}</span><span class="hljs-string">\\</span><span class="hljs-string">textgreater{}'</span>;
+                <span class="hljs-keyword">return</span> [<span class="hljs-title">rawInline</span>(marker + <span class="hljs-title">fragmentPageLink</span>(family, name))];
+            }
             <span class="hljs-keyword">if</span> (!inline.<span class="hljs-property">c</span>[<span class="hljs-number">0</span>][<span class="hljs-number">1</span>].<span class="hljs-title">includes</span>(<span class="hljs-string">'lit-term-use'</span>)) { <span class="hljs-keyword">return</span> [{ ...inline, <span class="hljs-attr">c</span>: [inline.<span class="hljs-property">c</span>[<span class="hljs-number">0</span>], label, inline.<span class="hljs-property">c</span>[<span class="hljs-number">2</span>]] }]; }
             <span class="hljs-keyword">const</span> id = <span class="hljs-title">target</span>(inline.<span class="hljs-property">c</span>[<span class="hljs-number">2</span>][<span class="hljs-number">0</span>].<span class="hljs-title">slice</span>(<span class="hljs-number">1</span>));
             <span class="hljs-keyword">const</span> opening = (markers ? <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">LitTermUse{</span><span class="hljs-subst">${next()}</span><span class="hljs-string">}{</span><span class="hljs-subst">${id}</span><span class="hljs-string">}{`</span> : <span class="hljs-string">''</span>) + <span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">hyperref[</span><span class="hljs-subst">${id}</span><span class="hljs-string">]{`</span>;
@@ -829,7 +848,7 @@ replay in moving arguments.</p>
             <span class="hljs-keyword">return</span> [<span class="hljs-title">rawInline</span>(opening), ...label, <span class="hljs-title">rawInline</span>(closing)];
         }
         <span class="hljs-keyword">if</span> (inline.<span class="hljs-property">t</span> === <span class="hljs-string">'Emph'</span> || inline.<span class="hljs-property">t</span> === <span class="hljs-string">'Strong'</span> || inline.<span class="hljs-property">t</span> === <span class="hljs-string">'Strikeout'</span>) {
-            <span class="hljs-keyword">return</span> [{ ...inline, <span class="hljs-attr">c</span>: <span class="hljs-title">annotationInlines</span>(inline.<span class="hljs-property">c</span>, markers, next) }];
+            <span class="hljs-keyword">return</span> [{ ...inline, <span class="hljs-attr">c</span>: <span class="hljs-title">annotationInlines</span>(inline.<span class="hljs-property">c</span>, project, markers, next) }];
         }
         <span class="hljs-keyword">return</span> [inline];
     });
@@ -880,8 +899,13 @@ final rail builder remains responsible for validating its full API contract.</p>
     <span class="hljs-keyword">const</span> used = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> contribution <span class="hljs-keyword">of</span> project.<span class="hljs-property">publication</span>.<span class="hljs-property">contributions</span>) {
         <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> segment <span class="hljs-keyword">of</span> contribution.<span class="hljs-property">segments</span>) {
-            <span class="hljs-keyword">if</span> (segment.<span class="hljs-property">kind</span> === <span class="hljs-string">'reference'</span> &amp;&amp; segment.<span class="hljs-property">placement</span> === <span class="hljs-string">'standalone'</span> &amp;&amp;
+            <span class="hljs-keyword">if</span> (segment.<span class="hljs-property">kind</span> === <span class="hljs-string">'reference'</span> &amp;&amp; segment.<span class="hljs-property">annotation</span> === <span class="hljs-string">'rail'</span> &amp;&amp;
                 segment.<span class="hljs-property">resolution</span>.<span class="hljs-property">kind</span> === <span class="hljs-string">'resolved'</span>) { used.<span class="hljs-title">add</span>(segment.<span class="hljs-property">resolution</span>.<span class="hljs-property">target</span>); }
+        }
+    }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> reference <span class="hljs-keyword">of</span> project.<span class="hljs-property">publication</span>.<span class="hljs-property">proseReferences</span> || []) {
+        <span class="hljs-keyword">if</span> (reference.<span class="hljs-property">annotation</span> === <span class="hljs-string">'rail'</span> &amp;&amp; reference.<span class="hljs-property">resolution</span>.<span class="hljs-property">kind</span> === <span class="hljs-string">'resolved'</span>) {
+            used.<span class="hljs-title">add</span>(reference.<span class="hljs-property">resolution</span>.<span class="hljs-property">target</span>);
         }
     }
     <span class="hljs-keyword">return</span> project.<span class="hljs-property">publication</span>.<span class="hljs-property">fragments</span>.<span class="hljs-title">filter</span>(<span class="hljs-params">family</span><span class="hljs-function"> =&gt;</span> used.<span class="hljs-title">has</span>(family.<span class="hljs-property">target</span>));
@@ -990,7 +1014,9 @@ comment emitted here; escaped author text cannot manufacture that preamble line.
     };
     <span class="hljs-keyword">const</span> ordinary = <span class="hljs-keyword">async</span> (<span class="hljs-attr">block</span>: <span class="hljs-title">PandocBlock</span>, <span class="hljs-attr">markers</span>: <span class="hljs-built_in">boolean</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">PandocBlock</span>&gt; =&gt; {
         <span class="hljs-keyword">switch</span> (block.<span class="hljs-property">t</span>) {
-            <span class="hljs-keyword">case</span> <span class="hljs-string">'Para'</span>: <span class="hljs-keyword">case</span> <span class="hljs-string">'Plain'</span>: <span class="hljs-keyword">return</span> { ...block, <span class="hljs-attr">c</span>: <span class="hljs-title">annotationInlines</span>(block.<span class="hljs-property">c</span>, markers, next) };
+            <span class="hljs-keyword">case</span> <span class="hljs-string">'Para'</span>: <span class="hljs-keyword">case</span> <span class="hljs-string">'Plain'</span>: <span class="hljs-keyword">return</span> { ...block, <span class="hljs-attr">c</span>: <span class="hljs-title">annotationInlines</span>(block.<span class="hljs-property">c</span>, project, markers, next) };
+            <span class="hljs-keyword">case</span> <span class="hljs-string">'Header'</span>: <span class="hljs-keyword">return</span> { ...block,
+                <span class="hljs-attr">c</span>: [block.<span class="hljs-property">c</span>[<span class="hljs-number">0</span>], block.<span class="hljs-property">c</span>[<span class="hljs-number">1</span>], <span class="hljs-title">annotationInlines</span>(block.<span class="hljs-property">c</span>[<span class="hljs-number">2</span>], project, markers, next)] };
             <span class="hljs-keyword">case</span> <span class="hljs-string">'BlockQuote'</span>: <span class="hljs-keyword">return</span> { ...block, <span class="hljs-attr">c</span>: <span class="hljs-keyword">await</span> <span class="hljs-title">walk</span>(block.<span class="hljs-property">c</span>, markers) };
             <span class="hljs-keyword">case</span> <span class="hljs-string">'BulletList'</span>: <span class="hljs-keyword">return</span> { ...block, <span class="hljs-attr">c</span>: <span class="hljs-keyword">await</span> <span class="hljs-title">items</span>(block.<span class="hljs-property">c</span>, markers) };
             <span class="hljs-keyword">case</span> <span class="hljs-string">'OrderedList'</span>: <span class="hljs-keyword">return</span> { ...block,

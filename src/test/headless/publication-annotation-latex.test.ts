@@ -159,8 +159,26 @@ test('plain books retain layout and indexes are conditional; annotated fragment 
     }
 });
 
-test('standalone fragment references activate compact rail rows with every contribution page', async () => {
-    const code = '```js : <<caller>>=\n  <<piece>>  \n<<piece>>\n````\n'.replace('````', '```') +
+test('prose fragment uses keep page links and explicitly activate the rail', async () => {
+    const code = '```js : <<piece>>=\nbase\n```\n```js : <<piece>>=+\naddition\n```\n';
+    const plain = await renderLatex(parse('# Plain <<piece>>\n\nBody <<piece>>.\n\n' + code), {}, convert);
+    assert.deepEqual(plain.diagnostics, []);
+    assert.equal((plain.latex!.match(/textless\{\}\\textless\{\}/g) || []).length, 2);
+    assert.ok((plain.latex!.match(/\\pageref\*/g) || []).length >= 4);
+    assert.doesNotMatch(plain.latex!, /\\LitFragmentUse|literate-publication-rail-v1|\[rail\]/);
+
+    const project = parse('Body <<piece>>[rail] and <<piece>>[rail].\n\n' + code);
+    const annotated = await renderLatex(project, {}, convert);
+    assert.deepEqual(annotated.diagnostics, []);
+    assert.match(annotated.latex!, /right=50mm/);
+    assert.equal((annotated.latex!.match(/\\LitFragmentUse\{/g) || []).length, 2);
+    assert.equal((annotated.latex!.match(/\\long\\def\\LitRailBodyA/g) || []).length, 1);
+    assert.doesNotMatch(annotated.latex!, /\\long\\def\\LitRailBodyB/);
+    assert.doesNotMatch(annotated.latex!, /\[rail\]/);
+});
+
+test('explicit fragment annotations add compact rail rows with every contribution page', async () => {
+    const code = '```js : <<caller>>=\n  <<piece>>[rail]  \n<<piece>>[rail]\n````\n'.replace('````', '```') +
         '```js : <<piece>>=\nbase\n```\n```js : <<piece>>=+\naddition\n```\n';
     const project = parse(code);
     const result = await renderLatex(project, {}, convert);
@@ -169,9 +187,9 @@ test('standalone fragment references activate compact rail rows with every contr
     assert.match(latex, /right=50mm/);
     assert.match(latex, /literate-publication-rail-v1/);
     assert.equal((latex.match(/\\LitFragmentUse\{/g) || []).length, 2,
-        'each standalone source occurrence has one marker');
-    assert.doesNotMatch(latex.slice(latex.indexOf('\\newcommand{\\LitReferenceA}'),
-        latex.indexOf('\\newcommand{\\LitReferenceB}')), /textless|pageref/);
+        'each annotated source occurrence has one marker');
+    assert.match(latex.slice(latex.indexOf('\\newcommand{\\LitReferenceA}'),
+        latex.indexOf('\\newcommand{\\LitReferenceB}')), /textless[\s\S]*pageref/);
     const family = project.publication.fragments.find(item => item.name === 'piece')!;
     for (const contribution of family.contributions) {
         assert.ok(latex.includes(`\\LitRailResolve{${encode(contribution)}}`));

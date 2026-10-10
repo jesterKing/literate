@@ -377,13 +377,16 @@ function headingLinkDestination(destination: DocumentDestination, slug: string, 
 
 The inline reader consumes matching pairs recursively. Ordinary text is split
 into Pandoc words and spaces; HTML- or TeX-looking text is still ordinary text.
-Code spans preserve their exact token content. Literal code is not scanned for
-fragment references. The nesting limit turns excessively nested input into a
-source diagnostic before JavaScript recursion becomes unsafe.
+Semantic fragment-use tokens become controlled links carrying occurrence and rail
+metadata. Recognition happens before Markdown escapes are consumed, but excludes
+code spans, code blocks, raw HTML, existing links, and escaped openers. The nesting
+limit turns excessively nested input into a source diagnostic before JavaScript
+recursion becomes unsafe.
 
 ```ts : <<publication Pandoc inline reader>>=
 interface InlineReader {
     annotations: PublicationAnnotations;
+    publication: ParsedProject['publication'];
     document: ParsedDocument;
     tokens: readonly Token[];
     index: number;
@@ -422,6 +425,7 @@ while (reader.index < reader.tokens.length) {
         case 'text':
                     for (const inline of textInlines(token.content)) { result.push(inline); }
                     break;
+        case 'literate_fragment_use': result.push(readFragmentUse(reader, token)); break;
         case 'code_inline': result.push({ t: 'Code', c: [emptyAttributes(), token.content] }); break;
         case 'softbreak': result.push({ t: 'SoftBreak' }); break;
         case 'hardbreak': result.push({ t: 'LineBreak' }); break;
@@ -439,6 +443,18 @@ empty destination on failure is never exposed, because any diagnostic suppresses
 the public document and all renderer callbacks.
 
 ```ts : <<publication Pandoc inline reader>>=+
+function readFragmentUse(reader: InlineReader, token: Token): PandocInline {
+    const name = String(token.meta?.name || '');
+    const family = reader.publication.fragments.find(item => item.name === name);
+    const occurrence = String(token.meta?.occurrenceTarget || '');
+    const annotation = token.meta?.annotation === 'rail' ? 'rail' : 'none';
+    if (!family || !occurrence) {
+        report(reader.diagnostics, reader.at, 'missing-fragment', `Missing fragment referenced from prose: ${name}`);
+    }
+    return { t: 'Link', c: [['', ['lit-fragment-use'], [
+        ['data-target', family?.target || ''], ['data-occurrence', occurrence], ['data-annotation', annotation]
+    ]], textInlines(token.content), ['#' + (family?.target || ''), '']] };
+}
 function readLink(reader: InlineReader, token: Token, depth: number): PandocInline {
     const original = token.attrGet('href') ?? '';
     const term = original.startsWith('term:');
@@ -464,6 +480,7 @@ cursor, preserving nesting and authored order across each contribution.
 ```ts : <<publication Pandoc block reader>>=
 interface BlockReader {
     annotations: PublicationAnnotations;
+    publication: ParsedProject['publication'];
     annotationBody?: boolean;
     document: ParsedDocument;
     index: number;
@@ -553,7 +570,8 @@ function readTextBlock(reader: BlockReader, opening: Token): PandocInline[] {
     }
     reader.index++;
     const result = readInlines({ document: reader.document, tokens: token.children ?? [],
-        index: 0, at, targets: reader.targets, diagnostics: reader.diagnostics, annotations: reader.annotations });
+        index: 0, at, targets: reader.targets, diagnostics: reader.diagnostics,
+        annotations: reader.annotations, publication: reader.publication });
     if (reader.document.tokens[reader.index]?.type === stop) { reader.index++; }
     else { report(reader.diagnostics, at, 'invalid-markdown-structure', `Expected ${stop}`); }
     return result;
@@ -563,10 +581,14 @@ function readHeading(reader: BlockReader, token: Token): PandocLeafBlock {
     if (!level) {
         report(reader.diagnostics, tokenLocation(reader.document, token), 'invalid-markdown-structure', 'Invalid heading level');
     }
-    if (reader.document.tokens[reader.index]?.children?.some(child =>
-        child.type === 'link_open' && child.attrGet('href')?.startsWith('term:'))) {
+    const headingChildren = reader.document.tokens[reader.index]?.children || [];
+    if (headingChildren.some(child => child.type === 'link_open' && child.attrGet('href')?.startsWith('term:'))) {
         report(reader.diagnostics, tokenLocation(reader.document, token), 'annotation-heading',
             'TERM links in headings are unsupported: use a prose link below the heading to avoid moving rail markers');
+    }
+    if (headingChildren.some(child => child.type === 'literate_fragment_use' && child.meta?.annotation === 'rail')) {
+        report(reader.diagnostics, tokenLocation(reader.document, token), 'annotation-heading',
+            'Rail fragment references in headings are unsupported: use a prose reference below the heading');
     }
     const id = reader.targets.get(reader.document.path)!.tokens.get(token)!;
     return { t: 'Header', c: [level, [id, [], []], readTextBlock(reader, token)] };

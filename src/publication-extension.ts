@@ -325,8 +325,8 @@ export function registerPublicationCommands(context: vscode.ExtensionContext,
             output.appendLine(detail);
             if (!disposed) {
                 output.show(true);
-                if (completed) { await vscode.window.showWarningMessage(detail.slice(0, 1500)); }
-                else { await vscode.window.showErrorMessage(detail.slice(0, 1500)); }
+                if (completed) { void vscode.window.showWarningMessage(detail.slice(0, 1500)); }
+                else { void vscode.window.showErrorMessage(detail.slice(0, 1500)); }
             }
         } finally {
             operation.source.dispose();

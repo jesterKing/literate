@@ -87,6 +87,12 @@ The state diagram emphasizes that an `exit` event alone is not completion. Outpu
 pipes and descendants still belong to the invocation. It omits staging cleanup,
 which surrounds the entire state machine.
 
+```NOTE
+A process can report its exit while a descendant still holds an inherited output
+pipe open. Treating the first exit event as completion can therefore leak work or
+lose the final part of the transcript.
+```
+
 Combined standard output and error have one aggregate byte limit. The runner counts
 bytes before retaining chunks and continues draining after the limit is crossed.
 Stream errors are failures, not unhandled events or permission to accept a partial
@@ -123,14 +129,16 @@ bounded stability certificate derived from physical page membership and placemen
 A missing, malformed, pending, or error certificate rejects a rail-enabled build
 before PDF bytes reach the destination transaction.
 
-`publication PDF build` accepts bytes only after the final log and rail certificate
-agree.
+`publication PDF build` keeps latexmk's console transcript quiet so expected
+first-pass forward-reference warnings cannot consume the process-output budget.
+Detailed diagnostics and returned warnings still come from the bounded final log.
+It accepts bytes only after that log and the rail certificate agree.
 
 ```ts : <<publication PDF build>>=
 async function buildPdf(runner: PdfProcessRunner, cwd: string,
     env: NodeJS.ProcessEnv, check: () => void): Promise<PdfCompilation> {
     const result = await runner(requestFor('latexmk', [
-        '-norc', '-lualatex', '-interaction=nonstopmode', '-halt-on-error',
+        '-norc', '-silent', '-lualatex', '-interaction=nonstopmode', '-halt-on-error',
         '-file-line-error', '-no-shell-escape', '-e', '$max_repeat = 5;', 'book.tex'
     ], cwd, env, buildTimeoutMs));
     if (result.code !== 0) { throw new Error(`latexmk failed (exit ${result.code}).\n${result.output}`); }

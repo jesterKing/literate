@@ -60,21 +60,25 @@ test('literal unescape maps repeated references after emoji in UTF-16', () => {
         assert.ok(ref.target);
         assert.equal(ref.occurrenceTarget, source[index].occurrenceTarget);
         assert.equal(ref.placement, source[index].placement);
+        assert.equal(ref.annotation, source[index].annotation);
         assert.equal(ref.occurrenceTarget, `${input.target}-r-${index + 1}`);
     }
     assert.deepEqual(result.spans, [{ start: 0, end: result.text.length, scope: '' }]);
     assert.equal(JSON.stringify(input), snapshot);
 });
 
-test('reference occurrences distinguish standalone lines and retain structural identities', () => {
-    const input = part(' \t' + tag('piece') + ' \t\n' +
-        'prefix ' + tag('piece') + '\n' + tag('piece') + ' suffix\n' +
+test('reference occurrences distinguish placement and explicit rail annotations', () => {
+    const input = part(' \t' + tag('piece') + '[rail] \t\n' +
+        'prefix ' + tag('piece') + '\n' + tag('piece') + '[rail] suffix\n' +
         tag('piece') + ' ' + tag('piece') + '\n\\' + tag('literal') + ' ' + tag('piece'));
     const refs = input.segments.filter(
         (segment): segment is Extract<(typeof input.segments)[number], { kind: 'reference' }> =>
             segment.kind === 'reference');
     assert.deepEqual(refs.map(ref => ref.placement),
         ['standalone', 'inline', 'inline', 'inline', 'inline', 'inline']);
+    assert.deepEqual(refs.map(ref => ref.annotation),
+        ['rail', 'none', 'rail', 'none', 'none', 'none']);
+    assert.doesNotMatch(highlightContribution(input).text, /\[rail\]/);
     assert.deepEqual(refs.map(ref => ref.occurrenceTarget),
         refs.map((_, index) => `${input.target}-r-${index + 1}`));
     const eof = finalPart('\t' + tag('piece') + '  ');
@@ -109,6 +113,12 @@ test('standalone validation rejects missing references, modifiers and invalid se
         (placementRef as unknown as { placement: string }).placement = 'invalid';
     }
     assert.throws(() => highlightContribution(invalidPlacement), /placement/);
+    const invalidAnnotation = part(tag('piece'));
+    const annotationRef = invalidAnnotation.segments.find(segment => segment.kind === 'reference')!;
+    if (annotationRef.kind === 'reference') {
+        (annotationRef as unknown as { annotation: string }).annotation = 'invalid';
+    }
+    assert.throws(() => highlightContribution(invalidAnnotation), /annotation/);
     const empty = part('', '');
     empty.content = ''; empty.segments = [];
     assert.deepEqual(highlightContribution(empty), { text: '', spans: [], references: [] });

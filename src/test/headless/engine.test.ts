@@ -85,6 +85,12 @@ test('repeated and inline references expand every occurrence without losing surr
     'W/W\nprefix A\n B suffix\nW\n');
 });
 
+test('rail annotations are consumed as occurrence metadata during generation', () => {
+    assert.equal(output(root('<<word>>[rail]/<<word>>\n  <<lines>>[rail]  ')
+        + fence('text: <<word>>=', 'W') + fence('text: <<lines>>=', 'A\nB')),
+    'W/W\n  A\n  B  \n');
+});
+
 test('5000 nested fragments preserve indentation, escapes, appends, and cached reuse', () => {
     const depth = 5000;
     const parts = [root('  <<part0>>\n\t<<part0>>')];

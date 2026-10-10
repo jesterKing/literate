@@ -62,7 +62,7 @@ export interface PdfProcessResult { code: number | null; output: string; }
 export type PdfProcessRunner = (request: PdfProcessRequest) => Promise<PdfProcessResult>;
 const maximumLogBytes = 4 * 1024 * 1024;
 const maximumPdfBytes = 64 * 1024 * 1024;
-const buildTimeoutMs = 180_000;
+const buildTimeoutMs = 480_000;
 ```
 
 Group termination also happens on a normal leader exit: a successful latexmk
@@ -417,7 +417,8 @@ async function checkRailCertificate(cwd: string, check: () => void): Promise<voi
 
 latexmk receives only literal arguments. `-norc` disables system, user and project
 rc discovery; the literal repeat limit cannot be influenced by an entry basename.
-A 180-second build deadline and five repeats bound runaway reruns. No `-f` option
+An eight-minute build deadline and five repeats bound runaway reruns while allowing
+large books to complete every permitted convergence pass. No `-f` option
 can turn a failed pass into apparent success, and shell escape stays disabled.
 
 Final PDF acceptance is presented in [Compiling and publishing a PDF](compiling_publishing_pdf.html).

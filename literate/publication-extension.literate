@@ -456,7 +456,9 @@ the queue on resolution or rejection, never merely on a cancellation request.
 A validated outcome precedes cancellation state: a late cancellation cannot undo
 commit. Authority is separate and is checked before remembering, offering an open
 action and opening. If authority is revoked after commit, report the actual completed
-output without claiming failure or taking further success actions. PDFs open via
+output without claiming failure or taking further success actions. Failure
+notifications are launched without awaiting user dismissal, so the command reaches
+its cleanup and releases the publication guard immediately. PDFs open via
 `vscode.open`, never as text documents.
 
 ```typescript: <<publication extension commands>>=+
@@ -476,8 +478,8 @@ output without claiming failure or taking further success actions. PDFs open via
             output.appendLine(detail);
             if (!disposed) {
                 output.show(true);
-                if (completed) { await vscode.window.showWarningMessage(detail.slice(0, 1500)); }
-                else { await vscode.window.showErrorMessage(detail.slice(0, 1500)); }
+                if (completed) { void vscode.window.showWarningMessage(detail.slice(0, 1500)); }
+                else { void vscode.window.showErrorMessage(detail.slice(0, 1500)); }
             }
         } finally {
             operation.source.dispose();

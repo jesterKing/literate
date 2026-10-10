@@ -88,7 +88,7 @@ async function fixture() {
                 f.onProgress?.();
                 return callback({ report: (value: any) => logs.push(value.message) }, token);
             },
-            async showErrorMessage(value: string) { errors.push(value); },
+            async showErrorMessage(value: string) { errors.push(value); await f.onError?.(); },
             async showWarningMessage(value: string) { warnings.push(value); },
             async showInformationMessage(...args: any[]) { f.infos.push(args); await f.onInfo?.(); return 'Open Output'; }
         } };
@@ -383,6 +383,18 @@ test('success notification does not retain the publication lock', () => using(as
     assert.deepEqual(f.warnings, []);
     release.resolve();
     await first;
+}));
+
+test('failure notification does not retain the publication lock', () => using(async f => {
+    const entered = deferred(), release = deferred();
+    f.bridgeFailure = 'fixture failure';
+    f.onError = () => { entered.resolve(); return release.promise; };
+    await f.run();
+    await entered.promise;
+    f.bridgeFailure = undefined;
+    await f.run();
+    assert.equal(f.requests.length, 2);
+    release.resolve();
 }));
 
 test('global command lock rejects overlap across kinds until helper finishes', () => using(async f => {

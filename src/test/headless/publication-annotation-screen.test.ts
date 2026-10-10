@@ -217,7 +217,7 @@ test('cached index reverse references require linear reads and never rescan sour
                 language: 'text', definition: at, tokenIndex: i, content: '',
                 segments: [0, 1].map((_, ordinal) => ({ kind: 'reference' as const, text: '', name: `Family ${i}`,
                     start: 0, end: 0, at, occurrenceTarget: `c-${i}-r-${ordinal + 1}`, placement: 'inline' as const,
-                    resolution: { kind: 'resolved' as const, target: `f-${i}` } }))
+                    annotation: 'none' as const, resolution: { kind: 'resolved' as const, target: `f-${i}` } }))
             })))
         };
         const annotations: PublicationAnnotations = {

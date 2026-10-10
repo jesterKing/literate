@@ -120,7 +120,11 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-</style>
+.literate-document .literate-annotation { margin-block: 1em; padding: .6em 1em; border-inline-start: .2em solid currentColor; }
+.literate-document .literate-annotation-title { font-weight: bold; }
+.literate-document .literate-note { border-inline-start-style: dotted; }
+.literate-document .literate-term-unresolved { text-decoration: underline dotted; }
+.literate-document .literate-screen-index { margin-block-start: 2em; }</style>
   <meta name="author" content="Nathan 'jesterKing' Letwory">
 </head>
 <body>
@@ -482,11 +486,27 @@ Only parser-owned link and ordered-list attributes survive.</p>
 </div>
 </div><p>Term links share resolution in prose, headings and annotation bodies. A missing,
 ambiguous or pending destination becomes a span, including its closing tag.
+Semantic prose fragment tokens use the same family destinations as code references;
+the <code>[rail]</code> suffix was consumed before rendering and does not affect screens.
 Other links retain the host renderer's behavior and Markdown URL validation.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-00730063007200650065006e0020007400650072006d0020006c0069006e006b0073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00730063007200650065006e002e006c0069007400650072006100740065-1"><span id="f-00730063007200650065006e0020007400650072006d0020006c0069006e006b0073"></span><a class="literate-tag-name" href="#f-00730063007200650065006e0020007400650072006d0020006c0069006e006b0073" data-literate-target="f-00730063007200650065006e0020007400650072006d0020006c0069006e006b0073" aria-label="Definition of screen term links">&lt;&lt;screen term links&gt;&gt;=</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">installScreenTermLinks</span>(<span class="hljs-params">md: MarkdownIt</span>): <span class="hljs-built_in">void</span> {
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">installScreenFragmentLinks</span>(<span class="hljs-params">md: MarkdownIt</span>): <span class="hljs-built_in">void</span> {
+    md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">literate_fragment_use</span> = <span class="hljs-function">(</span><span class="hljs-params">tokens, index, _options, env</span><span class="hljs-function">) =&gt;</span> {
+        <span class="hljs-keyword">const</span> token = tokens[index];
+        <span class="hljs-keyword">const</span> context = env?.<span class="hljs-property">literateScreen</span> <span class="hljs-keyword">as</span> <span class="hljs-title">ScreenAnnotationContext</span> | <span class="hljs-literal">undefined</span>;
+        <span class="hljs-keyword">const</span> name = <span class="hljs-title">String</span>(token.<span class="hljs-property">meta</span>?.<span class="hljs-property">name</span> || <span class="hljs-string">''</span>);
+        <span class="hljs-keyword">const</span> family = context?.<span class="hljs-property">model</span>.<span class="hljs-property">fragments</span>.<span class="hljs-title">find</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> item.<span class="hljs-property">name</span> === name);
+        <span class="hljs-keyword">const</span> lookup = context &amp;&amp; <span class="hljs-title">screenIndex</span>(context.<span class="hljs-property">model</span>, context.<span class="hljs-property">annotations</span>);
+        <span class="hljs-keyword">const</span> base = lookup?.<span class="hljs-property">parts</span>.<span class="hljs-title">get</span>(family?.<span class="hljs-property">contributions</span>[<span class="hljs-number">0</span>] || <span class="hljs-string">''</span>);
+        <span class="hljs-keyword">const</span> href = context &amp;&amp; family &amp;&amp; base ? <span class="hljs-title">screenHref</span>(context.<span class="hljs-property">path</span>, base.<span class="hljs-property">definition</span>.<span class="hljs-property">path</span>,
+            family.<span class="hljs-property">target</span>, context.<span class="hljs-property">format</span>, context.<span class="hljs-property">destination</span>) : <span class="hljs-literal">undefined</span>;
+        <span class="hljs-keyword">return</span> family ? <span class="hljs-title">screenLink</span>(href, <span class="hljs-string">`Definition of </span><span class="hljs-subst">${name}</span><span class="hljs-string">`</span>, token.<span class="hljs-property">content</span>, family.<span class="hljs-property">target</span>) :
+            escapeHtml(token.<span class="hljs-property">content</span>);
+    };
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">installScreenTermLinks</span>(<span class="hljs-params">md: MarkdownIt</span>): <span class="hljs-built_in">void</span> {
     <span class="hljs-keyword">const</span> open = md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">link_open</span>, close = md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">link_close</span>;
     <span class="hljs-keyword">const</span> <span class="hljs-title">destination</span> = (<span class="hljs-params">href: </span><span class="hljs-built_in">string</span><span class="hljs-params">, context?: ScreenAnnotationContext</span>) =&gt; {
         <span class="hljs-keyword">if</span> (!context) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }

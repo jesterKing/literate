@@ -120,14 +120,19 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-</style>
+.literate-document .literate-annotation { margin-block: 1em; padding: .6em 1em; border-inline-start: .2em solid currentColor; }
+.literate-document .literate-annotation-title { font-weight: bold; }
+.literate-document .literate-note { border-inline-start-style: dotted; }
+.literate-document .literate-term-unresolved { text-decoration: underline dotted; }
+.literate-document .literate-screen-index { margin-block-start: 2em; }</style>
   <meta name="author" content="Nathan 'jesterKing' Letwory">
 </head>
 <body>
 <div class="literate-document" data-literate-theme="rosepine-dawn"><h1>Changing files safely</h1>
 <p>A complete generation plan is atomically valid in memory: either every planned
 file is available or none is. A filesystem cannot usually replace several files at
-one physical instant. Between those two facts lies the output transaction.</p>
+one physical instant. Between those two facts lies the
+<span id="annotation-use-006c0069007400650072006100740065002f006300680061006e00670069006e0067005f00660069006c00650073005f0073006100660065006c0079002e006c0069007400650072006100740065-4-6"></span><a href="./appendix_glossary.html#annotation-term-006f00750074007000750074002d007400720061006e00730061006300740069006f006e" data-literate-target="annotation-term-006f00750074007000750074002d007400720061006e00730061006300740069006f006e">output transaction</a>.</p>
 <p>The transaction's purpose is narrower than the database term may suggest. It gives
 a batch recoverable behavior for caught failures: validate before mutation, stage
 all changed bytes, retain originals while installing replacements, and attempt to
@@ -324,6 +329,9 @@ allows a host to report installed files without pretending cleanup succeeded.</p
 <p>Recovery locations are evidence, not rubbish. They may contain the only surviving
 original after an interrupted restoration. A person or recovery tool should inspect
 the reported target, stage, and backup states before moving or deleting anything.</p>
+<aside class="literate-annotation literate-note" id="annotation-note-006c0069007400650072006100740065002f006300680061006e00670069006e0067005f00660069006c00650073005f0073006100660065006c0079002e006c0069007400650072006100740065-233-0"><div class="literate-annotation-title">Note 3</div><p>An untidy recovery directory can be good news: it may be the transaction refusing
+to destroy the last trustworthy copy merely to leave a neat workspace behind.</p>
+</aside>
 <h2>Filesystem adapters carry the physical contract</h2>
 <p>The coordinator is independent of a particular filesystem API. Its adapter must
 provide path inspection, reads, exclusive single-directory creation, exclusive file

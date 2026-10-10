@@ -120,7 +120,11 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-</style>
+.literate-document .literate-annotation { margin-block: 1em; padding: .6em 1em; border-inline-start: .2em solid currentColor; }
+.literate-document .literate-annotation-title { font-weight: bold; }
+.literate-document .literate-note { border-inline-start-style: dotted; }
+.literate-document .literate-term-unresolved { text-decoration: underline dotted; }
+.literate-document .literate-screen-index { margin-block-start: 2em; }</style>
   <meta name="author" content="Nathan 'jesterKing' Letwory">
 </head>
 <body>
@@ -165,11 +169,13 @@ test-runtime directories.</p>
 <div class="fragmentname" id="c-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-1"><span id="f-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073"></span><a class="literate-tag-name" href="#f-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073" data-literate-target="f-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073" aria-label="Definition of engine interfaces and dependencies">&lt;&lt;engine interfaces and dependencies&gt;&gt;=</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">import</span> <span class="hljs-title">MarkdownIt</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">'markdown-it'</span>);
+<span class="hljs-keyword">import</span> <span class="hljs-title">StateInline</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">'markdown-it/lib/rules_inline/state_inline'</span>);
 <span class="hljs-keyword">import</span> <span class="hljs-title">Token</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">'markdown-it/lib/token'</span>);
 <span class="hljs-keyword">import</span> hljs <span class="hljs-keyword">from</span> <span class="hljs-string">'highlight.js'</span>;
 <span class="hljs-keyword">import</span> { collectAnnotations, <span class="hljs-title">PublicationAnnotations</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-annotations'</span>;
 <span class="hljs-keyword">import</span> { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAnnotation,
-    installScreenTermLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle, renderScreenExploration } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-screen'</span>;
+    installScreenTermLinks, installScreenFragmentLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle,
+    renderScreenExploration } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-screen'</span>;
 <span class="hljs-keyword">import</span> { defaultThemeName, getTheme, themeCss } <span class="hljs-keyword">from</span> <span class="hljs-string">'./themes'</span>;
 
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">SourceDocument</span> { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">text</span>: <span class="hljs-built_in">string</span>; }
@@ -214,10 +220,15 @@ No Markdown tokens or renderer-specific destinations cross this boundary.</p>
 <div class="fragmentname" id="c-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-3"><a class="literate-tag-name" href="#f-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073" data-literate-target="f-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073" aria-label="Definition of engine interfaces and dependencies">&lt;&lt;engine interfaces and dependencies&gt;&gt;=+</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationLocation</span> { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">line</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">column</span>: <span class="hljs-built_in">number</span>; }
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationProseReference</span> {
+    <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">occurrenceTarget</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">annotation</span>: <span class="hljs-string">'none'</span> | <span class="hljs-string">'rail'</span>; <span class="hljs-attr">at</span>: <span class="hljs-title">PublicationLocation</span>;
+    <span class="hljs-attr">resolution</span>: { <span class="hljs-attr">kind</span>: <span class="hljs-string">'resolved'</span>; <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span> } | { <span class="hljs-attr">kind</span>: <span class="hljs-string">'missing'</span> };
+}
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationModel</span> {
     <span class="hljs-attr">documents</span>: { <span class="hljs-attr">path</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">contributions</span>: <span class="hljs-built_in">string</span>[] }[];
     <span class="hljs-attr">fragments</span>: { <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">contributions</span>: <span class="hljs-built_in">string</span>[] }[];
     <span class="hljs-attr">contributions</span>: <span class="hljs-title">PublicationContribution</span>[];
+    proseReferences?: <span class="hljs-title">PublicationProseReference</span>[];
 }
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationContribution</span> {
     <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span>;
@@ -235,12 +246,13 @@ No Markdown tokens or renderer-specific destinations cross this boundary.</p>
 <nav class="fragment-navigation" aria-label="Contributions of engine interfaces and dependencies"><a class="literate-tag-name" href="#c-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-2" data-literate-target="c-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-2" aria-label="Previous contribution of engine interfaces and dependencies">Previous</a> · <a class="literate-tag-name" href="#c-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-1" data-literate-target="c-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-1" aria-label="Base contribution of engine interfaces and dependencies">Base</a> · <a class="literate-tag-name" href="#c-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-4" data-literate-target="c-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-4" aria-label="Next contribution of engine interfaces and dependencies">Next</a></nav>
 </div><p>Content and segment text retain Markdown-normalized code, including escapes.
 Joining segment text reconstructs content exactly. Reference offsets are UTF-16
-positions within that content; <code>end</code> excludes any definition operator, matching
-the scanner. Reference text includes that operator when present. Each reference
-has a stable occurrence target within its accepted contribution and records whether
-it occupies a line by itself, apart from spaces or tabs. Source locations are
-zero-based UTF-16 coordinates, not visual columns. A missing target is data, not a
-new diagnostic; expansion remains responsible for validation.</p>
+positions within that content; <code>end</code> excludes a rail annotation and any definition
+operator, matching the tag-only scanner range. Reference text includes recognized
+suffixes. Each reference has a stable occurrence target within its accepted
+contribution, records whether it occupies a line by itself apart from spaces or
+tabs, and carries the author's explicit rail choice. Source locations are zero-based
+UTF-16 coordinates, not visual columns. A missing target is data, not a new
+diagnostic; expansion remains responsible for validation.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-4"><a class="literate-tag-name" href="#f-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073" data-literate-target="f-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073" aria-label="Definition of engine interfaces and dependencies">&lt;&lt;engine interfaces and dependencies&gt;&gt;=+</a></div>
 <div class="code">
@@ -248,7 +260,7 @@ new diagnostic; expansion remains responsible for validation.</p>
     | { <span class="hljs-attr">kind</span>: <span class="hljs-string">'text'</span>; <span class="hljs-attr">text</span>: <span class="hljs-built_in">string</span> }
     | { <span class="hljs-attr">kind</span>: <span class="hljs-string">'reference'</span>; <span class="hljs-attr">text</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>;
         <span class="hljs-attr">start</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">end</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">at</span>: <span class="hljs-title">PublicationLocation</span>; modifier?: <span class="hljs-built_in">string</span>;
-        <span class="hljs-attr">occurrenceTarget</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">placement</span>: <span class="hljs-string">'standalone'</span> | <span class="hljs-string">'inline'</span>;
+        <span class="hljs-attr">occurrenceTarget</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">placement</span>: <span class="hljs-string">'standalone'</span> | <span class="hljs-string">'inline'</span>; <span class="hljs-attr">annotation</span>: <span class="hljs-string">'none'</span> | <span class="hljs-string">'rail'</span>;
         <span class="hljs-attr">resolution</span>: { <span class="hljs-attr">kind</span>: <span class="hljs-string">'resolved'</span>; <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span> } | { <span class="hljs-attr">kind</span>: <span class="hljs-string">'missing'</span> } };
 </code></pre>
 
@@ -452,25 +464,57 @@ coordinates that Markdown normalization would otherwise obscure.</p>
 </div>
 <nav class="fragment-navigation" aria-label="Contributions of engine path and source validation"><a class="literate-tag-name" href="#c-0065006e00670069006e00650020007000610074006800200061006e006400200073006f0075007200630065002000760061006c00690064006100740069006f006e-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-2" data-literate-target="c-0065006e00670069006e00650020007000610074006800200061006e006400200073006f0075007200630065002000760061006c00690064006100740069006f006e-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-2" aria-label="Previous contribution of engine path and source validation">Previous</a> · <a class="literate-tag-name" href="#c-0065006e00670069006e00650020007000610074006800200061006e006400200073006f0075007200630065002000760061006c00690064006100740069006f006e-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-1" data-literate-target="c-0065006e00670069006e00650020007000610074006800200061006e006400200073006f0075007200630065002000760061006c00690064006100740069006f006e-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-1" aria-label="Base contribution of engine path and source validation">Base</a></nav>
 </div><h2>Shared lexical contracts for editor symbols</h2>
-<p>The scanner returns whole-tag UTF-16 ranges, excluding reference operators.
-Escaped openers are consumed by the same regex as real tags, so generation and
-editor tools cannot disagree about whether a tag is a dependency. Operators
-remain available to generation for diagnostics, without entering rename ranges.</p>
+<p>The scanner returns whole-tag UTF-16 ranges, excluding rail annotations and
+reference operators. Escaped openers are consumed by the same regex as real tags,
+so generation and editor tools cannot disagree about whether a tag is a dependency.
+An immediate, case-sensitive <code>[rail]</code> is occurrence metadata; generation consumes
+it without writing it to output. Operators remain available for diagnostics, while
+neither suffix enters rename ranges.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0065006e00670069006e0065002000730068006100720065006400200066007200610067006d0065006e00740020007300630061006e006e0069006e0067-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-1"><span id="f-0065006e00670069006e0065002000730068006100720065006400200066007200610067006d0065006e00740020007300630061006e006e0069006e0067"></span><a class="literate-tag-name" href="#f-0065006e00670069006e0065002000730068006100720065006400200066007200610067006d0065006e00740020007300630061006e006e0069006e0067" data-literate-target="f-0065006e00670069006e0065002000730068006100720065006400200066007200610067006d0065006e00740020007300630061006e006e0069006e0067" aria-label="Definition of engine shared fragment scanning">&lt;&lt;engine shared fragment scanning&gt;&gt;=</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">FragmentTag</span> { <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">start</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">end</span>: <span class="hljs-built_in">number</span>; modifier?: <span class="hljs-built_in">string</span>; }
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">FragmentTag</span> {
+    <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">start</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">end</span>: <span class="hljs-built_in">number</span>; annotation?: <span class="hljs-string">'rail'</span>; modifier?: <span class="hljs-built_in">string</span>;
+}
 
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">scanFragmentTags</span>(<span class="hljs-params">text: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">FragmentTag</span>[] {
     <span class="hljs-keyword">const</span> <span class="hljs-attr">tags</span>: <span class="hljs-title">FragmentTag</span>[] = [];
-    <span class="hljs-keyword">const</span> pattern = <span class="hljs-regexp">/</span><span class="hljs-regexp">\\</span><span class="hljs-regexp">&lt;&lt;|&lt;&lt;(</span><span class="hljs-regexp">[^&lt;&gt;</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">]</span><span class="hljs-regexp">+)&gt;&gt;(=</span><span class="hljs-regexp">\+</span><span class="hljs-regexp">?|</span><span class="hljs-regexp">\+</span><span class="hljs-regexp">)?/g</span>;
+    <span class="hljs-keyword">const</span> pattern = <span class="hljs-regexp">/</span><span class="hljs-regexp">\\</span><span class="hljs-regexp">&lt;&lt;|&lt;&lt;(</span><span class="hljs-regexp">[^&lt;&gt;</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">]</span><span class="hljs-regexp">+)&gt;&gt;(</span><span class="hljs-regexp">\[</span><span class="hljs-regexp">rail</span><span class="hljs-regexp">\]</span><span class="hljs-regexp">)?(=</span><span class="hljs-regexp">\+</span><span class="hljs-regexp">?|</span><span class="hljs-regexp">\+</span><span class="hljs-regexp">)?/g</span>;
     <span class="hljs-keyword">let</span> <span class="hljs-attr">match</span>: <span class="hljs-title">RegExpExecArray</span> | <span class="hljs-literal">null</span>;
     <span class="hljs-keyword">while</span> ((match = pattern.<span class="hljs-title">exec</span>(text))) {
         <span class="hljs-keyword">if</span> (match[<span class="hljs-number">1</span>] === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">continue</span>; }
         tags.<span class="hljs-title">push</span>({ <span class="hljs-attr">name</span>: match[<span class="hljs-number">1</span>], <span class="hljs-attr">start</span>: match.<span class="hljs-property">index</span>,
-            <span class="hljs-attr">end</span>: match.<span class="hljs-property">index</span> + match[<span class="hljs-number">1</span>].<span class="hljs-property">length</span> + <span class="hljs-number">4</span>, <span class="hljs-attr">modifier</span>: match[<span class="hljs-number">2</span>] });
+            <span class="hljs-attr">end</span>: match.<span class="hljs-property">index</span> + match[<span class="hljs-number">1</span>].<span class="hljs-property">length</span> + <span class="hljs-number">4</span>,
+            ...(match[<span class="hljs-number">2</span>] === <span class="hljs-literal">undefined</span> ? {} : { <span class="hljs-attr">annotation</span>: <span class="hljs-string">'rail'</span> <span class="hljs-keyword">as</span> <span class="hljs-keyword">const</span> }),
+            ...(match[<span class="hljs-number">3</span>] === <span class="hljs-literal">undefined</span> ? {} : { <span class="hljs-attr">modifier</span>: match[<span class="hljs-number">3</span>] }) });
     }
     <span class="hljs-keyword">return</span> tags;
+}
+
+<span class="hljs-keyword">function</span> <span class="hljs-title">insideMarkdownLink</span>(<span class="hljs-params">state: StateInline</span>): <span class="hljs-built_in">boolean</span> {
+    <span class="hljs-keyword">let</span> depth = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> state.<span class="hljs-property">tokens</span>) {
+        <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> === <span class="hljs-string">'link_open'</span>) { depth++; }
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> === <span class="hljs-string">'link_close'</span>) { depth--; }
+    }
+    <span class="hljs-keyword">return</span> depth &gt; <span class="hljs-number">0</span>;
+}
+
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">installFragmentReferenceSyntax</span>(<span class="hljs-params">md: MarkdownIt</span>): <span class="hljs-built_in">void</span> {
+    md.<span class="hljs-property">inline</span>.<span class="hljs-property">ruler</span>.<span class="hljs-title">before</span>(<span class="hljs-string">'text'</span>, <span class="hljs-string">'literate_fragment_reference'</span>, <span class="hljs-function">(</span><span class="hljs-params">state, silent</span><span class="hljs-function">) =&gt;</span> {
+        <span class="hljs-keyword">if</span> (state.<span class="hljs-property">src</span>.<span class="hljs-title">charCodeAt</span>(state.<span class="hljs-property">pos</span>) !== <span class="hljs-number">0x3c</span> || <span class="hljs-title">insideMarkdownLink</span>(state)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>; }
+        <span class="hljs-keyword">const</span> tag = <span class="hljs-title">scanFragmentTags</span>(state.<span class="hljs-property">src</span>.<span class="hljs-title">slice</span>(state.<span class="hljs-property">pos</span>))[<span class="hljs-number">0</span>];
+        <span class="hljs-keyword">if</span> (!tag || tag.<span class="hljs-property">start</span> !== <span class="hljs-number">0</span> || tag.<span class="hljs-property">modifier</span> !== <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>; }
+        <span class="hljs-keyword">const</span> end = tag.<span class="hljs-property">end</span> + (tag.<span class="hljs-property">annotation</span> === <span class="hljs-string">'rail'</span> ? <span class="hljs-string">'[rail]'</span>.<span class="hljs-property">length</span> : <span class="hljs-number">0</span>);
+        <span class="hljs-keyword">if</span> (!silent) {
+            <span class="hljs-keyword">const</span> use = state.<span class="hljs-title">push</span>(<span class="hljs-string">'literate_fragment_use'</span>, <span class="hljs-string">''</span>, <span class="hljs-number">0</span>);
+            use.<span class="hljs-property">content</span> = state.<span class="hljs-property">src</span>.<span class="hljs-title">slice</span>(state.<span class="hljs-property">pos</span>, state.<span class="hljs-property">pos</span> + tag.<span class="hljs-property">end</span>);
+            use.<span class="hljs-property">meta</span> = { <span class="hljs-attr">name</span>: tag.<span class="hljs-property">name</span>, <span class="hljs-attr">annotation</span>: tag.<span class="hljs-property">annotation</span> || <span class="hljs-string">'none'</span> };
+        }
+        state.<span class="hljs-property">pos</span> += end;
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+    });
 }
 </code></pre>
 
@@ -737,6 +781,7 @@ template references must resolve in the supplied template map.</p>
         diagnostics.<span class="hljs-title">push</span>({ ...location, message, ...(code === <span class="hljs-literal">undefined</span> ? {} : { code }) });
     };
     <span class="hljs-keyword">const</span> md = <span class="hljs-keyword">new</span> <span class="hljs-title">MarkdownIt</span>();
+    <span class="hljs-title">installFragmentReferenceSyntax</span>(md);
     <span class="hljs-keyword">const</span> sources = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">SourceDocument</span>&gt;();
     <span class="hljs-keyword">const</span> sourceKeys = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
     <span data-literate-explore="f-0065006e00670069006e0065002000610063006300650070007400200073006f007500720063006500200069006e0070007500740073"><a class="literate-tag-name" href="#f-0065006e00670069006e0065002000610063006300650070007400200073006f007500720063006500200069006e0070007500740073" data-literate-target="f-0065006e00670069006e0065002000610063006300650070007400200073006f007500720063006500200069006e0070007500740073" aria-label="Definition of engine accept source inputs">&lt;&lt;engine accept source inputs&gt;&gt;</a></span>
@@ -1056,7 +1101,7 @@ changes the graph used for expansion or the tokens used for HTML rendering.</p>
         <span class="hljs-attr">fragments</span>: <span class="hljs-title">Array</span>.<span class="hljs-title">from</span>(fragments.<span class="hljs-title">keys</span>(), <span class="hljs-params">name</span><span class="hljs-function"> =&gt;</span> ({
             name, <span class="hljs-attr">target</span>: <span class="hljs-string">'f-'</span> + <span class="hljs-title">publicationEncode</span>(name), <span class="hljs-attr">contributions</span>: []
         })),
-        <span class="hljs-attr">contributions</span>: []
+        <span class="hljs-attr">contributions</span>: [], <span class="hljs-attr">proseReferences</span>: []
     };
     <span class="hljs-keyword">const</span> publicationDocuments = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>(publication.<span class="hljs-property">documents</span>.<span class="hljs-title">map</span>(<span class="hljs-params">document</span><span class="hljs-function"> =&gt;</span> [<span class="hljs-variable">document</span>.<span class="hljs-property">path</span>, <span class="hljs-variable">document</span>]));
     <span class="hljs-keyword">const</span> publicationFamilies = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>(publication.<span class="hljs-property">fragments</span>.<span class="hljs-title">map</span>(<span class="hljs-params">fragment</span><span class="hljs-function"> =&gt;</span> [fragment.<span class="hljs-property">name</span>, fragment]));
@@ -1094,20 +1139,21 @@ unambiguous counter keys. Rejected declarations cannot consume ordinals.</p>
 
 </div>
 </div><p>Segment the original normalized body before unescaping or highlighting. The
-shared scanner excludes escaped openers. Operators belong to reference text,
-while <code>end</code> retains the scanner's tag-only boundary; advancing past the operator
-prevents duplicating it in the next literal segment. A reference is standalone
-only when spaces or tabs are its sole companions on the line. Its one-based
-ordinal is local to the accepted contribution, so prose and line-number changes do
-not alter its identity. Empty bodies need no segments.</p>
+shared scanner excludes escaped openers. Rail annotations and operators belong to
+raw reference text, while <code>end</code> retains the scanner's tag-only boundary; advancing
+past both suffixes prevents duplicating them in the next literal segment. A
+reference is standalone only when spaces or tabs are its sole companions after the
+complete recognized syntax. Its one-based ordinal is local to the accepted
+contribution, so prose and line-number changes do not alter its identity. Empty
+bodies need no segments.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0065006e00670069006e00650020007300650067006d0065006e00740020007000750062006c00690063006100740069006f006e00200063006f006e00740065006e0074-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-1"><span id="f-0065006e00670069006e00650020007300650067006d0065006e00740020007000750062006c00690063006100740069006f006e00200063006f006e00740065006e0074"></span><a class="literate-tag-name" href="#f-0065006e00670069006e00650020007300650067006d0065006e00740020007000750062006c00690063006100740069006f006e00200063006f006e00740065006e0074" data-literate-target="f-0065006e00670069006e00650020007300650067006d0065006e00740020007000750062006c00690063006100740069006f006e00200063006f006e00740065006e0074" aria-label="Definition of engine segment publication content">&lt;&lt;engine segment publication content&gt;&gt;=</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">let</span> cursor = <span class="hljs-number">0</span>;
-<span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> { name, start, end, modifier, at } <span class="hljs-keyword">of</span> <span class="hljs-title">references</span>(part)) {
+<span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> { name, start, end, annotation, modifier, at } <span class="hljs-keyword">of</span> <span class="hljs-title">references</span>(part)) {
     <span class="hljs-keyword">if</span> (start &gt; cursor) { segments.<span class="hljs-title">push</span>({ <span class="hljs-attr">kind</span>: <span class="hljs-string">'text'</span>, <span class="hljs-attr">text</span>: part.<span class="hljs-property">content</span>.<span class="hljs-title">slice</span>(cursor, start) }); }
     <span class="hljs-keyword">const</span> familyTarget = publicationFamilies.<span class="hljs-title">get</span>(name)?.<span class="hljs-property">target</span>;
-    <span class="hljs-keyword">const</span> textEnd = end + (modifier?.<span class="hljs-property">length</span> || <span class="hljs-number">0</span>);
+    <span class="hljs-keyword">const</span> textEnd = end + (annotation === <span class="hljs-string">'rail'</span> ? <span class="hljs-string">'[rail]'</span>.<span class="hljs-property">length</span> : <span class="hljs-number">0</span>) + (modifier?.<span class="hljs-property">length</span> || <span class="hljs-number">0</span>);
     <span class="hljs-keyword">const</span> lineStart = part.<span class="hljs-property">content</span>.<span class="hljs-title">lastIndexOf</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>, start - <span class="hljs-number">1</span>) + <span class="hljs-number">1</span>;
     <span class="hljs-keyword">const</span> newline = part.<span class="hljs-property">content</span>.<span class="hljs-title">indexOf</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>, textEnd);
     <span class="hljs-keyword">const</span> lineEnd = newline &lt; <span class="hljs-number">0</span> ? part.<span class="hljs-property">content</span>.<span class="hljs-property">length</span> : newline;
@@ -1116,7 +1162,7 @@ not alter its identity. Empty bodies need no segments.</p>
     segments.<span class="hljs-title">push</span>({
         <span class="hljs-attr">kind</span>: <span class="hljs-string">'reference'</span>, <span class="hljs-attr">text</span>: part.<span class="hljs-property">content</span>.<span class="hljs-title">slice</span>(start, textEnd), name, start, end, at,
         <span class="hljs-attr">occurrenceTarget</span>: <span class="hljs-string">`</span><span class="hljs-subst">${target}</span><span class="hljs-string">-r-</span><span class="hljs-subst">${++referenceOrdinal}</span><span class="hljs-string">`</span>, placement,
-        ...(modifier === <span class="hljs-literal">undefined</span> ? {} : { modifier }),
+        <span class="hljs-attr">annotation</span>: annotation || <span class="hljs-string">'none'</span>, ...(modifier === <span class="hljs-literal">undefined</span> ? {} : { modifier }),
         <span class="hljs-attr">resolution</span>: familyTarget === <span class="hljs-literal">undefined</span> ? { <span class="hljs-attr">kind</span>: <span class="hljs-string">'missing'</span> } : { <span class="hljs-attr">kind</span>: <span class="hljs-string">'resolved'</span>, <span class="hljs-attr">target</span>: familyTarget }
     });
     cursor = textEnd;
@@ -1126,13 +1172,34 @@ not alter its identity. Empty bodies need no segments.</p>
 
 </div>
 </div><h3>Finish the shared snapshot before expansion</h3>
-<p>Contribution token indexes select exactly the accepted fences. Keeping the token
-stream intact also preserves nested container boundaries and every rejected fence
-without inferring a second acceptance policy from headers.</p>
+<p>Semantic prose tokens are already separated from code spans, code blocks, raw HTML,
+and existing links by Markdown. Resolve those tokens against the same family model
+as contribution references. Missing prose targets remain data so generation and
+tolerant screens still work; strict publication reports them. Occurrence identities
+follow canonical document and token order rather than rendered output.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0065006e00670069006e0065002000660069006e006900730068002000730068006100720065006400200063006f006c006c0065006300740069006f006e-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-1"><span id="f-0065006e00670069006e0065002000660069006e006900730068002000730068006100720065006400200063006f006c006c0065006300740069006f006e"></span><a class="literate-tag-name" href="#f-0065006e00670069006e0065002000660069006e006900730068002000730068006100720065006400200063006f006c006c0065006300740069006f006e" data-literate-target="f-0065006e00670069006e0065002000660069006e006900730068002000730068006100720065006400200063006f006c006c0065006300740069006f006e" aria-label="Definition of engine finish shared collection">&lt;&lt;engine finish shared collection&gt;&gt;=</a></div>
 <div class="code">
-<pre><code>    <span class="hljs-keyword">const</span> <span class="hljs-attr">parsedDocuments</span>: <span class="hljs-title">ParsedDocument</span>[] = order.<span class="hljs-title">map</span>(<span class="hljs-params">path</span><span class="hljs-function"> =&gt;</span> {
+<pre><code>    <span class="hljs-keyword">let</span> proseOrdinal = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> path <span class="hljs-keyword">of</span> order) {
+        <span class="hljs-keyword">const</span> documentTokens = tokens.<span class="hljs-title">get</span>(path)!;
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> token <span class="hljs-keyword">of</span> documentTokens) {
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> child <span class="hljs-keyword">of</span> token.<span class="hljs-property">children</span> || []) {
+                <span class="hljs-keyword">if</span> (child.<span class="hljs-property">type</span> !== <span class="hljs-string">'literate_fragment_use'</span>) { <span class="hljs-keyword">continue</span>; }
+                <span class="hljs-keyword">const</span> name = <span class="hljs-title">String</span>(child.<span class="hljs-property">meta</span>?.<span class="hljs-property">name</span> || <span class="hljs-string">''</span>);
+                <span class="hljs-keyword">const</span> familyTarget = publicationFamilies.<span class="hljs-title">get</span>(name)?.<span class="hljs-property">target</span>;
+                <span class="hljs-keyword">const</span> <span class="hljs-attr">reference</span>: <span class="hljs-title">PublicationProseReference</span> = {
+                    name, <span class="hljs-attr">occurrenceTarget</span>: <span class="hljs-string">`p-</span><span class="hljs-subst">${publicationEncode(path)}</span><span class="hljs-string">-</span><span class="hljs-subst">${++proseOrdinal}</span><span class="hljs-string">`</span>,
+                    <span class="hljs-attr">annotation</span>: child.<span class="hljs-property">meta</span>?.<span class="hljs-property">annotation</span> === <span class="hljs-string">'rail'</span> ? <span class="hljs-string">'rail'</span> : <span class="hljs-string">'none'</span>,
+                    <span class="hljs-attr">at</span>: { path, <span class="hljs-attr">line</span>: token.<span class="hljs-property">map</span>?.[<span class="hljs-number">0</span>] ?? <span class="hljs-number">0</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span> },
+                    <span class="hljs-attr">resolution</span>: familyTarget === <span class="hljs-literal">undefined</span> ? { <span class="hljs-attr">kind</span>: <span class="hljs-string">'missing'</span> } :
+                        { <span class="hljs-attr">kind</span>: <span class="hljs-string">'resolved'</span>, <span class="hljs-attr">target</span>: familyTarget }
+                };
+                child.<span class="hljs-property">meta</span> = reference; publication.<span class="hljs-property">proseReferences</span>!.<span class="hljs-title">push</span>(reference);
+            }
+        }
+    }
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">parsedDocuments</span>: <span class="hljs-title">ParsedDocument</span>[] = order.<span class="hljs-title">map</span>(<span class="hljs-params">path</span><span class="hljs-function"> =&gt;</span> {
         <span class="hljs-keyword">const</span> documentTokens = tokens.<span class="hljs-title">get</span>(path)!;
         <span class="hljs-keyword">const</span> targets = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>(publicationDocuments.<span class="hljs-title">get</span>(path)!.<span class="hljs-property">contributions</span>.<span class="hljs-title">map</span>(<span class="hljs-params">target</span><span class="hljs-function"> =&gt;</span> {
             <span class="hljs-keyword">const</span> contribution = contributionsByTarget.<span class="hljs-title">get</span>(target)!;
@@ -1290,7 +1357,8 @@ finish, preserving diagnostic ordering as well as output ordering.</p>
                 <span class="hljs-keyword">const</span> replacement = (<span class="hljs-keyword">yield</span> reference).<span class="hljs-title">replace</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">$/</span>, <span class="hljs-string">''</span>);
                 <span class="hljs-keyword">const</span> indent = <span class="hljs-regexp">/</span><span class="hljs-regexp">[ </span><span class="hljs-regexp">\t</span><span class="hljs-regexp">]</span><span class="hljs-regexp">*$/</span>.<span class="hljs-title">exec</span>(reference.<span class="hljs-property">prefix</span>)?.[<span class="hljs-number">0</span>] || <span class="hljs-string">''</span>;
                 content += replacement.<span class="hljs-title">replace</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">/g</span>, <span class="hljs-function">() =&gt;</span> <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + indent);
-                cursor = reference.<span class="hljs-property">end</span> + (reference.<span class="hljs-property">modifier</span>?.<span class="hljs-property">length</span> || <span class="hljs-number">0</span>);
+                cursor = reference.<span class="hljs-property">end</span> + (reference.<span class="hljs-property">annotation</span> === <span class="hljs-string">'rail'</span> ? <span class="hljs-string">'[rail]'</span>.<span class="hljs-property">length</span> : <span class="hljs-number">0</span>) +
+                    (reference.<span class="hljs-property">modifier</span>?.<span class="hljs-property">length</span> || <span class="hljs-number">0</span>);
             }
             content += part.<span class="hljs-property">content</span>.<span class="hljs-title">slice</span>(cursor);
         }
@@ -1418,6 +1486,7 @@ HTML-only: hiding highlighted comments never changes the tangled source bytes.</
 <div class="code">
 <pre><code><span class="hljs-keyword">const</span> annotations = collected.<span class="hljs-property">parsed</span>.<span class="hljs-property">annotations</span>;
 <span class="hljs-title">installScreenTermLinks</span>(md);
+<span class="hljs-title">installScreenFragmentLinks</span>(md);
 md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">fence</span> = <span class="hljs-function">(</span><span class="hljs-params">fenceTokens: Token[], index: </span><span class="hljs-built_in">number</span><span class="hljs-params">, _options, env</span><span class="hljs-function">) =&gt;</span> {
     <span class="hljs-keyword">const</span> token = fenceTokens[index];
     <span class="hljs-keyword">if</span> (token.<span class="hljs-property">info</span>.<span class="hljs-title">trim</span>() === <span class="hljs-string">'SETTINGS'</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">''</span>; }

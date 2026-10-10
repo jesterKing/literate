@@ -85,7 +85,8 @@ function localBody(document: vscode.TextDocument, cursor: vscode.Position): bool
         if (column <= 0 || column > body.length) { return false; }
         const before = body.slice(0, column - 1) + body.slice(column);
         if (before.trim().startsWith(token.markup)) { return false; }
-        if (scanFragmentTags(body).some(tag => column >= tag.start && column <= tag.end + (tag.modifier?.length ?? 0))) {
+        if (scanFragmentTags(body).some(tag => column >= tag.start && column <= tag.end +
+            (tag.annotation === 'rail' ? '[rail]'.length : 0) + (tag.modifier?.length ?? 0))) {
             return false;
         }
         const prefix = body.slice(0, column);

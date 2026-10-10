@@ -1,9 +1,11 @@
 import MarkdownIt = require('markdown-it');
+import StateInline = require('markdown-it/lib/rules_inline/state_inline');
 import Token = require('markdown-it/lib/token');
 import hljs from 'highlight.js';
 import { collectAnnotations, PublicationAnnotations } from './publication-annotations';
 import { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAnnotation,
-    installScreenTermLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle, renderScreenExploration } from './publication-screen';
+    installScreenTermLinks, installScreenFragmentLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle,
+    renderScreenExploration } from './publication-screen';
 import { defaultThemeName, getTheme, themeCss } from './themes';
 
 export interface SourceDocument { path: string; text: string; }
@@ -26,10 +28,15 @@ export interface GenerationResult {
 }
 
 export interface PublicationLocation { path: string; line: number; column: number; }
+export interface PublicationProseReference {
+    name: string; occurrenceTarget: string; annotation: 'none' | 'rail'; at: PublicationLocation;
+    resolution: { kind: 'resolved'; target: string } | { kind: 'missing' };
+}
 export interface PublicationModel {
     documents: { path: string; contributions: string[] }[];
     fragments: { name: string; target: string; contributions: string[] }[];
     contributions: PublicationContribution[];
+    proseReferences?: PublicationProseReference[];
 }
 export interface PublicationContribution {
     target: string;
@@ -45,7 +52,7 @@ export type PublicationSegment =
     | { kind: 'text'; text: string }
     | { kind: 'reference'; text: string; name: string;
         start: number; end: number; at: PublicationLocation; modifier?: string;
-        occurrenceTarget: string; placement: 'standalone' | 'inline';
+        occurrenceTarget: string; placement: 'standalone' | 'inline'; annotation: 'none' | 'rail';
         resolution: { kind: 'resolved'; target: string } | { kind: 'missing' } };
 export const discoveryExcludedDirectories: readonly string[] = Object.freeze([
     '.git', 'node_modules', 'out', 'dist', '.yarn', '.vscode-test'
@@ -127,18 +134,48 @@ function sourceNulDiagnostic(document: SourceDocument): GenerationDiagnostic | u
     };
 }
 
-export interface FragmentTag { name: string; start: number; end: number; modifier?: string; }
+export interface FragmentTag {
+    name: string; start: number; end: number; annotation?: 'rail'; modifier?: string;
+}
 
 export function scanFragmentTags(text: string): FragmentTag[] {
     const tags: FragmentTag[] = [];
-    const pattern = /\\<<|<<([^<>\r\n]+)>>(=\+?|\+)?/g;
+    const pattern = /\\<<|<<([^<>\r\n]+)>>(\[rail\])?(=\+?|\+)?/g;
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(text))) {
         if (match[1] === undefined) { continue; }
         tags.push({ name: match[1], start: match.index,
-            end: match.index + match[1].length + 4, modifier: match[2] });
+            end: match.index + match[1].length + 4,
+            ...(match[2] === undefined ? {} : { annotation: 'rail' as const }),
+            ...(match[3] === undefined ? {} : { modifier: match[3] }) });
     }
     return tags;
+}
+
+function insideMarkdownLink(state: StateInline): boolean {
+    let depth = 0;
+    for (const token of state.tokens) {
+        if (token.type === 'link_open') { depth++; }
+        else if (token.type === 'link_close') { depth--; }
+    }
+    return depth > 0;
+}
+
+/** Install semantic prose fragment uses without scanning code, HTML, or existing links. */
+export function installFragmentReferenceSyntax(md: MarkdownIt): void {
+    md.inline.ruler.before('text', 'literate_fragment_reference', (state, silent) => {
+        if (state.src.charCodeAt(state.pos) !== 0x3c || insideMarkdownLink(state)) { return false; }
+        const tag = scanFragmentTags(state.src.slice(state.pos))[0];
+        if (!tag || tag.start !== 0 || tag.modifier !== undefined) { return false; }
+        const end = tag.end + (tag.annotation === 'rail' ? '[rail]'.length : 0);
+        if (!silent) {
+            const use = state.push('literate_fragment_use', '', 0);
+            use.content = state.src.slice(state.pos, state.pos + tag.end);
+            use.meta = { name: tag.name, annotation: tag.annotation || 'none' };
+        }
+        state.pos += end;
+        return true;
+    });
 }
 export interface FragmentHeader {
     name: string; language: string; append: boolean; remainder: string;
@@ -274,6 +311,7 @@ function collectProject(documents: SourceDocument[], policy?: CollectionPolicy) 
         diagnostics.push({ ...location, message, ...(code === undefined ? {} : { code }) });
     };
     const md = new MarkdownIt();
+    installFragmentReferenceSyntax(md);
     const sources = new Map<string, SourceDocument>();
     const sourceKeys = new Set<string>();
     for (const document of documents) {
@@ -418,7 +456,7 @@ function collectProject(documents: SourceDocument[], policy?: CollectionPolicy) 
         fragments: Array.from(fragments.keys(), name => ({
             name, target: 'f-' + publicationEncode(name), contributions: []
         })),
-        contributions: []
+        contributions: [], proseReferences: []
     };
     const publicationDocuments = new Map(publication.documents.map(document => [document.path, document]));
     const publicationFamilies = new Map(publication.fragments.map(fragment => [fragment.name, fragment]));
@@ -432,10 +470,10 @@ function collectProject(documents: SourceDocument[], policy?: CollectionPolicy) 
         const segments: PublicationSegment[] = [];
         let referenceOrdinal = 0;
         let cursor = 0;
-        for (const { name, start, end, modifier, at } of references(part)) {
+        for (const { name, start, end, annotation, modifier, at } of references(part)) {
             if (start > cursor) { segments.push({ kind: 'text', text: part.content.slice(cursor, start) }); }
             const familyTarget = publicationFamilies.get(name)?.target;
-            const textEnd = end + (modifier?.length || 0);
+            const textEnd = end + (annotation === 'rail' ? '[rail]'.length : 0) + (modifier?.length || 0);
             const lineStart = part.content.lastIndexOf('\n', start - 1) + 1;
             const newline = part.content.indexOf('\n', textEnd);
             const lineEnd = newline < 0 ? part.content.length : newline;
@@ -444,7 +482,7 @@ function collectProject(documents: SourceDocument[], policy?: CollectionPolicy) 
             segments.push({
                 kind: 'reference', text: part.content.slice(start, textEnd), name, start, end, at,
                 occurrenceTarget: `${target}-r-${++referenceOrdinal}`, placement,
-                ...(modifier === undefined ? {} : { modifier }),
+                annotation: annotation || 'none', ...(modifier === undefined ? {} : { modifier }),
                 resolution: familyTarget === undefined ? { kind: 'missing' } : { kind: 'resolved', target: familyTarget }
             });
             cursor = textEnd;
@@ -459,6 +497,25 @@ function collectProject(documents: SourceDocument[], policy?: CollectionPolicy) 
         publicationDocuments.get(part.definition.path)!.contributions.push(target);
     }
     const contributionsByTarget = new Map(publication.contributions.map(value => [value.target, value]));
+    let proseOrdinal = 0;
+    for (const path of order) {
+        const documentTokens = tokens.get(path)!;
+        for (const token of documentTokens) {
+            for (const child of token.children || []) {
+                if (child.type !== 'literate_fragment_use') { continue; }
+                const name = String(child.meta?.name || '');
+                const familyTarget = publicationFamilies.get(name)?.target;
+                const reference: PublicationProseReference = {
+                    name, occurrenceTarget: `p-${publicationEncode(path)}-${++proseOrdinal}`,
+                    annotation: child.meta?.annotation === 'rail' ? 'rail' : 'none',
+                    at: { path, line: token.map?.[0] ?? 0, column: 0 },
+                    resolution: familyTarget === undefined ? { kind: 'missing' } :
+                        { kind: 'resolved', target: familyTarget }
+                };
+                child.meta = reference; publication.proseReferences!.push(reference);
+            }
+        }
+    }
     const parsedDocuments: ParsedDocument[] = order.map(path => {
         const documentTokens = tokens.get(path)!;
         const targets = new Map(publicationDocuments.get(path)!.contributions.map(target => {
@@ -553,7 +610,8 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
                 const replacement = (yield reference).replace(/\n$/, '');
                 const indent = /[ \t]*$/.exec(reference.prefix)?.[0] || '';
                 content += replacement.replace(/\n/g, () => '\n' + indent);
-                cursor = reference.end + (reference.modifier?.length || 0);
+                cursor = reference.end + (reference.annotation === 'rail' ? '[rail]'.length : 0) +
+                    (reference.modifier?.length || 0);
             }
             content += part.content.slice(cursor);
         }
@@ -609,6 +667,7 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
     }
     const annotations = collected.parsed.annotations;
     installScreenTermLinks(md);
+    installScreenFragmentLinks(md);
     md.renderer.rules.fence = (fenceTokens: Token[], index: number, _options, env) => {
         const token = fenceTokens[index];
         if (token.info.trim() === 'SETTINGS') { return ''; }

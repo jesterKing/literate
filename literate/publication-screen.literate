@@ -332,9 +332,25 @@ function sanitizeAnnotationTokens(tokens: Token[]): Token[] {
 
 Term links share resolution in prose, headings and annotation bodies. A missing,
 ambiguous or pending destination becomes a span, including its closing tag.
+Semantic prose fragment tokens use the same family destinations as code references;
+the `[rail]` suffix was consumed before rendering and does not affect screens.
 Other links retain the host renderer's behavior and Markdown URL validation.
 
 ```ts : <<screen term links>>=
+export function installScreenFragmentLinks(md: MarkdownIt): void {
+    md.renderer.rules.literate_fragment_use = (tokens, index, _options, env) => {
+        const token = tokens[index];
+        const context = env?.literateScreen as ScreenAnnotationContext | undefined;
+        const name = String(token.meta?.name || '');
+        const family = context?.model.fragments.find(item => item.name === name);
+        const lookup = context && screenIndex(context.model, context.annotations);
+        const base = lookup?.parts.get(family?.contributions[0] || '');
+        const href = context && family && base ? screenHref(context.path, base.definition.path,
+            family.target, context.format, context.destination) : undefined;
+        return family ? screenLink(href, `Definition of ${name}`, token.content, family.target) :
+            escapeHtml(token.content);
+    };
+}
 export function installScreenTermLinks(md: MarkdownIt): void {
     const open = md.renderer.rules.link_open, close = md.renderer.rules.link_close;
     const destination = (href: string, context?: ScreenAnnotationContext) => {

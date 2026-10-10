@@ -49,6 +49,30 @@ test('Pandoc prepares empty projects and retains empty document destinations', (
     assert.deepEqual(chapter(prepared(parse(''))).blocks, []);
 });
 
+test('Pandoc models prose fragment uses and consumes explicit rail suffixes', () => {
+    const project = parse('Before <<piece>> and <<piece>>[rail] after.\n\n' +
+        fence('js : <<piece>>=', 'base') + fence('js : <<piece>>=+', 'addition'));
+    const document = prepared(project), block = chapter(document).blocks[0];
+    assert.equal(block.t, 'Para');
+    if (block.t !== 'Para') { throw new Error('Expected paragraph'); }
+    const links = block.c.filter((inline): inline is Extract<PandocInline, { t: 'Link' }> => inline.t === 'Link');
+    assert.equal(links.length, 2);
+    assert.deepEqual(links.map(link => link.c[0][1]), [['lit-fragment-use'], ['lit-fragment-use']]);
+    assert.deepEqual(links.map(link => new Map(link.c[0][2]).get('data-annotation')), ['none', 'rail']);
+    assert.equal(new Set(links.map(link => new Map(link.c[0][2]).get('data-occurrence'))).size, 2);
+    assert.deepEqual(links.map(link => link.c[1]), [[word('<<piece>>')], [word('<<piece>>')]]);
+    assert.doesNotMatch(JSON.stringify(document), /\[rail\]/);
+});
+
+test('prose fragment uses respect Markdown boundaries and strict publication safety', () => {
+    const project = parse('`<<piece>>` [label <<piece>>](https://example.org/<<piece>>) ' +
+        '\\<<piece>>[rail] <<piece>>\n\n' + fence('text', '<<piece>>[rail]') + fence('js : <<piece>>=', 'base'));
+    assert.equal(project.publication.proseReferences?.length, 1);
+    assert.equal(project.publication.proseReferences?.[0].annotation, 'none');
+    rejected(parse('Missing <<absent>>'), 'missing-fragment', 0);
+    rejected(parse('# Important <<piece>>[rail]\n\n' + fence('js : <<piece>>=', 'base')), 'annotation-heading', 0);
+});
+
 test('Pandoc preserves supported blocks, inline nesting, breaks and list attributes', () => {
     const project = parse('# Title\n\n## Subtitle\n\n'
         + '*em **strong*** ~~gone~~ `x < y`\nsoft  \nhard\n\n---\n\n'

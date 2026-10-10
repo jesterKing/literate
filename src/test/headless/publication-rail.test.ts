@@ -33,15 +33,17 @@ test('rail keeps model targets separate from pre-encoded definition labels', () 
     assert.ok(tex.includes('\\LitRailBuild{1}{A}{2}'));
 });
 
-test('fragment rows link every contribution and expose a marker-only use command', () => {
+test('fragment rows link distinct contribution pages and expose a marker-only use command', () => {
     const tex = publicationRail([], [], 9, [fragment]);
     const lua = runtime(tex);
     assert.ok(lua.includes(`litrail.declare(1,"${fragment.target}","fragment",0)`));
     for (const label of fragment.labels) {
         assert.ok(tex.includes(`\\LitRailResolve{${label}}`));
-        assert.ok(tex.includes(`\\hyperref[${label}]{\\pageref*{${label}}}`));
+        assert.ok(tex.includes(`\\LitRailFragmentPage{${label}}`));
     }
     assert.ok(tex.includes('\\LitRailBuild{1}{A}{0.75}'));
+    assert.ok(tex.includes('\\ifcsname LitRailSeenPage@\\LitRailPage\\endcsname'));
+    assert.ok(tex.includes('\\LitRailPageSeparator\\hyperref[##1]{\\pageref*{##1}}'));
     const macro = tex.slice(tex.indexOf('\\DeclareRobustCommand{\\LitFragmentUse}'),
         tex.indexOf('\\AddToHook{begindocument/end}'));
     assert.match(macro, /litrail\.use\(/);
@@ -130,6 +132,9 @@ test('rail uses physical shipout parity with stable-state errors and a release c
     assert.ok(tex.includes('\\oddsidemargin'));
     assert.ok(tex.includes('\\evensidemargin'));
     assert.doesNotMatch(tex, /two-sided rail unsupported|\\value\{page\}|\\thepage/);
+    assert.ok(lua.includes('R.catcodes = tex.catcodetable'));
+    assert.ok(lua.includes('tex.sprint(R.catcodes,string.format("\\\\put'));
+    assert.doesNotMatch(lua, /tex\.sprint\((?!R\.catcodes,)/);
     assert.ok(lua.includes('page~=R.page+1'));
     assert.ok(lua.includes('twoside==1 and page%2==0'));
     assert.ok(lua.includes('evenleft-separation-width'));

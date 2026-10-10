@@ -420,9 +420,17 @@ headings, blockquotes, tables, strikethrough, indented/fenced code and nested
 TERM/NOTE/Mermaid fences are rejected. Inline code is allowed; code blocks are not.
 Raw author TeX is not an escape hatch into the rail.
 
-Only explicit `[label](term:key)` links are term uses. Keys are exact and
-case-sensitive; destinations are percent-decoded once. There is no heuristic
-matching of words, labels or display titles. Different keys may share a title.
+Only explicit `[label](term:key)` links are term uses. In prose and named code
+contributions, fragment references remain visible in print with linked
+contribution-page suffixes. An immediate, case-sensitive
+`<<fragment name>>[rail]` additionally places that occurrence's family in the
+page-local print rail; ordinary `<<fragment name>>` uses stay in the body only.
+`[rail]` is consumed as Literate metadata and never enters generated source.
+Prose recognition excludes inline code, code blocks, raw HTML, existing links,
+and escaped `\<<fragment name>>` text. Keys are exact and case-sensitive;
+destinations are percent-decoded once.
+There is no heuristic matching of words, labels or display titles. Different keys
+may share a title.
 Malformed headers/bodies report `annotation-header` / `annotation-body`;
 duplicate definitions report `annotation-duplicate`, and unresolved uses report
 `annotation-missing` or `annotation-ambiguous`, with source locations. These
@@ -443,6 +451,12 @@ These are four distinct things:
   in print prose and its controlled body in the rail. It is not a term definition
   or a term lookup. Links inside annotation bodies still resolve, but do not
   recursively create rail markers.
+- A **fragment rail annotation** is an explicitly curated `<<name>>[rail]` use.
+  The complete reference and linked contribution page numbers remain in the prose
+  or code body, while the rail repeats the family name and contribution pages.
+  Inline and standalone uses are both eligible; placement does not imply rail
+  membership. Plain fragment references are allowed in headings, but annotated
+  heading uses fail with `annotation-heading` to avoid replayed rail markers.
 
 Annotated projects get both **Term index** and **Fragment index**. Print indexes
 link to term definitions and fragment contribution pages. HTML/preview indexes
@@ -450,8 +464,9 @@ also link to definitions, additions and reference sites, and appear only at the
 root (`index.literate`, or the first document if absent), not on every chapter.
 Screen TERM sections and numbered NOTE asides remain in document flow; screens
 have no physical-page rail. Preview uses the existing semantic navigation route,
-including current unsaved canonical documents. Projects without TERM/NOTE
-annotations retain their previous output and geometry: no new indexes or rail.
+including current unsaved canonical documents. Projects without TERM/NOTE or
+`[rail]` annotations retain their previous output and geometry: no new indexes or
+rail.
 
 ### Print geometry and failure policy
 
@@ -472,7 +487,8 @@ there is no split, shrink, spill-to-another-page or other fallback. Stable verti
 or horizontal rail overflow fails publication, as does non-convergence, preserving
 the previous PDF. A valid page size alone does not guarantee that its notes fit.
 
-Export allows at most **1,000 terms and 1,000 notes**. Each source annotation body
+Export allows at most **1,000 terms, 1,000 notes, and 1,000 explicitly selected
+fragment families**. Each source annotation body
 and each controlled rail text value is limited to **131,072 UTF-16 code units**;
 aggregate source/declaration and rendered declaration budgets are **2,097,152
 code units**. These are the implementation's nominal “128 KiB” / “2 MiB” limits,
@@ -521,7 +537,7 @@ Compilation uses a private temporary stage and private TeX caches, with a fixed
 `book.tex` entry regardless of the requested PDF name. Both the `latexmk` version
 preflight and build use `-norc`, so latexmk rc files are ignored. Shell escape is
 disabled, but this is **not a TeX/Lua sandbox: trusted inputs only**. Each preflight
-process has a 15-second timeout; the build has a 180-second deadline and
+process has a 15-second timeout; the build has an eight-minute deadline and
 `max_repeat = 5`. Process output and the compiler log are bounded at 4 MiB; the
 PDF is bounded at 64 MiB. Publication requires reference convergence: genuine
 final-log undefined-reference/citation or rerun warnings and exhausted passes

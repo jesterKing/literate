@@ -86,8 +86,8 @@ export function publicationRail(terms: readonly RailTerm[], notes: readonly Rail
             body: `\\textbf{${note.number}.}\\space ${note.body}` })),
         ...fragments.map(fragment => ({ target: fragment.target, kind: 'fragment', number: 0,
             labels: [...fragment.labels], padding: 0.75,
-            body: `\\textbf{${fragment.title}}\\par ` + fragment.labels.map(label =>
-                `\\hyperref[${label}]{\\pageref*{${label}}}`).join(', ') }))
+            body: `\\textbf{${fragment.title}}\\par \\LitRailFragmentPages{` + fragment.labels.map(label =>
+                `\\LitRailFragmentPage{${label}}`).join('') + '}' }))
     ];
     const registration = declarations.map((item, index) =>
         `litrail.declare(${index + 1},"${item.target}","${item.kind}",${item.number})`).join('\n');
@@ -111,6 +111,16 @@ function railTex(fontSize: number): string {
 \newcommand{\LitRailState}[1]{\directlua{litrail.oldhash="\luaescapestring{#1}"}}
 \newcommand{\LitRailWrite}[5]{\immediate\write\@auxout{\string\LitRailPrevious{#1}{#2}{#3}{#4}{#5}}}
 \newcommand{\LitRailWriteState}[1]{\immediate\write\@auxout{\string\LitRailState{#1}}}
+\newcommand{\LitRailFragmentPages}[1]{%
+  \def\LitRailPageSeparator{}%
+  \def\LitRailFragmentPage##1{%
+    \edef\LitRailPage{\getpagerefnumber{##1}}%
+    \ifcsname LitRailSeenPage@\LitRailPage\endcsname\else
+      \expandafter\def\csname LitRailSeenPage@\LitRailPage\endcsname{}%
+      \LitRailPageSeparator\hyperref[##1]{\pageref*{##1}}%
+      \def\LitRailPageSeparator{, }%
+    \fi}%
+  #1}
 \newcommand{\LitRailBuild}[3]{%
   \begingroup\LitRailBuildingtrue
   \hsize=\marginparwidth\linewidth=\hsize\columnwidth=\hsize\textwidth=\hsize
@@ -156,6 +166,7 @@ function railLua(): string {
     return String.raw`litrail = { defs={}, targets={}, old={}, oldpages={}, current={}, issued={}, seen={}, pages={},
   oldhash="", page=0, count=0, nodes=0, bounds={}, problems={}, fingerprints={} }
 local R = litrail
+R.catcodes = tex.catcodetable
 local mm = 65536*72.27/25.4
 local gap = tex.sp("2mm")
 local function fatal(message)
@@ -262,9 +273,9 @@ function R.use(id,target,kind)
   if R.count>=10000 then fatal("annotation use budget exceeds 10000"); return end
   R.seen[identity]=true; R.count=R.count+1
   R.issued[R.count]={index=index,id=id,kind=kind}
-  tex.sprint("\\latelua{litrail.mark("..R.count..")}")
+  tex.sprint(R.catcodes,"\\latelua{litrail.mark("..R.count..")}")
   if kind=="note" then
-    tex.sprint("\\hyperlink{lit-rail-note-"..index.."}{\\textsuperscript{\\notefont "..R.defs[index].number.."}}")
+    tex.sprint(R.catcodes,"\\hyperlink{lit-rail-note-"..index.."}{\\textsuperscript{\\notefont "..R.defs[index].number.."}}")
   end
 end
 function R.mark(use)
@@ -328,7 +339,10 @@ function R.ship(page,twoside,oddleft,evenleft,top,body,height,width,separation)
     end
   end
   if needed>height then
-    pending(string.format("overflow on absolute page %d: required %.3f mm, available %.3f mm",R.page,needed/mm,height/mm))
+    local rows={}
+    for _,item in ipairs(items) do rows[#rows+1]=string.format("%s:%d=%.3fmm",item.d.kind,item.index,item.d.height/mm) end
+    pending(string.format("overflow on absolute page %d: required %.3f mm, available %.3f mm; rows %s",
+      R.page,needed/mm,height/mm,table.concat(rows,",")))
     failed=true
   end
   if failed then return end
@@ -345,7 +359,7 @@ function R.ship(page,twoside,oddleft,evenleft,top,body,height,width,separation)
     if item.d.kind=="note" then destination="lit-rail-note-"..item.index
     elseif item.d.kind=="term" then destination="lit-rail-term-"..R.page.."-"..item.index
     else destination="lit-rail-fragment-"..R.page.."-"..item.index end
-    tex.sprint(string.format("\\put(%.8f,%.8f){\\vtop{\\kern0pt\\hbox{\\hypertarget{%s}{\\copy%d}}}}",x/65536,-item.y/65536,destination,item.d.box))
+    tex.sprint(R.catcodes,string.format("\\put(%.8f,%.8f){\\vtop{\\kern0pt\\hbox{\\hypertarget{%s}{\\copy%d}}}}",x/65536,-item.y/65536,destination,item.d.box))
   end
 end
 function R.finish()
@@ -362,11 +376,11 @@ function R.finish()
   local records={}
   for _,r in ipairs(R.current) do
     records[#records+1]=table.concat(r,",")
-    tex.sprint(string.format("\\LitRailWrite{%d}{%d}{%d}{%d}{%d}",table.unpack(r)))
+    tex.sprint(R.catcodes,string.format("\\LitRailWrite{%d}{%d}{%d}{%d}{%d}",table.unpack(r)))
   end
   local hash=digest(table.concat(R.fingerprints,"|")..";"..table.concat(records,"|")..";"..
     table.concat(R.pages,"|")..";"..table.concat(R.bounds,"|")..";"..table.concat(R.problems,"|"))
-  tex.sprint("\\LitRailWriteState{"..hash.."}")
+  tex.sprint(R.catcodes,"\\LitRailWriteState{"..hash.."}")
   if hash==R.oldhash and #R.problems>0 then fatal(R.problems[1]); return end
   local stable=hash==R.oldhash
   local f=assert(io.open(tex.jobname..".litrail","w"))
@@ -374,6 +388,6 @@ function R.finish()
   f:write(string.format("pages %d uses %d entries %d\n",R.page,#R.current,#R.bounds))
   for _,b in ipairs(R.bounds) do f:write("bounds ",b,"\n") end
   f:close()
-  if not stable then tex.sprint("\\PackageWarningNoLine{literate-rail}{Rerun to get rail membership, dimensions and references right}") end
+  if not stable then tex.sprint(R.catcodes,"\\PackageWarningNoLine{literate-rail}{Rerun to get rail membership, dimensions and references right}") end
 end`;
 }

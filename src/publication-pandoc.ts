@@ -226,6 +226,7 @@ function headingLinkDestination(destination: DocumentDestination, slug: string, 
 }
 interface InlineReader {
     annotations: PublicationAnnotations;
+    publication: ParsedProject['publication'];
     document: ParsedDocument;
     tokens: readonly Token[];
     index: number;
@@ -251,6 +252,7 @@ function readInlines(reader: InlineReader, stop?: string, depth = 0): PandocInli
             case 'text':
                         for (const inline of textInlines(token.content)) { result.push(inline); }
                         break;
+            case 'literate_fragment_use': result.push(readFragmentUse(reader, token)); break;
             case 'code_inline': result.push({ t: 'Code', c: [emptyAttributes(), token.content] }); break;
             case 'softbreak': result.push({ t: 'SoftBreak' }); break;
             case 'hardbreak': result.push({ t: 'LineBreak' }); break;
@@ -263,6 +265,18 @@ function readInlines(reader: InlineReader, stop?: string, depth = 0): PandocInli
     }
     if (stop) { report(reader.diagnostics, reader.at, 'invalid-markdown-structure', `Missing ${stop}`); }
     return result;
+}
+function readFragmentUse(reader: InlineReader, token: Token): PandocInline {
+    const name = String(token.meta?.name || '');
+    const family = reader.publication.fragments.find(item => item.name === name);
+    const occurrence = String(token.meta?.occurrenceTarget || '');
+    const annotation = token.meta?.annotation === 'rail' ? 'rail' : 'none';
+    if (!family || !occurrence) {
+        report(reader.diagnostics, reader.at, 'missing-fragment', `Missing fragment referenced from prose: ${name}`);
+    }
+    return { t: 'Link', c: [['', ['lit-fragment-use'], [
+        ['data-target', family?.target || ''], ['data-occurrence', occurrence], ['data-annotation', annotation]
+    ]], textInlines(token.content), ['#' + (family?.target || ''), '']] };
 }
 function readLink(reader: InlineReader, token: Token, depth: number): PandocInline {
     const original = token.attrGet('href') ?? '';
@@ -279,6 +293,7 @@ function readLink(reader: InlineReader, token: Token, depth: number): PandocInli
 }
 interface BlockReader {
     annotations: PublicationAnnotations;
+    publication: ParsedProject['publication'];
     annotationBody?: boolean;
     document: ParsedDocument;
     index: number;
@@ -363,7 +378,8 @@ function readTextBlock(reader: BlockReader, opening: Token): PandocInline[] {
     }
     reader.index++;
     const result = readInlines({ document: reader.document, tokens: token.children ?? [],
-        index: 0, at, targets: reader.targets, diagnostics: reader.diagnostics, annotations: reader.annotations });
+        index: 0, at, targets: reader.targets, diagnostics: reader.diagnostics,
+        annotations: reader.annotations, publication: reader.publication });
     if (reader.document.tokens[reader.index]?.type === stop) { reader.index++; }
     else { report(reader.diagnostics, at, 'invalid-markdown-structure', `Expected ${stop}`); }
     return result;
@@ -373,10 +389,14 @@ function readHeading(reader: BlockReader, token: Token): PandocLeafBlock {
     if (!level) {
         report(reader.diagnostics, tokenLocation(reader.document, token), 'invalid-markdown-structure', 'Invalid heading level');
     }
-    if (reader.document.tokens[reader.index]?.children?.some(child =>
-        child.type === 'link_open' && child.attrGet('href')?.startsWith('term:'))) {
+    const headingChildren = reader.document.tokens[reader.index]?.children || [];
+    if (headingChildren.some(child => child.type === 'link_open' && child.attrGet('href')?.startsWith('term:'))) {
         report(reader.diagnostics, tokenLocation(reader.document, token), 'annotation-heading',
             'TERM links in headings are unsupported: use a prose link below the heading to avoid moving rail markers');
+    }
+    if (headingChildren.some(child => child.type === 'literate_fragment_use' && child.meta?.annotation === 'rail')) {
+        report(reader.diagnostics, tokenLocation(reader.document, token), 'annotation-heading',
+            'Rail fragment references in headings are unsupported: use a prose reference below the heading');
     }
     const id = reader.targets.get(reader.document.path)!.tokens.get(token)!;
     return { t: 'Header', c: [level, [id, [], []], readTextBlock(reader, token)] };
@@ -490,7 +510,7 @@ export function preparePandoc(
     const pending: PendingBlock[] = project.documents.map(document => {
         const contributions = contributionIndex(document, parts, diagnostics);
         const body = readBlocks({ document, index: 0, contributions, targets, diagnostics,
-            annotations: project.annotations, assets: !!renderAsset });
+            annotations: project.annotations, publication: project.publication, assets: !!renderAsset });
         return { t: 'Div', c: [[targets.get(document.path)!.id, [], []], body] };
     });
     if (diagnostics.length) { return { diagnostics }; }

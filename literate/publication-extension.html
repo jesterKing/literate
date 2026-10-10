@@ -120,7 +120,11 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-</style>
+.literate-document .literate-annotation { margin-block: 1em; padding: .6em 1em; border-inline-start: .2em solid currentColor; }
+.literate-document .literate-annotation-title { font-weight: bold; }
+.literate-document .literate-note { border-inline-start-style: dotted; }
+.literate-document .literate-term-unresolved { text-decoration: underline dotted; }
+.literate-document .literate-screen-index { margin-block-start: 2em; }</style>
   <meta name="author" content="Nathan 'jesterKing' Letwory">
 </head>
 <body>
@@ -607,7 +611,9 @@ the queue on resolution or rejection, never merely on a cancellation request.</p
 </div><p>A validated outcome precedes cancellation state: a late cancellation cannot undo
 commit. Authority is separate and is checked before remembering, offering an open
 action and opening. If authority is revoked after commit, report the actual completed
-output without claiming failure or taking further success actions. PDFs open via
+output without claiming failure or taking further success actions. Failure
+notifications are launched without awaiting user dismissal, so the command reaches
+its cleanup and releases the publication guard immediately. PDFs open via
 <code>vscode.open</code>, never as text documents.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-4"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" aria-label="Definition of publication extension commands">&lt;&lt;publication extension commands&gt;&gt;=+</a></div>
@@ -628,8 +634,8 @@ output without claiming failure or taking further success actions. PDFs open via
             output.<span class="hljs-title">appendLine</span>(detail);
             <span class="hljs-keyword">if</span> (!disposed) {
                 output.<span class="hljs-title">show</span>(<span class="hljs-literal">true</span>);
-                <span class="hljs-keyword">if</span> (completed) { <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showWarningMessage</span>(detail.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">1500</span>)); }
-                <span class="hljs-keyword">else</span> { <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showErrorMessage</span>(detail.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">1500</span>)); }
+                <span class="hljs-keyword">if</span> (completed) { <span class="hljs-built_in">void</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showWarningMessage</span>(detail.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">1500</span>)); }
+                <span class="hljs-keyword">else</span> { <span class="hljs-built_in">void</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showErrorMessage</span>(detail.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">1500</span>)); }
             }
         } <span class="hljs-keyword">finally</span> {
             operation.<span class="hljs-property">source</span>.<span class="hljs-title">dispose</span>();

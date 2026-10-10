@@ -120,7 +120,11 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-</style>
+.literate-document .literate-annotation { margin-block: 1em; padding: .6em 1em; border-inline-start: .2em solid currentColor; }
+.literate-document .literate-annotation-title { font-weight: bold; }
+.literate-document .literate-note { border-inline-start-style: dotted; }
+.literate-document .literate-term-unresolved { text-decoration: underline dotted; }
+.literate-document .literate-screen-index { margin-block-start: 2em; }</style>
   <meta name="author" content="Nathan 'jesterKing' Letwory">
 </head>
 <body>
@@ -1763,7 +1767,9 @@ latest open index buffer.</p>
 <div class="fragmentname" id="c-00720065006e0064006500720043006f0064006500460065006e00630065002000720075006c0065-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-00720065006e0064006500720043006f0064006500460065006e00630065002000720075006c0065" data-literate-target="f-00720065006e0064006500720043006f0064006500460065006e00630065002000720075006c0065" aria-label="Definition of renderCodeFence rule">&lt;&lt;renderCodeFence rule&gt;&gt;=+</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">installPreviewDocument</span>(<span class="hljs-params">md: MarkdownIt, repository: FragmentRepository, navigation: PreviewNavigation</span>): <span class="hljs-built_in">void</span> {
+  <span class="hljs-title">installFragmentReferenceSyntax</span>(md);
   <span class="hljs-title">installScreenTermLinks</span>(md);
+  <span class="hljs-title">installScreenFragmentLinks</span>(md);
   <span class="hljs-keyword">const</span> sources = <span class="hljs-keyword">new</span> <span class="hljs-title">WeakMap</span>&lt;<span class="hljs-title">Token</span>[], <span class="hljs-built_in">string</span>&gt;();
   md.<span class="hljs-property">core</span>.<span class="hljs-property">ruler</span>.<span class="hljs-title">before</span>(<span class="hljs-string">'normalize'</span>, <span class="hljs-string">'literate_preview_source'</span>, <span class="hljs-params">state</span><span class="hljs-function"> =&gt;</span> { sources.<span class="hljs-title">set</span>(state.<span class="hljs-property">tokens</span>, state.<span class="hljs-property">src</span>); });
   <span class="hljs-keyword">const</span> originalRender = md.<span class="hljs-property">renderer</span>.<span class="hljs-property">render</span>;
@@ -2581,8 +2587,10 @@ services on which the editor adapter depends.</p>
 <span class="hljs-keyword">import</span> { parseProject, discoveryExcludedDirectories, generateProject, resolveProjectTheme, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, <span class="hljs-title">SourceDocument</span>, <span class="hljs-title">FragmentInspection</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
 <span class="hljs-keyword">import</span> { collectFragmentOccurrences, planFragmentRename, <span class="hljs-title">FragmentOccurrence</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./symbols'</span>;
 <span class="hljs-keyword">import</span> { defaultThemeName } <span class="hljs-keyword">from</span> <span class="hljs-string">'./themes'</span>;
+<span class="hljs-keyword">import</span> { installFragmentReferenceSyntax } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
 <span class="hljs-keyword">import</span> { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAnnotation,
-  installScreenTermLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle, renderScreenExploration } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-screen'</span>;
+  installScreenTermLinks, installScreenFragmentLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle,
+  renderScreenExploration } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-screen'</span>;
 <span class="hljs-keyword">import</span> { registerPublicationCommands } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-extension'</span>;
 <span class="hljs-keyword">import</span> { registerLanguageFeatures, <span class="hljs-title">LanguageSnapshot</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./language-features'</span>;
 

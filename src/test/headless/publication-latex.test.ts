@@ -70,7 +70,7 @@ test('LaTeX links full hanging names, distinct contribution labels and navigatio
     const latex = result.latex!;
     assert.ok(latex.includes(Array.from(name).join('\\allowbreak{}')));
     assert.match(latex, /\\newcommand\{\\LitReferenceA\}\{\\par\\begingroup/);
-    assert.match(latex, /\\textsuperscript\{\\notefont\\pageref\*/);
+    assert.match(latex, /\\textsuperscript\{\\notefont \\hyperref\[[^\]]+\]\{\\pageref\*/);
     assert.match(latex, /Previous /); assert.match(latex, /Next /); assert.match(latex, /Base /);
     assert.match(latex, /\\ensuremath\{\+\\equiv\}/);
     const labels = [...latex.matchAll(/\\label\{([^}]+)\}/g)].map(match => match[1]);
@@ -80,8 +80,8 @@ test('LaTeX links full hanging names, distinct contribution labels and navigatio
     assert.doesNotMatch(latex.slice(latex.indexOf('\\begin{document}')), /\\parbox/);
 });
 
-test('standalone references become marker baselines while inline references stay in the code body', async () => {
-    const project = parse(fence('caller', '  <<leaf>>  \nbefore <<leaf>> after') + fence('leaf', 'value'));
+test('explicit rail annotations add markers without hiding body references', async () => {
+    const project = parse(fence('caller', '  <<leaf>>[rail]  \nbefore <<leaf>> after') + fence('leaf', 'value'));
     const result = await renderLatex(project, {}, convert);
     assert.deepEqual(result.diagnostics, []);
     const latex = result.latex!;
@@ -89,8 +89,8 @@ test('standalone references become marker baselines while inline references stay
         latex.indexOf('\\newcommand{\\LitReferenceB}'));
     const second = latex.slice(latex.indexOf('\\newcommand{\\LitReferenceB}'),
         latex.indexOf('% literate-publication-rail-v1'));
-    assert.match(first, /\\LitFragmentUse\{lit-[a-f0-9]+\}\{lit-[a-f0-9]+\}\\strut/);
-    assert.doesNotMatch(first, /textless|pageref/);
+    assert.match(first, /\\LitFragmentUse\{lit-[a-f0-9]+\}\{lit-[a-f0-9]+\}/);
+    assert.match(first, /textless[\s\S]*pageref/);
     assert.doesNotMatch(second, /\\LitFragmentUse/);
     assert.match(second, /textless[\s\S]*pageref/);
     assert.match(latex, /literate-publication-rail-v1/);

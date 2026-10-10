@@ -120,7 +120,11 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-</style>
+.literate-document .literate-annotation { margin-block: 1em; padding: .6em 1em; border-inline-start: .2em solid currentColor; }
+.literate-document .literate-annotation-title { font-weight: bold; }
+.literate-document .literate-note { border-inline-start-style: dotted; }
+.literate-document .literate-term-unresolved { text-decoration: underline dotted; }
+.literate-document .literate-screen-index { margin-block-start: 2em; }</style>
   <meta name="author" content="Nathan 'jesterKing' Letwory">
 </head>
 <body>
@@ -194,6 +198,10 @@ stateDiagram-v2
 <p>The state diagram emphasizes that an <code>exit</code> event alone is not completion. Output
 pipes and descendants still belong to the invocation. It omits staging cleanup,
 which surrounds the entire state machine.</p>
+<aside class="literate-annotation literate-note" id="annotation-note-006c0069007400650072006100740065002f0063006f006d00700069006c0069006e0067005f007000750062006c0069007300680069006e0067005f007000640066002e006c0069007400650072006100740065-89-0"><div class="literate-annotation-title">Note 10</div><p>A process can report its exit while a descendant still holds an inherited output
+pipe open. Treating the first exit event as completion can therefore leak work or
+lose the final part of the transcript.</p>
+</aside>
 <p>Combined standard output and error have one aggregate byte limit. The runner counts
 bytes before retaining chunks and continues draining after the limit is crossed.
 Stream errors are failures, not unhandled events or permission to accept a partial
@@ -221,15 +229,17 @@ overfull boxes are returned to the publisher rather than silently discarded.</p>
 bounded stability certificate derived from physical page membership and placement.
 A missing, malformed, pending, or error certificate rejects a rail-enabled build
 before PDF bytes reach the destination transaction.</p>
-<p><code>publication PDF build</code> accepts bytes only after the final log and rail certificate
-agree.</p>
+<p><code>publication PDF build</code> keeps latexmk's console transcript quiet so expected
+first-pass forward-reference warnings cannot consume the process-output budget.
+Detailed diagnostics and returned warnings still come from the bounded final log.
+It accepts bytes only after that log and the rail certificate agree.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200050004400460020006200750069006c0064-006c0069007400650072006100740065002f0063006f006d00700069006c0069006e0067005f007000750062006c0069007300680069006e0067005f007000640066002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200050004400460020006200750069006c0064"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200050004400460020006200750069006c0064" data-literate-target="f-007000750062006c00690063006100740069006f006e00200050004400460020006200750069006c0064" aria-label="Definition of publication PDF build">&lt;&lt;publication PDF build&gt;&gt;=</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">buildPdf</span>(<span class="hljs-params">runner: PdfProcessRunner, cwd: </span><span class="hljs-built_in">string</span><span class="hljs-params">,
     env: NodeJS.ProcessEnv, check: </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">void</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">PdfCompilation</span>&gt; {
     <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">await</span> <span class="hljs-title">runner</span>(<span class="hljs-title">requestFor</span>(<span class="hljs-string">'latexmk'</span>, [
-        <span class="hljs-string">'-norc'</span>, <span class="hljs-string">'-lualatex'</span>, <span class="hljs-string">'-interaction=nonstopmode'</span>, <span class="hljs-string">'-halt-on-error'</span>,
+        <span class="hljs-string">'-norc'</span>, <span class="hljs-string">'-silent'</span>, <span class="hljs-string">'-lualatex'</span>, <span class="hljs-string">'-interaction=nonstopmode'</span>, <span class="hljs-string">'-halt-on-error'</span>,
         <span class="hljs-string">'-file-line-error'</span>, <span class="hljs-string">'-no-shell-escape'</span>, <span class="hljs-string">'-e'</span>, <span class="hljs-string">'$max_repeat = 5;'</span>, <span class="hljs-string">'book.tex'</span>
     ], cwd, env, buildTimeoutMs));
     <span class="hljs-keyword">if</span> (result.<span class="hljs-property">code</span> !== <span class="hljs-number">0</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`latexmk failed (exit </span><span class="hljs-subst">${result.code}</span><span class="hljs-string">).</span><span class="hljs-string">\n</span><span class="hljs-subst">${result.output}</span><span class="hljs-string">`</span>); }

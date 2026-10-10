@@ -81,9 +81,9 @@ test('PDF preflight checks template dependencies and uses literal bounded build 
         required.map(file => ['-progname=lualatex', file]));
     const build = fake.calls[fake.calls.length - 1];
     assert.equal(build.command, 'latexmk');
-    assert.deepEqual(build.args, ['-norc', '-lualatex', '-interaction=nonstopmode', '-halt-on-error',
+    assert.deepEqual(build.args, ['-norc', '-silent', '-lualatex', '-interaction=nonstopmode', '-halt-on-error',
         '-file-line-error', '-no-shell-escape', '-e', '$max_repeat = 5;', 'book.tex']);
-    assert.equal(build.timeoutMs, 180_000);
+    assert.equal(build.timeoutMs, 480_000);
     assert.equal(build.maximumOutputBytes, 4 * 1024 * 1024);
     assert.equal(build.env.TEXMFOUTPUT, path.dirname(build.cwd));
     assert.ok(build.env.TEXMFVAR?.startsWith(path.dirname(build.cwd) + path.sep));

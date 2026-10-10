@@ -1007,21 +1007,25 @@ test('literal unescape maps repeated references after emoji in UTF-16', () => {
         assert.ok(ref.target);
         assert.equal(ref.occurrenceTarget, source[index].occurrenceTarget);
         assert.equal(ref.placement, source[index].placement);
+        assert.equal(ref.annotation, source[index].annotation);
         assert.equal(ref.occurrenceTarget, `${input.target}-r-${index + 1}`);
     }
     assert.deepEqual(result.spans, [{ start: 0, end: result.text.length, scope: '' }]);
     assert.equal(JSON.stringify(input), snapshot);
 });
 
-test('reference occurrences distinguish standalone lines and retain structural identities', () => {
-    const input = part(' \t' + tag('piece') + ' \t\n' +
-        'prefix ' + tag('piece') + '\n' + tag('piece') + ' suffix\n' +
+test('reference occurrences distinguish placement and explicit rail annotations', () => {
+    const input = part(' \t' + tag('piece') + '[rail] \t\n' +
+        'prefix ' + tag('piece') + '\n' + tag('piece') + '[rail] suffix\n' +
         tag('piece') + ' ' + tag('piece') + '\n\\' + tag('literal') + ' ' + tag('piece'));
     const refs = input.segments.filter(
         (segment): segment is Extract<(typeof input.segments)[number], { kind: 'reference' }> =>
             segment.kind === 'reference');
     assert.deepEqual(refs.map(ref => ref.placement),
         ['standalone', 'inline', 'inline', 'inline', 'inline', 'inline']);
+    assert.deepEqual(refs.map(ref => ref.annotation),
+        ['rail', 'none', 'rail', 'none', 'none', 'none']);
+    assert.doesNotMatch(highlightContribution(input).text, /\[rail\]/);
     assert.deepEqual(refs.map(ref => ref.occurrenceTarget),
         refs.map((_, index) => `${input.target}-r-${index + 1}`));
     const eof = finalPart('\t' + tag('piece') + '  ');
@@ -1062,6 +1066,12 @@ test('standalone validation rejects missing references, modifiers and invalid se
         (placementRef as unknown as { placement: string }).placement = 'invalid';
     }
     assert.throws(() => highlightContribution(invalidPlacement), /placement/);
+    const invalidAnnotation = part(tag('piece'));
+    const annotationRef = invalidAnnotation.segments.find(segment => segment.kind === 'reference')!;
+    if (annotationRef.kind === 'reference') {
+        (annotationRef as unknown as { annotation: string }).annotation = 'invalid';
+    }
+    assert.throws(() => highlightContribution(invalidAnnotation), /annotation/);
     const empty = part('', '');
     empty.content = ''; empty.segments = [];
     assert.deepEqual(highlightContribution(empty), { text: '', spans: [], references: [] });
@@ -2290,6 +2300,30 @@ test('nested chapters encode relative filenames and preserve whole-block syntax'
             else { assert.match(code, /href="vscode:\/\/jesterking\.literate\/navigate\//); }
             assert.equal((code.match(/<a /g) || []).length, 1);
             assert.match(code, /class="hljs-string">\nafter`/);
+        }
+    } finally { p.dispose(); }
+});
+```
+
+Prose fragment uses share the same semantic screen destinations as code uses. The
+rail suffix is presentation metadata, while a backslash keeps the opener literal.
+
+```ts : <<screen navigation regression>>=+
+test('prose fragment uses link on screen and consume only exact rail metadata', async () => {
+    const text = '# Plain \<<piece>>\n\nBefore \<<piece>>[rail] and \\\<<piece>>[rail].\n\n' +
+        fence('text: \<<piece>>=', 'value');
+    const inputs = [{ path: 'index.literate', text }], generated = generateProject(inputs);
+    assert.deepEqual(generated.diagnostics, []);
+    const family = generated.publication.fragments[0], html = generated.files.find(file => file.path === 'index.html')!.content;
+    const p = await preview(inputs);
+    try {
+        const screen = p.md.render(text, { currentDocument: p.f.document('index.literate', text).uri });
+        for (const output of [html, screen]) {
+            const prose = output.slice(0, output.indexOf('<div class="codefragment">'));
+            assert.equal((prose.match(/aria-label="Definition of piece"/g) || []).length, 2);
+            assert.ok(prose.includes(`data-literate-target="${family.target}"`));
+            assert.ok((prose.match(/&lt;&lt;piece&gt;&gt;/g) || []).length >= 3);
+            assert.equal((prose.match(/\[rail\]/g) || []).length, 1);
         }
     } finally { p.dispose(); }
 });

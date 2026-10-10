@@ -120,7 +120,11 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-</style>
+.literate-document .literate-annotation { margin-block: 1em; padding: .6em 1em; border-inline-start: .2em solid currentColor; }
+.literate-document .literate-annotation-title { font-weight: bold; }
+.literate-document .literate-note { border-inline-start-style: dotted; }
+.literate-document .literate-term-unresolved { text-decoration: underline dotted; }
+.literate-document .literate-screen-index { margin-block-start: 2em; }</style>
   <meta name="author" content="Nathan 'jesterKing' Letwory">
 </head>
 <body>
@@ -213,7 +217,8 @@ body, never a generated mapping: requests still require full snapshot projection
         <span class="hljs-keyword">if</span> (column &lt;= <span class="hljs-number">0</span> || column &gt; body.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>; }
         <span class="hljs-keyword">const</span> before = body.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, column - <span class="hljs-number">1</span>) + body.<span class="hljs-title">slice</span>(column);
         <span class="hljs-keyword">if</span> (before.<span class="hljs-title">trim</span>().<span class="hljs-title">startsWith</span>(token.<span class="hljs-property">markup</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>; }
-        <span class="hljs-keyword">if</span> (<span class="hljs-title">scanFragmentTags</span>(body).<span class="hljs-title">some</span>(<span class="hljs-params">tag</span><span class="hljs-function"> =&gt;</span> column &gt;= tag.<span class="hljs-property">start</span> &amp;&amp; column &lt;= tag.<span class="hljs-property">end</span> + (tag.<span class="hljs-property">modifier</span>?.<span class="hljs-property">length</span> ?? <span class="hljs-number">0</span>))) {
+        <span class="hljs-keyword">if</span> (<span class="hljs-title">scanFragmentTags</span>(body).<span class="hljs-title">some</span>(<span class="hljs-params">tag</span><span class="hljs-function"> =&gt;</span> column &gt;= tag.<span class="hljs-property">start</span> &amp;&amp; column &lt;= tag.<span class="hljs-property">end</span> +
+            (tag.<span class="hljs-property">annotation</span> === <span class="hljs-string">'rail'</span> ? <span class="hljs-string">'[rail]'</span>.<span class="hljs-property">length</span> : <span class="hljs-number">0</span>) + (tag.<span class="hljs-property">modifier</span>?.<span class="hljs-property">length</span> ?? <span class="hljs-number">0</span>))) {
             <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;
         }
         <span class="hljs-keyword">const</span> prefix = body.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, column);

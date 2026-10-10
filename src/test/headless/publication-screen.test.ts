@@ -296,6 +296,24 @@ test('nested chapters encode relative filenames and preserve whole-block syntax'
         }
     } finally { p.dispose(); }
 });
+test('prose fragment uses link on screen and consume only exact rail metadata', async () => {
+    const text = '# Plain <<piece>>\n\nBefore <<piece>>[rail] and \\<<piece>>[rail].\n\n' +
+        fence('text: <<piece>>=', 'value');
+    const inputs = [{ path: 'index.literate', text }], generated = generateProject(inputs);
+    assert.deepEqual(generated.diagnostics, []);
+    const family = generated.publication.fragments[0], html = generated.files.find(file => file.path === 'index.html')!.content;
+    const p = await preview(inputs);
+    try {
+        const screen = p.md.render(text, { currentDocument: p.f.document('index.literate', text).uri });
+        for (const output of [html, screen]) {
+            const prose = output.slice(0, output.indexOf('<div class="codefragment">'));
+            assert.equal((prose.match(/aria-label="Definition of piece"/g) || []).length, 2);
+            assert.ok(prose.includes(`data-literate-target="${family.target}"`));
+            assert.ok((prose.match(/&lt;&lt;piece&gt;&gt;/g) || []).length >= 3);
+            assert.equal((prose.match(/\[rail\]/g) || []).length, 1);
+        }
+    } finally { p.dispose(); }
+});
 test('cached preview tokens use unsaved project buffers without I/O or generation', async () => {
     const inputs = documents(), p = await preview(inputs);
     try {

@@ -30,7 +30,7 @@ export interface PdfProcessResult { code: number | null; output: string; }
 export type PdfProcessRunner = (request: PdfProcessRequest) => Promise<PdfProcessResult>;
 const maximumLogBytes = 4 * 1024 * 1024;
 const maximumPdfBytes = 64 * 1024 * 1024;
-const buildTimeoutMs = 180_000;
+const buildTimeoutMs = 480_000;
 function killProcessTree(child: ChildProcess): void {
     if (!child.pid) { return; }
     try {
@@ -273,7 +273,7 @@ async function checkRailCertificate(cwd: string, check: () => void): Promise<voi
 async function buildPdf(runner: PdfProcessRunner, cwd: string,
     env: NodeJS.ProcessEnv, check: () => void): Promise<PdfCompilation> {
     const result = await runner(requestFor('latexmk', [
-        '-norc', '-lualatex', '-interaction=nonstopmode', '-halt-on-error',
+        '-norc', '-silent', '-lualatex', '-interaction=nonstopmode', '-halt-on-error',
         '-file-line-error', '-no-shell-escape', '-e', '$max_repeat = 5;', 'book.tex'
     ], cwd, env, buildTimeoutMs));
     if (result.code !== 0) { throw new Error(`latexmk failed (exit ${result.code}).\n${result.output}`); }
