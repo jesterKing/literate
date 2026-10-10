@@ -142,7 +142,7 @@ async function fixture() {
         const request = args[3];
         return f.reply ?? { stdout: JSON.stringify({ schemaVersion: 1, command: request.args[0], ok: true,
             outputs: [{ path: request.args[request.args.indexOf('--output') + 1], status: 'written' }],
-            publication: { warnings: ['fixture warning'] } }), stderr: '' };
+            publication: { warnings: ['fixture warning'] }, elapsedMs: 65423 }), stderr: '' };
     };
     exports.registerPublicationCommands(context, undefined, bridge);
     Object.assign(f, { vscode, workspace, context, api: exports,
@@ -309,6 +309,7 @@ test('PDF request arguments, disk fonts, warning channel, open URI and successfu
         '--margin-top', '10mm', '--margin-outer', '11mm', '--margin-bottom', '12mm', '--margin-inner', '13mm',
         '--browser', '/opt/chromium', '--font-manifest', 'fonts.json', '--json'], documents: [] });
     assert.ok(f.logs.some((line: string) => line.includes('fixture warning')));
+    assert.equal(f.logs[f.logs.length - 1], 'Publication finished in 01:05');
     assert.equal(f.opened[0][0], 'vscode.open');
     assert.equal(f.opened[0][1].fsPath, f.save.fsPath);
     assert.deepEqual([...f.state.values()], [{ paper: 'legal', margins: '10,11,12,13', destination: 'book.pdf' }]);

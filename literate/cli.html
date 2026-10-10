@@ -217,6 +217,7 @@ an attempted write succeeded. Inspection does not read or preflight output paths
     inspection?: <span class="hljs-title">Generation</span>[<span class="hljs-string">'inspection'</span>];
     selfHosting?: { <span class="hljs-attr">ok</span>: <span class="hljs-built_in">boolean</span>; <span class="hljs-attr">checks</span>: { <span class="hljs-attr">name</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">ok</span>: <span class="hljs-built_in">boolean</span>; message?: <span class="hljs-built_in">string</span> }[] };
     publication?: { <span class="hljs-attr">warnings</span>: <span class="hljs-built_in">string</span>[]; buildDirectory?: <span class="hljs-built_in">string</span> };
+    elapsedMs?: <span class="hljs-built_in">number</span>;
     usage?: <span class="hljs-built_in">string</span>;
 }
 
@@ -911,7 +912,8 @@ is added only after that stage runs.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0063006c006900200072006500730070006f006e00730065002000730065007400750070-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1"><span id="f-0063006c006900200072006500730070006f006e00730065002000730065007400750070"></span><a class="literate-tag-name" href="#f-0063006c006900200072006500730070006f006e00730065002000730065007400750070" data-literate-target="f-0063006c006900200072006500730070006f006e00730065002000730065007400750070" aria-label="Definition of cli response setup">&lt;&lt;cli response setup&gt;&gt;=</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">const</span> json = args.<span class="hljs-title">includes</span>(<span class="hljs-string">'--json'</span>);
+<pre><code><span class="hljs-keyword">const</span> started = process.<span class="hljs-property">hrtime</span>.<span class="hljs-title">bigint</span>();
+<span class="hljs-keyword">const</span> json = args.<span class="hljs-title">includes</span>(<span class="hljs-string">'--json'</span>);
 <span class="hljs-keyword">const</span> <span class="hljs-attr">positional</span>: <span class="hljs-built_in">string</span>[] = [];
 <span class="hljs-keyword">const</span> flags = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;();
 <span class="hljs-keyword">const</span> values = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;();
@@ -922,7 +924,17 @@ is added only after that stage runs.</p>
 };
 <span class="hljs-keyword">const</span> finish = (<span class="hljs-attr">code</span>: <span class="hljs-built_in">number</span>): <span class="hljs-params">number</span><span class="hljs-function"> =&gt;</span> {
     response.<span class="hljs-property">ok</span> = code === <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">if</span> (response.<span class="hljs-property">command</span> === <span class="hljs-string">'latex'</span> || response.<span class="hljs-property">command</span> === <span class="hljs-string">'pdf'</span>) {
+        response.<span class="hljs-property">elapsedMs</span> = <span class="hljs-title">Number</span>((process.<span class="hljs-property">hrtime</span>.<span class="hljs-title">bigint</span>() - started) / <span class="hljs-number">1000000n</span>);
+    }
     <span class="hljs-keyword">if</span> (json) { io.<span class="hljs-title">stdout</span>(<span class="hljs-title">JSON</span>.<span class="hljs-title">stringify</span>(response) + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>); }
+    <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (response.<span class="hljs-property">elapsedMs</span> !== <span class="hljs-literal">undefined</span>) {
+        <span class="hljs-keyword">const</span> seconds = <span class="hljs-title">Math</span>.<span class="hljs-title">floor</span>(response.<span class="hljs-property">elapsedMs</span> / <span class="hljs-number">1000</span>);
+        <span class="hljs-keyword">const</span> elapsed = response.<span class="hljs-property">elapsedMs</span> &lt; <span class="hljs-number">1000</span> ? <span class="hljs-string">`</span><span class="hljs-subst">${response.elapsedMs}</span><span class="hljs-string"> ms`</span> :
+            <span class="hljs-string">`</span><span class="hljs-subst">${</span><span class="hljs-built_in">String</span><span class="hljs-subst">(</span><span class="hljs-built_in">Math</span><span class="hljs-subst">.floor(seconds / </span><span class="hljs-number">60</span><span class="hljs-subst">)).padStart(</span><span class="hljs-number">2</span><span class="hljs-subst">, </span><span class="hljs-string">'0'</span><span class="hljs-subst">)}</span><span class="hljs-string">:</span><span class="hljs-subst">${</span><span class="hljs-built_in">String</span><span class="hljs-subst">(seconds % </span><span class="hljs-number">60</span><span class="hljs-subst">).padStart(</span><span class="hljs-number">2</span><span class="hljs-subst">, </span><span class="hljs-string">'0'</span><span class="hljs-subst">)}</span><span class="hljs-string">`</span>;
+        <span class="hljs-keyword">const</span> write = code === <span class="hljs-number">0</span> ? io.<span class="hljs-property">stdout</span> : io.<span class="hljs-property">stderr</span>;
+        <span class="hljs-title">write</span>(<span class="hljs-string">`literate: finished in </span><span class="hljs-subst">${elapsed}</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>);
+    }
     <span class="hljs-keyword">return</span> code;
 };
 </code></pre>

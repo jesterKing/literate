@@ -380,8 +380,9 @@ the output channel report that publication remains locked. The queue is retained
 until the helper exits—there is **no force kill or hard termination guarantee**.
 
 The **Literate Publication** output channel records results, errors and compiler
-warnings. Success offers **Open Output**, which opens the exported file. Success
-with warnings is not a clean-typography guarantee; inspect the channel and PDF.
+warnings. Its final success line reports the helper's total elapsed time. Success
+offers **Open Output**, which opens the exported file. Success with warnings is not
+a clean-typography guarantee; inspect the channel and PDF.
 See [M5 acceptance](CONTRIBUTING.md#m5-integrated-publication-acceptance) for the
 headless, real-host and isolated-package evidence and its limits.
 
@@ -557,7 +558,10 @@ The caller owns cleanup: retained TeX, logs, caches, fonts and assets may contai
 sensitive material and licensed files. `publication.warnings` is an array of
 deduplicated final compiler warnings, including missing glyphs and overfull boxes;
 JSON mode reports them there, while human mode prints warnings and any retained
-build path to stderr. Successful compilation does **not** imply clean typography.
+build path to stderr. Both `latex` and `pdf` print their total elapsed time last in
+human mode, as milliseconds below one second and zero-padded `mm:ss` otherwise;
+JSON responses expose the integer measurement as `elapsedMs`.
+Successful compilation does **not** imply clean typography.
 
 `SOURCE_DATE_EPOCH` is honored via the inherited build environment, but PDF byte
 determinism is not promised. The `latex ... --output books/book.tex` command is

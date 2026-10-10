@@ -33,6 +33,7 @@ interface CliResponse {
     inspection?: Generation['inspection'];
     selfHosting?: { ok: boolean; checks: { name: string; ok: boolean; message?: string }[] };
     publication?: { warnings: string[]; buildDirectory?: string };
+    elapsedMs?: number;
     usage?: string;
 }
 
@@ -369,6 +370,7 @@ export async function run(args: string[], io: CliIO = defaultIO,
     compile: PdfCompiler = async (...args) => (await import('./publication-pdf')).compilePdf(...args),
     options: CliRunOptions = {}
 ): Promise<number> {
+    const started = process.hrtime.bigint();
     const json = args.includes('--json');
     const positional: string[] = [];
     const flags = new Set<string>();
@@ -380,7 +382,17 @@ export async function run(args: string[], io: CliIO = defaultIO,
     };
     const finish = (code: number): number => {
         response.ok = code === 0;
+        if (response.command === 'latex' || response.command === 'pdf') {
+            response.elapsedMs = Number((process.hrtime.bigint() - started) / 1000000n);
+        }
         if (json) { io.stdout(JSON.stringify(response) + '\n'); }
+        else if (response.elapsedMs !== undefined) {
+            const seconds = Math.floor(response.elapsedMs / 1000);
+            const elapsed = response.elapsedMs < 1000 ? `${response.elapsedMs} ms` :
+                `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+            const write = code === 0 ? io.stdout : io.stderr;
+            write(`literate: finished in ${elapsed}\n`);
+        }
         return code;
     };
     for (let index = 0; index < args.length; index++) {

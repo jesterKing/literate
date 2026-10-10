@@ -385,7 +385,7 @@ This is a bounded execution budget, not an unsafe hard cleanup deadline.</p>
                     .<span class="hljs-title">filter</span>(<span class="hljs-title">Boolean</span>).<span class="hljs-title">join</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>)));
             } <span class="hljs-keyword">else</span> {
                 <span class="hljs-keyword">try</span> {
-                    <span class="hljs-title">publicationWarnings</span>(result, request.<span class="hljs-property">args</span>[<span class="hljs-number">0</span>], request.<span class="hljs-property">args</span>[request.<span class="hljs-property">args</span>.<span class="hljs-title">indexOf</span>(<span class="hljs-string">'--output'</span>) + <span class="hljs-number">1</span>]);
+                    <span class="hljs-title">publicationOutcome</span>(result, request.<span class="hljs-property">args</span>[<span class="hljs-number">0</span>], request.<span class="hljs-property">args</span>[request.<span class="hljs-property">args</span>.<span class="hljs-title">indexOf</span>(<span class="hljs-string">'--output'</span>) + <span class="hljs-number">1</span>]);
                     <span class="hljs-title">resolve</span>(result);
                 } <span class="hljs-keyword">catch</span> (error) { <span class="hljs-title">reject</span>(error); }
             }
@@ -406,7 +406,8 @@ success merely because cancellation was requested.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-3"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e0020006200720069006400670065" aria-label="Definition of publication extension bridge">&lt;&lt;publication extension bridge&gt;&gt;=+</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">publicationWarnings</span>(<span class="hljs-params">result: HelperResult, kind: </span><span class="hljs-built_in">string</span><span class="hljs-params">, destination: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span>[] {
+<pre><code><span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationOutcome</span> { <span class="hljs-attr">warnings</span>: <span class="hljs-built_in">string</span>[]; elapsedMs?: <span class="hljs-built_in">number</span>; }
+<span class="hljs-keyword">function</span> <span class="hljs-title">publicationOutcome</span>(<span class="hljs-params">result: HelperResult, kind: </span><span class="hljs-built_in">string</span><span class="hljs-params">, destination: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">PublicationOutcome</span> {
     <span class="hljs-keyword">let</span> response;
     <span class="hljs-keyword">try</span> { response = <span class="hljs-title">JSON</span>.<span class="hljs-title">parse</span>(result.<span class="hljs-property">stdout</span>); }
     <span class="hljs-keyword">catch</span> { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Invalid JSON from publication helper:</span><span class="hljs-string">\n</span><span class="hljs-subst">${result.stdout}</span><span class="hljs-string">`</span>); }
@@ -416,7 +417,14 @@ success merely because cancellation was requested.</p>
         <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Publication did not report successful output:</span><span class="hljs-string">\n</span><span class="hljs-subst">${result.stdout}</span><span class="hljs-string">`</span>);
     }
     <span class="hljs-keyword">const</span> <span class="hljs-attr">warnings</span>: <span class="hljs-built_in">unknown</span> = response.<span class="hljs-property">publication</span>?.<span class="hljs-property">warnings</span>;
-    <span class="hljs-keyword">return</span> <span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(warnings) ? warnings.<span class="hljs-title">map</span>(<span class="hljs-title">String</span>) : [];
+    <span class="hljs-keyword">const</span> elapsed = response.<span class="hljs-property">elapsedMs</span>;
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">warnings</span>: <span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(warnings) ? warnings.<span class="hljs-title">map</span>(<span class="hljs-title">String</span>) : [],
+        ...(<span class="hljs-title">Number</span>.<span class="hljs-title">isInteger</span>(elapsed) &amp;&amp; elapsed &gt;= <span class="hljs-number">0</span> ? { <span class="hljs-attr">elapsedMs</span>: elapsed } : {}) };
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title">elapsedPublicationTime</span>(<span class="hljs-params">elapsedMs: </span><span class="hljs-built_in">number</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">if</span> (elapsedMs &lt; <span class="hljs-number">1000</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">`</span><span class="hljs-subst">${elapsedMs}</span><span class="hljs-string"> ms`</span>; }
+    <span class="hljs-keyword">const</span> seconds = <span class="hljs-title">Math</span>.<span class="hljs-title">floor</span>(elapsedMs / <span class="hljs-number">1000</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-string">`</span><span class="hljs-subst">${</span><span class="hljs-built_in">String</span><span class="hljs-subst">(</span><span class="hljs-built_in">Math</span><span class="hljs-subst">.floor(seconds / </span><span class="hljs-number">60</span><span class="hljs-subst">)).padStart(</span><span class="hljs-number">2</span><span class="hljs-subst">, </span><span class="hljs-string">'0'</span><span class="hljs-subst">)}</span><span class="hljs-string">:</span><span class="hljs-subst">${</span><span class="hljs-built_in">String</span><span class="hljs-subst">(seconds % </span><span class="hljs-number">60</span><span class="hljs-subst">).padStart(</span><span class="hljs-number">2</span><span class="hljs-subst">, </span><span class="hljs-string">'0'</span><span class="hljs-subst">)}</span><span class="hljs-string">`</span>;
 }
 </code></pre>
 
@@ -588,10 +596,13 @@ the queue on resolution or rejection, never merely on a cancellation request.</p
                         <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">await</span> <span class="hljs-title">bridge</span>(node, context.<span class="hljs-title">asAbsolutePath</span>(<span class="hljs-string">'out/publication-helper.cjs'</span>), root,
                             { args, documents }, token, <span class="hljs-params">text</span><span class="hljs-function"> =&gt;</span> { output.<span class="hljs-title">appendLine</span>(text); progress.<span class="hljs-title">report</span>({ <span class="hljs-attr">message</span>: text }); });
                         <span class="hljs-keyword">if</span> (result.<span class="hljs-property">stderr</span>) { output.<span class="hljs-title">appendLine</span>(result.<span class="hljs-property">stderr</span>); }
-                        <span class="hljs-keyword">const</span> warnings = <span class="hljs-title">publicationWarnings</span>(result, kind, choice.<span class="hljs-property">destination</span>);
+                        <span class="hljs-keyword">const</span> outcome = <span class="hljs-title">publicationOutcome</span>(result, kind, choice.<span class="hljs-property">destination</span>);
                         completed = path.<span class="hljs-title">join</span>(root, choice.<span class="hljs-property">destination</span>);
                         output.<span class="hljs-title">appendLine</span>(<span class="hljs-string">`Publication completed: </span><span class="hljs-subst">${completed}</span><span class="hljs-string">`</span>);
-                        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> warning <span class="hljs-keyword">of</span> warnings) { output.<span class="hljs-title">appendLine</span>(<span class="hljs-string">`Warning: </span><span class="hljs-subst">${warning}</span><span class="hljs-string">`</span>); }
+                        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> warning <span class="hljs-keyword">of</span> outcome.<span class="hljs-property">warnings</span>) { output.<span class="hljs-title">appendLine</span>(<span class="hljs-string">`Warning: </span><span class="hljs-subst">${warning}</span><span class="hljs-string">`</span>); }
+                        <span class="hljs-keyword">if</span> (outcome.<span class="hljs-property">elapsedMs</span> !== <span class="hljs-literal">undefined</span>) {
+                            output.<span class="hljs-title">appendLine</span>(<span class="hljs-string">`Publication finished in </span><span class="hljs-subst">${elapsedPublicationTime(outcome.elapsedMs)}</span><span class="hljs-string">`</span>);
+                        }
                     });
                 } <span class="hljs-keyword">finally</span> { forwarding.<span class="hljs-title">dispose</span>(); }
             });

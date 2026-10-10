@@ -38,6 +38,7 @@ interface Response {
     command: string; ok: boolean; errors: string[]; diagnostics: { message: string }[];
     outputs: { path: string; status: string }[]; usage?: string;
     publication?: { warnings: string[]; buildDirectory?: string };
+    elapsedMs?: number;
 }
 const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
 const signalListeners = () => signals.map(signal => process.rawListeners(signal));
@@ -50,7 +51,12 @@ async function command(args: string[], compiler = compile, converter = convert,
     }, factory, converter, diagrams, compiler);
     assert.deepEqual(signalListeners(), listeners, 'CLI signal handlers must be disposed on every exit');
     const response: Response = json ? JSON.parse(stdout) : undefined;
-    if (json) { assert.equal(stderr, ''); assert.equal(response.ok, code === 0); }
+    if (json) {
+        assert.equal(stderr, ''); assert.equal(response.ok, code === 0);
+        if (response.command === 'latex' || response.command === 'pdf') {
+            assert.equal(typeof response.elapsedMs, 'number'); assert.ok(response.elapsedMs! >= 0);
+        }
+    }
     return { code, response, stdout, stderr };
 }
 const args = (root: string, output = 'books/result.pdf') => ['pdf', root, '--output', output];
@@ -177,6 +183,7 @@ test('human warnings and retained directories go to stderr; keep-build defaults 
     assert.match(result.stderr, /warning: Font warning/);
     assert.match(result.stderr, /build directory: \/private\/build/);
     assert.doesNotMatch(result.stdout, /Font warning/);
+    assert.match(result.stdout, /literate: finished in (?:\d+ ms|\d{2,}:\d{2})\n$/);
 });
 
 for (const input of ['index.literate', 'image.pdf', 'template.pdf', 'fonts.json', 'font.ttf', 'license.txt', 'browser']) {

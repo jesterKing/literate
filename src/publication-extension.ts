@@ -162,7 +162,7 @@ export const runPublicationHelper: PublicationBridge = (node, helper, root, requ
                     .filter(Boolean).join('\n')));
             } else {
                 try {
-                    publicationWarnings(result, request.args[0], request.args[request.args.indexOf('--output') + 1]);
+                    publicationOutcome(result, request.args[0], request.args[request.args.indexOf('--output') + 1]);
                     resolve(result);
                 } catch (error) { reject(error); }
             }
@@ -172,7 +172,8 @@ export const runPublicationHelper: PublicationBridge = (node, helper, root, requ
         else { child.stdin.end(); }
     });
 };
-function publicationWarnings(result: HelperResult, kind: string, destination: string): string[] {
+interface PublicationOutcome { warnings: string[]; elapsedMs?: number; }
+function publicationOutcome(result: HelperResult, kind: string, destination: string): PublicationOutcome {
     let response;
     try { response = JSON.parse(result.stdout); }
     catch { throw new Error(`Invalid JSON from publication helper:\n${result.stdout}`); }
@@ -182,7 +183,14 @@ function publicationWarnings(result: HelperResult, kind: string, destination: st
         throw new Error(`Publication did not report successful output:\n${result.stdout}`);
     }
     const warnings: unknown = response.publication?.warnings;
-    return Array.isArray(warnings) ? warnings.map(String) : [];
+    const elapsed = response.elapsedMs;
+    return { warnings: Array.isArray(warnings) ? warnings.map(String) : [],
+        ...(Number.isInteger(elapsed) && elapsed >= 0 ? { elapsedMs: elapsed } : {}) };
+}
+function elapsedPublicationTime(elapsedMs: number): string {
+    if (elapsedMs < 1000) { return `${elapsedMs} ms`; }
+    const seconds = Math.floor(elapsedMs / 1000);
+    return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 }
 async function chooseFolder(): Promise<vscode.WorkspaceFolder | undefined> {
     allowed();
@@ -302,10 +310,13 @@ export function registerPublicationCommands(context: vscode.ExtensionContext,
                         const result = await bridge(node, context.asAbsolutePath('out/publication-helper.cjs'), root,
                             { args, documents }, token, text => { output.appendLine(text); progress.report({ message: text }); });
                         if (result.stderr) { output.appendLine(result.stderr); }
-                        const warnings = publicationWarnings(result, kind, choice.destination);
+                        const outcome = publicationOutcome(result, kind, choice.destination);
                         completed = path.join(root, choice.destination);
                         output.appendLine(`Publication completed: ${completed}`);
-                        for (const warning of warnings) { output.appendLine(`Warning: ${warning}`); }
+                        for (const warning of outcome.warnings) { output.appendLine(`Warning: ${warning}`); }
+                        if (outcome.elapsedMs !== undefined) {
+                            output.appendLine(`Publication finished in ${elapsedPublicationTime(outcome.elapsedMs)}`);
+                        }
                     });
                 } finally { forwarding.dispose(); }
             });
