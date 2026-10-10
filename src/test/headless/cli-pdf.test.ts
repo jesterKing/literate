@@ -100,8 +100,12 @@ for (const help of [['pdf', '--help'], ['help', 'pdf'], ['pdf', '-h', '--keep-bu
 test('series PDF publishes every manifest book with geometry and cross-book links', async t => {
     const root = fixture(t), series = path.join(root, 'series');
     fs.mkdirSync(series);
-    write(root, 'books/python/index.literate', '# Python\n\n[Zig](../zig/index.literate#zig)\n');
-    write(root, 'books/zig/index.literate', '# Zig\n\n[Python](../python/index.literate#python)\n');
+    write(root, 'books/python/index.literate', '# Python\n\n[Zig](../zig/index.literate#zig) '
+        + '[Pivot](../zig/index.literate#term/pivot) '
+        + '[Partition](../zig/index.literate#fragment/partition%20slice)\n');
+    write(root, 'books/zig/index.literate', '# Zig\n\n[Python](../python/index.literate#python)\n\n'
+        + '```TERM pivot "Pivot"\nThe partition value.\n```\n\n'
+        + '```zig : <<partition slice>>=\nconst pivot = 0;\n```\n');
     write(series, 'literate-workspace.json', JSON.stringify({ schemaVersion: 1, publications: [
         { id: 'python', title: 'Python', root: '../books/python', entry: 'index.literate',
             pdf: '../publications/python.pdf', paper: 'a4',
@@ -126,10 +130,13 @@ test('series PDF publishes every manifest book with geometry and cross-book link
         { path: '../publications/python.pdf', status: 'written' },
         { path: '../publications/zig.pdf', status: 'written' }
     ]);
-    assert.match(links[0], /zig\.pdf#h-/);
-    assert.match(links[1], /python\.pdf#h-/);
+    const converted = links.join('\n');
+    assert.match(converted, /zig\.pdf#h-/);
+    assert.match(converted, /zig\.pdf#annotation-term-/);
+    assert.match(converted, /zig\.pdf#f-/);
+    assert.match(converted, /python\.pdf#h-/);
     assert.match(geometries[0], /a4paper,top=20mm,outer=50mm,bottom=20mm,inner=20mm/);
-    assert.match(geometries[1], /legalpaper,top=10mm,outer=30mm,bottom=15mm,inner=25mm/);
+    assert.match(geometries[1], /legalpaper,top=10mm,outer=60mm,bottom=15mm,inner=25mm/);
     assert.equal(fs.readFileSync(path.join(root, 'publications/python.pdf'), 'utf8'), 'pdf-1');
     assert.equal(fs.readFileSync(path.join(root, 'publications/zig.pdf'), 'utf8'), 'pdf-2');
 });

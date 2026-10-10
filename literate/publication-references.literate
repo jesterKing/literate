@@ -1,0 +1,86 @@
+# Semantic publication references
+
+Ordinary Markdown links can name a semantic definition without exposing the
+renderer-specific target stored in generated HTML or PDF. The fragment part of
+the destination reserves three namespaces: `term/`, `fragment/`, and `diagram/`.
+This host-neutral module parses those authored references and resolves the kinds
+already represented by a parsed project. Diagram definitions join the same index
+when authored diagram identities are introduced.
+
+## Contracts
+
+A reference keeps the authored identifier separate from its generated target and
+source definition. Hosts use the target for links and the definition for editor
+navigation.
+
+```ts : <<publication reference contracts>>=
+import type { ParsedProject, PublicationLocation } from './engine';
+
+export type PublicationReferenceKind = 'term' | 'fragment' | 'diagram';
+export interface PublicationReference {
+    kind: PublicationReferenceKind;
+    id: string;
+}
+export interface PublicationDefinition extends PublicationReference {
+    target: string;
+    definition: PublicationLocation;
+}
+export type PublicationReferenceResolution =
+    | { status: 'resolved'; value: PublicationDefinition }
+    | { status: 'missing' | 'ambiguous'; reference: PublicationReference };
+```
+
+## Parse authored fragments
+
+Decode exactly once. Terms and diagrams use portable keys; fragment family names
+retain their exact spelling and may contain spaces or punctuation accepted by the
+fragment language. Empty, malformed, control-bearing, and oversized identifiers
+are not semantic references.
+
+```ts : <<publication reference parsing>>=
+const portableId = /^[A-Za-z][A-Za-z0-9_.:-]{0,99}$/;
+
+export function parsePublicationReference(fragment: string): PublicationReference | undefined {
+    const slash = fragment.indexOf('/');
+    if (slash < 1) { return undefined; }
+    const kind = fragment.slice(0, slash);
+    if (!['term', 'fragment', 'diagram'].includes(kind)) { return undefined; }
+    let id: string;
+    try { id = decodeURIComponent(fragment.slice(slash + 1)); } catch { return undefined; }
+    if (!id || id.length > 200 || /[\x00-\x1f\x7f]/.test(id) || id.trim() !== id) { return undefined; }
+    if (kind !== 'fragment' && !portableId.test(id)) { return undefined; }
+    return { kind: kind as PublicationReferenceKind, id };
+}
+```
+
+## Resolve one project
+
+Term keys and fragment family names are authored identities. Duplicate terms stay
+ambiguous; a fragment family points to its first contribution definition while its
+stable family target remains the rendered destination.
+
+```ts : <<publication reference resolution>>=
+export function publicationDefinitions(project: ParsedProject): PublicationDefinition[] {
+    const definitions: PublicationDefinition[] = project.annotations.terms.map(term => ({
+        kind: 'term', id: term.key, target: term.target, definition: term.at
+    }));
+    for (const family of project.publication.fragments) {
+        const contribution = project.publication.contributions.find(item =>
+            family.contributions.includes(item.target));
+        if (contribution) {
+            definitions.push({ kind: 'fragment', id: family.name, target: family.target,
+                definition: contribution.definition });
+        }
+    }
+    return definitions;
+}
+
+export function resolvePublicationReference(project: ParsedProject,
+    reference: PublicationReference): PublicationReferenceResolution {
+    const matches = publicationDefinitions(project).filter(item =>
+        item.kind === reference.kind && item.id === reference.id);
+    if (!matches.length) { return { status: 'missing', reference }; }
+    if (matches.length > 1) { return { status: 'ambiguous', reference }; }
+    return { status: 'resolved', value: matches[0] };
+}
+```

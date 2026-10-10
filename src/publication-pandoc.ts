@@ -199,10 +199,10 @@ function linkDestination(
     if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {
         if (safeExternalLink(href)) { return href; }
     } else {
+        const semantic = external?.(href, document.path);
+        if (semantic !== undefined) { return semantic; }
         const resolved = localLinkDestination(href, document, targets, diagnostics, at);
         if (resolved !== undefined) { return resolved || undefined; }
-        const crossPublication = external?.(href, document.path);
-        if (crossPublication !== undefined) { return crossPublication; }
     }
     report(diagnostics, at, 'unsupported-publication-link',
         `Unsupported link (expected safe HTTP/HTTPS/mailto or an included document/heading without query): ${href}`);

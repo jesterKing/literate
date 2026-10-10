@@ -484,10 +484,10 @@ diagnostics. Link text and titles remain Pandoc data, never TeX commands.</p>
     <span class="hljs-keyword">if</span> (<span class="hljs-regexp">/^</span><span class="hljs-regexp">[a-z]</span><span class="hljs-regexp">[a-z0-9+.-]</span><span class="hljs-regexp">*:/i</span>.<span class="hljs-title">test</span>(href)) {
         <span class="hljs-keyword">if</span> (<span class="hljs-title">safeExternalLink</span>(href)) { <span class="hljs-keyword">return</span> href; }
     } <span class="hljs-keyword">else</span> {
+        <span class="hljs-keyword">const</span> semantic = external?.(href, <span class="hljs-variable">document</span>.<span class="hljs-property">path</span>);
+        <span class="hljs-keyword">if</span> (semantic !== <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> semantic; }
         <span class="hljs-keyword">const</span> resolved = <span class="hljs-title">localLinkDestination</span>(href, <span class="hljs-variable">document</span>, targets, diagnostics, at);
         <span class="hljs-keyword">if</span> (resolved !== <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> resolved || <span class="hljs-literal">undefined</span>; }
-        <span class="hljs-keyword">const</span> crossPublication = external?.(href, <span class="hljs-variable">document</span>.<span class="hljs-property">path</span>);
-        <span class="hljs-keyword">if</span> (crossPublication !== <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> crossPublication; }
     }
     <span class="hljs-title">report</span>(diagnostics, at, <span class="hljs-string">'unsupported-publication-link'</span>,
         <span class="hljs-string">`Unsupported link (expected safe HTTP/HTTPS/mailto or an included document/heading without query): </span><span class="hljs-subst">${href}</span><span class="hljs-string">`</span>);

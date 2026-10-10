@@ -118,6 +118,7 @@ import { collectAssets, planAssets, assetKey, maximumAssetBytes } from './public
 import type { PdfCompiler, PdfCompilationError } from './publication-pdf';
 import type { DiagramRenderer } from './publication-mermaid';
 import { publicationDestination } from './publication-pandoc';
+import { parsePublicationReference, resolvePublicationReference } from './publication-references';
 import { resolvePublicationSettings } from './publication-settings';
 import { commitOutputs, OutputTransactionError, TransactionIO } from './output-transactions';
 import { discoveryExcludedDirectories, generateProject, parseProject, resolveProjectTheme, safeRelativePath, templateReferences, SourceDocument } from './engine';
@@ -780,19 +781,28 @@ async function publishSeriesPdf(rootArgument: string | undefined, response: CliR
                 if (!pathname || path.isAbsolute(pathname)) { return undefined; }
                 let decoded: string;
                 try { decoded = decodeURIComponent(pathname); } catch { return undefined; }
+                const semantic = hash < 0 ? undefined : parsePublicationReference(href.slice(hash + 1));
                 const targetPath = path.posix.normalize(path.posix.join(publication.root,
                     path.posix.dirname(source), decoded.replace(/\.html$/, '.literate')));
                 let targetDocument: SourceDocument | undefined;
-                const target = plans.find(candidate => candidate !== plan && !!(targetDocument = candidate.documents.find(document =>
+                const target = plans.find(candidate => (candidate !== plan || !!semantic) && !!(targetDocument = candidate.documents.find(document =>
                     path.posix.normalize(path.posix.join(candidate.publication.root, document.path)) === targetPath)));
                 if (!target || !targetDocument) { return undefined; }
-                let slug: string | undefined;
-                if (hash >= 0) {
-                    try { slug = decodeURIComponent(href.slice(hash + 1)); } catch { return undefined; }
-                    if (!slug) { return undefined; }
+                const targetProject = parsedProjects.get(target.publication.id)!;
+                let destination: string | undefined;
+                if (semantic) {
+                    const resolved = resolvePublicationReference(targetProject, semantic);
+                    if (resolved.status === 'resolved') { destination = resolved.value.target; }
+                } else {
+                    let slug: string | undefined;
+                    if (hash >= 0) {
+                        try { slug = decodeURIComponent(href.slice(hash + 1)); } catch { return undefined; }
+                        if (!slug) { return undefined; }
+                    }
+                    destination = publicationDestination(targetProject, targetDocument.path, slug);
                 }
-                const destination = publicationDestination(parsedProjects.get(target.publication.id)!, targetDocument.path, slug);
                 if (!destination) { return undefined; }
+                if (target === plan) { return '#' + destination; }
                 const relativePdf = path.relative(path.dirname(plan.output), target.output).split(path.sep).join('/');
                 return encodeURI(relativePdf) + '#' + destination;
             } };
