@@ -227,7 +227,7 @@ test('every canonical theme embeds its CSS and uses the local Mermaid runtime pr
             assert.ok(!file.content.includes('href="./style.css"'));
             assert.doesNotMatch(file.content, /<script[^>]+https?:|import\s+[^;]+https?:/);
             const prefix = file.path.includes('/') ? '../' : './';
-            assert.ok(file.content.includes(`<script defer src="${prefix}out/mermaid-preview.js"></script>`));
+            assert.ok(file.content.includes(`<script defer src="${prefix}web/mermaid-preview.js"></script>`));
         }
         assert.match(files.find(file => file.path === 'nested/chapter.html')!.content, /<pre class="literate-mermaid">/);
     }
@@ -262,7 +262,7 @@ test('default HTML has accessible metadata, a local runtime, and injection-safe 
     assert.match(html, /<meta charset="utf-8" \/>/);
     assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1" \/>/);
     assert.match(html, /<title>Default<\/title>/);
-    assert.match(html, /<script defer src="\.\/out\/mermaid-preview\.js"><\/script>/);
+    assert.match(html, /<script defer src="\.\/web\/mermaid-preview\.js"><\/script>/);
     assert.doesNotMatch(html, /<script[^>]+https?:|import\s+[^;]+https?:/);
     rejected([document(fence('SETTINGS', 'theme=</script><script>alert(1)</script>') + root('safe'))], /Unknown theme/);
 });
@@ -274,7 +274,7 @@ test('explicit THEME slots replace literally and do not duplicate the sheet in C
     const html = successful([document(text)], {
         'page.template': '[TITLE]|[PREVIEW]|[THEME]|[CONTENT]|[THEME]|[CONTENT]|[AUTHORS]|[CODE]',
     })[0].content;
-    assert.equal(html, 'index.literate|<script defer src="./out/mermaid-preview.js"></script>|'
+    assert.equal(html, 'index.literate|<script defer src="./web/mermaid-preview.js"></script>|'
         + sheet + '|' + content + '|' + sheet + '|' + content
         + '|<meta name="author" content="[THEME]">|[CODE]');
     assert.equal(output(fence('text: <<main.*>>= result.txt $ template=source.template', '[THEME]'),

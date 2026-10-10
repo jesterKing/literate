@@ -748,7 +748,7 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
         const title = heading >= 0 && documentTokens[heading + 1]?.type === 'inline'
             ? documentTokens[heading + 1].content.trim() || path : path;
         const depth = output.split('/').length - 1;
-        const preview = `<script defer src="${'../'.repeat(depth) || './'}out/mermaid-preview.js"></script>`;
+        const preview = `<script defer src="${'../'.repeat(depth) || './'}web/mermaid-preview.js"></script>`;
         files.push({ path: output, content: substitute(htmlTemplate, {
             content, authors: metaAuthors, theme, title: escape(title), preview
         }) });
