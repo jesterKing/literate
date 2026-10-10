@@ -104,8 +104,11 @@ test('series PDF publishes every manifest book with geometry and cross-book link
         + '[Pivot](../zig/index.literate#term/pivot) '
         + '[Partition](../zig/index.literate#fragment/partition%20slice)\n');
     write(root, 'books/zig/index.literate', '# Zig\n\n[Python](../python/index.literate#python)\n\n'
+        + '[Local pivot](#term/pivot) [Local partition](#fragment/partition%20slice) '
+        + '[Local flow](#diagram/partition-flow)\n\n'
         + '```TERM pivot "Pivot"\nThe partition value.\n```\n\n'
-        + '```zig : <<partition slice>>=\nconst pivot = 0;\n```\n');
+        + '```zig : <<partition slice>>=\nconst pivot = 0;\n```\n\n'
+        + '```mermaid id=partition-flow\nflowchart TD\nA-->B\n```\n');
     write(series, 'literate-workspace.json', JSON.stringify({ schemaVersion: 1, publications: [
         { id: 'python', title: 'Python', root: '../books/python', entry: 'index.literate',
             pdf: '../publications/python.pdf', paper: 'a4',
@@ -135,6 +138,9 @@ test('series PDF publishes every manifest book with geometry and cross-book link
     assert.match(converted, /zig\.pdf#annotation-term-/);
     assert.match(converted, /zig\.pdf#f-/);
     assert.match(converted, /python\.pdf#h-/);
+    assert.match(converted, /"#annotation-term-/);
+    assert.match(converted, /"#f-/);
+    assert.match(converted, /"#diagram-/);
     assert.match(geometries[0], /a4paper,top=20mm,outer=50mm,bottom=20mm,inner=20mm/);
     assert.match(geometries[1], /legalpaper,top=10mm,outer=60mm,bottom=15mm,inner=25mm/);
     assert.equal(fs.readFileSync(path.join(root, 'publications/python.pdf'), 'utf8'), 'pdf-1');

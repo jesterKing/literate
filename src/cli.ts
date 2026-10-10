@@ -455,12 +455,13 @@ async function publishSeriesPdf(rootArgument: string | undefined, response: CliR
             marginInnerMm: publication.margins.inner, publicationLink: (href, source) => {
                 if (!href || /[?\\\x00-\x20\x7f]/.test(href)) { return undefined; }
                 const hash = href.indexOf('#'), pathname = hash < 0 ? href : href.slice(0, hash);
-                if (!pathname || path.isAbsolute(pathname)) { return undefined; }
+                const semantic = hash < 0 ? undefined : parsePublicationReference(href.slice(hash + 1));
+                if ((!pathname && !semantic) || path.isAbsolute(pathname)) { return undefined; }
                 let decoded: string;
                 try { decoded = decodeURIComponent(pathname); } catch { return undefined; }
-                const semantic = hash < 0 ? undefined : parsePublicationReference(href.slice(hash + 1));
                 const targetPath = path.posix.normalize(path.posix.join(publication.root,
-                    path.posix.dirname(source), decoded.replace(/\.html$/, '.literate')));
+                    pathname ? path.posix.dirname(source) : '',
+                    pathname ? decoded.replace(/\.html$/, '.literate') : source));
                 let targetDocument: SourceDocument | undefined;
                 const target = plans.find(candidate => (candidate !== plan || !!semantic) && !!(targetDocument = candidate.documents.find(document =>
                     path.posix.normalize(path.posix.join(candidate.publication.root, document.path)) === targetPath)));
