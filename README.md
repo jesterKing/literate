@@ -298,11 +298,15 @@ locally. No Mermaid extension, account, or CDN is required to preview
 ordinary Mermaid fences:
 
 ````markdown
-```mermaid
+```mermaid id=preview-flow
 flowchart TD
     A[Write literate source] --> B[Preview the diagram]
 ```
 ````
+
+The optional `id=` value gives a diagram a stable semantic target. It
+uses the same portable key grammar as TERM keys. A plain `mermaid`
+fence remains valid and renders without a referenceable identity.
 
 Associate `*.literate` with Markdown, then use **Markdown: Open
 Preview to the Side**. Diagrams update with the document and follow
@@ -394,6 +398,21 @@ Series publication requires every project to declare `pdf`. It uses
 each project's manifest paper and margins, compiles every book before
 writing, and commits all final PDFs in one transaction. Cross-project
 Markdown links to declared documents become links to the target PDF.
+
+Semantic links use ordinary Markdown destinations. They may address a
+local definition or a document in another book:
+
+```markdown
+[pivot](#term/pivot)
+[partition](../zig/index.literate#fragment/partition%20slice)
+[flow](../zig/index.literate#diagram/cursor-partition)
+```
+
+The namespaces are `term/`, `fragment/`, and `diagram/`. Term and
+diagram IDs use the portable key grammar. Fragment names are exact and
+must be percent-encoded where a URL requires it. Generated HTML and
+PDF use stable targets. Markdown preview uses editor capabilities, and
+Go to Definition opens the authored definition when it is available.
 
 A manifest containing one publication is selected automatically for
 non-series commands. A series with several publications requires an

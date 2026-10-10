@@ -25,6 +25,15 @@ export function parsePublicationReference(fragment: string): PublicationReferenc
     if (kind !== 'fragment' && !portableId.test(id)) { return undefined; }
     return { kind: kind as PublicationReferenceKind, id };
 }
+function encodeTarget(value: string): string {
+    return value.split('').map(char => char.charCodeAt(0).toString(16).padStart(4, '0')).join('');
+}
+export function publicationReferenceTarget(reference: PublicationReference): string {
+    if (reference.kind === 'term') { return `annotation-term-${encodeTarget(reference.id)}`; }
+    if (reference.kind === 'fragment') { return `f-${encodeTarget(reference.id)}`; }
+    return `diagram-${encodeTarget(reference.id)}`;
+}
+
 export function publicationDefinitions(project: ParsedProject): PublicationDefinition[] {
     const definitions: PublicationDefinition[] = project.annotations.terms.map(term => ({
         kind: 'term', id: term.key, target: term.target, definition: term.at

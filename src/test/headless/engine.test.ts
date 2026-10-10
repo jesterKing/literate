@@ -239,7 +239,11 @@ test('authored Mermaid identities are stable and diagnosed before publication', 
     assert.equal(valid.diagrams.length, 1);
     assert.equal(valid.diagrams[0].id, 'partition-flow');
     assert.match(valid.diagrams[0].target, /^diagram-/);
-    const html = successful([document(fence('mermaid id=partition-flow', 'flowchart TD\nA-->B'))])[0].content;
+    const html = successful([document('[flow](#diagram/partition-flow)\n\n'
+        + '[other](../other/index.literate#term/pivot)\n\n'
+        + fence('mermaid id=partition-flow', 'flowchart TD\nA-->B'))])[0].content;
+    assert.ok(html.includes(`<a href="#${valid.diagrams[0].target}" data-literate-target="${valid.diagrams[0].target}">flow</a>`));
+    assert.match(html, /href="\.\.\/other\/index\.html#annotation-term-/);
     assert.ok(html.includes(`<pre id="${valid.diagrams[0].target}" class="literate-mermaid">`));
 
     const invalid = parseProject([document(fence('mermaid id=two words', 'flowchart TD'))]);

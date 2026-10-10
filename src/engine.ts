@@ -4,7 +4,8 @@ import Token = require('markdown-it/lib/token');
 import hljs from 'highlight.js';
 import { collectAnnotations, PublicationAnnotations } from './publication-annotations';
 import { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAnnotation,
-    installScreenTermLinks, installScreenFragmentLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle,
+    installScreenTermLinks, installScreenFragmentLinks, installScreenPublicationLinks,
+    renderScreenIndexes, screenTermUseAnchors, screenStyle,
     renderScreenExploration } from './publication-screen';
 import { defaultThemeName, getTheme, themeCss } from './themes';
 
@@ -707,6 +708,7 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
     const annotations = collected.parsed.annotations;
     installScreenTermLinks(md);
     installScreenFragmentLinks(md);
+    installScreenPublicationLinks(md);
     md.renderer.rules.fence = (fenceTokens: Token[], index: number, _options, env) => {
         const token = fenceTokens[index];
         if (token.info.trim() === 'SETTINGS') { return ''; }

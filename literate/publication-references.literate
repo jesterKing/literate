@@ -59,6 +59,15 @@ ambiguous; a fragment family points to its first contribution definition while i
 stable family target remains the rendered destination.
 
 ```ts : <<publication reference resolution>>=
+function encodeTarget(value: string): string {
+    return value.split('').map(char => char.charCodeAt(0).toString(16).padStart(4, '0')).join('');
+}
+export function publicationReferenceTarget(reference: PublicationReference): string {
+    if (reference.kind === 'term') { return `annotation-term-${encodeTarget(reference.id)}`; }
+    if (reference.kind === 'fragment') { return `f-${encodeTarget(reference.id)}`; }
+    return `diagram-${encodeTarget(reference.id)}`;
+}
+
 export function publicationDefinitions(project: ParsedProject): PublicationDefinition[] {
     const definitions: PublicationDefinition[] = project.annotations.terms.map(term => ({
         kind: 'term', id: term.key, target: term.target, definition: term.at

@@ -140,11 +140,13 @@ separately. Preview supplies a synchronous lookup of asynchronously resolved URL
 <div class="code">
 <pre><code><span class="hljs-keyword">import</span> <span class="hljs-title">MarkdownIt</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">'markdown-it'</span>);
 <span class="hljs-keyword">import</span> <span class="hljs-title">Token</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">'markdown-it/lib/token'</span>);
+<span class="hljs-keyword">import</span> { posix } <span class="hljs-keyword">from</span> <span class="hljs-string">'path'</span>;
 <span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">PublicationModel</span>, <span class="hljs-title">PublicationContribution</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
 <span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">PublicationAnnotations</span>, <span class="hljs-title">PublicationTerm</span>, <span class="hljs-title">PublicationNote</span>, <span class="hljs-title">PublicationTermUse</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-annotations'</span>;
 <span class="hljs-keyword">import</span> { parseAnnotationBody, resolveTermHref } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-annotations'</span>;
 <span class="hljs-keyword">import</span> { highlightContribution } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-highlight'</span>;
 <span class="hljs-keyword">import</span> { explorationPayload, explorationBrowserScript } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-exploration'</span>;
+<span class="hljs-keyword">import</span> { parsePublicationReference, publicationReferenceTarget } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-references'</span>;
 <span class="hljs-keyword">const</span> escapeHtml = <span class="hljs-keyword">new</span> <span class="hljs-title">MarkdownIt</span>().<span class="hljs-property">utils</span>.<span class="hljs-property">escapeHtml</span>;
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title">ScreenFormat</span> = <span class="hljs-string">'html'</span> | <span class="hljs-string">'preview'</span>;
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title">PreviewDestination</span> = <span class="hljs-function">(</span><span class="hljs-params">target: </span><span class="hljs-built_in">string</span><span class="hljs-function">) =&gt;</span> <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>;
@@ -475,6 +477,39 @@ Other links retain the host renderer's behavior and Markdown URL validation.</p>
             family.<span class="hljs-property">target</span>, context.<span class="hljs-property">format</span>, context.<span class="hljs-property">destination</span>) : <span class="hljs-literal">undefined</span>;
         <span class="hljs-keyword">return</span> family ? <span class="hljs-title">screenLink</span>(href, <span class="hljs-string">`Definition of </span><span class="hljs-subst">${name}</span><span class="hljs-string">`</span>, token.<span class="hljs-property">content</span>, family.<span class="hljs-property">target</span>) :
             escapeHtml(token.<span class="hljs-property">content</span>);
+    };
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">installScreenPublicationLinks</span>(<span class="hljs-params">md: MarkdownIt</span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">const</span> open = md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">link_open</span>, close = md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">link_close</span>;
+    md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">link_open</span> = <span class="hljs-function">(</span><span class="hljs-params">tokens, index, options, env, renderer</span><span class="hljs-function">) =&gt;</span> {
+        <span class="hljs-keyword">const</span> token = tokens[index], href = token.<span class="hljs-title">attrGet</span>(<span class="hljs-string">'href'</span>) || <span class="hljs-string">''</span>;
+        <span class="hljs-keyword">const</span> hash = href.<span class="hljs-title">indexOf</span>(<span class="hljs-string">'#'</span>);
+        <span class="hljs-keyword">const</span> reference = hash &gt;= <span class="hljs-number">0</span> ? <span class="hljs-title">parsePublicationReference</span>(href.<span class="hljs-title">slice</span>(hash + <span class="hljs-number">1</span>)) : <span class="hljs-literal">undefined</span>;
+        <span class="hljs-keyword">if</span> (!reference) { <span class="hljs-keyword">return</span> open ? <span class="hljs-title">open</span>(tokens, index, options, env, renderer)
+            : renderer.<span class="hljs-title">renderToken</span>(tokens, index, options); }
+        <span class="hljs-keyword">const</span> context = env?.<span class="hljs-property">literateScreen</span> <span class="hljs-keyword">as</span> <span class="hljs-title">ScreenAnnotationContext</span> | <span class="hljs-literal">undefined</span>;
+        <span class="hljs-keyword">const</span> target = <span class="hljs-title">publicationReferenceTarget</span>(reference);
+        <span class="hljs-keyword">const</span> <span class="hljs-variable">document</span> = href.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, hash);
+        <span class="hljs-keyword">let</span> <span class="hljs-attr">resolved</span>: <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>;
+        <span class="hljs-keyword">if</span> (context &amp;&amp; (!<span class="hljs-variable">document</span> || posix.<span class="hljs-title">normalize</span>(posix.<span class="hljs-title">join</span>(posix.<span class="hljs-title">dirname</span>(context.<span class="hljs-property">path</span>), <span class="hljs-variable">document</span>)) === context.<span class="hljs-property">path</span>)) {
+            resolved = context.<span class="hljs-property">format</span> === <span class="hljs-string">'preview'</span> ? context.<span class="hljs-property">destination</span>?.(target) : <span class="hljs-string">`#</span><span class="hljs-subst">${target}</span><span class="hljs-string">`</span>;
+        } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (context?.<span class="hljs-property">format</span> === <span class="hljs-string">'html'</span> &amp;&amp; <span class="hljs-variable">document</span>.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'.literate'</span>)) {
+            resolved = <span class="hljs-variable">document</span>.<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, -<span class="hljs-string">'.literate'</span>.<span class="hljs-property">length</span>) + <span class="hljs-string">`.html#</span><span class="hljs-subst">${target}</span><span class="hljs-string">`</span>;
+        }
+        token.<span class="hljs-property">meta</span> = { ...(token.<span class="hljs-property">meta</span> || {}), <span class="hljs-attr">literatePublicationLink</span>: !!resolved };
+        <span class="hljs-keyword">return</span> resolved ? <span class="hljs-string">`&lt;a href=&quot;</span><span class="hljs-subst">${escapeHtml(resolved)}</span><span class="hljs-string">&quot; data-literate-target=&quot;</span><span class="hljs-subst">${target}</span><span class="hljs-string">&quot;&gt;`</span>
+            : <span class="hljs-string">'&lt;span class=&quot;literate-publication-unresolved&quot;&gt;'</span>;
+    };
+    md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules</span>.<span class="hljs-property">link_close</span> = <span class="hljs-function">(</span><span class="hljs-params">tokens, index, options, env, renderer</span><span class="hljs-function">) =&gt;</span> {
+        <span class="hljs-keyword">let</span> start = index - <span class="hljs-number">1</span>;
+        <span class="hljs-keyword">while</span> (start &gt;= <span class="hljs-number">0</span> &amp;&amp; tokens[start].<span class="hljs-property">type</span> !== <span class="hljs-string">'link_open'</span>) { start--; }
+        <span class="hljs-keyword">if</span> (start &gt;= <span class="hljs-number">0</span>) {
+            <span class="hljs-keyword">const</span> href = tokens[start].<span class="hljs-title">attrGet</span>(<span class="hljs-string">'href'</span>) || <span class="hljs-string">''</span>, hash = href.<span class="hljs-title">indexOf</span>(<span class="hljs-string">'#'</span>);
+            <span class="hljs-keyword">if</span> (hash &gt;= <span class="hljs-number">0</span> &amp;&amp; <span class="hljs-title">parsePublicationReference</span>(href.<span class="hljs-title">slice</span>(hash + <span class="hljs-number">1</span>))) {
+                <span class="hljs-keyword">return</span> tokens[start].<span class="hljs-property">meta</span>?.<span class="hljs-property">literatePublicationLink</span> ? <span class="hljs-string">'&lt;/a&gt;'</span> : <span class="hljs-string">'&lt;/span&gt;'</span>;
+            }
+        }
+        <span class="hljs-keyword">return</span> close ? <span class="hljs-title">close</span>(tokens, index, options, env, renderer) : renderer.<span class="hljs-title">renderToken</span>(tokens, index, options);
     };
 }
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">installScreenTermLinks</span>(<span class="hljs-params">md: MarkdownIt</span>): <span class="hljs-built_in">void</span> {

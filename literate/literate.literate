@@ -1582,6 +1582,7 @@ function installPreviewDocument(md: MarkdownIt, repository: FragmentRepository, 
   installFragmentReferenceSyntax(md);
   installScreenTermLinks(md);
   installScreenFragmentLinks(md);
+  installScreenPublicationLinks(md);
   const sources = new WeakMap<Token[], string>();
   md.core.ruler.before('normalize', 'literate_preview_source', state => { sources.set(state.tokens, state.src); });
   const originalRender = md.renderer.render;
@@ -2328,10 +2329,12 @@ import * as path from 'path';
 import { randomBytes } from 'crypto';
 import { parseProject, discoveryExcludedDirectories, generateProject, resolveProjectTheme, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection, PublicationDiagram } from './engine';
 import { collectFragmentOccurrences, planFragmentRename, FragmentOccurrence } from './symbols';
+import { parsePublicationReference, resolvePublicationReference } from './publication-references';
 import { defaultThemeName } from './themes';
 import { installFragmentReferenceSyntax } from './engine';
 import { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAnnotation,
-  installScreenTermLinks, installScreenFragmentLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle,
+  installScreenTermLinks, installScreenFragmentLinks, installScreenPublicationLinks,
+  renderScreenIndexes, screenTermUseAnchors, screenStyle,
   renderScreenExploration } from './publication-screen';
 import { registerPublicationCommands } from './publication-extension';
 import { registerLanguageFeatures, LanguageSnapshot } from './language-features';

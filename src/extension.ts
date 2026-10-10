@@ -19,10 +19,12 @@ import * as path from 'path';
 import { randomBytes } from 'crypto';
 import { parseProject, discoveryExcludedDirectories, generateProject, resolveProjectTheme, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection, PublicationDiagram } from './engine';
 import { collectFragmentOccurrences, planFragmentRename, FragmentOccurrence } from './symbols';
+import { parsePublicationReference, resolvePublicationReference } from './publication-references';
 import { defaultThemeName } from './themes';
 import { installFragmentReferenceSyntax } from './engine';
 import { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAnnotation,
-  installScreenTermLinks, installScreenFragmentLinks, renderScreenIndexes, screenTermUseAnchors, screenStyle,
+  installScreenTermLinks, installScreenFragmentLinks, installScreenPublicationLinks,
+  renderScreenIndexes, screenTermUseAnchors, screenStyle,
   renderScreenExploration } from './publication-screen';
 import { registerPublicationCommands } from './publication-extension';
 import { registerLanguageFeatures, LanguageSnapshot } from './language-features';
@@ -318,6 +320,7 @@ function installPreviewDocument(md: MarkdownIt, repository: FragmentRepository, 
   installFragmentReferenceSyntax(md);
   installScreenTermLinks(md);
   installScreenFragmentLinks(md);
+  installScreenPublicationLinks(md);
   const sources = new WeakMap<Token[], string>();
   md.core.ruler.before('normalize', 'literate_preview_source', state => { sources.set(state.tokens, state.src); });
   const originalRender = md.renderer.render;
@@ -1363,6 +1366,25 @@ export class LiterateDefinitionProvider implements vscode.DefinitionProvider
         if(!workspaceFolder) { return null; }
         await this.repository.processLiterateFiles(document);
         if(token.isCancellationRequested) { return null; }
+        const line = document.lineAt(position).text;
+        for (const match of line.matchAll(/\]\(([^)\s]+)(?:\s+[^)]*)?\)/g)) {
+            const start = (match.index || 0) + 2, end = start + match[1].length;
+            if (position.character < start || position.character > end) { continue; }
+            const hash = match[1].indexOf('#');
+            const reference = hash >= 0 ? parsePublicationReference(match[1].slice(hash + 1)) : undefined;
+            if (!reference) { break; }
+            const current = path.posix.relative(workspaceFolder.uri.path, document.uri.path);
+            const authoredPath = match[1].slice(0, hash);
+            const targetPath = authoredPath
+                ? path.posix.normalize(path.posix.join(path.posix.dirname(current), authoredPath)) : current;
+            const project = parseProject(this.repository.getSourceDocuments(workspaceFolder));
+            if (!project.documents.some(item => item.path === targetPath)) { return null; }
+            const resolution = resolvePublicationReference(project, reference);
+            if (resolution.status !== 'resolved' || token.isCancellationRequested) { return null; }
+            const at = resolution.value.definition;
+            return new vscode.Location(vscode.Uri.joinPath(workspaceFolder.uri, at.path),
+                new vscode.Position(at.line, at.column));
+        }
         const fragmentLocation = this.repository.getFragmentTagLocation(
             document,
             document.lineAt(position),

@@ -12,11 +12,13 @@ separately. Preview supplies a synchronous lookup of asynchronously resolved URL
 ```ts : <<screen renderer imports>>=
 import MarkdownIt = require('markdown-it');
 import Token = require('markdown-it/lib/token');
+import { posix } from 'path';
 import type { PublicationModel, PublicationContribution } from './engine';
 import type { PublicationAnnotations, PublicationTerm, PublicationNote, PublicationTermUse } from './publication-annotations';
 import { parseAnnotationBody, resolveTermHref } from './publication-annotations';
 import { highlightContribution } from './publication-highlight';
 import { explorationPayload, explorationBrowserScript } from './publication-exploration';
+import { parsePublicationReference, publicationReferenceTarget } from './publication-references';
 const escapeHtml = new MarkdownIt().utils.escapeHtml;
 export type ScreenFormat = 'html' | 'preview';
 export type PreviewDestination = (target: string) => string | undefined;
@@ -325,6 +327,39 @@ export function installScreenFragmentLinks(md: MarkdownIt): void {
             family.target, context.format, context.destination) : undefined;
         return family ? screenLink(href, `Definition of ${name}`, token.content, family.target) :
             escapeHtml(token.content);
+    };
+}
+export function installScreenPublicationLinks(md: MarkdownIt): void {
+    const open = md.renderer.rules.link_open, close = md.renderer.rules.link_close;
+    md.renderer.rules.link_open = (tokens, index, options, env, renderer) => {
+        const token = tokens[index], href = token.attrGet('href') || '';
+        const hash = href.indexOf('#');
+        const reference = hash >= 0 ? parsePublicationReference(href.slice(hash + 1)) : undefined;
+        if (!reference) { return open ? open(tokens, index, options, env, renderer)
+            : renderer.renderToken(tokens, index, options); }
+        const context = env?.literateScreen as ScreenAnnotationContext | undefined;
+        const target = publicationReferenceTarget(reference);
+        const document = href.slice(0, hash);
+        let resolved: string | undefined;
+        if (context && (!document || posix.normalize(posix.join(posix.dirname(context.path), document)) === context.path)) {
+            resolved = context.format === 'preview' ? context.destination?.(target) : `#${target}`;
+        } else if (context?.format === 'html' && document.endsWith('.literate')) {
+            resolved = document.slice(0, -'.literate'.length) + `.html#${target}`;
+        }
+        token.meta = { ...(token.meta || {}), literatePublicationLink: !!resolved };
+        return resolved ? `<a href="${escapeHtml(resolved)}" data-literate-target="${target}">`
+            : '<span class="literate-publication-unresolved">';
+    };
+    md.renderer.rules.link_close = (tokens, index, options, env, renderer) => {
+        let start = index - 1;
+        while (start >= 0 && tokens[start].type !== 'link_open') { start--; }
+        if (start >= 0) {
+            const href = tokens[start].attrGet('href') || '', hash = href.indexOf('#');
+            if (hash >= 0 && parsePublicationReference(href.slice(hash + 1))) {
+                return tokens[start].meta?.literatePublicationLink ? '</a>' : '</span>';
+            }
+        }
+        return close ? close(tokens, index, options, env, renderer) : renderer.renderToken(tokens, index, options);
     };
 }
 export function installScreenTermLinks(md: MarkdownIt): void {

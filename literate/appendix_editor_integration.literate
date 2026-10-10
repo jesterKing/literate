@@ -517,6 +517,25 @@ public async provideDefinition
     if(!workspaceFolder) { return null; }
     await this.repository.processLiterateFiles(document);
     if(token.isCancellationRequested) { return null; }
+    const line = document.lineAt(position).text;
+    for (const match of line.matchAll(/\]\(([^)\s]+)(?:\s+[^)]*)?\)/g)) {
+        const start = (match.index || 0) + 2, end = start + match[1].length;
+        if (position.character < start || position.character > end) { continue; }
+        const hash = match[1].indexOf('#');
+        const reference = hash >= 0 ? parsePublicationReference(match[1].slice(hash + 1)) : undefined;
+        if (!reference) { break; }
+        const current = path.posix.relative(workspaceFolder.uri.path, document.uri.path);
+        const authoredPath = match[1].slice(0, hash);
+        const targetPath = authoredPath
+            ? path.posix.normalize(path.posix.join(path.posix.dirname(current), authoredPath)) : current;
+        const project = parseProject(this.repository.getSourceDocuments(workspaceFolder));
+        if (!project.documents.some(item => item.path === targetPath)) { return null; }
+        const resolution = resolvePublicationReference(project, reference);
+        if (resolution.status !== 'resolved' || token.isCancellationRequested) { return null; }
+        const at = resolution.value.definition;
+        return new vscode.Location(vscode.Uri.joinPath(workspaceFolder.uri, at.path),
+            new vscode.Position(at.line, at.column));
+    }
     const fragmentLocation = this.repository.getFragmentTagLocation(
         document,
         document.lineAt(position),

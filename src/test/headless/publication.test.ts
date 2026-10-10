@@ -173,7 +173,8 @@ test('rejected declarations do not consume ordinals and ordinal changes stay doc
 test('ordinary and SETTINGS fences remain outside publication contributions', () => {
     const result = project(fence('SETTINGS', 'theme=rosepine-dawn') + fence('text', '<<not a reference>>'));
     assert.deepEqual(result.publication, {
-        documents: [{ path: 'index.literate', contributions: [] }], fragments: [], contributions: []
+        documents: [{ path: 'index.literate', contributions: [] }], fragments: [], contributions: [],
+        proseReferences: []
     });
     assert.deepEqual(result.diagnostics, []);
 });
