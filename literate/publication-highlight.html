@@ -304,15 +304,52 @@ changed emitter cannot quietly return plausible but incorrect coordinates.</p>
 language detection, and semantic references still work in plain blocks. Syntax
 spans cover the entire nonempty display, including reference characters; the
 renderer intersects these ranges and gives semantic references precedence.</p>
+<p>Comment syntax is removed from the shared display rather than independently by
+renderers. Semantic references take precedence and remain visible even inside a
+comment span. A line containing only removed comment text and surrounding
+whitespace is removed with its line ending, reclaiming its vertical space. The
+boundary map then projects syntax and reference ranges into the compact display.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200068006900670068006c00690067006800740069006e006700200065006e007400720079-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0068006900670068006c0069006700680074002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200068006900670068006c00690067006800740069006e006700200065006e007400720079"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200068006900670068006c00690067006800740069006e006700200065006e007400720079" data-literate-target="f-007000750062006c00690063006100740069006f006e00200068006900670068006c00690067006800740069006e006700200065006e007400720079" aria-label="Definition of publication highlighting entry">&lt;&lt;publication highlighting entry&gt;&gt;=</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">highlightContribution</span>(<span class="hljs-params">part: PublicationContribution, screen = </span><span class="hljs-literal">false</span>): <span class="hljs-title">HighlightedContribution</span> {
+<pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">withoutComments</span>(<span class="hljs-params">display: HighlightedContribution</span>): <span class="hljs-title">HighlightedContribution</span> {
+    <span class="hljs-keyword">const</span> removed = <span class="hljs-keyword">new</span> <span class="hljs-title">Uint8Array</span>(display.<span class="hljs-property">text</span>.<span class="hljs-property">length</span>);
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> span <span class="hljs-keyword">of</span> display.<span class="hljs-property">spans</span>) {
+        <span class="hljs-keyword">if</span> (span.<span class="hljs-property">scope</span>.<span class="hljs-title">split</span>(<span class="hljs-string">'.'</span>)[<span class="hljs-number">0</span>] === <span class="hljs-string">'comment'</span>) { removed.<span class="hljs-title">fill</span>(<span class="hljs-number">1</span>, span.<span class="hljs-property">start</span>, span.<span class="hljs-property">end</span>); }
+    }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> reference <span class="hljs-keyword">of</span> display.<span class="hljs-property">references</span>) { removed.<span class="hljs-title">fill</span>(<span class="hljs-number">0</span>, reference.<span class="hljs-property">start</span>, reference.<span class="hljs-property">end</span>); }
+    <span class="hljs-keyword">let</span> start = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">while</span> (start &lt; display.<span class="hljs-property">text</span>.<span class="hljs-property">length</span>) {
+        <span class="hljs-keyword">const</span> newline = display.<span class="hljs-property">text</span>.<span class="hljs-title">indexOf</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>, start);
+        <span class="hljs-keyword">const</span> end = newline &lt; <span class="hljs-number">0</span> ? display.<span class="hljs-property">text</span>.<span class="hljs-property">length</span> : newline;
+        <span class="hljs-keyword">let</span> visible = <span class="hljs-literal">false</span>;
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = start; index &lt; end; index++) {
+            <span class="hljs-keyword">if</span> (!removed[index] &amp;&amp; !<span class="hljs-regexp">/</span><span class="hljs-regexp">[</span><span class="hljs-regexp">\t</span><span class="hljs-regexp">\r</span><span class="hljs-regexp"> ]</span><span class="hljs-regexp">/</span>.<span class="hljs-title">test</span>(display.<span class="hljs-property">text</span>[index])) { visible = <span class="hljs-literal">true</span>; <span class="hljs-keyword">break</span>; }
+        }
+        <span class="hljs-keyword">if</span> (!visible &amp;&amp; removed.<span class="hljs-title">subarray</span>(start, end).<span class="hljs-title">some</span>(<span class="hljs-params">value</span><span class="hljs-function"> =&gt;</span> value === <span class="hljs-number">1</span>)) {
+            removed.<span class="hljs-title">fill</span>(<span class="hljs-number">1</span>, start, newline &lt; <span class="hljs-number">0</span> ? end : end + <span class="hljs-number">1</span>);
+        } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (visible &amp;&amp; newline &gt;= <span class="hljs-number">0</span>) { removed[newline] = <span class="hljs-number">0</span>; }
+        start = newline &lt; <span class="hljs-number">0</span> ? display.<span class="hljs-property">text</span>.<span class="hljs-property">length</span> : newline + <span class="hljs-number">1</span>;
+    }
+    <span class="hljs-keyword">const</span> boundaries = <span class="hljs-keyword">new</span> <span class="hljs-title">Uint32Array</span>(display.<span class="hljs-property">text</span>.<span class="hljs-property">length</span> + <span class="hljs-number">1</span>);
+    <span class="hljs-keyword">let</span> text = <span class="hljs-string">''</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> index = <span class="hljs-number">0</span>; index &lt; display.<span class="hljs-property">text</span>.<span class="hljs-property">length</span>; index++) {
+        boundaries[index] = text.<span class="hljs-property">length</span>;
+        <span class="hljs-keyword">if</span> (!removed[index]) { text += display.<span class="hljs-property">text</span>[index]; }
+    }
+    boundaries[display.<span class="hljs-property">text</span>.<span class="hljs-property">length</span>] = text.<span class="hljs-property">length</span>;
+    <span class="hljs-keyword">const</span> ranges = &lt;T <span class="hljs-keyword">extends</span> { <span class="hljs-attr">start</span>: <span class="hljs-built_in">number</span>; <span class="hljs-attr">end</span>: <span class="hljs-built_in">number</span> }&gt;(<span class="hljs-attr">items</span>: T[]): T[] =&gt; items.<span class="hljs-title">map</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> ({ ...item,
+        <span class="hljs-attr">start</span>: boundaries[item.<span class="hljs-property">start</span>], <span class="hljs-attr">end</span>: boundaries[item.<span class="hljs-property">end</span>] })).<span class="hljs-title">filter</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> item.<span class="hljs-property">start</span> &lt; item.<span class="hljs-property">end</span>);
+    <span class="hljs-keyword">return</span> { text, <span class="hljs-attr">spans</span>: <span class="hljs-title">ranges</span>(display.<span class="hljs-property">spans</span>.<span class="hljs-title">filter</span>(<span class="hljs-params">span</span><span class="hljs-function"> =&gt;</span> span.<span class="hljs-property">scope</span>.<span class="hljs-title">split</span>(<span class="hljs-string">'.'</span>)[<span class="hljs-number">0</span>] !== <span class="hljs-string">'comment'</span>)),
+        <span class="hljs-attr">references</span>: <span class="hljs-title">ranges</span>(display.<span class="hljs-property">references</span>) };
+}
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">highlightContribution</span>(<span class="hljs-params">part: PublicationContribution, screen = </span><span class="hljs-literal">false</span>): <span class="hljs-title">HighlightedContribution</span> {
     <span class="hljs-keyword">const</span> display = <span class="hljs-title">displayContribution</span>(part, screen);
     display.<span class="hljs-property">spans</span> = part.<span class="hljs-property">language</span> &amp;&amp; hljs.<span class="hljs-title">getLanguage</span>(part.<span class="hljs-property">language</span>)
         ? <span class="hljs-title">syntaxSpans</span>(display.<span class="hljs-property">text</span>, <span class="hljs-title">emitterRoot</span>(display.<span class="hljs-property">text</span>, part.<span class="hljs-property">language</span>))
         : display.<span class="hljs-property">text</span>.<span class="hljs-property">length</span> ? [{ <span class="hljs-attr">start</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">end</span>: display.<span class="hljs-property">text</span>.<span class="hljs-property">length</span>, <span class="hljs-attr">scope</span>: <span class="hljs-string">''</span> }] : [];
-    <span class="hljs-keyword">return</span> display;
+    <span class="hljs-keyword">return</span> <span class="hljs-title">withoutComments</span>(display);
 }
 </code></pre>
 

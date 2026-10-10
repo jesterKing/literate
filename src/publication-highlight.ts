@@ -102,12 +102,44 @@ function syntaxSpans(text: string, root: unknown): SyntaxSpan[] {
     }
     return spans;
 }
+function withoutComments(display: HighlightedContribution): HighlightedContribution {
+    const removed = new Uint8Array(display.text.length);
+    for (const span of display.spans) {
+        if (span.scope.split('.')[0] === 'comment') { removed.fill(1, span.start, span.end); }
+    }
+    for (const reference of display.references) { removed.fill(0, reference.start, reference.end); }
+    let start = 0;
+    while (start < display.text.length) {
+        const newline = display.text.indexOf('\n', start);
+        const end = newline < 0 ? display.text.length : newline;
+        let visible = false;
+        for (let index = start; index < end; index++) {
+            if (!removed[index] && !/[\t\r ]/.test(display.text[index])) { visible = true; break; }
+        }
+        if (!visible && removed.subarray(start, end).some(value => value === 1)) {
+            removed.fill(1, start, newline < 0 ? end : end + 1);
+        } else if (visible && newline >= 0) { removed[newline] = 0; }
+        start = newline < 0 ? display.text.length : newline + 1;
+    }
+    const boundaries = new Uint32Array(display.text.length + 1);
+    let text = '';
+    for (let index = 0; index < display.text.length; index++) {
+        boundaries[index] = text.length;
+        if (!removed[index]) { text += display.text[index]; }
+    }
+    boundaries[display.text.length] = text.length;
+    const ranges = <T extends { start: number; end: number }>(items: T[]): T[] => items.map(item => ({ ...item,
+        start: boundaries[item.start], end: boundaries[item.end] })).filter(item => item.start < item.end);
+    return { text, spans: ranges(display.spans.filter(span => span.scope.split('.')[0] !== 'comment')),
+        references: ranges(display.references) };
+}
+
 export function highlightContribution(part: PublicationContribution, screen = false): HighlightedContribution {
     const display = displayContribution(part, screen);
     display.spans = part.language && hljs.getLanguage(part.language)
         ? syntaxSpans(display.text, emitterRoot(display.text, part.language))
         : display.text.length ? [{ start: 0, end: display.text.length, scope: '' }] : [];
-    return display;
+    return withoutComments(display);
 }
 
 export function syntaxStyle(scope: string, theme: LiterateTheme): {

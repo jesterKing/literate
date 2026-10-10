@@ -465,8 +465,10 @@ function contribution(part: PublicationContribution, project: ParsedProject,
     const data = highlightContribution(part);
     validateHighlight(data);
     mergeStyles(data, theme);
-    let output = '\\par\\Needspace{5\\baselineskip}\n\\begingroup\n' +
-        '\\leftskip=1.5em\\rightskip=0pt plus 1fil\\parindent=0pt\\fvset{xleftmargin=1.5em}\n' + anchor(part.target);
+    let output = '\\par\\addvspace{\\parskip}\\Needspace{5\\baselineskip}\n\\begingroup\n' +
+        '\\leftskip=1.5em\\rightskip=0pt plus 1fil\\parindent=0pt\\parskip=0pt' +
+        '\\fvset{xleftmargin=1.5em,listparameters={\\setlength{\\topsep}{0pt}' +
+        '\\setlength{\\partopsep}{0pt}\\setlength{\\parsep}{0pt}\\setlength{\\itemsep}{0pt}}}\n' + anchor(part.target);
     if (part.kind === 'definition') { output += anchor(family.target); }
     output += `{\\fragmentfont\\raggedright\\color{publicationAccent} ${nameText(family.name)}` +
         `\\enspace\\ensuremath{${part.kind === 'definition' ? '\\equiv' : '+\\equiv'}}\\par}\n`;
@@ -510,7 +512,7 @@ function contributionBody(data: Highlighted, project: ParsedProject,
             `\\LitFragmentUse{${target(reference.occurrenceTarget)}}{${target(reference.target)}}` : '';
         definitions.push(`\\newcommand{\\${command}}{\\par\\begingroup` +
             (standalone ? '' : '\\leftskip=1.5em\\rightskip=0pt plus 1fil\\parindent=0pt') +
-            '\\fragmentfont\\small\\noindent ' + marker + fragmentPageLink(family, label) +
+            '\\ttfamily\\LitCodeSize\\noindent ' + marker + fragmentPageLink(family, label) +
             '\\par\\endgroup}');
         output += `\\${command}{}\n`;
         if (standalone) {

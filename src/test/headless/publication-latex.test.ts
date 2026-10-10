@@ -35,7 +35,7 @@ for (const theme of themes) {
         assert.ok(result.latex.includes('Copyright © 2019 Ashkan Kiani'));
         assert.ok(result.latex.includes('THE SOFTWARE IS PROVIDED "AS IS"'));
         assert.match(result.latex, /\\LitStyle\{[A-Fa-f0-9]+\}\{\\bfseries\}/);
-        assert.match(result.latex, /\\LitStyle\{[A-Fa-f0-9]+\}\{\}\{\\itshape\}/);
+        assert.doesNotMatch(result.latex, /comment/);
     });
 }
 
@@ -69,10 +69,13 @@ test('LaTeX links full hanging names and indents contribution blocks', async () 
     assert.equal(JSON.stringify(project), before);
     const latex = result.latex!;
     assert.ok(latex.includes(Array.from(name).join('\\allowbreak{}')));
-    assert.match(latex, /\\newcommand\{\\LitReferenceA\}\{\\par\\begingroup/);
+    assert.match(latex, /\\newcommand\{\\LitReferenceA\}\{\\par\\begingroup[^\n]*\\ttfamily\\LitCodeSize\\noindent /);
     assert.match(latex, /\\textsuperscript\{\\notefont \\hyperref\[[^\]]+\]\{\\pageref\*/);
     assert.doesNotMatch(latex, /Previous |Next |Base /);
-    assert.match(latex, /\\begingroup\s*\\leftskip=1\.5em\\rightskip=0pt plus 1fil\\parindent=0pt\\fvset\{xleftmargin=1\.5em\}/);
+    assert.match(latex, /\\par\\addvspace\{\\parskip\}\\Needspace\{5\\baselineskip\}\s*\\begingroup\s*\\leftskip=1\.5em\\rightskip=0pt plus 1fil\\parindent=0pt\\parskip=0pt/);
+    for (const spacing of ['topsep', 'partopsep', 'parsep', 'itemsep']) {
+        assert.ok(latex.includes(`\\setlength{\\${spacing}}{0pt}`), spacing);
+    }
     assert.match(latex, /\\ensuremath\{\+\\equiv\}/);
     const labels = [...latex.matchAll(/\\label\{([^}]+)\}/g)].map(match => match[1]);
     assert.equal(labels.length, 5); assert.equal(new Set(labels).size, 5);
@@ -228,7 +231,7 @@ test('LaTeX root settings select independent font roles and their command sites'
         '\\newfontfamily\\fragmentfont{Fragment}', '\\newfontfamily\\notefont{Note}',
         ']{Code}', '\\setkomafont{disposition}{\\headingfont',
         '\\setkomafont{pageheadfoot}{\\notefont', '\\setkomafont{footnote}{\\notefont}',
-        '\\fragmentfont\\small\\noindent',
+        '\\ttfamily\\LitCodeSize\\noindent',
         '\\fragmentfont\\raggedright', 'RawFeature={-calt}']) {
         assert.ok(result.latex?.includes(expected), expected);
     }

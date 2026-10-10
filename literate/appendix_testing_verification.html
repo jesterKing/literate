@@ -1047,27 +1047,33 @@ fragment dependencies. Each fixture includes one resolved family named <code>pie
 </code></pre>
 
 </div>
-</div><p>Both positive cases deliberately retain text after a reference inside an open
-lexical construct. The split-block negative controls prove that these fixtures
-actually detect loss of context, rather than merely exercising the API.</p>
+</div><p>The template case deliberately retains text after a reference inside an open
+lexical construct. The split-block negative control proves that the fixture detects
+loss of context, rather than merely exercising the API. Comment-only lines collapse
+from the shared display, while semantic references inside comments remain visible.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200068006900670068006c00690067006800740069006e006700200063006f006e0074006500780074002000740065007300740073-006c0069007400650072006100740065002f0061007000700065006e006400690078005f00740065007300740069006e0067005f0076006500720069006600690063006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200068006900670068006c00690067006800740069006e006700200063006f006e0074006500780074002000740065007300740073"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200068006900670068006c00690067006800740069006e006700200063006f006e0074006500780074002000740065007300740073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200068006900670068006c00690067006800740069006e006700200063006f006e0074006500780074002000740065007300740073" aria-label="Definition of publication highlighting context tests">&lt;&lt;publication highlighting context tests&gt;&gt;=</a></div>
 <div class="code">
-<pre><code><span class="hljs-title">test</span>(<span class="hljs-string">'whole-block highlighting preserves comment and template context around references'</span>, <span class="hljs-function">() =&gt;</span> {
-    <span class="hljs-keyword">const</span> cases = [
-        { <span class="hljs-attr">body</span>: <span class="hljs-string">'/* before</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + <span class="hljs-title">tag</span>(<span class="hljs-string">'piece'</span>) + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">COMMENT_AFTER</span><span class="hljs-string">\n</span><span class="hljs-string">*/</span><span class="hljs-string">\n</span><span class="hljs-string">const ready = true;'</span>,
-            <span class="hljs-attr">marker</span>: <span class="hljs-string">'COMMENT_AFTER'</span>, <span class="hljs-attr">scope</span>: <span class="hljs-string">'comment'</span> },
-        { <span class="hljs-attr">body</span>: <span class="hljs-string">'const message = `before</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + <span class="hljs-title">tag</span>(<span class="hljs-string">'piece'</span>) + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">TEMPLATE_AFTER ${count + 1}`;'</span>,
-            <span class="hljs-attr">marker</span>: <span class="hljs-string">'TEMPLATE_AFTER'</span>, <span class="hljs-attr">scope</span>: <span class="hljs-string">'string'</span> }
-    ];
-    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> fixture <span class="hljs-keyword">of</span> cases) {
-        <span class="hljs-keyword">const</span> result = <span class="hljs-title">highlightContribution</span>(<span class="hljs-title">part</span>(fixture.<span class="hljs-property">body</span>));
-        assert.<span class="hljs-title">equal</span>(<span class="hljs-title">scopeAt</span>(result, fixture.<span class="hljs-property">marker</span>), fixture.<span class="hljs-property">scope</span>);
-        assert.<span class="hljs-title">equal</span>(result.<span class="hljs-property">references</span>.<span class="hljs-property">length</span>, <span class="hljs-number">1</span>);
-        <span class="hljs-keyword">const</span> suffix = result.<span class="hljs-property">text</span>.<span class="hljs-title">slice</span>(result.<span class="hljs-property">references</span>[<span class="hljs-number">0</span>].<span class="hljs-property">end</span>);
-        assert.<span class="hljs-title">notEqual</span>(<span class="hljs-title">scopeAt</span>(<span class="hljs-title">highlightContribution</span>(<span class="hljs-title">part</span>(suffix)), fixture.<span class="hljs-property">marker</span>), fixture.<span class="hljs-property">scope</span>);
-        assert.<span class="hljs-title">equal</span>(<span class="hljs-title">scopeAt</span>(result, <span class="hljs-string">'const'</span>), <span class="hljs-string">'keyword'</span>);
-    }
+<pre><code><span class="hljs-title">test</span>(<span class="hljs-string">'whole-block highlighting preserves template context around references'</span>, <span class="hljs-function">() =&gt;</span> {
+    <span class="hljs-keyword">const</span> marker = <span class="hljs-string">'TEMPLATE_AFTER'</span>;
+    <span class="hljs-keyword">const</span> result = <span class="hljs-title">highlightContribution</span>(<span class="hljs-title">part</span>(<span class="hljs-string">'const message = `before</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + <span class="hljs-title">tag</span>(<span class="hljs-string">'piece'</span>) +
+        <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + marker + <span class="hljs-string">' ${count + 1}`;'</span>));
+    assert.<span class="hljs-title">equal</span>(<span class="hljs-title">scopeAt</span>(result, marker), <span class="hljs-string">'string'</span>);
+    assert.<span class="hljs-title">equal</span>(result.<span class="hljs-property">references</span>.<span class="hljs-property">length</span>, <span class="hljs-number">1</span>);
+    <span class="hljs-keyword">const</span> suffix = result.<span class="hljs-property">text</span>.<span class="hljs-title">slice</span>(result.<span class="hljs-property">references</span>[<span class="hljs-number">0</span>].<span class="hljs-property">end</span>);
+    assert.<span class="hljs-title">notEqual</span>(<span class="hljs-title">scopeAt</span>(<span class="hljs-title">highlightContribution</span>(<span class="hljs-title">part</span>(suffix)), marker), <span class="hljs-string">'string'</span>);
+    assert.<span class="hljs-title">equal</span>(<span class="hljs-title">scopeAt</span>(result, <span class="hljs-string">'const'</span>), <span class="hljs-string">'keyword'</span>);
+});
+
+<span class="hljs-title">test</span>(<span class="hljs-string">'comment-only lines collapse while code and semantic references remain'</span>, <span class="hljs-function">() =&gt;</span> {
+    <span class="hljs-keyword">const</span> comments = <span class="hljs-string">'  /* some comment</span><span class="hljs-string">\n</span><span class="hljs-string">   * in code</span><span class="hljs-string">\n</span><span class="hljs-string">   **/</span><span class="hljs-string">\n</span><span class="hljs-string">if (actual_code) {</span><span class="hljs-string">\n</span><span class="hljs-string">  do_stuff();</span><span class="hljs-string">\n</span><span class="hljs-string">}'</span>;
+    assert.<span class="hljs-title">equal</span>(<span class="hljs-title">highlightContribution</span>(<span class="hljs-title">part</span>(comments)).<span class="hljs-property">text</span>,
+        <span class="hljs-string">'if (actual_code) {</span><span class="hljs-string">\n</span><span class="hljs-string">  do_stuff();</span><span class="hljs-string">\n</span><span class="hljs-string">}</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>);
+    assert.<span class="hljs-title">equal</span>(<span class="hljs-title">highlightContribution</span>(<span class="hljs-title">part</span>(<span class="hljs-string">'const ready = true; // hidden'</span>)).<span class="hljs-property">text</span>,
+        <span class="hljs-string">'const ready = true; </span><span class="hljs-string">\n</span><span class="hljs-string">'</span>);
+    <span class="hljs-keyword">const</span> referenced = <span class="hljs-title">highlightContribution</span>(<span class="hljs-title">part</span>(<span class="hljs-string">'/* before</span><span class="hljs-string">\n</span><span class="hljs-string">'</span> + <span class="hljs-title">tag</span>(<span class="hljs-string">'piece'</span>) + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">after */</span><span class="hljs-string">\n</span><span class="hljs-string">const ready = true;'</span>));
+    assert.<span class="hljs-title">equal</span>(referenced.<span class="hljs-property">text</span>, <span class="hljs-title">tag</span>(<span class="hljs-string">'piece'</span>) + <span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">const ready = true;</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>);
+    assert.<span class="hljs-title">equal</span>(referenced.<span class="hljs-property">references</span>.<span class="hljs-property">length</span>, <span class="hljs-number">1</span>);
 });
 </code></pre>
 
@@ -1211,7 +1217,7 @@ Every mutation is restored even when an assertion fails.</p>
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> depth = <span class="hljs-number">0</span>; depth &lt; <span class="hljs-number">20000</span>; depth++) { root = { <span class="hljs-attr">children</span>: [root] }; }
     root = { <span class="hljs-attr">scope</span>: <span class="hljs-string">'comment'</span>, <span class="hljs-attr">children</span>: [{ <span class="hljs-attr">scope</span>: <span class="hljs-string">'language:javascript'</span>, <span class="hljs-attr">children</span>: [root] }] };
     <span class="hljs-title">withEmitter</span>(root, <span class="hljs-function">() =&gt;</span> {
-        assert.<span class="hljs-title">deepEqual</span>(<span class="hljs-title">highlightContribution</span>(<span class="hljs-title">part</span>(<span class="hljs-string">'x'</span>)).<span class="hljs-property">spans</span>, [{ <span class="hljs-attr">start</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">end</span>: <span class="hljs-number">2</span>, <span class="hljs-attr">scope</span>: <span class="hljs-string">'comment'</span> }]);
+        assert.<span class="hljs-title">deepEqual</span>(<span class="hljs-title">highlightContribution</span>(<span class="hljs-title">part</span>(<span class="hljs-string">'x'</span>)), { <span class="hljs-attr">text</span>: <span class="hljs-string">''</span>, <span class="hljs-attr">spans</span>: [], <span class="hljs-attr">references</span>: [] });
     });
 });
 </code></pre>
@@ -1381,10 +1387,14 @@ No syntax underline command should appear, even for the link scope.</p>
 <div class="code">
 <pre><code>scopes.<span class="hljs-title">forEach</span>(<span class="hljs-function">(</span><span class="hljs-params">scope, index</span><span class="hljs-function">) =&gt;</span> {
     <span class="hljs-keyword">const</span> base = scope.<span class="hljs-title">split</span>(<span class="hljs-string">'.'</span>)[<span class="hljs-number">0</span>];
+    <span class="hljs-keyword">if</span> (base === <span class="hljs-string">'comment'</span>) {
+        assert.<span class="hljs-title">doesNotMatch</span>(result.<span class="hljs-property">latex</span>!, <span class="hljs-keyword">new</span> <span class="hljs-title">RegExp</span>(<span class="hljs-string">`token</span><span class="hljs-subst">${index}</span><span class="hljs-string">(?!</span><span class="hljs-string">\\</span><span class="hljs-string">d)`</span>));
+        <span class="hljs-keyword">return</span>;
+    }
     <span class="hljs-keyword">const</span> key = <span class="hljs-title">Object</span>.<span class="hljs-title">entries</span>(groups).<span class="hljs-title">find</span>(<span class="hljs-function">(</span><span class="hljs-params">[, names]</span><span class="hljs-function">) =&gt;</span> names.<span class="hljs-title">split</span>(<span class="hljs-string">' '</span>).<span class="hljs-title">includes</span>(base))?.[<span class="hljs-number">0</span>] || <span class="hljs-string">'text'</span>;
     <span class="hljs-keyword">const</span> hex = theme.<span class="hljs-property">colors</span>[key <span class="hljs-keyword">as</span> keyof <span class="hljs-keyword">typeof</span> theme.<span class="hljs-property">colors</span>].<span class="hljs-title">slice</span>(<span class="hljs-number">1</span>);
     <span class="hljs-keyword">const</span> bold = [<span class="hljs-string">'keyword'</span>, <span class="hljs-string">'variable'</span>, <span class="hljs-string">'template-variable'</span>, <span class="hljs-string">'strong'</span>].<span class="hljs-title">includes</span>(base) ? <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">bfseries'</span> : <span class="hljs-string">''</span>;
-    <span class="hljs-keyword">const</span> italic = [<span class="hljs-string">'comment'</span>, <span class="hljs-string">'quote'</span>, <span class="hljs-string">'emphasis'</span>].<span class="hljs-title">includes</span>(base) ? <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">itshape'</span> : <span class="hljs-string">''</span>;
+    <span class="hljs-keyword">const</span> italic = [<span class="hljs-string">'quote'</span>, <span class="hljs-string">'emphasis'</span>].<span class="hljs-title">includes</span>(base) ? <span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">itshape'</span> : <span class="hljs-string">''</span>;
     assert.<span class="hljs-title">ok</span>(result.<span class="hljs-property">latex</span>?.<span class="hljs-title">includes</span>(<span class="hljs-string">`</span><span class="hljs-string">\\</span><span class="hljs-string">LitStyle{</span><span class="hljs-subst">${hex}</span><span class="hljs-string">}{</span><span class="hljs-subst">${bold}</span><span class="hljs-string">}{</span><span class="hljs-subst">${italic}</span><span class="hljs-string">}{token</span><span class="hljs-subst">${index}</span><span class="hljs-string">}`</span>),
         theme.<span class="hljs-property">name</span> + <span class="hljs-string">': '</span> + scope);
 });
@@ -1400,8 +1410,7 @@ rollback, conversion failures, and the renderer boundary.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0070006f0072007400610062006c006500200066006f006e007400200074006500730074002000730065007400750070-006c0069007400650072006100740065002f0061007000700065006e006400690078005f00740065007300740069006e0067005f0076006500720069006600690063006100740069006f006e002e006c0069007400650072006100740065-1"><span id="f-0070006f0072007400610062006c006500200066006f006e007400200074006500730074002000730065007400750070"></span><a class="literate-tag-name" href="#f-0070006f0072007400610062006c006500200066006f006e007400200074006500730074002000730065007400750070" data-literate-target="f-0070006f0072007400610062006c006500200066006f006e007400200074006500730074002000730065007400750070" aria-label="Definition of portable font test setup">&lt;&lt;portable font test setup&gt;&gt;=</a></div>
 <div class="code">
-<pre><code>
-<span class="hljs-keyword">import</span> assert = <span class="hljs-built_in">require</span>(<span class="hljs-string">'node:assert/strict'</span>);
+<pre><code><span class="hljs-keyword">import</span> assert = <span class="hljs-built_in">require</span>(<span class="hljs-string">'node:assert/strict'</span>);
 <span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> fs <span class="hljs-keyword">from</span> <span class="hljs-string">'node:fs'</span>;
 <span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> os <span class="hljs-keyword">from</span> <span class="hljs-string">'node:os'</span>;
 <span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> path <span class="hljs-keyword">from</span> <span class="hljs-string">'node:path'</span>;

@@ -28,21 +28,26 @@ function scopeAt(result: ReturnType<typeof highlightContribution>, marker: strin
     assert.ok(offset >= 0);
     return result.spans.find(span => span.start <= offset && offset < span.end)!.scope;
 }
-test('whole-block highlighting preserves comment and template context around references', () => {
-    const cases = [
-        { body: '/* before\n' + tag('piece') + '\nCOMMENT_AFTER\n*/\nconst ready = true;',
-            marker: 'COMMENT_AFTER', scope: 'comment' },
-        { body: 'const message = `before\n' + tag('piece') + '\nTEMPLATE_AFTER ${count + 1}`;',
-            marker: 'TEMPLATE_AFTER', scope: 'string' }
-    ];
-    for (const fixture of cases) {
-        const result = highlightContribution(part(fixture.body));
-        assert.equal(scopeAt(result, fixture.marker), fixture.scope);
-        assert.equal(result.references.length, 1);
-        const suffix = result.text.slice(result.references[0].end);
-        assert.notEqual(scopeAt(highlightContribution(part(suffix)), fixture.marker), fixture.scope);
-        assert.equal(scopeAt(result, 'const'), 'keyword');
-    }
+test('whole-block highlighting preserves template context around references', () => {
+    const marker = 'TEMPLATE_AFTER';
+    const result = highlightContribution(part('const message = `before\n' + tag('piece') +
+        '\n' + marker + ' ${count + 1}`;'));
+    assert.equal(scopeAt(result, marker), 'string');
+    assert.equal(result.references.length, 1);
+    const suffix = result.text.slice(result.references[0].end);
+    assert.notEqual(scopeAt(highlightContribution(part(suffix)), marker), 'string');
+    assert.equal(scopeAt(result, 'const'), 'keyword');
+});
+
+test('comment-only lines collapse while code and semantic references remain', () => {
+    const comments = '  /* some comment\n   * in code\n   **/\nif (actual_code) {\n  do_stuff();\n}';
+    assert.equal(highlightContribution(part(comments)).text,
+        'if (actual_code) {\n  do_stuff();\n}\n');
+    assert.equal(highlightContribution(part('const ready = true; // hidden')).text,
+        'const ready = true; \n');
+    const referenced = highlightContribution(part('/* before\n' + tag('piece') + '\nafter */\nconst ready = true;'));
+    assert.equal(referenced.text, tag('piece') + '\nconst ready = true;\n');
+    assert.equal(referenced.references.length, 1);
 });
 test('literal unescape maps repeated references after emoji in UTF-16', () => {
     const input = part('\\' + tag('literal') + ' 😀 ' + tag('piece') + '/' + tag('piece'), 'unknown-language');
@@ -150,7 +155,7 @@ test('private adapter inherits scopes without recursive traversal', () => {
     for (let depth = 0; depth < 20000; depth++) { root = { children: [root] }; }
     root = { scope: 'comment', children: [{ scope: 'language:javascript', children: [root] }] };
     withEmitter(root, () => {
-        assert.deepEqual(highlightContribution(part('x')).spans, [{ start: 0, end: 2, scope: 'comment' }]);
+        assert.deepEqual(highlightContribution(part('x')), { text: '', spans: [], references: [] });
     });
 });
 test('private adapter guards version, shape, cycles and exact reconstruction', () => {
@@ -247,10 +252,14 @@ test('LaTeX emits every scope with unchanged typography in all themes', async ()
             assert.deepEqual(result.diagnostics, []);
             scopes.forEach((scope, index) => {
                 const base = scope.split('.')[0];
+                if (base === 'comment') {
+                    assert.doesNotMatch(result.latex!, new RegExp(`token${index}(?!\\d)`));
+                    return;
+                }
                 const key = Object.entries(groups).find(([, names]) => names.split(' ').includes(base))?.[0] || 'text';
                 const hex = theme.colors[key as keyof typeof theme.colors].slice(1);
                 const bold = ['keyword', 'variable', 'template-variable', 'strong'].includes(base) ? '\\bfseries' : '';
-                const italic = ['comment', 'quote', 'emphasis'].includes(base) ? '\\itshape' : '';
+                const italic = ['quote', 'emphasis'].includes(base) ? '\\itshape' : '';
                 assert.ok(result.latex?.includes(`\\LitStyle{${hex}}{${bold}}{${italic}}{token${index}}`),
                     theme.name + ': ' + scope);
             });
