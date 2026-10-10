@@ -3,7 +3,7 @@
 ## 0.17.0
 
 * Add manifest-driven multi-book workspaces and atomic series PDF export.
-* Add cross-book chapter, heading, term, fragment, and diagram links ( #7 ).
+* Add cross-book chapter, heading, term, fragment, and diagram links ( #7, #11 ).
 * Add stable authored Mermaid diagram IDs.
 * Add book-and-page print citations with grouped references.
 
