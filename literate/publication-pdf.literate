@@ -29,10 +29,19 @@ export interface PdfCompileOptions { keepBuild?: boolean; checkCancelled?: () =>
 export interface PdfCompilation {
     pdf: Uint8Array;
     warnings: string[];
+    pageLabels?: Readonly<Record<string, string>>;
     buildDirectory?: string;
 }
 export type PdfCompiler = (files: readonly { path: string; content: string | Uint8Array }[],
     entry: string, options?: PdfCompileOptions) => Promise<PdfCompilation>;
+export function parseAuxPageLabels(aux: string): Readonly<Record<string, string>> {
+    const labels: Record<string, string> = {};
+    for (const line of aux.split(/\r?\n/)) {
+        const match = /^\\newlabel\{([A-Za-z0-9-]+)\}\{\{.*\}\{([1-9][0-9]{0,6})\}(?:\{.*\})*\}$/.exec(line);
+        if (match) { labels[match[1]] = match[2]; }
+    }
+    return labels;
+}
 export class PdfCompilationError extends Error {
     constructor(message: string, public readonly buildDirectory?: string,
         public readonly warnings: string[] = []) {

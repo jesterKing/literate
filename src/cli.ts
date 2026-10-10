@@ -443,16 +443,23 @@ async function publishSeriesPdf(rootArgument: string | undefined, response: CliR
         }
     }
     const parsedProjects = new Map(plans.map(plan => [plan.publication.id, parseProject(plan.documents)]));
-    const compiledFiles: { path: string; content: Uint8Array; display: string }[] = [];
+    let compiledFiles: { path: string; content: Uint8Array; display: string }[] = [];
     const warnings: string[] = [];
     const buildDirectories: string[] = [];
+    let pageMaps = new Map<string, Readonly<Record<string, string>>>();
+    for (let round = 0; round < 4; round++) {
+        const roundFiles: typeof compiledFiles = [];
+        const nextPages = new Map<string, Readonly<Record<string, string>>>();
+        let completePages = true;
     for (const plan of plans) {
         checkCancelled?.();
         const publication = plan.publication;
         const options: LatexOptions = { paper: (publication.paper === 'a4' ? 'A4' : publication.paper === 'a5' ? 'A5'
             : publication.paper) as LatexOptions['paper'], marginTopMm: publication.margins.top,
             marginOuterMm: publication.margins.outer, marginBottomMm: publication.margins.bottom,
-            marginInnerMm: publication.margins.inner, publicationLink: (href, source) => {
+            marginInnerMm: publication.margins.inner };
+        const citations = new Map<string, { book: string; page: string }>();
+        options.publicationLink = (href, source) => {
                 if (!href || /[?\\\x00-\x20\x7f]/.test(href)) { return undefined; }
                 const hash = href.indexOf('#'), pathname = hash < 0 ? href : href.slice(0, hash);
                 const semantic = hash < 0 ? undefined : parsePublicationReference(href.slice(hash + 1));
@@ -482,8 +489,12 @@ async function publishSeriesPdf(rootArgument: string | undefined, response: CliR
                 if (!destination) { return undefined; }
                 if (target === plan) { return '#' + destination; }
                 const relativePdf = path.relative(path.dirname(plan.output), target.output).split(path.sep).join('/');
-                return encodeURI(relativePdf) + '#' + destination;
-            } };
+                const resolved = encodeURI(relativePdf) + '#' + destination;
+                const page = pageMaps.get(target.publication.id)?.[destination];
+                if (page) { citations.set(resolved, { book: target.publication.title, page }); }
+                return resolved;
+            };
+        if (round > 0) { options.printedCitation = destination => citations.get(destination); }
         const entry = `.literate-series/${publication.id}/book.tex`;
         const result = await planLatex(plan.root, plan.documents, entry, options, convert,
             fontManifest ? relative(fontManifest) : undefined, browser, diagrams,
@@ -491,10 +502,11 @@ async function publishSeriesPdf(rootArgument: string | undefined, response: CliR
         response.diagnostics.push(...result.diagnostics);
         if (result.diagnostics.length) { return finish(1); }
         try {
-            const built = await compile(result.files, entry, { keepBuild, checkCancelled });
+            const built = await compile(result.files, entry, { keepBuild: round > 0 && keepBuild, checkCancelled });
             warnings.push(...built.warnings.map(value => `${publication.id}: ${value}`));
             if (built.buildDirectory) { buildDirectories.push(built.buildDirectory); }
-            compiledFiles.push({ path: plan.transactionPath, content: built.pdf, display: publication.pdf! });
+            if (built.pageLabels) { nextPages.set(publication.id, built.pageLabels); } else { completePages = false; }
+            roundFiles.push({ path: plan.transactionPath, content: built.pdf, display: publication.pdf! });
         } catch (error) {
             const details = error as Partial<PdfCompilationError>;
             warnings.push(...(details.warnings ?? []).map(value => `${publication.id}: ${value}`));
@@ -503,6 +515,13 @@ async function publishSeriesPdf(rootArgument: string | undefined, response: CliR
                 ? { buildDirectory: buildDirectories[0] } : {}) };
             throw error;
         }
+    }
+        compiledFiles = roundFiles;
+        if (!completePages) { break; }
+        const stable = round > 0 && JSON.stringify([...pageMaps]) === JSON.stringify([...nextPages]);
+        pageMaps = nextPages;
+        if (stable) { break; }
+        if (round === 3) { throw new Error('Cross-publication page references did not converge'); }
     }
     response.publication = { warnings, ...(buildDirectories.length === 1 ? { buildDirectory: buildDirectories[0] } : {}) };
     if (!json) { for (const warning of warnings) { io.stderr(`literate: warning: ${warning}\n`); } }

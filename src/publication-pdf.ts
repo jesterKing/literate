@@ -7,10 +7,19 @@ export interface PdfCompileOptions { keepBuild?: boolean; checkCancelled?: () =>
 export interface PdfCompilation {
     pdf: Uint8Array;
     warnings: string[];
+    pageLabels?: Readonly<Record<string, string>>;
     buildDirectory?: string;
 }
 export type PdfCompiler = (files: readonly { path: string; content: string | Uint8Array }[],
     entry: string, options?: PdfCompileOptions) => Promise<PdfCompilation>;
+export function parseAuxPageLabels(aux: string): Readonly<Record<string, string>> {
+    const labels: Record<string, string> = {};
+    for (const line of aux.split(/\r?\n/)) {
+        const match = /^\\newlabel\{([A-Za-z0-9-]+)\}\{\{.*\}\{([1-9][0-9]{0,6})\}(?:\{.*\})*\}$/.exec(line);
+        if (match) { labels[match[1]] = match[2]; }
+    }
+    return labels;
+}
 export class PdfCompilationError extends Error {
     constructor(message: string, public readonly buildDirectory?: string,
         public readonly warnings: string[] = []) {
@@ -281,11 +290,14 @@ async function buildPdf(runner: PdfProcessRunner, cwd: string,
     checkConvergence(log, result.output);
     await checkRailCertificate(cwd, check);
     const pdf = await readBoundedFile(path.join(cwd, 'book.pdf'), maximumPdfBytes, check);
+    let aux = '';
+    try { aux = (await readBoundedFile(path.join(cwd, 'book.aux'), maximumLogBytes, check)).toString('utf8'); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') { throw error; } }
     check();
     if (pdf.length < 8 || !/^%PDF-[12]\.[0-9]/.test(pdf.subarray(0, 8).toString('ascii'))) {
         throw new Error('LuaLaTeX did not produce a valid PDF header in book.pdf');
     }
-    return { pdf, warnings: logWarnings(log) };
+    return { pdf, warnings: logWarnings(log), pageLabels: parseAuxPageLabels(aux) };
 }
 async function compileStaged(directory: string, cwd: string, files: Parameters<PdfCompiler>[0],
     runner: PdfProcessRunner, check: () => void): Promise<PdfCompilation> {

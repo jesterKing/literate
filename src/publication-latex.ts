@@ -13,6 +13,7 @@ export const publicationTemplateVersion = 5;
 export interface LatexOptions {
     assetPath?: (asset: PublicationAsset) => string;
     publicationLink?: PublicationLinkResolver;
+    printedCitation?: (destination: string) => { book: string; page: string } | undefined;
     theme?: string;
     paper?: 'A4' | 'A5' | 'letter' | 'legal';
     marginMm?: number;
@@ -619,6 +620,30 @@ async function annotationLatex(document: PandocDocument, project: ParsedProject,
         '\\setlength{\\marginparwidth}{25mm}\n\\setlength{\\marginparsep}{5mm}\n' +
         '\\microtypesetup{protrusion=false}\n' + publicationRail(terms, notes, railFontSize, fragments);
 }
+function printedCitations(body: string, lookup?: LatexOptions['printedCitation']): { body: string; references: string } {
+    if (!lookup) { return { body, references: '' }; }
+    const references = new Map<string, { book: string; page: string }>();
+    const rendered = body.replace(/\\href\{([^{}]+)\}\{[^{}]*\}/g, (whole, destination: string) => {
+        const citation = lookup(destination.replace(/\\([#%&_])/g, '$1'));
+        if (!citation) { return whole; }
+        if (!citation.book || citation.book.length > 200 || /[\x00-\x1f\x7f]/.test(citation.book)
+            || !/^[1-9][0-9]{0,6}$/.test(citation.page)) { throw new Error('Invalid printed publication citation'); }
+        references.set(destination, citation);
+        return `${whole}\\nobreak\\hspace{0.25em}{\\notefont [${tex(citation.book)}, page ${citation.page}]}`;
+    });
+    if (!references.size) { return { body: rendered, references: '' }; }
+    const books = new Map<string, Set<string>>();
+    for (const item of references.values()) {
+        const pages = books.get(item.book) ?? new Set<string>();
+        pages.add(item.page); books.set(item.book, pages);
+    }
+    const items = [...books].map(([book, pages]) => {
+        const ordered = [...pages].sort((left, right) => Number(left) - Number(right));
+        return `${tex(book)}, page${ordered.length === 1 ? '' : 's'} ${ordered.join(', ')}\\par`;
+    }).join('\n');
+    return { body: rendered, references: `\n\\chapter*{References}\n\\addcontentsline{toc}{chapter}{References}\n${items}\n` };
+}
+
 function annotationIndexes(project: ParsedProject): string {
     let output = '';
     if (project.annotations.terms.length) {
@@ -660,8 +685,9 @@ export async function renderLatex(parsed: ParsedProject, options: LatexOptions,
             checked.railFontSize);
         const body = await convert(prepared.document, conversionOptions);
         if (typeof body !== 'string') { throw new Error('Converter must return a LaTeX body string'); }
+        const cited = printedCitations(body, options.printedCitation);
         stage = 'latex-template';
-        return { latex: template(body + (hasRail ? annotationIndexes(parsed) : ''),
+        return { latex: template(cited.body + (hasRail ? annotationIndexes(parsed) : '') + cited.references,
             checked, definitions, annotations), diagnostics: [] };
     } catch (error) {
         return { diagnostics: [{ path: parsed.documents[0]?.path ?? '', line: 0, column: 0,

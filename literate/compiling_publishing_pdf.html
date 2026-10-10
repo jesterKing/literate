@@ -247,11 +247,14 @@ It accepts bytes only after that log and the rail certificate agree.</p>
     <span class="hljs-title">checkConvergence</span>(log, result.<span class="hljs-property">output</span>);
     <span class="hljs-keyword">await</span> <span class="hljs-title">checkRailCertificate</span>(cwd, check);
     <span class="hljs-keyword">const</span> pdf = <span class="hljs-keyword">await</span> <span class="hljs-title">readBoundedFile</span>(path.<span class="hljs-title">join</span>(cwd, <span class="hljs-string">'book.pdf'</span>), maximumPdfBytes, check);
+    <span class="hljs-keyword">let</span> aux = <span class="hljs-string">''</span>;
+    <span class="hljs-keyword">try</span> { aux = (<span class="hljs-keyword">await</span> <span class="hljs-title">readBoundedFile</span>(path.<span class="hljs-title">join</span>(cwd, <span class="hljs-string">'book.aux'</span>), maximumLogBytes, check)).<span class="hljs-title">toString</span>(<span class="hljs-string">'utf8'</span>); }
+    <span class="hljs-keyword">catch</span> (error) { <span class="hljs-keyword">if</span> ((error <span class="hljs-keyword">as</span> <span class="hljs-title">NodeJS</span>.<span class="hljs-property">ErrnoException</span>).<span class="hljs-property">code</span> !== <span class="hljs-string">'ENOENT'</span>) { <span class="hljs-keyword">throw</span> error; } }
     <span class="hljs-title">check</span>();
     <span class="hljs-keyword">if</span> (pdf.<span class="hljs-property">length</span> &lt; <span class="hljs-number">8</span> || !<span class="hljs-regexp">/^%PDF-</span><span class="hljs-regexp">[12]</span><span class="hljs-regexp">\.</span><span class="hljs-regexp">[0-9]</span><span class="hljs-regexp">/</span>.<span class="hljs-title">test</span>(pdf.<span class="hljs-title">subarray</span>(<span class="hljs-number">0</span>, <span class="hljs-number">8</span>).<span class="hljs-title">toString</span>(<span class="hljs-string">'ascii'</span>))) {
         <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'LuaLaTeX did not produce a valid PDF header in book.pdf'</span>);
     }
-    <span class="hljs-keyword">return</span> { pdf, <span class="hljs-attr">warnings</span>: <span class="hljs-title">logWarnings</span>(log) };
+    <span class="hljs-keyword">return</span> { pdf, <span class="hljs-attr">warnings</span>: <span class="hljs-title">logWarnings</span>(log), <span class="hljs-attr">pageLabels</span>: <span class="hljs-title">parseAuxPageLabels</span>(aux) };
 }
 </code></pre>
 

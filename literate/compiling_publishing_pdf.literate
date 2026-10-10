@@ -146,11 +146,14 @@ async function buildPdf(runner: PdfProcessRunner, cwd: string,
     checkConvergence(log, result.output);
     await checkRailCertificate(cwd, check);
     const pdf = await readBoundedFile(path.join(cwd, 'book.pdf'), maximumPdfBytes, check);
+    let aux = '';
+    try { aux = (await readBoundedFile(path.join(cwd, 'book.aux'), maximumLogBytes, check)).toString('utf8'); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') { throw error; } }
     check();
     if (pdf.length < 8 || !/^%PDF-[12]\.[0-9]/.test(pdf.subarray(0, 8).toString('ascii'))) {
         throw new Error('LuaLaTeX did not produce a valid PDF header in book.pdf');
     }
-    return { pdf, warnings: logWarnings(log) };
+    return { pdf, warnings: logWarnings(log), pageLabels: parseAuxPageLabels(aux) };
 }
 ```
 

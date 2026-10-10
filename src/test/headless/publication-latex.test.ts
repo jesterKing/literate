@@ -25,6 +25,19 @@ const convert: LatexConverter = async (document, options) => {
     return raw(document.blocks);
 };
 
+test('LaTeX adds cross-book citations and groups the References section by book', async () => {
+    const project = parse('[one](other.literate) and [two](other.literate#part)');
+    const result = await renderLatex(project, { publicationLink: href => `other.pdf${href.includes('#') ? '#part' : '#book'}`,
+        printedCitation: destination => destination.endsWith('#part')
+            ? { book: 'Other & Better', page: '4' } : { book: 'Other & Better', page: '2' } },
+    async document => document.blocks.length
+        ? '\\href{other.pdf\\#book}{one} and \\href{other.pdf\\#part}{two}' : '');
+    assert.deepEqual(result.diagnostics, []);
+    assert.match(result.latex!, /one}\\nobreak.*Other \\& Better, page 2/);
+    assert.match(result.latex!, /two}\\nobreak.*Other \\& Better, page 4/);
+    assert.match(result.latex!, /\\chapter\*\{References\}[\s\S]*Other \\& Better, pages 2, 4/);
+});
+
 test('LaTeX emits logical PDF destinations for terms and fragment families', async () => {
     const project = parseProject([{ path: 'book.literate', text:
         '```TERM pivot "Pivot"\nA partition value.\n```\n\n'

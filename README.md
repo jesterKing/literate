@@ -414,6 +414,13 @@ must be percent-encoded where a URL requires it. Generated HTML and
 PDF use stable targets. Markdown preview uses editor capabilities, and
 Go to Definition opens the authored definition when it is available.
 
+In a series PDF, links into another book retain their clickable text and
+add a print citation such as `[Quicksort in Zig, page 4]`. Publication
+repeats bounded whole-series passes until destination pages stabilize.
+Each book also receives a References chapter that groups referenced
+books and lists their cited pages. A changing layout that does not
+stabilize within four passes fails without replacing existing PDFs.
+
 A manifest containing one publication is selected automatically for
 non-series commands. A series with several publications requires an
 exact ID for inspection and generation. Outputs, templates, settings,
