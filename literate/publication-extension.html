@@ -159,6 +159,9 @@ Fonts and licenses are optional disk inputs; editor overlays apply only to sourc
 <span class="hljs-keyword">import</span> { spawn } <span class="hljs-keyword">from</span> <span class="hljs-string">'node:child_process'</span>;
 <span class="hljs-keyword">import</span> { discoveryExcludedDirectories, safeRelativePath } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
 <span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
+<span class="hljs-keyword">import</span> { parsePublicationWorkspace, publicationForPath, publicationWorkspaceManifest,
+    selectPublication } <span class="hljs-keyword">from</span> <span class="hljs-string">'./workspace-projects'</span>;
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">PublicationProject</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./workspace-projects'</span>;
 
 <span class="hljs-keyword">type</span> <span class="hljs-title">Kind</span> = <span class="hljs-string">'latex'</span> | <span class="hljs-string">'pdf'</span>;
 <span class="hljs-keyword">interface</span> <span class="hljs-title">Choice</span> { <span class="hljs-attr">paper</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">margins</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">destination</span>: <span class="hljs-built_in">string</span>; }
@@ -256,6 +259,41 @@ remain real directories.</p>
         <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Publication root must be a real, canonical directory, not a symlink.'</span>);
     }
     <span class="hljs-keyword">return</span> root;
+}
+<span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">canonicalProjectRoot</span>(<span class="hljs-params">manifestRoot: </span><span class="hljs-built_in">string</span><span class="hljs-params">, relativeRoot: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">string</span>&gt; {
+    <span class="hljs-keyword">let</span> root = manifestRoot;
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> component <span class="hljs-keyword">of</span> relativeRoot.<span class="hljs-title">split</span>(<span class="hljs-string">'/'</span>)) {
+        root = path.<span class="hljs-title">join</span>(root, component);
+        <span class="hljs-keyword">const</span> stat = <span class="hljs-keyword">await</span> fs.<span class="hljs-title">lstat</span>(root);
+        <span class="hljs-keyword">if</span> (stat.<span class="hljs-title">isSymbolicLink</span>() || !stat.<span class="hljs-title">isDirectory</span>() || <span class="hljs-keyword">await</span> fs.<span class="hljs-title">realpath</span>(root) !== root) {
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Publication root must be a real, canonical directory: </span><span class="hljs-subst">${relativeRoot}</span><span class="hljs-string">`</span>);
+        }
+    }
+    <span class="hljs-keyword">return</span> root;
+}
+</code></pre>
+
+</div>
+</div><p>A workspace manifest may live below the VS Code folder so series metadata can be
+a sibling of its books. Discovery is bounded, excludes generated and dependency
+directories, and never follows symbolic links. More than one manifest is
+ambiguous and must be resolved by opening a narrower workspace folder.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700061007400680073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700061007400680073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700061007400680073" aria-label="Definition of publication extension paths">&lt;&lt;publication extension paths&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">findPublicationManifest</span>(<span class="hljs-params">root: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>&gt; {
+    <span class="hljs-keyword">const</span> excluded = <span class="hljs-string">`**/{</span><span class="hljs-subst">${discoveryExcludedDirectories.join(</span><span class="hljs-string">','</span><span class="hljs-subst">)}</span><span class="hljs-string">}/**`</span>;
+    <span class="hljs-keyword">const</span> matches = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">findFiles</span>(
+        <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">RelativePattern</span>(root, <span class="hljs-string">`**/</span><span class="hljs-subst">${publicationWorkspaceManifest}</span><span class="hljs-string">`</span>), excluded, <span class="hljs-number">2</span>);
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">found</span>: <span class="hljs-built_in">string</span>[] = [];
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> match <span class="hljs-keyword">of</span> matches) {
+        <span class="hljs-keyword">if</span> (match.<span class="hljs-property">scheme</span> !== <span class="hljs-string">'file'</span> || match.<span class="hljs-property">authority</span>) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">const</span> relative = <span class="hljs-title">relativePath</span>(root, match.<span class="hljs-property">fsPath</span>);
+        <span class="hljs-keyword">await</span> <span class="hljs-title">checkPath</span>(root, relative);
+        found.<span class="hljs-title">push</span>(match.<span class="hljs-property">fsPath</span>);
+    }
+    <span class="hljs-keyword">if</span> (found.<span class="hljs-property">length</span> &gt; <span class="hljs-number">1</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Multiple </span><span class="hljs-subst">${publicationWorkspaceManifest}</span><span class="hljs-string"> files found; open a narrower workspace folder`</span>); }
+    <span class="hljs-keyword">return</span> found[<span class="hljs-number">0</span>];
 }
 </code></pre>
 
@@ -445,9 +483,38 @@ The active editor's workspace wins; otherwise offer all folders explicitly.</p>
     <span class="hljs-keyword">if</span> (!folders.<span class="hljs-property">length</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Open a local project folder before exporting.'</span>); }
     <span class="hljs-keyword">const</span> choice = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showQuickPick</span>(folders.<span class="hljs-title">map</span>(<span class="hljs-params">folder</span><span class="hljs-function"> =&gt;</span> ({
         <span class="hljs-attr">label</span>: folder.<span class="hljs-property">name</span>, <span class="hljs-attr">description</span>: folder.<span class="hljs-property">uri</span>.<span class="hljs-property">fsPath</span>, folder
-    })), { <span class="hljs-attr">placeHolder</span>: <span class="hljs-string">'Select publication project folder'</span> });
+    })), { <span class="hljs-attr">placeHolder</span>: <span class="hljs-string">'Select publication workspace folder'</span> });
     <span class="hljs-keyword">if</span> (choice) { <span class="hljs-title">allowed</span>(choice.<span class="hljs-property">folder</span>); }
     <span class="hljs-keyword">return</span> choice?.<span class="hljs-property">folder</span>;
+}
+<span class="hljs-keyword">interface</span> <span class="hljs-title">SelectedPublication</span> {
+    <span class="hljs-attr">folder</span>: vscode.<span class="hljs-property">WorkspaceFolder</span>;
+    <span class="hljs-attr">workspaceRoot</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">root</span>: <span class="hljs-built_in">string</span>;
+    project?: <span class="hljs-title">PublicationProject</span>;
+}
+<span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">choosePublication</span>(): <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">SelectedPublication</span> | <span class="hljs-literal">undefined</span>&gt; {
+    <span class="hljs-keyword">const</span> folder = <span class="hljs-keyword">await</span> <span class="hljs-title">chooseFolder</span>();
+    <span class="hljs-keyword">if</span> (!folder) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">const</span> folderRoot = <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalRoot</span>(folder);
+    <span class="hljs-keyword">const</span> manifestPath = <span class="hljs-keyword">await</span> <span class="hljs-title">findPublicationManifest</span>(folderRoot);
+    <span class="hljs-keyword">if</span> (!manifestPath) { <span class="hljs-keyword">return</span> { folder, <span class="hljs-attr">workspaceRoot</span>: folderRoot, <span class="hljs-attr">root</span>: folderRoot }; }
+    <span class="hljs-keyword">const</span> workspaceRoot = path.<span class="hljs-title">dirname</span>(manifestPath);
+    <span class="hljs-keyword">await</span> <span class="hljs-title">checkPath</span>(workspaceRoot, publicationWorkspaceManifest);
+    <span class="hljs-keyword">const</span> workspace = <span class="hljs-title">parsePublicationWorkspace</span>(<span class="hljs-keyword">await</span> fs.<span class="hljs-title">readFile</span>(manifestPath, <span class="hljs-string">'utf8'</span>));
+    <span class="hljs-keyword">const</span> active = vscode.<span class="hljs-property">window</span>.<span class="hljs-property">activeTextEditor</span>?.<span class="hljs-property">document</span>.<span class="hljs-property">uri</span>;
+    <span class="hljs-keyword">const</span> relative = active?.<span class="hljs-property">scheme</span> === <span class="hljs-string">'file'</span> &amp;&amp; !active.<span class="hljs-property">authority</span> ?
+        path.<span class="hljs-title">relative</span>(workspaceRoot, active.<span class="hljs-property">fsPath</span>).<span class="hljs-title">split</span>(path.<span class="hljs-property">sep</span>).<span class="hljs-title">join</span>(<span class="hljs-string">'/'</span>) : <span class="hljs-literal">undefined</span>;
+    <span class="hljs-keyword">let</span> project = relative &amp;&amp; !path.<span class="hljs-title">isAbsolute</span>(relative) ? <span class="hljs-title">publicationForPath</span>(workspace, relative) : <span class="hljs-literal">undefined</span>;
+    <span class="hljs-keyword">if</span> (!project &amp;&amp; workspace.<span class="hljs-property">publications</span>.<span class="hljs-property">length</span> === <span class="hljs-number">1</span>) { project = <span class="hljs-title">selectPublication</span>(workspace); }
+    <span class="hljs-keyword">if</span> (!project) {
+        <span class="hljs-keyword">const</span> choice = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showQuickPick</span>(workspace.<span class="hljs-property">publications</span>.<span class="hljs-title">map</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> ({
+            <span class="hljs-attr">label</span>: item.<span class="hljs-property">title</span>, <span class="hljs-attr">description</span>: item.<span class="hljs-property">id</span>, <span class="hljs-attr">detail</span>: item.<span class="hljs-property">root</span>, <span class="hljs-attr">project</span>: item
+        })), { <span class="hljs-attr">placeHolder</span>: <span class="hljs-string">'Select publication'</span> });
+        project = choice?.<span class="hljs-property">project</span>;
+    }
+    <span class="hljs-keyword">if</span> (!project) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">return</span> { folder, workspaceRoot, <span class="hljs-attr">root</span>: <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalProjectRoot</span>(workspaceRoot, project.<span class="hljs-property">root</span>), project };
 }
 <span class="hljs-keyword">function</span> <span class="hljs-title">executable</span>(<span class="hljs-params">name: </span><span class="hljs-built_in">string</span><span class="hljs-params">, required: </span><span class="hljs-built_in">boolean</span>): <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span> {
     <span class="hljs-keyword">const</span> value = vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">getConfiguration</span>(<span class="hljs-string">'literate.publication'</span>).<span class="hljs-property">inspect</span>&lt;<span class="hljs-built_in">string</span>&gt;(name)?.<span class="hljs-property">globalValue</span>;
@@ -544,13 +611,13 @@ are resolved only after a destination has been chosen.</p>
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" aria-label="Definition of publication extension commands">&lt;&lt;publication extension commands&gt;&gt;=+</a></div>
 <div class="code">
 <pre><code>        <span class="hljs-keyword">try</span> {
-            <span class="hljs-keyword">const</span> folder = <span class="hljs-keyword">await</span> <span class="hljs-title">chooseFolder</span>();
-            <span class="hljs-keyword">if</span> (!folder) { <span class="hljs-keyword">return</span>; }
+            <span class="hljs-keyword">const</span> selected = <span class="hljs-keyword">await</span> <span class="hljs-title">choosePublication</span>();
+            <span class="hljs-keyword">if</span> (!selected) { <span class="hljs-keyword">return</span>; }
+            <span class="hljs-keyword">const</span> { folder, workspaceRoot, root, project } = selected;
             operation.<span class="hljs-property">folder</span> = folder;
             <span class="hljs-title">cancelled</span>(token);
             <span class="hljs-title">authority</span>();
-            <span class="hljs-keyword">const</span> root = <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalRoot</span>(folder);
-            <span class="hljs-keyword">const</span> key = <span class="hljs-string">`literate.publication:v2:</span><span class="hljs-subst">${kind}</span><span class="hljs-string">:</span><span class="hljs-subst">${root}</span><span class="hljs-string">`</span>;
+            <span class="hljs-keyword">const</span> key = <span class="hljs-string">`literate.publication:v3:</span><span class="hljs-subst">${kind}</span><span class="hljs-string">:</span><span class="hljs-subst">${workspaceRoot}</span><span class="hljs-string">:</span><span class="hljs-subst">${project?.id ?? </span><span class="hljs-string">''</span><span class="hljs-subst">}</span><span class="hljs-string">`</span>;
             <span class="hljs-keyword">const</span> choice = <span class="hljs-keyword">await</span> <span class="hljs-title">chooseOutput</span>(root, kind, context.<span class="hljs-property">workspaceState</span>.<span class="hljs-property">get</span>&lt;<span class="hljs-title">Choice</span>&gt;(key));
             <span class="hljs-keyword">if</span> (!choice) { <span class="hljs-keyword">return</span>; }
             <span class="hljs-title">cancelled</span>(token);
@@ -580,6 +647,7 @@ the queue on resolution or rejection, never merely on a cancellation request.</p
 <div class="code">
 <pre><code>                        <span class="hljs-title">cancelled</span>(token);
                         <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalRoot</span>(folder);
+                        <span class="hljs-keyword">if</span> (project) { <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalProjectRoot</span>(workspaceRoot, project.<span class="hljs-property">root</span>); }
                         <span class="hljs-title">authority</span>();
                         <span class="hljs-keyword">const</span> documents = <span class="hljs-keyword">await</span> <span class="hljs-title">capturePublicationSnapshot</span>(root, token);
                         <span class="hljs-keyword">const</span> args = [kind, root, <span class="hljs-string">'--output'</span>, choice.<span class="hljs-property">destination</span>, <span class="hljs-string">'--paper'</span>, choice.<span class="hljs-property">paper</span>];
@@ -590,6 +658,7 @@ the queue on resolution or rejection, never merely on a cancellation request.</p
                         <span class="hljs-keyword">if</span> (manifest) { <span class="hljs-keyword">await</span> <span class="hljs-title">checkPath</span>(root, manifest); args.<span class="hljs-title">push</span>(<span class="hljs-string">'--font-manifest'</span>, manifest); }
                         args.<span class="hljs-title">push</span>(<span class="hljs-string">'--json'</span>);
                         <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalRoot</span>(folder);
+                        <span class="hljs-keyword">if</span> (project) { <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalProjectRoot</span>(workspaceRoot, project.<span class="hljs-property">root</span>); }
                         <span class="hljs-keyword">await</span> <span class="hljs-title">checkPath</span>(root, choice.<span class="hljs-property">destination</span>);
                         <span class="hljs-title">authority</span>();
                         <span class="hljs-title">cancelled</span>(token);

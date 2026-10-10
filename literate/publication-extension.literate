@@ -33,6 +33,9 @@ import * as path from 'node:path';
 import { spawn } from 'node:child_process';
 import { discoveryExcludedDirectories, safeRelativePath } from './engine';
 import type { SourceDocument } from './engine';
+import { parsePublicationWorkspace, publicationForPath, publicationWorkspaceManifest,
+    selectPublication } from './workspace-projects';
+import type { PublicationProject } from './workspace-projects';
 
 type Kind = 'latex' | 'pdf';
 interface Choice { paper: string; margins: string; destination: string; }
@@ -128,6 +131,39 @@ async function canonicalRoot(folder: vscode.WorkspaceFolder): Promise<string> {
         throw new Error('Publication root must be a real, canonical directory, not a symlink.');
     }
     return root;
+}
+async function canonicalProjectRoot(manifestRoot: string, relativeRoot: string): Promise<string> {
+    let root = manifestRoot;
+    for (const component of relativeRoot.split('/')) {
+        root = path.join(root, component);
+        const stat = await fs.lstat(root);
+        if (stat.isSymbolicLink() || !stat.isDirectory() || await fs.realpath(root) !== root) {
+            throw new Error(`Publication root must be a real, canonical directory: ${relativeRoot}`);
+        }
+    }
+    return root;
+}
+```
+
+A workspace manifest may live below the VS Code folder so series metadata can be
+a sibling of its books. Discovery is bounded, excludes generated and dependency
+directories, and never follows symbolic links. More than one manifest is
+ambiguous and must be resolved by opening a narrower workspace folder.
+
+```typescript: <<publication extension paths>>=+
+async function findPublicationManifest(root: string): Promise<string | undefined> {
+    const excluded = `**/{${discoveryExcludedDirectories.join(',')}}/**`;
+    const matches = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(root, `**/${publicationWorkspaceManifest}`), excluded, 2);
+    const found: string[] = [];
+    for (const match of matches) {
+        if (match.scheme !== 'file' || match.authority) { continue; }
+        const relative = relativePath(root, match.fsPath);
+        await checkPath(root, relative);
+        found.push(match.fsPath);
+    }
+    if (found.length > 1) { throw new Error(`Multiple ${publicationWorkspaceManifest} files found; open a narrower workspace folder`); }
+    return found[0];
 }
 ```
 
@@ -308,9 +344,38 @@ async function chooseFolder(): Promise<vscode.WorkspaceFolder | undefined> {
     if (!folders.length) { throw new Error('Open a local project folder before exporting.'); }
     const choice = await vscode.window.showQuickPick(folders.map(folder => ({
         label: folder.name, description: folder.uri.fsPath, folder
-    })), { placeHolder: 'Select publication project folder' });
+    })), { placeHolder: 'Select publication workspace folder' });
     if (choice) { allowed(choice.folder); }
     return choice?.folder;
+}
+interface SelectedPublication {
+    folder: vscode.WorkspaceFolder;
+    workspaceRoot: string;
+    root: string;
+    project?: PublicationProject;
+}
+async function choosePublication(): Promise<SelectedPublication | undefined> {
+    const folder = await chooseFolder();
+    if (!folder) { return undefined; }
+    const folderRoot = await canonicalRoot(folder);
+    const manifestPath = await findPublicationManifest(folderRoot);
+    if (!manifestPath) { return { folder, workspaceRoot: folderRoot, root: folderRoot }; }
+    const workspaceRoot = path.dirname(manifestPath);
+    await checkPath(workspaceRoot, publicationWorkspaceManifest);
+    const workspace = parsePublicationWorkspace(await fs.readFile(manifestPath, 'utf8'));
+    const active = vscode.window.activeTextEditor?.document.uri;
+    const relative = active?.scheme === 'file' && !active.authority ?
+        path.relative(workspaceRoot, active.fsPath).split(path.sep).join('/') : undefined;
+    let project = relative && !path.isAbsolute(relative) ? publicationForPath(workspace, relative) : undefined;
+    if (!project && workspace.publications.length === 1) { project = selectPublication(workspace); }
+    if (!project) {
+        const choice = await vscode.window.showQuickPick(workspace.publications.map(item => ({
+            label: item.title, description: item.id, detail: item.root, project: item
+        })), { placeHolder: 'Select publication' });
+        project = choice?.project;
+    }
+    if (!project) { return undefined; }
+    return { folder, workspaceRoot, root: await canonicalProjectRoot(workspaceRoot, project.root), project };
 }
 function executable(name: string, required: boolean): string | undefined {
     const value = vscode.workspace.getConfiguration('literate.publication').inspect<string>(name)?.globalValue;
@@ -402,13 +467,13 @@ are resolved only after a destination has been chosen.
 
 ```typescript: <<publication extension commands>>=+
         try {
-            const folder = await chooseFolder();
-            if (!folder) { return; }
+            const selected = await choosePublication();
+            if (!selected) { return; }
+            const { folder, workspaceRoot, root, project } = selected;
             operation.folder = folder;
             cancelled(token);
             authority();
-            const root = await canonicalRoot(folder);
-            const key = `literate.publication:v2:${kind}:${root}`;
+            const key = `literate.publication:v3:${kind}:${workspaceRoot}:${project?.id ?? ''}`;
             const choice = await chooseOutput(root, kind, context.workspaceState.get<Choice>(key));
             if (!choice) { return; }
             cancelled(token);
@@ -436,6 +501,7 @@ the queue on resolution or rejection, never merely on a cancellation request.
 ```typescript: <<publication extension commands>>=+
                         cancelled(token);
                         await canonicalRoot(folder);
+                        if (project) { await canonicalProjectRoot(workspaceRoot, project.root); }
                         authority();
                         const documents = await capturePublicationSnapshot(root, token);
                         const args = [kind, root, '--output', choice.destination, '--paper', choice.paper];
@@ -446,6 +512,7 @@ the queue on resolution or rejection, never merely on a cancellation request.
                         if (manifest) { await checkPath(root, manifest); args.push('--font-manifest', manifest); }
                         args.push('--json');
                         await canonicalRoot(folder);
+                        if (project) { await canonicalProjectRoot(workspaceRoot, project.root); }
                         await checkPath(root, choice.destination);
                         authority();
                         cancelled(token);

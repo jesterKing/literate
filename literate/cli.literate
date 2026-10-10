@@ -333,9 +333,11 @@ async removeDirectory(value) {
 ## Discover saved inputs
 
 Directory enumeration is sorted, skips symlinks, and shares exclusions with the
-editor. The engine will apply index ordering later. The CLI reads disk, not
-unsaved editor buffers, so CLI and editor generation must not run concurrently
-against the same project.
+editor. A nested manifest, or an immediate directory containing one, establishes
+a series boundary so sibling project roots are not absorbed by legacy discovery.
+The engine will apply index ordering later. The CLI reads disk, not unsaved editor
+buffers, so CLI and editor generation must not run concurrently against the same
+project.
 
 ```typescript: <<cli document discovery>>=
 async function discover(root: string): Promise<SourceDocument[]> {
@@ -344,6 +346,12 @@ async function discover(root: string): Promise<SourceDocument[]> {
         const entries = await fs.readdir(path.join(root, directory), { withFileTypes: true });
         if (directory && entries.some(entry => entry.isFile() && entry.name === publicationWorkspaceManifest)) {
             return;
+        }
+        if (directory) {
+            for (const entry of entries) {
+                if (entry.isDirectory() && !entry.isSymbolicLink() &&
+                    await inspect(root, `${directory}/${entry.name}/${publicationWorkspaceManifest}`)) { return; }
+            }
         }
         entries.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
         for (const entry of entries) {

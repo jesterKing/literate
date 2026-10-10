@@ -178,6 +178,12 @@ async function discover(root: string): Promise<SourceDocument[]> {
         if (directory && entries.some(entry => entry.isFile() && entry.name === publicationWorkspaceManifest)) {
             return;
         }
+        if (directory) {
+            for (const entry of entries) {
+                if (entry.isDirectory() && !entry.isSymbolicLink() &&
+                    await inspect(root, `${directory}/${entry.name}/${publicationWorkspaceManifest}`)) { return; }
+            }
+        }
         entries.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
         for (const entry of entries) {
             if (entry.isSymbolicLink()) { continue; }

@@ -477,9 +477,11 @@ residue rather than broadening the cleanup operation.</p>
 </div>
 </div><h2>Discover saved inputs</h2>
 <p>Directory enumeration is sorted, skips symlinks, and shares exclusions with the
-editor. The engine will apply index ordering later. The CLI reads disk, not
-unsaved editor buffers, so CLI and editor generation must not run concurrently
-against the same project.</p>
+editor. A nested manifest, or an immediate directory containing one, establishes
+a series boundary so sibling project roots are not absorbed by legacy discovery.
+The engine will apply index ordering later. The CLI reads disk, not unsaved editor
+buffers, so CLI and editor generation must not run concurrently against the same
+project.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0063006c006900200064006f00630075006d0065006e007400200064006900730063006f0076006500720079-006c0069007400650072006100740065002f0063006c0069002e006c0069007400650072006100740065-1"><span id="f-0063006c006900200064006f00630075006d0065006e007400200064006900730063006f0076006500720079"></span><a class="literate-tag-name" href="#f-0063006c006900200064006f00630075006d0065006e007400200064006900730063006f0076006500720079" data-literate-target="f-0063006c006900200064006f00630075006d0065006e007400200064006900730063006f0076006500720079" aria-label="Definition of cli document discovery">&lt;&lt;cli document discovery&gt;&gt;=</a></div>
 <div class="code">
@@ -489,6 +491,12 @@ against the same project.</p>
         <span class="hljs-keyword">const</span> entries = <span class="hljs-keyword">await</span> fs.<span class="hljs-title">readdir</span>(path.<span class="hljs-title">join</span>(root, directory), { <span class="hljs-attr">withFileTypes</span>: <span class="hljs-literal">true</span> });
         <span class="hljs-keyword">if</span> (directory &amp;&amp; entries.<span class="hljs-title">some</span>(<span class="hljs-params">entry</span><span class="hljs-function"> =&gt;</span> entry.<span class="hljs-title">isFile</span>() &amp;&amp; entry.<span class="hljs-property">name</span> === publicationWorkspaceManifest)) {
             <span class="hljs-keyword">return</span>;
+        }
+        <span class="hljs-keyword">if</span> (directory) {
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> entry <span class="hljs-keyword">of</span> entries) {
+                <span class="hljs-keyword">if</span> (entry.<span class="hljs-title">isDirectory</span>() &amp;&amp; !entry.<span class="hljs-title">isSymbolicLink</span>() &amp;&amp;
+                    <span class="hljs-keyword">await</span> <span class="hljs-title">inspect</span>(root, <span class="hljs-string">`</span><span class="hljs-subst">${directory}</span><span class="hljs-string">/</span><span class="hljs-subst">${entry.name}</span><span class="hljs-string">/</span><span class="hljs-subst">${publicationWorkspaceManifest}</span><span class="hljs-string">`</span>)) { <span class="hljs-keyword">return</span>; }
+            }
         }
         entries.<span class="hljs-title">sort</span>(<span class="hljs-function">(</span><span class="hljs-params">a, b</span><span class="hljs-function">) =&gt;</span> a.<span class="hljs-property">name</span> &lt; b.<span class="hljs-property">name</span> ? -<span class="hljs-number">1</span> : a.<span class="hljs-property">name</span> &gt; b.<span class="hljs-property">name</span> ? <span class="hljs-number">1</span> : <span class="hljs-number">0</span>);
         <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> entry <span class="hljs-keyword">of</span> entries) {

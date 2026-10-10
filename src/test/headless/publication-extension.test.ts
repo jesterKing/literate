@@ -48,6 +48,19 @@ async function fixture() {
         dispose(): void { this.disposed = true; this.events.removeAllListeners(); }
     }
     const workspace: any = { isTrusted: true, workspaceFolders: [folder], textDocuments: [],
+        async findFiles(pattern: any, _exclude: string, maximum: number) {
+            const found: any[] = [];
+            const visit = async (directory: string): Promise<void> => {
+                for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+                    if (found.length >= maximum || entry.isSymbolicLink()) { continue; }
+                    const target = path.join(directory, entry.name);
+                    if (entry.isFile() && entry.name === 'literate-workspace.json') { found.push(uri(target)); }
+                    else if (entry.isDirectory() && !sizes.includes(entry.name)) { await visit(target); }
+                }
+            };
+            await visit(pattern.base);
+            return found;
+        },
         onDidChangeWorkspaceFolders(callback: (event: any) => void) {
             folderEvents.on('change', callback);
             return { dispose() { folderEvents.off('change', callback); } };
@@ -56,7 +69,8 @@ async function fixture() {
             value.scheme === item.uri.scheme && (value.fsPath === item.uri.fsPath || value.fsPath.startsWith(item.uri.fsPath + '/'))),
         getConfiguration: () => ({ inspect: (name: string) => ({ globalValue: settings[name], workspaceValue: f.workspaceNode }),
             get: (name: string) => settings[name] }) };
-    const vscode: any = { workspace, CancellationTokenSource, env: {}, UIKind: { Web: 2 }, Uri: { file: uri }, ProgressLocation: { Notification: 15 },
+    class RelativePattern { constructor(readonly base: string, readonly pattern: string) {} }
+    const vscode: any = { workspace, CancellationTokenSource, RelativePattern, env: {}, UIKind: { Web: 2 }, Uri: { file: uri }, ProgressLocation: { Notification: 15 },
         commands: { registerCommand(name: string, callback: () => Promise<void>) {
             handlers.set(name, callback); return { dispose() { handlers.delete(name); } };
         }, async executeCommand(...args: any[]) { opened.push(args); } },
@@ -70,10 +84,11 @@ async function fixture() {
                 f.channels.push(channel); return channel;
             },
             async showQuickPick(items: any[], options: any) {
-                const stage = typeof items[0] === 'string' ? 'paper' : 'folder';
+                const stage = typeof items[0] === 'string' ? 'paper' : items[0]?.project ? 'publication' : 'folder';
                 prompts.push({ stage, items, options });
                 if (f.cancelStage === stage) { return undefined; }
-                return stage === 'paper' ? f.paper : items[f.folderIndex ?? 0];
+                if (stage === 'paper') { return f.paper; }
+                return items[stage === 'publication' ? f.publicationIndex ?? 0 : f.folderIndex ?? 0];
             },
             async showInputBox(options: any) {
                 prompts.push({ stage: 'margins', options });
@@ -108,6 +123,7 @@ async function fixture() {
             // Use the actual engine in both source-run and compiled test environments.
             return require('../../engine');
         }
+        if (name === './workspace-projects') { return require('../../workspace-projects'); }
         if (name === 'node:fs/promises') { return { ...fs, async readdir(...args: any[]) {
             f.onSnapshotRead?.();
             return (fs.readdir as any)(...args);
@@ -240,6 +256,82 @@ test('folder picker selects a nonactive workspace', () => using(async f => {
     await f.run();
     assert.deepEqual(f.errors, []);
     assert.equal(f.requests[0][2], other);
+}));
+
+test('active document selects and isolates its publication', () => using(async f => {
+    await f.put('literate-workspace.json', JSON.stringify({ schemaVersion: 1, publications: [
+        { id: 'python', title: 'Python', root: 'books/python', entry: 'index.literate' },
+        { id: 'zig', title: 'Zig', root: 'books/zig', entry: 'index.literate' }
+    ] }));
+    await f.put('books/python/index.literate', 'python disk');
+    await f.put('books/zig/index.literate', 'zig disk');
+    const python = f.document('books/python/index.literate', 'python buffer');
+    const zig = f.document('books/zig/index.literate', 'zig buffer');
+    f.workspace.textDocuments = [python, zig];
+    f.vscode.window.activeTextEditor = { document: zig };
+    f.save = uri(path.join(f.root, 'books/zig/book.tex'));
+    await f.run();
+    const projectRoot = path.join(f.root, 'books/zig');
+    assert.deepEqual(f.errors, []);
+    assert.equal(f.prompts.some((prompt: any) => prompt.stage === 'publication'), false);
+    assert.equal(f.requests[0][2], projectRoot);
+    assert.deepEqual(f.requests[0][3].documents, [
+        { path: 'index.literate', text: 'zig buffer' }
+    ]);
+    assert.ok(f.state.has(`literate.publication:v3:latex:${f.root}:zig`));
+}));
+
+test('nested series manifest selects a parent-relative active publication', () => using(async f => {
+    await f.put('series/literate-workspace.json', JSON.stringify({ schemaVersion: 1, publications: [
+        { id: 'python', title: 'Python', root: '../books/python', entry: 'index.literate' },
+        { id: 'zig', title: 'Zig', root: '../books/zig', entry: 'index.literate' }
+    ] }));
+    await f.put('books/python/index.literate', 'python');
+    await f.put('books/zig/index.literate', 'zig');
+    const zig = f.document('books/zig/index.literate', 'zig buffer');
+    f.workspace.textDocuments = [f.document('books/python/index.literate', 'python buffer'), zig];
+    f.vscode.window.activeTextEditor = { document: zig };
+    f.save = uri(path.join(f.root, 'books/zig/book.tex'));
+    await f.run();
+    assert.deepEqual(f.errors, []);
+    assert.equal(f.requests[0][2], path.join(f.root, 'books/zig'));
+    assert.deepEqual(f.requests[0][3].documents, [
+        { path: 'index.literate', text: 'zig buffer' }
+    ]);
+    assert.ok(f.state.has(`literate.publication:v3:latex:${path.join(f.root, 'series')}:zig`));
+}));
+
+test('publication picker selects a project and cancellation launches nothing', () => using(async f => {
+    await f.put('literate-workspace.json', JSON.stringify({ schemaVersion: 1, publications: [
+        { id: 'python', title: 'Python', root: 'books/python', entry: 'index.literate' },
+        { id: 'zig', title: 'Zig', root: 'books/zig', entry: 'index.literate' }
+    ] }));
+    await f.put('books/python/index.literate', 'python');
+    await f.put('books/zig/index.literate', 'zig');
+    f.publicationIndex = 1;
+    f.save = uri(path.join(f.root, 'books/zig/book.tex'));
+    await f.run();
+    const prompt = f.prompts.find((item: any) => item.stage === 'publication');
+    assert.deepEqual(prompt.items.map((item: any) => [item.label, item.description, item.detail]), [
+        ['Python', 'python', 'books/python'], ['Zig', 'zig', 'books/zig']
+    ]);
+    assert.equal(f.requests[0][2], path.join(f.root, 'books/zig'));
+
+    f.cancelStage = 'publication';
+    await f.run();
+    assert.equal(f.requests.length, 1);
+}));
+
+test('single publication is selected without a publication picker', () => using(async f => {
+    await f.put('literate-workspace.json', JSON.stringify({ schemaVersion: 1, publications: [
+        { id: 'python', title: 'Python', root: 'books/python', entry: 'index.literate' }
+    ] }));
+    await f.put('books/python/index.literate', 'python');
+    f.save = uri(path.join(f.root, 'books/python/book.tex'));
+    await f.run();
+    assert.deepEqual(f.errors, []);
+    assert.equal(f.prompts.some((prompt: any) => prompt.stage === 'publication'), false);
+    assert.equal(f.requests[0][2], path.join(f.root, 'books/python'));
 }));
 
 for (const mode of ['disk', 'buffer', 'ancestor', 'dangling', 'destination']) {

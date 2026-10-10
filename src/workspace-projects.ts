@@ -34,8 +34,29 @@ function text(value: unknown, label: string, maximum: number): string {
 function projectPath(value: unknown, label: string): string {
     const input = text(value, label, 1024);
     const normalized = safeRelativePath(input);
-    if (!normalized) { throw new Error(`${label} is not a safe relative path: ${input}`); }
+    if (!normalized) { throw new Error(`${label} is not a safe project-relative path: ${input}`); }
     return normalized;
+}
+
+function manifestPath(value: unknown, label: string): string {
+    const input = text(value, label, 1024);
+    if (input.includes('\\') || input.startsWith('/') || /^[A-Za-z]:/.test(input)) {
+        throw new Error(`${label} is not a portable manifest-relative path: ${input}`);
+    }
+    const components: string[] = [];
+    for (const component of input.split('/')) {
+        if (!component || component === '.') { continue; }
+        if (component === '..') {
+            if (components.length && components[components.length - 1] !== '..') { components.pop(); }
+            else { components.push(component); }
+        } else { components.push(component); }
+    }
+    const first = components.findIndex(component => component !== '..');
+    const tail = first < 0 ? '' : components.slice(first).join('/');
+    if (!tail || safeRelativePath(tail) !== tail) {
+        throw new Error(`${label} is not a portable manifest-relative path: ${input}`);
+    }
+    return components.join('/');
 }
 
 function collision(left: string, right: string): boolean {
@@ -59,10 +80,10 @@ export function parsePublicationWorkspace(source: string): PublicationWorkspace 
         fields(value, ['id', 'title', 'root', 'entry', 'pdf'], label);
         const id = text(value.id, `${label} id`, 100);
         if (!identifier.test(id)) { throw new Error(`${label} id is invalid: ${id}`); }
-        const root = projectPath(value.root, `${label} root`);
+        const root = manifestPath(value.root, `${label} root`);
         const title = value.title === undefined ? id : text(value.title, `${label} title`, 200);
         const entry = value.entry === undefined ? 'index.literate' : projectPath(value.entry, `${label} entry`);
-        const pdf = value.pdf === undefined ? undefined : projectPath(value.pdf, `${label} pdf`);
+        const pdf = value.pdf === undefined ? undefined : manifestPath(value.pdf, `${label} pdf`);
         if (!entry.endsWith('.literate')) { throw new Error(`${label} entry must end in .literate`); }
         if (pdf !== undefined && !pdf.endsWith('.pdf')) { throw new Error(`${label} pdf must end in .pdf`); }
         return { id, title, root, entry, ...(pdf === undefined ? {} : { pdf }) };
@@ -97,8 +118,9 @@ export function selectPublication(workspace: PublicationWorkspace, id?: string):
 }
 
 export function publicationForPath(workspace: PublicationWorkspace,
-    workspacePath: string): PublicationProject | undefined {
-    const normalized = safeRelativePath(workspacePath);
-    if (!normalized) { return undefined; }
+    manifestPathname: string): PublicationProject | undefined {
+    let normalized: string;
+    try { normalized = manifestPath(manifestPathname, 'Document path'); }
+    catch { return undefined; }
     return workspace.publications.find(item => normalized === item.root || normalized.startsWith(item.root + '/'));
 }

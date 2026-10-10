@@ -341,8 +341,10 @@ project.
 
 ### Several projects in one workspace
 
-Add `literate-workspace.json` at the workspace root to declare a series
-of independent projects:
+Add `literate-workspace.json` to declare a series of independent
+projects. The CLI root is the directory containing this manifest; VS
+Code also finds one manifest nested inside the selected workspace
+folder:
 
 ```json
 {
@@ -355,10 +357,12 @@ of independent projects:
 ```
 
 Publication IDs use lowercase letters, digits, dots, underscores, and
-hyphens. Roots are portable workspace-relative directories and may not
-overlap. Optional `entry` and `pdf` fields name the project-relative
-entry document and workspace-relative PDF destination; they default to
-`index.literate` and no declared PDF.
+hyphens. Roots are portable directories relative to the manifest and
+may not overlap. Parent-relative roots such as `../books/one` support a
+manifest kept in a sibling `series` directory. Optional `entry` and
+`pdf` fields name the project-relative entry document and
+manifest-relative PDF destination; they default to `index.literate`
+and no declared PDF.
 
 Select one project before discovery with `--publication`:
 
@@ -371,8 +375,9 @@ yarn literate pdf . --publication book-one --output book.pdf
 A manifest containing one publication is selected automatically. A
 series with several publications requires an exact ID. Outputs,
 templates, settings, fragments, and diagnostics remain relative to the
-selected project root. Workspaces without a manifest keep the existing
-single-project behavior.
+selected project root. VS Code rejects multiple manifests in one
+workspace folder as ambiguous. Workspaces without a manifest keep the
+existing single-project behavior.
 
 After `yarn build:cli`,  the direct executable is
 `node out/cli-entry.js` (for example,
@@ -424,8 +429,10 @@ bundled or installed automatically.
 
 ### Export a captured book
 
-1. The active editor's workspace folder is selected when available;
-   otherwise choose a workspace folder in the picker.
+1. The active editor selects its owning publication when a workspace
+   manifest is present. With no owning document, a single publication
+   is automatic; choose among several publications in the picker.
+   Workspaces without a manifest retain workspace-folder selection.
 2. Pick the page size: `a4`, `a5`, `letter`, or `legal`.
 3. Enter margins in **top,outer,bottom,inner** order, in millimetres,
    for example `18,20,22,14`. The inner margin is the binding edge:
@@ -437,9 +444,9 @@ bundled or installed automatically.
    input documents. Unsafe paths, symlinks and protected input aliases
    are rejected.
 
-Only successful choices are remembered, separately per workspace root
-and export kind. Defaults are A4, `20,20,20,20`, and `publication.tex`
-or `publication.pdf`. Prompt cancellation starts no helper and writes
+Only successful choices are remembered, separately per publication and
+export kind. Defaults are A4, `20,20,20,20`, and `publication.tex` or
+`publication.pdf`. Prompt cancellation starts no helper and writes
 nothing.
 
 After the prompts and on entering the shared queue, publication

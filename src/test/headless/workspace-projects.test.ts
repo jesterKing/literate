@@ -8,16 +8,16 @@ const project = (id: string, root = id) => ({ id, title: `Book ${id}`, root,
 
 test('workspace manifests retain ordered normalized publication metadata', () => {
     const parsed = parsePublicationWorkspace(manifest([
-        project('python', 'books/./python'),
-        { id: 'zig', root: 'books/zig' }
+        project('python', '../books/./python'),
+        { id: 'zig', root: '../books/zig' }
     ]));
     assert.deepEqual(parsed, { schemaVersion: 1, publications: [
-        project('python', 'books/python'),
-        { id: 'zig', title: 'zig', root: 'books/zig', entry: 'index.literate' }
+        project('python', '../books/python'),
+        { id: 'zig', title: 'zig', root: '../books/zig', entry: 'index.literate' }
     ] });
-    assert.equal(selectPublication(parsed, 'zig').root, 'books/zig');
-    assert.equal(publicationForPath(parsed, 'books/python/chapter.literate')?.id, 'python');
-    assert.equal(publicationForPath(parsed, 'books/zig')?.id, 'zig');
+    assert.equal(selectPublication(parsed, 'zig').root, '../books/zig');
+    assert.equal(publicationForPath(parsed, '../books/python/chapter.literate')?.id, 'python');
+    assert.equal(publicationForPath(parsed, '../books/zig')?.id, 'zig');
     assert.equal(publicationForPath(parsed, 'outside/index.literate'), undefined);
 });
 
@@ -37,7 +37,8 @@ for (const [name, source, message] of [
     ['empty publications', manifest([]), /1 to 1000 entries/],
     ['unknown publication field', manifest([{ ...project('one'), extra: true }]), /unknown field: extra/],
     ['invalid id', manifest([project('Bad ID')]), /id is invalid/],
-    ['unsafe root', manifest([project('one', '../one')]), /not a safe relative path/],
+    ['absolute root', manifest([project('one', '/one')]), /not a portable manifest-relative path/],
+    ['backslash root', manifest([project('one', '..\\one')]), /not a portable manifest-relative path/],
     ['invalid entry', manifest([{ ...project('one'), entry: 'README.md' }]), /entry must end in .literate/],
     ['invalid PDF', manifest([{ ...project('one'), pdf: 'book.tex' }]), /pdf must end in .pdf/],
     ['duplicate id', manifest([project('one'), project('one', 'two')]), /id conflicts/],
@@ -47,6 +48,14 @@ for (const [name, source, message] of [
 ] as const) {
     test(`workspace manifest rejects ${name}`, () => assert.throws(() => parsePublicationWorkspace(source), message));
 }
+
+test('workspace manifests normalize parent-relative roots and outputs', () => {
+    const parsed = parsePublicationWorkspace(manifest([
+        { ...project('one', 'series/../books/one'), pdf: '../publications/one.pdf' }
+    ]));
+    assert.equal(parsed.publications[0].root, 'books/one');
+    assert.equal(parsed.publications[0].pdf, '../publications/one.pdf');
+});
 
 test('workspace manifests bound source and publication counts', () => {
     assert.throws(() => parsePublicationWorkspace(' '.repeat(1024 * 1024 + 1)), /exceeds 1 MiB/);

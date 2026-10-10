@@ -86,27 +86,29 @@ test('workspace manifests select one isolated publication before discovery and w
         fs.mkdirSync(path.join(root, 'books', id), { recursive: true });
         fs.writeFileSync(path.join(root, 'books', id, 'index.literate'), source(id));
     }
-    fs.writeFileSync(path.join(root, 'literate-workspace.json'), JSON.stringify({ schemaVersion: 1,
+    const series = path.join(root, 'series');
+    fs.mkdirSync(series);
+    fs.writeFileSync(path.join(series, 'literate-workspace.json'), JSON.stringify({ schemaVersion: 1,
         publications: [
-            { id: 'python', title: 'Python Quicksort', root: 'books/python' },
-            { id: 'zig', title: 'Zig Quicksort', root: 'books/zig' }
+            { id: 'python', title: 'Python Quicksort', root: '../books/python' },
+            { id: 'zig', title: 'Zig Quicksort', root: '../books/zig' }
         ] }));
-    const missing = run(['inspect', root, '--json'], root);
+    const missing = run(['inspect', series, '--json'], root);
     assert.equal(missing.status, 1);
     assert.match(missing.response.errors.join(' '), /Select a publication: python, zig/);
-    const unknown = run(['inspect', root, '--publication', 'haskell', '--json'], root);
+    const unknown = run(['inspect', series, '--publication', 'haskell', '--json'], root);
     assert.equal(unknown.status, 1);
     assert.match(unknown.response.errors.join(' '), /Unknown publication haskell/);
 
-    const inspected = run(['inspect', root, '--publication', 'python', '--json'], root);
+    const inspected = run(['inspect', series, '--publication', 'python', '--json'], root);
     assert.equal(inspected.status, 0, JSON.stringify(inspected.response));
-    assert.equal(inspected.response.workspaceRoot, root);
+    assert.equal(inspected.response.workspaceRoot, series);
     assert.equal(inspected.response.root, path.join(root, 'books', 'python'));
     assert.equal(inspected.response.publicationId, 'python');
     assert.deepEqual(inspected.response.inspection?.documents, ['index.literate']);
     assert.deepEqual(inspected.response.inspection?.fragments.map(item => item.name), ['main.*', 'piece']);
 
-    const generated = run(['generate', root, '--publication', 'python', '--json'], root);
+    const generated = run(['generate', series, '--publication', 'python', '--json'], root);
     assert.equal(generated.status, 0);
     assert.equal(fs.readFileSync(path.join(root, 'books', 'python', 'result.txt'), 'utf8'), 'python\n');
     assert.equal(fs.existsSync(path.join(root, 'books', 'zig', 'result.txt')), false);
@@ -115,10 +117,11 @@ test('workspace manifests select one isolated publication before discovery and w
 test('legacy discovery treats nested publication workspaces as isolated boundaries', t => {
     const root = fixture(t);
     fs.writeFileSync(path.join(root, 'index.literate'), source());
-    fs.mkdirSync(path.join(root, 'series', 'books', 'other'), { recursive: true });
-    fs.writeFileSync(path.join(root, 'series', 'literate-workspace.json'), JSON.stringify({ schemaVersion: 1,
-        publications: [{ id: 'other', root: 'books/other' }] }));
-    fs.writeFileSync(path.join(root, 'series', 'books', 'other', 'index.literate'),
+    fs.mkdirSync(path.join(root, 'collection', 'series'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'collection', 'books', 'other'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'collection', 'series', 'literate-workspace.json'), JSON.stringify({ schemaVersion: 1,
+        publications: [{ id: 'other', root: '../books/other' }] }));
+    fs.writeFileSync(path.join(root, 'collection', 'books', 'other', 'index.literate'),
         '```text : <<broken>>=\n<<missing>>\n```\n');
     const result = run(['inspect', root, '--json'], root);
     assert.equal(result.status, 0, JSON.stringify(result.response));

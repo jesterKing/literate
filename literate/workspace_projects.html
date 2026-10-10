@@ -138,10 +138,12 @@ publication roots and enough metadata for hosts to present and publish them. The
 engine inside each root remains unchanged: paths, settings, fragments, templates,
 and outputs are still relative to that selected project.</p>
 <h2>Public contracts</h2>
-<p>The fixed manifest name makes discovery deterministic. A resolved entry retains
-normalized workspace-relative paths. Optional author fields receive conservative
-defaults so the first schema can describe both a minimal project and a publication
-with a declared title, entry document, and PDF destination.</p>
+<p>The fixed manifest name makes discovery deterministic. Project roots and PDF
+outputs are normalized relative to the manifest, including parent traversal for
+layouts that keep series metadata beside a <code>books</code> directory. Entries remain
+strictly project-relative. Optional fields receive conservative defaults so the
+first schema can describe both a minimal project and a publication with a declared
+title, entry document, and PDF destination.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0077006f0072006b00730070006100630065002000700072006f006a00650063007400200063006f006e007400720061006300740073-006c0069007400650072006100740065002f0077006f0072006b00730070006100630065005f00700072006f006a0065006300740073002e006c0069007400650072006100740065-1"><span id="f-0077006f0072006b00730070006100630065002000700072006f006a00650063007400200063006f006e007400720061006300740073"></span><a class="literate-tag-name" href="#f-0077006f0072006b00730070006100630065002000700072006f006a00650063007400200063006f006e007400720061006300740073" data-literate-target="f-0077006f0072006b00730070006100630065002000700072006f006a00650063007400200063006f006e007400720061006300740073" aria-label="Definition of workspace project contracts">&lt;&lt;workspace project contracts&gt;&gt;=</a></div>
 <div class="code">
@@ -167,9 +169,9 @@ with a declared title, entry document, and PDF destination.</p>
 </div><h2>Validate bounded data</h2>
 <p>JSON parsing is only the first boundary. The accepted value must be a plain object
 with exactly the documented fields. IDs are short portable keys; titles reject
-control characters; paths use the engine's existing portable path policy.
-Publication roots cannot overlap because recursive discovery in either root must
-never absorb another project. PDF destinations are workspace-relative and unique.</p>
+control characters; paths use a portable slash-separated policy. Publication
+roots cannot overlap because recursive discovery in either root must never absorb
+another project. PDF destinations are manifest-relative and unique.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0077006f0072006b00730070006100630065002000700072006f006a006500630074002000760061006c00690064006100740069006f006e-006c0069007400650072006100740065002f0077006f0072006b00730070006100630065005f00700072006f006a0065006300740073002e006c0069007400650072006100740065-1"><span id="f-0077006f0072006b00730070006100630065002000700072006f006a006500630074002000760061006c00690064006100740069006f006e"></span><a class="literate-tag-name" href="#f-0077006f0072006b00730070006100630065002000700072006f006a006500630074002000760061006c00690064006100740069006f006e" data-literate-target="f-0077006f0072006b00730070006100630065002000700072006f006a006500630074002000760061006c00690064006100740069006f006e" aria-label="Definition of workspace project validation">&lt;&lt;workspace project validation&gt;&gt;=</a></div>
 <div class="code">
@@ -193,8 +195,29 @@ never absorb another project. PDF destinations are workspace-relative and unique
 <span class="hljs-keyword">function</span> <span class="hljs-title">projectPath</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">unknown</span><span class="hljs-params">, label: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span> {
     <span class="hljs-keyword">const</span> input = <span class="hljs-title">text</span>(value, label, <span class="hljs-number">1024</span>);
     <span class="hljs-keyword">const</span> normalized = <span class="hljs-title">safeRelativePath</span>(input);
-    <span class="hljs-keyword">if</span> (!normalized) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> is not a safe relative path: </span><span class="hljs-subst">${input}</span><span class="hljs-string">`</span>); }
+    <span class="hljs-keyword">if</span> (!normalized) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> is not a safe project-relative path: </span><span class="hljs-subst">${input}</span><span class="hljs-string">`</span>); }
     <span class="hljs-keyword">return</span> normalized;
+}
+
+<span class="hljs-keyword">function</span> <span class="hljs-title">manifestPath</span>(<span class="hljs-params">value: </span><span class="hljs-built_in">unknown</span><span class="hljs-params">, label: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span> {
+    <span class="hljs-keyword">const</span> input = <span class="hljs-title">text</span>(value, label, <span class="hljs-number">1024</span>);
+    <span class="hljs-keyword">if</span> (input.<span class="hljs-title">includes</span>(<span class="hljs-string">'</span><span class="hljs-string">\\</span><span class="hljs-string">'</span>) || input.<span class="hljs-title">startsWith</span>(<span class="hljs-string">'/'</span>) || <span class="hljs-regexp">/^</span><span class="hljs-regexp">[A-Za-z]</span><span class="hljs-regexp">:/</span>.<span class="hljs-title">test</span>(input)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> is not a portable manifest-relative path: </span><span class="hljs-subst">${input}</span><span class="hljs-string">`</span>);
+    }
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">components</span>: <span class="hljs-built_in">string</span>[] = [];
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> component <span class="hljs-keyword">of</span> input.<span class="hljs-title">split</span>(<span class="hljs-string">'/'</span>)) {
+        <span class="hljs-keyword">if</span> (!component || component === <span class="hljs-string">'.'</span>) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">if</span> (component === <span class="hljs-string">'..'</span>) {
+            <span class="hljs-keyword">if</span> (components.<span class="hljs-property">length</span> &amp;&amp; components[components.<span class="hljs-property">length</span> - <span class="hljs-number">1</span>] !== <span class="hljs-string">'..'</span>) { components.<span class="hljs-title">pop</span>(); }
+            <span class="hljs-keyword">else</span> { components.<span class="hljs-title">push</span>(component); }
+        } <span class="hljs-keyword">else</span> { components.<span class="hljs-title">push</span>(component); }
+    }
+    <span class="hljs-keyword">const</span> first = components.<span class="hljs-title">findIndex</span>(<span class="hljs-params">component</span><span class="hljs-function"> =&gt;</span> component !== <span class="hljs-string">'..'</span>);
+    <span class="hljs-keyword">const</span> tail = first &lt; <span class="hljs-number">0</span> ? <span class="hljs-string">''</span> : components.<span class="hljs-title">slice</span>(first).<span class="hljs-title">join</span>(<span class="hljs-string">'/'</span>);
+    <span class="hljs-keyword">if</span> (!tail || <span class="hljs-title">safeRelativePath</span>(tail) !== tail) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> is not a portable manifest-relative path: </span><span class="hljs-subst">${input}</span><span class="hljs-string">`</span>);
+    }
+    <span class="hljs-keyword">return</span> components.<span class="hljs-title">join</span>(<span class="hljs-string">'/'</span>);
 }
 
 <span class="hljs-keyword">function</span> <span class="hljs-title">collision</span>(<span class="hljs-params">left: </span><span class="hljs-built_in">string</span><span class="hljs-params">, right: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">boolean</span> {
@@ -227,10 +250,10 @@ manifest's publication order and is used by selectors and future project pickers
         <span class="hljs-title">fields</span>(value, [<span class="hljs-string">'id'</span>, <span class="hljs-string">'title'</span>, <span class="hljs-string">'root'</span>, <span class="hljs-string">'entry'</span>, <span class="hljs-string">'pdf'</span>], label);
         <span class="hljs-keyword">const</span> id = <span class="hljs-title">text</span>(value.<span class="hljs-property">id</span>, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> id`</span>, <span class="hljs-number">100</span>);
         <span class="hljs-keyword">if</span> (!identifier.<span class="hljs-title">test</span>(id)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> id is invalid: </span><span class="hljs-subst">${id}</span><span class="hljs-string">`</span>); }
-        <span class="hljs-keyword">const</span> root = <span class="hljs-title">projectPath</span>(value.<span class="hljs-property">root</span>, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> root`</span>);
+        <span class="hljs-keyword">const</span> root = <span class="hljs-title">manifestPath</span>(value.<span class="hljs-property">root</span>, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> root`</span>);
         <span class="hljs-keyword">const</span> title = value.<span class="hljs-property">title</span> === <span class="hljs-literal">undefined</span> ? id : <span class="hljs-title">text</span>(value.<span class="hljs-property">title</span>, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> title`</span>, <span class="hljs-number">200</span>);
         <span class="hljs-keyword">const</span> entry = value.<span class="hljs-property">entry</span> === <span class="hljs-literal">undefined</span> ? <span class="hljs-string">'index.literate'</span> : <span class="hljs-title">projectPath</span>(value.<span class="hljs-property">entry</span>, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> entry`</span>);
-        <span class="hljs-keyword">const</span> pdf = value.<span class="hljs-property">pdf</span> === <span class="hljs-literal">undefined</span> ? <span class="hljs-literal">undefined</span> : <span class="hljs-title">projectPath</span>(value.<span class="hljs-property">pdf</span>, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> pdf`</span>);
+        <span class="hljs-keyword">const</span> pdf = value.<span class="hljs-property">pdf</span> === <span class="hljs-literal">undefined</span> ? <span class="hljs-literal">undefined</span> : <span class="hljs-title">manifestPath</span>(value.<span class="hljs-property">pdf</span>, <span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> pdf`</span>);
         <span class="hljs-keyword">if</span> (!entry.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'.literate'</span>)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> entry must end in .literate`</span>); }
         <span class="hljs-keyword">if</span> (pdf !== <span class="hljs-literal">undefined</span> &amp;&amp; !pdf.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'.pdf'</span>)) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`</span><span class="hljs-subst">${label}</span><span class="hljs-string"> pdf must end in .pdf`</span>); }
         <span class="hljs-keyword">return</span> { id, title, root, entry, ...(pdf === <span class="hljs-literal">undefined</span> ? {} : { pdf }) };
@@ -276,9 +299,10 @@ internal state.</p>
 }
 
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">publicationForPath</span>(<span class="hljs-params">workspace: PublicationWorkspace,
-    workspacePath: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">PublicationProject</span> | <span class="hljs-literal">undefined</span> {
-    <span class="hljs-keyword">const</span> normalized = <span class="hljs-title">safeRelativePath</span>(workspacePath);
-    <span class="hljs-keyword">if</span> (!normalized) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    manifestPathname: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">PublicationProject</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">let</span> <span class="hljs-attr">normalized</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-keyword">try</span> { normalized = <span class="hljs-title">manifestPath</span>(manifestPathname, <span class="hljs-string">'Document path'</span>); }
+    <span class="hljs-keyword">catch</span> { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
     <span class="hljs-keyword">return</span> workspace.<span class="hljs-property">publications</span>.<span class="hljs-title">find</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> normalized === item.<span class="hljs-property">root</span> || normalized.<span class="hljs-title">startsWith</span>(item.<span class="hljs-property">root</span> + <span class="hljs-string">'/'</span>));
 }
 </code></pre>
