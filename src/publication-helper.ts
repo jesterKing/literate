@@ -2,7 +2,11 @@ import type { SourceDocument } from './engine';
 import type { Readable } from 'node:stream';
 
 export const maximumRequestBytes = 32 * 1024 * 1024;
-export interface PublicationRequest { args: string[]; documents: SourceDocument[]; }
+export interface PublicationRequest {
+    args: string[];
+    documents: SourceDocument[];
+    publicationDocuments?: Record<string, SourceDocument[]>;
+}
 
 export function validateRuntime(versions: { node: string; electron?: string } = process.versions): void {
     const [major, minor] = versions.node.split('.').map(Number);
@@ -18,11 +22,15 @@ export function parseRequest(text: string): PublicationRequest {
         throw new Error('Expected a publication request object');
     }
     const request = value as Record<string, unknown>;
-    if (Object.keys(request).some(key => key !== 'args' && key !== 'documents')
+    const publicationDocuments = request.publicationDocuments;
+    if (Object.keys(request).some(key => !['args', 'documents', 'publicationDocuments'].includes(key))
         || !Array.isArray(request.args) || !request.args.every(arg => typeof arg === 'string')
         || !['latex', 'pdf'].includes(request.args[0]) || !request.args.includes('--json')
         || request.args.some(arg => ['--help', '-h'].includes(arg))
-        || !Array.isArray(request.documents)) {
+        || !Array.isArray(request.documents)
+        || publicationDocuments !== undefined && (!publicationDocuments || typeof publicationDocuments !== 'object'
+            || Array.isArray(publicationDocuments)
+            || Object.values(publicationDocuments).some(value => !Array.isArray(value)))) {
         throw new Error('Expected {args, documents}: latex or pdf first, --json required, no help');
     }
     return request as unknown as PublicationRequest;
@@ -68,7 +76,8 @@ export async function publicationHelper(): Promise<number> {
         const code = await run(request.args, {
             stdout: text => { output += text; },
             stderr: () => { throw new Error('Unexpected non-JSON publication output'); }
-        }, undefined, undefined, undefined, undefined, { documents: request.documents });
+        }, undefined, undefined, undefined, undefined,
+            { documents: request.documents, publicationDocuments: request.publicationDocuments });
         process.stdout.write(output);
         return code;
     } catch (error) {

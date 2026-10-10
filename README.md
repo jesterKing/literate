@@ -350,23 +350,32 @@ folder:
 {
   "schemaVersion": 1,
   "publications": [
-    { "id": "book-one", "title": "Book One", "root": "books/one" },
-    { "id": "book-two", "title": "Book Two", "root": "books/two" }
+    {
+      "id": "book-one",
+      "title": "Book One",
+      "root": "../books/one",
+      "pdf": "../publications/book-one.pdf",
+      "paper": "a4",
+      "margins": { "top": 20, "outer": 50, "bottom": 20, "inner": 20 }
+    }
   ]
 }
 ```
 
 Publication IDs use lowercase letters, digits, dots, underscores, and
 hyphens. Roots are portable directories relative to the manifest and
-may not overlap. Parent-relative roots such as `../books/one` support a
-manifest kept in a sibling `series` directory. Optional `entry` and `pdf` fields name the project-relative entry
-document and manifest-relative PDF destination; they default to
-`index.literate` and no declared PDF. Optional `paper` is `a4`, `a5`,
+may not overlap. Parent-relative roots such as `../books/one`
+support a manifest kept in a sibling `series` directory. Optional
+`entry` and `pdf` fields name the project-relative entry document and
+manifest-relative PDF destination; they default to `index.literate`
+and no declared PDF. Optional `paper` is `a4`, `a5`,
 `letter`, or `legal`. Optional `margins` supplies numeric `top`,
-`outer`, `bottom`, and `inner` millimetres; all four fields are required
-when the object is present. Paper and margins default to A4 and 20 mm.
+`outer`, `bottom`, and `inner` millimetres; all four fields are
+required when the object is present. Paper and margins default to A4
+and 20 mm.
 
-Select one project before discovery with `--publication`:
+Select one project for inspection, generation, or an explicit
+single-book publication with `--publication`:
 
 ```sh
 yarn literate inspect . --publication book-one
@@ -374,12 +383,25 @@ yarn literate generate . --publication book-one
 yarn literate pdf . --publication book-one --output book.pdf
 ```
 
-A manifest containing one publication is selected automatically. A
-series with several publications requires an exact ID. Outputs,
-templates, settings, fragments, and diagnostics remain relative to the
-selected project root. VS Code rejects multiple manifests in one
-workspace folder as ambiguous. Workspaces without a manifest keep the
-existing single-project behavior.
+Publish every declared PDF in manifest order by omitting the selector
+and output:
+
+```sh
+yarn literate pdf series
+```
+
+Series publication requires every project to declare `pdf`. It uses
+each project's manifest paper and margins, compiles every book before
+writing, and commits all final PDFs in one transaction. Cross-project
+Markdown links to declared documents become links to the target PDF.
+
+A manifest containing one publication is selected automatically for
+non-series commands. A series with several publications requires an
+exact ID for inspection and generation. Outputs, templates, settings,
+fragments, and diagnostics remain relative to the selected project
+root. VS Code rejects multiple manifests in one workspace folder as
+ambiguous. Workspaces without a manifest keep the existing
+single-project behavior.
 
 After `yarn build:cli`,  the direct executable is
 `node out/cli-entry.js` (for example,
@@ -429,12 +451,19 @@ publication ships three self-contained runtime files
 `publication-mermaid-browser.js`). External tools and fonts are not
 bundled or installed automatically.
 
-### Export a captured book
+### Export captured publications
 
-1. The active editor selects its owning publication when a workspace
-   manifest is present. With no owning document, a single publication
-   is automatic; choose among several publications in the picker.
-   Workspaces without a manifest retain workspace-folder selection.
+For **Literate: Export PDF**, a workspace manifest represents one
+series operation. After selecting the workspace folder, the extension
+publishes every declared book without another publication, paper,
+margin, or destination prompt. It captures each project's current open
+buffers separately and uses the manifest's `pdf`, `paper`, and
+`margins` values. All books must declare `pdf`.
+
+Export LaTeX and PDF export without a manifest retain the interactive
+single-project flow:
+
+1. Select a workspace folder.
 2. Pick the page size: `a4`, `a5`, `letter`, or `legal`.
 3. Enter margins in **top,outer,bottom,inner** order, in millimetres,
    for example `18,20,22,14`. The inner margin is the binding edge:

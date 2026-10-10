@@ -44,7 +44,8 @@ const projectUsage = '[--publication id]';
 const latexUsage = `latex [root] ${projectUsage} --output path.tex [--paper a4|a5|letter|legal] [--margin 20mm]`
     + ' [--margin-top Nmm] [--margin-right Nmm] [--margin-bottom Nmm] [--margin-left Nmm]'
     + ' [--margin-inner Nmm] [--margin-outer Nmm] [--font-manifest path.json] [--browser /absolute/path] [--json]';
-const pdfUsage = latexUsage.replace(/^latex/, 'pdf').replace('path.tex', 'path.pdf') + ' [--keep-build]';
+const pdfUsage = latexUsage.replace(/^latex/, 'pdf').replace('path.tex', 'path.pdf')
+    .replace(' --output path.pdf', ' [--output path.pdf]') + ' [--keep-build]';
 const usage = `Usage: node out/cli-entry.js generate|check|inspect [root] ${projectUsage} [--json]\n`
     + '       node out/cli-entry.js self-check [root] [--json]\n'
     + `       node out/cli-entry.js ${latexUsage}\n`
@@ -53,7 +54,7 @@ const usage = `Usage: node out/cli-entry.js generate|check|inspect [root] ${proj
 const descriptions: Record<string, string> = Object.fromEntries([
     ['generate', 'Write missing or changed generated files.'],
     ['latex', 'Export a .tex book using Pandoc on PATH; output is relative to root, not the working directory. Defaults: a4, 20mm. Margins: numeric mm, 5–50, leaving at least an 80 × 100 mm body. Physical left/right produce one-sided pages; inner/outer produce mirrored two-sided pages. Each side overrides --margin; unspecified sides use --margin or 20mm. Fonts resolve from root index.literate SETTINGS. No TeX/book PDF execution. --font-manifest opts into explicit font/license companions. --browser explicitly selects a sandbox-capable system Chromium for Mermaid PDF/SVG assets; no browser download.'],
-    ['pdf', 'Compile a .pdf book using Pandoc and latexmk/LuaLaTeX on PATH. Shares latex paper, margin, font-manifest and browser options; output is relative to root. Only the PDF is published. --keep-build retains the private build directory on success or compilation failure. TeX/Lua execution is for trusted inputs, not a sandbox. No source/HTML generation or tool downloads.'],
+    ['pdf', 'Compile PDF books using Pandoc and latexmk/LuaLaTeX on PATH. With --publication, behavior remains single-publication and --output is relative to that root. Without --publication, a manifest directory publishes every declared publication in manifest order, requires each pdf field, and uses each declared paper and margins; --output is then omitted. Only PDFs are published, as one fail-closed transaction. --keep-build retains private build directories on success or compilation failure. TeX/Lua execution is for trusted inputs, not a sandbox. No source/HTML generation or tool downloads.'],
     ['check', 'Report missing or stale generated files without writing.'],
     ['inspect', 'Report documents, templates, and fragment definitions and dependencies without reading outputs or writing.'],
     ['self-check', 'Verify this repository’s trusted self-hosting code without generating files; all outputs must already be current.']
@@ -78,6 +79,7 @@ export interface CliIO {
 
 export interface CliRunOptions {
     documents?: readonly SourceDocument[];
+    publicationDocuments?: Readonly<Record<string, readonly SourceDocument[]>>;
 }
 
 type Generation = ReturnType<typeof generateProject>;
@@ -115,10 +117,12 @@ import { planFonts } from './publication-fonts';
 import { collectAssets, planAssets, assetKey, maximumAssetBytes } from './publication-assets';
 import type { PdfCompiler, PdfCompilationError } from './publication-pdf';
 import type { DiagramRenderer } from './publication-mermaid';
+import { publicationDestination } from './publication-pandoc';
 import { resolvePublicationSettings } from './publication-settings';
 import { commitOutputs, OutputTransactionError, TransactionIO } from './output-transactions';
 import { discoveryExcludedDirectories, generateProject, parseProject, resolveProjectTheme, safeRelativePath, templateReferences, SourceDocument } from './engine';
 import { parsePublicationWorkspace, publicationWorkspaceManifest, selectPublication } from './workspace-projects';
+import type { PublicationProject } from './workspace-projects';
 
 ```
 
@@ -543,7 +547,7 @@ async function planLatex(root: string, documents: SourceDocument[], output: stri
     const project = parseProject(documents);
     const settings = resolvePublicationSettings(project);
     if (settings.diagnostics.length) { return { files: [], diagnostics: settings.diagnostics }; }
-    const collected = collectAssets(project);
+    const collected = collectAssets(project, options.publicationLink);
     if (collected.diagnostics.length) { return { files: [], diagnostics: collected.diagnostics }; }
     <<cli browser input>>
     <<cli image inputs>>
@@ -688,6 +692,149 @@ async function protectLatexAliases(root: string, inputs: string[], outputs: stri
 }
 ```
 
+A PDF invocation naming a manifest directory and no publication is a series
+publication. Resolve every project root and PDF from the manifest directory,
+rejecting symbolic links in all existing components. Plan and compile in manifest
+order, but do not mutate the filesystem until every publication succeeds. The
+final PDFs then enter one transaction rooted at the filesystem root; transaction
+paths are canonical absolute destinations with the leading separator removed,
+while protocol paths remain manifest-relative. This permits declared outputs next
+to or above project roots without weakening path inspection.
+
+```typescript: <<cli LaTeX plan>>=+
+async function regularDirectory(root: string, value: string, label: string): Promise<string> {
+    let current = root;
+    for (const component of value.split('/')) {
+        if (!component || component === '.') { continue; }
+        current = path.resolve(current, component);
+        const stat = await fs.lstat(current);
+        if (stat.isSymbolicLink() || !stat.isDirectory()) { throw new Error(`${label} is not a regular directory: ${value}`); }
+    }
+    return current;
+}
+
+async function publishSeriesPdf(rootArgument: string | undefined, response: CliResponse,
+    finish: (code: number) => number, io: CliIO, transactionIO: (root: string) => TransactionIO,
+    convert: LatexConverter, diagrams: DiagramRenderer, compile: PdfCompiler, keepBuild: boolean,
+    fontManifest: string | undefined, browser: string | undefined, checkCancelled: (() => void) | undefined,
+    json: boolean, snapshots?: Readonly<Record<string, readonly SourceDocument[]>>): Promise<number> {
+    const workspaceRoot = await fs.realpath(path.resolve(rootArgument || process.cwd()));
+    response.workspaceRoot = workspaceRoot;
+    response.root = workspaceRoot;
+    if (!(await fs.stat(workspaceRoot)).isDirectory()) { throw new Error('Root is not a directory'); }
+    if (!await inspect(workspaceRoot, publicationWorkspaceManifest)) {
+        throw new Error(`pdf requires --output unless root contains ${publicationWorkspaceManifest}`);
+    }
+    const workspace = parsePublicationWorkspace(await fs.readFile(
+        path.join(workspaceRoot, publicationWorkspaceManifest), 'utf8'));
+    if (workspace.publications.some(item => !item.pdf)) {
+        const missingPdf = workspace.publications.find(item => !item.pdf)!;
+        throw new Error(`Publication ${missingPdf.id} requires pdf for series publication`);
+    }
+    const plans: { publication: PublicationProject; root: string; output: string; transactionPath: string;
+        documents: SourceDocument[] }[] = [];
+    for (const publication of workspace.publications) {
+        const projectRoot = await regularDirectory(workspaceRoot, publication.root, 'Publication root');
+        const output = path.resolve(workspaceRoot, publication.pdf!);
+        const transactionPath = output.slice(path.parse(output).root.length).split(path.sep).join('/');
+        await inspect(path.parse(output).root, transactionPath);
+        const supplied = snapshots?.[publication.id];
+        const documents = supplied === undefined ? await discover(projectRoot) : validateSnapshot(supplied);
+        if (!documents.length) { throw new Error(`No literate documents found for publication ${publication.id}`); }
+        plans.push({ publication, root: projectRoot, output, transactionPath, documents });
+    }
+    const canonicalOutputs = new Set<string>();
+    const inputIdentities = new Map<string, string>();
+    for (const plan of plans) {
+        const outputKey = plan.output.toLowerCase();
+        if (canonicalOutputs.has(outputKey)) { throw new Error(`Publication PDF conflicts: ${plan.publication.pdf}`); }
+        canonicalOutputs.add(outputKey);
+        for (const input of [...plan.documents.map(item => item.path), ...templateReferences(plan.documents)]) {
+            const absolute = path.resolve(plan.root, input);
+            if (absolute.toLowerCase() === outputKey) {
+                throw new Error(`PDF output conflicts with input: ${input} (output ${plan.publication.pdf})`);
+            }
+            if (await inspect(plan.root, input)) {
+                const stat = await fs.stat(absolute);
+                inputIdentities.set(`${stat.dev}:${stat.ino}`, absolute);
+            }
+        }
+        if (await inspect(path.parse(plan.output).root, plan.transactionPath)) {
+            const stat = await fs.stat(plan.output), alias = inputIdentities.get(`${stat.dev}:${stat.ino}`);
+            if (alias) { throw new Error(`PDF output aliases input: ${plan.publication.pdf} (${alias})`); }
+        }
+    }
+    const parsedProjects = new Map(plans.map(plan => [plan.publication.id, parseProject(plan.documents)]));
+    const compiledFiles: { path: string; content: Uint8Array; display: string }[] = [];
+    const warnings: string[] = [];
+    const buildDirectories: string[] = [];
+    for (const plan of plans) {
+        checkCancelled?.();
+        const publication = plan.publication;
+        const options: LatexOptions = { paper: (publication.paper === 'a4' ? 'A4' : publication.paper === 'a5' ? 'A5'
+            : publication.paper) as LatexOptions['paper'], marginTopMm: publication.margins.top,
+            marginOuterMm: publication.margins.outer, marginBottomMm: publication.margins.bottom,
+            marginInnerMm: publication.margins.inner, publicationLink: (href, source) => {
+                if (!href || /[?\\\x00-\x20\x7f]/.test(href)) { return undefined; }
+                const hash = href.indexOf('#'), pathname = hash < 0 ? href : href.slice(0, hash);
+                if (!pathname || path.isAbsolute(pathname)) { return undefined; }
+                let decoded: string;
+                try { decoded = decodeURIComponent(pathname); } catch { return undefined; }
+                const targetPath = path.posix.normalize(path.posix.join(publication.root,
+                    path.posix.dirname(source), decoded.replace(/\.html$/, '.literate')));
+                let targetDocument: SourceDocument | undefined;
+                const target = plans.find(candidate => candidate !== plan && !!(targetDocument = candidate.documents.find(document =>
+                    path.posix.normalize(path.posix.join(candidate.publication.root, document.path)) === targetPath)));
+                if (!target || !targetDocument) { return undefined; }
+                let slug: string | undefined;
+                if (hash >= 0) {
+                    try { slug = decodeURIComponent(href.slice(hash + 1)); } catch { return undefined; }
+                    if (!slug) { return undefined; }
+                }
+                const destination = publicationDestination(parsedProjects.get(target.publication.id)!, targetDocument.path, slug);
+                if (!destination) { return undefined; }
+                const relativePdf = path.relative(path.dirname(plan.output), target.output).split(path.sep).join('/');
+                return encodeURI(relativePdf) + '#' + destination;
+            } };
+        const entry = `.literate-series/${publication.id}/book.tex`;
+        const result = await planLatex(plan.root, plan.documents, entry, options, convert,
+            fontManifest ? relative(fontManifest) : undefined, browser, diagrams,
+            { destinations: [`.literate-series/${publication.id}/result.pdf`] });
+        response.diagnostics.push(...result.diagnostics);
+        if (result.diagnostics.length) { return finish(1); }
+        try {
+            const built = await compile(result.files, entry, { keepBuild, checkCancelled });
+            warnings.push(...built.warnings.map(value => `${publication.id}: ${value}`));
+            if (built.buildDirectory) { buildDirectories.push(built.buildDirectory); }
+            compiledFiles.push({ path: plan.transactionPath, content: built.pdf, display: publication.pdf! });
+        } catch (error) {
+            const details = error as Partial<PdfCompilationError>;
+            warnings.push(...(details.warnings ?? []).map(value => `${publication.id}: ${value}`));
+            if (details.buildDirectory) { buildDirectories.push(details.buildDirectory); }
+            response.publication = { warnings, ...(buildDirectories.length === 1
+                ? { buildDirectory: buildDirectories[0] } : {}) };
+            throw error;
+        }
+    }
+    response.publication = { warnings, ...(buildDirectories.length === 1 ? { buildDirectory: buildDirectories[0] } : {}) };
+    if (!json) { for (const warning of warnings) { io.stderr(`literate: warning: ${warning}\n`); } }
+    const filesystemRoot = path.parse(plans[0].output).root;
+    const statuses = new Map<string, CliResponse['outputs'][number]>();
+    for (const file of compiledFiles) {
+        const exists = await inspect(filesystemRoot, file.path);
+        const current = exists && (await fs.readFile(path.join(filesystemRoot, file.path))).equals(Buffer.from(file.content));
+        const output = { path: file.display, status: current ? 'current' as const : exists ? 'stale' as const : 'missing' as const };
+        response.outputs.push(output); statuses.set(file.path, output);
+    }
+    checkCancelled?.();
+    const written = await commitOutputs(compiledFiles.map(file => ({ path: file.path, content: file.content })),
+        transactionIO(filesystemRoot), checkCancelled);
+    for (const pathname of written) { const output = statuses.get(pathname); if (output) { output.status = 'written'; } }
+    if (!json) { for (const output of response.outputs) { if (output.status === 'written') { io.stdout(`generated: ${output.path}\n`); } } }
+    return finish(0);
+}
+```
+
 ## The command lifecycle
 
 The orchestration keeps the write boundary visible. Argument errors and help
@@ -713,6 +860,11 @@ export async function run(args: string[], io: CliIO = defaultIO,
     <<cli PDF cancellation scope>>
     try {
         const snapshot = options.documents === undefined ? undefined : validateSnapshot(options.documents);
+        if (seriesPdf) {
+            return await publishSeriesPdf(positional[1], response, finish, io, transactionIO, convert, diagrams,
+                compile, flags.has('--keep-build'), values.get('--font-manifest'), values.get('--browser'),
+                checkCancelled, json, options.publicationDocuments);
+        }
         <<cli load project>>
         checkCancelled?.();
         <<cli validate and inspect project>>
@@ -769,6 +921,7 @@ const flags = new Set<string>();
 const values = new Map<string, string>();
 const latexOptions: LatexOptions = {};
 let latexOutput = '';
+let seriesPdf = false;
 const response: CliResponse = {
     schemaVersion: 1, command: 'help', ok: false, diagnostics: [], errors: [], outputs: []
 };
@@ -882,8 +1035,16 @@ if (topic === 'latex' || topic === 'pdf') {
     const output = values.get('--output');
     latexOutput = output ? safeRelativePath(output) || '' : '';
     const extension = topic === 'pdf' ? '.pdf' : '.tex';
-    if ((!help || output !== undefined) && (!latexOutput || !latexOutput.endsWith(extension))) {
+    const possibleSeries = topic === 'pdf' && output === undefined && !values.has('--publication') && positional.length === 2;
+    if (possibleSeries) {
+        try { seriesPdf = (await fs.lstat(path.join(path.resolve(positional[1]), publicationWorkspaceManifest))).isFile(); }
+        catch { seriesPdf = false; }
+    }
+    if ((!help || output !== undefined) && !seriesPdf && (!latexOutput || !latexOutput.endsWith(extension))) {
         response.errors.push(`${topic} requires --output with a safe root-relative ${extension} path`);
+    }
+    if (seriesPdf && (values.has('--paper') || latexMarginOptions.some(([flag]) => values.has(flag)))) {
+        response.errors.push('Series PDF paper and margins come from literate-workspace.json');
     }
     const paper = values.get('--paper') ?? 'a4';
     if (!['a4', 'a5', 'letter', 'legal'].includes(paper)) {

@@ -153,6 +153,7 @@ It prepares bytes only; the existing output transaction owns publication.</p>
 <span class="hljs-keyword">import</span> { posix } <span class="hljs-keyword">from</span> <span class="hljs-string">'path'</span>;
 <span class="hljs-keyword">import</span> { safeRelativePath, <span class="hljs-title">ParsedProject</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
 <span class="hljs-keyword">import</span> { preparePandoc, <span class="hljs-title">PublicationAsset</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-pandoc'</span>;
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">PublicationLinkResolver</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-pandoc'</span>;
 <span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">FontInputIO</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-fonts'</span>;
 <span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">DiagramBytes</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-mermaid'</span>;
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">const</span> maximumAssetBytes = <span class="hljs-number">32</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>;
@@ -255,11 +256,11 @@ before doing any asset I/O. Contribution rendering here is deliberately inert.</
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200061007300730065007400200063006f006c006c0065006300740069006f006e-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d006100730073006500740073002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200061007300730065007400200063006f006c006c0065006300740069006f006e"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200061007300730065007400200063006f006c006c0065006300740069006f006e" data-literate-target="f-007000750062006c00690063006100740069006f006e00200061007300730065007400200063006f006c006c0065006300740069006f006e" aria-label="Definition of publication asset collection">&lt;&lt;publication asset collection&gt;&gt;=</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">collectAssets</span>(<span class="hljs-params">project: ParsedProject</span>): {
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">collectAssets</span>(<span class="hljs-params">project: ParsedProject, external?: PublicationLinkResolver</span>): {
     <span class="hljs-attr">assets</span>: <span class="hljs-title">PublicationAsset</span>[]; <span class="hljs-attr">diagnostics</span>: <span class="hljs-title">ReturnType</span>&lt;<span class="hljs-keyword">typeof</span> preparePandoc&gt;[<span class="hljs-string">'diagnostics'</span>];
 } {
     <span class="hljs-keyword">const</span> <span class="hljs-attr">assets</span>: <span class="hljs-title">PublicationAsset</span>[] = [];
-    <span class="hljs-keyword">const</span> prepared = <span class="hljs-title">preparePandoc</span>(project, <span class="hljs-function">() =&gt;</span> [], <span class="hljs-params">asset</span><span class="hljs-function"> =&gt;</span> { assets.<span class="hljs-title">push</span>(asset); <span class="hljs-keyword">return</span> []; });
+    <span class="hljs-keyword">const</span> prepared = <span class="hljs-title">preparePandoc</span>(project, <span class="hljs-function">() =&gt;</span> [], <span class="hljs-params">asset</span><span class="hljs-function"> =&gt;</span> { assets.<span class="hljs-title">push</span>(asset); <span class="hljs-keyword">return</span> []; }, external);
     <span class="hljs-keyword">return</span> { assets, <span class="hljs-attr">diagnostics</span>: prepared.<span class="hljs-property">diagnostics</span> };
 }
 </code></pre>

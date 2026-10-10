@@ -45,6 +45,7 @@ export interface PublicationAsset {
     kind: 'image' | 'mermaid'; source: string; caption: string; at: PublicationLocation;
 }
 export type AssetRenderer = (asset: PublicationAsset) => PandocBlock[];
+export type PublicationLinkResolver = (href: string, source: string) => string | undefined;
 type ContributionRenderer = (part: PublicationContribution) => PandocBlock[];
 const maximumNesting = 128;
 function emptyAttributes(): PandocAttr { return ['', [], []]; }
@@ -136,6 +137,15 @@ function headingDestinations(document: ParsedDocument): DocumentDestination {
     }
     return destination;
 }
+export function publicationDestination(project: ParsedProject, pathname: string,
+    slug?: string): string | undefined {
+    const document = project.documents.find(item => item.path === pathname);
+    if (!document) { return undefined; }
+    const destination = headingDestinations(document);
+    if (slug === undefined) { return destination.id; }
+    const matches = destination.headings.get(slug.normalize('NFC'));
+    return matches?.length === 1 ? matches[0] : undefined;
+}
 function allocateHeadings(path: string, base: string, tokens: Token[], reserved: Set<string>,
     destination: DocumentDestination): void {
     const slugs: string[] = [];
@@ -183,13 +193,16 @@ function safeExternalLink(href: string): boolean {
 }
 function linkDestination(
     href: string, document: ParsedDocument, targets: PublicationTargets,
-    diagnostics: GenerationDiagnostic[], at: PublicationLocation
+    diagnostics: GenerationDiagnostic[], at: PublicationLocation,
+    external?: PublicationLinkResolver
 ): string | undefined {
     if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {
         if (safeExternalLink(href)) { return href; }
     } else {
         const resolved = localLinkDestination(href, document, targets, diagnostics, at);
         if (resolved !== undefined) { return resolved || undefined; }
+        const crossPublication = external?.(href, document.path);
+        if (crossPublication !== undefined) { return crossPublication; }
     }
     report(diagnostics, at, 'unsupported-publication-link',
         `Unsupported link (expected safe HTTP/HTTPS/mailto or an included document/heading without query): ${href}`);
@@ -233,6 +246,7 @@ interface InlineReader {
     at: PublicationLocation;
     targets: PublicationTargets;
     diagnostics: GenerationDiagnostic[];
+    external?: PublicationLinkResolver;
 }
 function textInlines(text: string): PandocInline[] {
     return text.split(/([ \t\r\n]+)/).filter(Boolean).map(value =>
@@ -286,7 +300,7 @@ function readLink(reader: InlineReader, token: Token, depth: number): PandocInli
         report(reader.diagnostics, reader.at, 'annotation-missing', `Unresolved TERM link: ${original}`);
     }
     const href = term ? '#' + (resolved ?? '') : linkDestination(original, reader.document,
-        reader.targets, reader.diagnostics, reader.at);
+        reader.targets, reader.diagnostics, reader.at, reader.external);
     const label = readInlines(reader, 'link_close', depth + 1);
     return { t: 'Link', c: [['', term ? ['lit-term-use'] : [], []], label,
         [href ?? '', token.attrGet('title') ?? '']] };
@@ -301,6 +315,7 @@ interface BlockReader {
     assets: boolean;
     targets: PublicationTargets;
     diagnostics: GenerationDiagnostic[];
+    external?: PublicationLinkResolver;
 }
 function contributionIndex(
     document: ParsedDocument, parts: Map<string, PublicationContribution>, diagnostics: GenerationDiagnostic[]
@@ -378,7 +393,7 @@ function readTextBlock(reader: BlockReader, opening: Token): PandocInline[] {
     }
     reader.index++;
     const result = readInlines({ document: reader.document, tokens: token.children ?? [],
-        index: 0, at, targets: reader.targets, diagnostics: reader.diagnostics,
+        index: 0, at, targets: reader.targets, diagnostics: reader.diagnostics, external: reader.external,
         annotations: reader.annotations, publication: reader.publication });
     if (reader.document.tokens[reader.index]?.type === stop) { reader.index++; }
     else { report(reader.diagnostics, at, 'invalid-markdown-structure', `Expected ${stop}`); }
@@ -498,7 +513,7 @@ function renderPart(
 }
 export function preparePandoc(
     project: ParsedProject, renderContribution: (part: PublicationContribution) => PandocBlock[],
-    renderAsset?: AssetRenderer
+    renderAsset?: AssetRenderer, external?: PublicationLinkResolver
 ): PandocPreparationResult {
     const diagnostics = project.diagnostics.map(diagnostic => ({ ...diagnostic }));
     if (diagnostics.length) { return { diagnostics }; }
@@ -509,7 +524,7 @@ export function preparePandoc(
     const parts = new Map(project.publication.contributions.map(part => [part.target, part]));
     const pending: PendingBlock[] = project.documents.map(document => {
         const contributions = contributionIndex(document, parts, diagnostics);
-        const body = readBlocks({ document, index: 0, contributions, targets, diagnostics,
+        const body = readBlocks({ document, index: 0, contributions, targets, diagnostics, external,
             annotations: project.annotations, publication: project.publication, assets: !!renderAsset });
         return { t: 'Div', c: [[targets.get(document.path)!.id, [], []], body] };
     });

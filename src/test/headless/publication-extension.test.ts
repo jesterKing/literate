@@ -156,8 +156,11 @@ async function fixture() {
         await f.bridgeHook?.(...args);
         if (f.bridgeFailure) { throw new Error(f.bridgeFailure); }
         const request = args[3];
+        const output = request.args[0] === 'series-pdf'
+            ? f.seriesOutputs?.[request.args[request.args.indexOf('--publication') + 1]]
+            : request.args[request.args.indexOf('--output') + 1];
         return f.reply ?? { stdout: JSON.stringify({ schemaVersion: 1, command: request.args[0], ok: true,
-            outputs: [{ path: request.args[request.args.indexOf('--output') + 1], status: 'written' }],
+            outputs: [{ path: output, status: 'written' }],
             publication: { warnings: ['fixture warning'] }, elapsedMs: 65423 }), stderr: '' };
     };
     exports.registerPublicationCommands(context, undefined, bridge);
@@ -332,6 +335,62 @@ test('single publication is selected without a publication picker', () => using(
     assert.deepEqual(f.errors, []);
     assert.equal(f.prompts.some((prompt: any) => prompt.stage === 'publication'), false);
     assert.equal(f.requests[0][2], path.join(f.root, 'books/python'));
+}));
+
+test('PDF exports every manifest publication in order with isolated fresh snapshots and no output prompts', () => using(async f => {
+    await f.put('series/literate-workspace.json', JSON.stringify({ schemaVersion: 1, publications: [
+        { id: 'python', title: 'Python', root: '../books/python', entry: 'index.literate',
+            pdf: '../release/python.pdf', paper: 'a5', margins: { top: 10, outer: 11, bottom: 12, inner: 13 } },
+        { id: 'zig', title: 'Zig', root: '../books/zig', entry: 'index.literate',
+            pdf: '../../exports/zig.pdf', paper: 'legal', margins: { top: 14, outer: 15, bottom: 16, inner: 17 } }
+    ] }));
+    await f.put('books/python/index.literate', 'python disk');
+    await f.put('books/zig/index.literate', 'zig disk');
+    const python = f.document('books/python/index.literate', 'python buffer');
+    const zig = f.document('books/zig/index.literate', 'zig first buffer');
+    f.workspace.textDocuments = [python, zig];
+    let snapshots = 0;
+    f.onSnapshotRead = () => { if (++snapshots === 1) { zig.getText = () => 'zig fresh buffer'; } };
+    f.reply = { stdout: JSON.stringify({ schemaVersion: 1, command: 'pdf', ok: true, outputs: [
+        { path: '../release/python.pdf', status: 'written' },
+        { path: '../../exports/zig.pdf', status: 'written' }
+    ], publication: { warnings: [] }, elapsedMs: 1000 }), stderr: '' };
+
+    await f.run('pdf');
+
+    assert.deepEqual(f.errors, []);
+    assert.deepEqual(f.prompts.map((prompt: any) => prompt.stage), ['folder']);
+    assert.equal(f.requests.length, 1);
+    assert.equal(f.requests[0][2], path.join(f.root, 'series'));
+    assert.deepEqual(f.requests[0][3].args, ['pdf', path.join(f.root, 'series'), '--json']);
+    assert.deepEqual(f.requests[0][3].documents, []);
+    assert.deepEqual({ ...f.requests[0][3].publicationDocuments }, {
+        python: [{ path: 'index.literate', text: 'python buffer' }],
+        zig: [{ path: 'index.literate', text: 'zig fresh buffer' }]
+    });
+    assert.equal(f.state.size, 0);
+    assert.deepEqual(f.opened, []);
+    assert.deepEqual(f.infos.at(-1), ['Exported 2 PDFs']);
+    assert.ok(f.logs.includes(`Publication completed: ${path.resolve(f.root, 'release/python.pdf')}`));
+    assert.ok(f.logs.includes(`Publication completed: ${path.resolve(f.root, 'series', '../../exports/zig.pdf')}`));
+}));
+
+test('PDF series rejects every missing pdf before snapshot or helper launch', () => using(async f => {
+    await f.put('literate-workspace.json', JSON.stringify({ schemaVersion: 1, publications: [
+        { id: 'ready', title: 'Ready', root: 'books/ready', entry: 'index.literate', pdf: 'out/ready.pdf' },
+        { id: 'missing', title: 'Missing', root: 'books/missing', entry: 'index.literate' }
+    ] }));
+    await f.put('books/ready/index.literate', 'ready');
+    await f.put('books/missing/index.literate', 'missing');
+    let snapshots = 0;
+    f.onSnapshotRead = () => { snapshots++; };
+
+    await f.run('pdf');
+
+    assert.equal(f.requests.length, 0);
+    assert.equal(snapshots, 0);
+    assert.deepEqual(f.prompts.map((prompt: any) => prompt.stage), ['folder']);
+    assert.match(f.errors[0], /missing: missing/);
 }));
 
 for (const mode of ['disk', 'buffer', 'ancestor', 'dangling', 'destination']) {

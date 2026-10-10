@@ -222,6 +222,7 @@ string placeholders that could collide with author text.</p>
     <span class="hljs-attr">kind</span>: <span class="hljs-string">'image'</span> | <span class="hljs-string">'mermaid'</span>; <span class="hljs-attr">source</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">caption</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">at</span>: <span class="hljs-title">PublicationLocation</span>;
 }
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title">AssetRenderer</span> = <span class="hljs-function">(</span><span class="hljs-params">asset: PublicationAsset</span><span class="hljs-function">) =&gt;</span> <span class="hljs-title">PandocBlock</span>[];
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title">PublicationLinkResolver</span> = <span class="hljs-function">(</span><span class="hljs-params">href: </span><span class="hljs-built_in">string</span><span class="hljs-params">, source: </span><span class="hljs-built_in">string</span><span class="hljs-function">) =&gt;</span> <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>;
 <span class="hljs-keyword">type</span> <span class="hljs-title">ContributionRenderer</span> = <span class="hljs-function">(</span><span class="hljs-params">part: PublicationContribution</span><span class="hljs-function">) =&gt;</span> <span class="hljs-title">PandocBlock</span>[];
 <span class="hljs-keyword">const</span> maximumNesting = <span class="hljs-number">128</span>;
 <span class="hljs-keyword">function</span> <span class="hljs-title">emptyAttributes</span>(): <span class="hljs-title">PandocAttr</span> { <span class="hljs-keyword">return</span> [<span class="hljs-string">''</span>, [], []]; }
@@ -385,13 +386,30 @@ and lists usable alternatives. Unlinked duplicates are valid.</p>
 </code></pre>
 
 </div>
+</div><p>Series publication uses the same opaque destinations when linking into another
+book. Only a unique included document or heading produces a destination.</p>
+<div class="codefragment">
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500061006e0064006f0063002000680065006100640069006e00670020006900640065006e007400690074006900650073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00700061006e0064006f0063002e006c0069007400650072006100740065-3"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500061006e0064006f0063002000680065006100640069006e00670020006900640065006e007400690074006900650073" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500061006e0064006f0063002000680065006100640069006e00670020006900640065006e007400690074006900650073" aria-label="Definition of publication Pandoc heading identities">&lt;&lt;publication Pandoc heading identities&gt;&gt;=+</a></div>
+<div class="code">
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">publicationDestination</span>(<span class="hljs-params">project: ParsedProject, pathname: </span><span class="hljs-built_in">string</span><span class="hljs-params">,
+    slug?: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span> {
+    <span class="hljs-keyword">const</span> <span class="hljs-variable">document</span> = project.<span class="hljs-property">documents</span>.<span class="hljs-title">find</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> item.<span class="hljs-property">path</span> === pathname);
+    <span class="hljs-keyword">if</span> (!<span class="hljs-variable">document</span>) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
+    <span class="hljs-keyword">const</span> destination = <span class="hljs-title">headingDestinations</span>(<span class="hljs-variable">document</span>);
+    <span class="hljs-keyword">if</span> (slug === <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> destination.<span class="hljs-property">id</span>; }
+    <span class="hljs-keyword">const</span> matches = destination.<span class="hljs-property">headings</span>.<span class="hljs-title">get</span>(slug.<span class="hljs-title">normalize</span>(<span class="hljs-string">'NFC'</span>));
+    <span class="hljs-keyword">return</span> matches?.<span class="hljs-property">length</span> === <span class="hljs-number">1</span> ? matches[<span class="hljs-number">0</span>] : <span class="hljs-literal">undefined</span>;
+}
+</code></pre>
+
+</div>
 </div><p>The index scans the full stream before reading any links, so forward links,
 setext headings and nested headings work without flattening their containers.
 Identities do not depend on line offsets or chapter order. Unrelated headings do
 not change IDs; renaming a heading/path or inserting a colliding slug can change
 them. Duplicate ordinals follow source token order, not arbitrary edit-stable IDs.</p>
 <div class="codefragment">
-<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500061006e0064006f0063002000680065006100640069006e00670020006900640065006e007400690074006900650073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00700061006e0064006f0063002e006c0069007400650072006100740065-3"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500061006e0064006f0063002000680065006100640069006e00670020006900640065006e007400690074006900650073" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500061006e0064006f0063002000680065006100640069006e00670020006900640065006e007400690074006900650073" aria-label="Definition of publication Pandoc heading identities">&lt;&lt;publication Pandoc heading identities&gt;&gt;=+</a></div>
+<div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500061006e0064006f0063002000680065006100640069006e00670020006900640065006e007400690074006900650073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00700061006e0064006f0063002e006c0069007400650072006100740065-4"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500061006e0064006f0063002000680065006100640069006e00670020006900640065006e007400690074006900650073" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500061006e0064006f0063002000680065006100640069006e00670020006900640065006e007400690074006900650073" aria-label="Definition of publication Pandoc heading identities">&lt;&lt;publication Pandoc heading identities&gt;&gt;=+</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">function</span> <span class="hljs-title">allocateHeadings</span>(<span class="hljs-params">path: </span><span class="hljs-built_in">string</span><span class="hljs-params">, base: </span><span class="hljs-built_in">string</span><span class="hljs-params">, tokens: Token[], reserved: </span><span class="hljs-built_in">Set</span><span class="hljs-params">&lt;</span><span class="hljs-built_in">string</span><span class="hljs-params">&gt;,
     destination: DocumentDestination</span>): <span class="hljs-built_in">void</span> {
@@ -460,13 +478,16 @@ diagnostics. Link text and titles remain Pandoc data, never TeX commands.</p>
 }
 <span class="hljs-keyword">function</span> <span class="hljs-title">linkDestination</span>(<span class="hljs-params">
     href: </span><span class="hljs-built_in">string</span><span class="hljs-params">, </span><span class="hljs-variable">document</span><span class="hljs-params">: ParsedDocument, targets: PublicationTargets,
-    diagnostics: GenerationDiagnostic[], at: PublicationLocation
+    diagnostics: GenerationDiagnostic[], at: PublicationLocation,
+    external?: PublicationLinkResolver
 </span>): <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span> {
     <span class="hljs-keyword">if</span> (<span class="hljs-regexp">/^</span><span class="hljs-regexp">[a-z]</span><span class="hljs-regexp">[a-z0-9+.-]</span><span class="hljs-regexp">*:/i</span>.<span class="hljs-title">test</span>(href)) {
         <span class="hljs-keyword">if</span> (<span class="hljs-title">safeExternalLink</span>(href)) { <span class="hljs-keyword">return</span> href; }
     } <span class="hljs-keyword">else</span> {
         <span class="hljs-keyword">const</span> resolved = <span class="hljs-title">localLinkDestination</span>(href, <span class="hljs-variable">document</span>, targets, diagnostics, at);
         <span class="hljs-keyword">if</span> (resolved !== <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> resolved || <span class="hljs-literal">undefined</span>; }
+        <span class="hljs-keyword">const</span> crossPublication = external?.(href, <span class="hljs-variable">document</span>.<span class="hljs-property">path</span>);
+        <span class="hljs-keyword">if</span> (crossPublication !== <span class="hljs-literal">undefined</span>) { <span class="hljs-keyword">return</span> crossPublication; }
     }
     <span class="hljs-title">report</span>(diagnostics, at, <span class="hljs-string">'unsupported-publication-link'</span>,
         <span class="hljs-string">`Unsupported link (expected safe HTTP/HTTPS/mailto or an included document/heading without query): </span><span class="hljs-subst">${href}</span><span class="hljs-string">`</span>);
@@ -542,6 +563,7 @@ recursion becomes unsafe.</p>
     <span class="hljs-attr">at</span>: <span class="hljs-title">PublicationLocation</span>;
     <span class="hljs-attr">targets</span>: <span class="hljs-title">PublicationTargets</span>;
     <span class="hljs-attr">diagnostics</span>: <span class="hljs-title">GenerationDiagnostic</span>[];
+    external?: <span class="hljs-title">PublicationLinkResolver</span>;
 }
 <span class="hljs-keyword">function</span> <span class="hljs-title">textInlines</span>(<span class="hljs-params">text: </span><span class="hljs-built_in">string</span>): <span class="hljs-title">PandocInline</span>[] {
     <span class="hljs-keyword">return</span> text.<span class="hljs-title">split</span>(<span class="hljs-regexp">/(</span><span class="hljs-regexp">[ </span><span class="hljs-regexp">\t</span><span class="hljs-regexp">\r</span><span class="hljs-regexp">\n</span><span class="hljs-regexp">]</span><span class="hljs-regexp">+)/</span>).<span class="hljs-title">filter</span>(<span class="hljs-title">Boolean</span>).<span class="hljs-title">map</span>(<span class="hljs-params">value</span><span class="hljs-function"> =&gt;</span>
@@ -616,7 +638,7 @@ the public document and all renderer callbacks.</p>
         <span class="hljs-title">report</span>(reader.<span class="hljs-property">diagnostics</span>, reader.<span class="hljs-property">at</span>, <span class="hljs-string">'annotation-missing'</span>, <span class="hljs-string">`Unresolved TERM link: </span><span class="hljs-subst">${original}</span><span class="hljs-string">`</span>);
     }
     <span class="hljs-keyword">const</span> href = term ? <span class="hljs-string">'#'</span> + (resolved ?? <span class="hljs-string">''</span>) : <span class="hljs-title">linkDestination</span>(original, reader.<span class="hljs-property">document</span>,
-        reader.<span class="hljs-property">targets</span>, reader.<span class="hljs-property">diagnostics</span>, reader.<span class="hljs-property">at</span>);
+        reader.<span class="hljs-property">targets</span>, reader.<span class="hljs-property">diagnostics</span>, reader.<span class="hljs-property">at</span>, reader.<span class="hljs-property">external</span>);
     <span class="hljs-keyword">const</span> label = <span class="hljs-title">readInlines</span>(reader, <span class="hljs-string">'link_close'</span>, depth + <span class="hljs-number">1</span>);
     <span class="hljs-keyword">return</span> { <span class="hljs-attr">t</span>: <span class="hljs-string">'Link'</span>, <span class="hljs-attr">c</span>: [[<span class="hljs-string">''</span>, term ? [<span class="hljs-string">'lit-term-use'</span>] : [], []], label,
         [href ?? <span class="hljs-string">''</span>, token.<span class="hljs-title">attrGet</span>(<span class="hljs-string">'title'</span>) ?? <span class="hljs-string">''</span>]] };
@@ -642,6 +664,7 @@ cursor, preserving nesting and authored order across each contribution.</p>
     <span class="hljs-attr">assets</span>: <span class="hljs-built_in">boolean</span>;
     <span class="hljs-attr">targets</span>: <span class="hljs-title">PublicationTargets</span>;
     <span class="hljs-attr">diagnostics</span>: <span class="hljs-title">GenerationDiagnostic</span>[];
+    external?: <span class="hljs-title">PublicationLinkResolver</span>;
 }
 <span class="hljs-keyword">function</span> <span class="hljs-title">contributionIndex</span>(<span class="hljs-params">
     </span><span class="hljs-variable">document</span><span class="hljs-params">: ParsedDocument, parts: </span><span class="hljs-built_in">Map</span><span class="hljs-params">&lt;</span><span class="hljs-built_in">string</span><span class="hljs-params">, PublicationContribution&gt;, diagnostics: GenerationDiagnostic[]
@@ -730,7 +753,7 @@ would introduce a different interpretation of escaping and links.</p>
     }
     reader.<span class="hljs-property">index</span>++;
     <span class="hljs-keyword">const</span> result = <span class="hljs-title">readInlines</span>({ <span class="hljs-attr">document</span>: reader.<span class="hljs-property">document</span>, <span class="hljs-attr">tokens</span>: token.<span class="hljs-property">children</span> ?? [],
-        <span class="hljs-attr">index</span>: <span class="hljs-number">0</span>, at, <span class="hljs-attr">targets</span>: reader.<span class="hljs-property">targets</span>, <span class="hljs-attr">diagnostics</span>: reader.<span class="hljs-property">diagnostics</span>,
+        <span class="hljs-attr">index</span>: <span class="hljs-number">0</span>, at, <span class="hljs-attr">targets</span>: reader.<span class="hljs-property">targets</span>, <span class="hljs-attr">diagnostics</span>: reader.<span class="hljs-property">diagnostics</span>, <span class="hljs-attr">external</span>: reader.<span class="hljs-property">external</span>,
         <span class="hljs-attr">annotations</span>: reader.<span class="hljs-property">annotations</span>, <span class="hljs-attr">publication</span>: reader.<span class="hljs-property">publication</span> });
     <span class="hljs-keyword">if</span> (reader.<span class="hljs-property">document</span>.<span class="hljs-property">tokens</span>[reader.<span class="hljs-property">index</span>]?.<span class="hljs-property">type</span> === stop) { reader.<span class="hljs-property">index</span>++; }
     <span class="hljs-keyword">else</span> { <span class="hljs-title">report</span>(reader.<span class="hljs-property">diagnostics</span>, at, <span class="hljs-string">'invalid-markdown-structure'</span>, <span class="hljs-string">`Expected </span><span class="hljs-subst">${stop}</span><span class="hljs-string">`</span>); }

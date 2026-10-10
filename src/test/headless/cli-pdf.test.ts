@@ -97,6 +97,57 @@ for (const help of [['pdf', '--help'], ['help', 'pdf'], ['pdf', '-h', '--keep-bu
     });
 }
 
+test('series PDF publishes every manifest book with geometry and cross-book links', async t => {
+    const root = fixture(t), series = path.join(root, 'series');
+    fs.mkdirSync(series);
+    write(root, 'books/python/index.literate', '# Python\n\n[Zig](../zig/index.literate#zig)\n');
+    write(root, 'books/zig/index.literate', '# Zig\n\n[Python](../python/index.literate#python)\n');
+    write(series, 'literate-workspace.json', JSON.stringify({ schemaVersion: 1, publications: [
+        { id: 'python', title: 'Python', root: '../books/python', entry: 'index.literate',
+            pdf: '../publications/python.pdf', paper: 'a4',
+            margins: { top: 20, outer: 50, bottom: 20, inner: 20 } },
+        { id: 'zig', title: 'Zig', root: '../books/zig', entry: 'index.literate',
+            pdf: '../publications/zig.pdf', paper: 'legal',
+            margins: { top: 10, outer: 30, bottom: 15, inner: 25 } }
+    ] }));
+    const links: string[] = [], geometries: string[] = [];
+    const converter: LatexConverter = async document => {
+        links.push(JSON.stringify(document));
+        return 'Converted body';
+    };
+    const compiler: PdfCompiler = async files => {
+        const tex = String(files.find(file => file.path.endsWith('/book.tex'))!.content);
+        geometries.push(tex);
+        return { pdf: Buffer.from(`pdf-${geometries.length}`), warnings: [] };
+    };
+    const result = await command(['pdf', series], compiler, converter);
+    assert.equal(result.code, 0, JSON.stringify(result.response));
+    assert.deepEqual(result.response.outputs, [
+        { path: '../publications/python.pdf', status: 'written' },
+        { path: '../publications/zig.pdf', status: 'written' }
+    ]);
+    assert.match(links[0], /zig\.pdf#h-/);
+    assert.match(links[1], /python\.pdf#h-/);
+    assert.match(geometries[0], /a4paper,top=20mm,outer=50mm,bottom=20mm,inner=20mm/);
+    assert.match(geometries[1], /legalpaper,top=10mm,outer=30mm,bottom=15mm,inner=25mm/);
+    assert.equal(fs.readFileSync(path.join(root, 'publications/python.pdf'), 'utf8'), 'pdf-1');
+    assert.equal(fs.readFileSync(path.join(root, 'publications/zig.pdf'), 'utf8'), 'pdf-2');
+});
+
+test('series PDF requires every destination before conversion', async t => {
+    const root = fixture(t), series = path.join(root, 'series');
+    fs.mkdirSync(series);
+    write(root, 'books/one/index.literate', '# One\n');
+    write(series, 'literate-workspace.json', JSON.stringify({ schemaVersion: 1, publications: [
+        { id: 'one', root: '../books/one' }
+    ] }));
+    const result = await command(['pdf', series], async () => assert.fail('compiler called'),
+        async () => assert.fail('converter called'));
+    assert.equal(result.code, 1);
+    assert.match(result.response.errors.join(' '), /requires pdf/);
+    assert.deepEqual(result.response.outputs, []);
+});
+
 test('PDF compiler receives the full virtual plan; only PDF is published, with metadata and stable identical output', async t => {
     const root = fixture(t);
     write(root, 'index.literate', source + '\n![Image](image.png)\n\n```mermaid\ngraph TD; A-->B\n```\n'

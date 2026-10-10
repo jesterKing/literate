@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import { posix } from 'path';
 import { safeRelativePath, ParsedProject } from './engine';
 import { preparePandoc, PublicationAsset } from './publication-pandoc';
+import type { PublicationLinkResolver } from './publication-pandoc';
 import type { FontInputIO } from './publication-fonts';
 import type { DiagramBytes } from './publication-mermaid';
 export const maximumAssetBytes = 32 * 1024 * 1024;
@@ -81,10 +82,10 @@ export async function planAssets(assets: readonly PublicationAsset[], output: st
     }
     return plan;
 }
-export function collectAssets(project: ParsedProject): {
+export function collectAssets(project: ParsedProject, external?: PublicationLinkResolver): {
     assets: PublicationAsset[]; diagnostics: ReturnType<typeof preparePandoc>['diagnostics'];
 } {
     const assets: PublicationAsset[] = [];
-    const prepared = preparePandoc(project, () => [], asset => { assets.push(asset); return []; });
+    const prepared = preparePandoc(project, () => [], asset => { assets.push(asset); return []; }, external);
     return { assets, diagnostics: prepared.diagnostics };
 }

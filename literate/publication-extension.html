@@ -161,11 +161,15 @@ Fonts and licenses are optional disk inputs; editor overlays apply only to sourc
 <span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
 <span class="hljs-keyword">import</span> { parsePublicationWorkspace, publicationForPath, publicationWorkspaceManifest,
     selectPublication } <span class="hljs-keyword">from</span> <span class="hljs-string">'./workspace-projects'</span>;
-<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">PublicationProject</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./workspace-projects'</span>;
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">PublicationProject</span>, <span class="hljs-title">PublicationWorkspace</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./workspace-projects'</span>;
 
 <span class="hljs-keyword">type</span> <span class="hljs-title">Kind</span> = <span class="hljs-string">'latex'</span> | <span class="hljs-string">'pdf'</span>;
 <span class="hljs-keyword">interface</span> <span class="hljs-title">Choice</span> { <span class="hljs-attr">paper</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">margins</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">destination</span>: <span class="hljs-built_in">string</span>; }
-<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationRequest</span> { <span class="hljs-attr">args</span>: <span class="hljs-built_in">string</span>[]; <span class="hljs-attr">documents</span>: <span class="hljs-title">SourceDocument</span>[]; }
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationRequest</span> {
+    <span class="hljs-attr">args</span>: <span class="hljs-built_in">string</span>[];
+    <span class="hljs-attr">documents</span>: <span class="hljs-title">SourceDocument</span>[];
+    publicationDocuments?: <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">SourceDocument</span>[]&gt;;
+}
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">HelperResult</span> { <span class="hljs-attr">stdout</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">stderr</span>: <span class="hljs-built_in">string</span>; }
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title">PublicationQueue</span> = &lt;T&gt;<span class="hljs-function">(</span><span class="hljs-params">operation: </span><span class="hljs-params">()</span><span class="hljs-params"> =&gt; </span><span class="hljs-built_in">Promise</span><span class="hljs-params">&lt;T&gt;</span><span class="hljs-function">) =&gt;</span> <span class="hljs-title">Promise</span>&lt;T&gt;;
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title">PublicationBridge</span> = <span class="hljs-function">(</span><span class="hljs-params">node: </span><span class="hljs-built_in">string</span><span class="hljs-params">, helper: </span><span class="hljs-built_in">string</span><span class="hljs-params">, root: </span><span class="hljs-built_in">string</span><span class="hljs-params">,
@@ -459,6 +463,21 @@ success merely because cancellation was requested.</p>
     <span class="hljs-keyword">return</span> { <span class="hljs-attr">warnings</span>: <span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(warnings) ? warnings.<span class="hljs-title">map</span>(<span class="hljs-title">String</span>) : [],
         ...(<span class="hljs-title">Number</span>.<span class="hljs-title">isInteger</span>(elapsed) &amp;&amp; elapsed &gt;= <span class="hljs-number">0</span> ? { <span class="hljs-attr">elapsedMs</span>: elapsed } : {}) };
 }
+<span class="hljs-keyword">function</span> <span class="hljs-title">seriesPublicationOutcome</span>(<span class="hljs-params">result: HelperResult, destinations: </span><span class="hljs-built_in">string</span><span class="hljs-params">[]</span>): <span class="hljs-title">PublicationOutcome</span> {
+    <span class="hljs-keyword">let</span> response;
+    <span class="hljs-keyword">try</span> { response = <span class="hljs-title">JSON</span>.<span class="hljs-title">parse</span>(result.<span class="hljs-property">stdout</span>); }
+    <span class="hljs-keyword">catch</span> { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Invalid JSON from publication helper:</span><span class="hljs-string">\n</span><span class="hljs-subst">${result.stdout}</span><span class="hljs-string">`</span>); }
+    <span class="hljs-keyword">const</span> outputs = <span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(response?.<span class="hljs-property">outputs</span>) ? response.<span class="hljs-property">outputs</span> : [];
+    <span class="hljs-keyword">if</span> (response?.<span class="hljs-property">schemaVersion</span> !== <span class="hljs-number">1</span> || response.<span class="hljs-property">command</span> !== <span class="hljs-string">'pdf'</span> || response.<span class="hljs-property">ok</span> !== <span class="hljs-literal">true</span> ||
+        destinations.<span class="hljs-title">some</span>(<span class="hljs-params">destination</span><span class="hljs-function"> =&gt;</span> !outputs.<span class="hljs-title">some</span>(<span class="hljs-function">(</span><span class="hljs-params">item: </span><span class="hljs-params">{ path?: </span><span class="hljs-built_in">string</span><span class="hljs-params">; status?: </span><span class="hljs-built_in">string</span><span class="hljs-params"> }</span><span class="hljs-function">) =&gt;</span>
+            item?.<span class="hljs-property">path</span> === destination &amp;&amp; [<span class="hljs-string">'written'</span>, <span class="hljs-string">'current'</span>].<span class="hljs-title">includes</span>(item.<span class="hljs-property">status</span> ?? <span class="hljs-string">''</span>)))) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Publication did not report successful series outputs:</span><span class="hljs-string">\n</span><span class="hljs-subst">${result.stdout}</span><span class="hljs-string">`</span>);
+    }
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">warnings</span>: <span class="hljs-built_in">unknown</span> = response.<span class="hljs-property">publication</span>?.<span class="hljs-property">warnings</span>;
+    <span class="hljs-keyword">const</span> elapsed = response.<span class="hljs-property">elapsedMs</span>;
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">warnings</span>: <span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(warnings) ? warnings.<span class="hljs-title">map</span>(<span class="hljs-title">String</span>) : [],
+        ...(<span class="hljs-title">Number</span>.<span class="hljs-title">isInteger</span>(elapsed) &amp;&amp; elapsed &gt;= <span class="hljs-number">0</span> ? { <span class="hljs-attr">elapsedMs</span>: elapsed } : {}) };
+}
 <span class="hljs-keyword">function</span> <span class="hljs-title">elapsedPublicationTime</span>(<span class="hljs-params">elapsedMs: </span><span class="hljs-built_in">number</span>): <span class="hljs-built_in">string</span> {
     <span class="hljs-keyword">if</span> (elapsedMs &lt; <span class="hljs-number">1000</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">`</span><span class="hljs-subst">${elapsedMs}</span><span class="hljs-string"> ms`</span>; }
     <span class="hljs-keyword">const</span> seconds = <span class="hljs-title">Math</span>.<span class="hljs-title">floor</span>(elapsedMs / <span class="hljs-number">1000</span>);
@@ -471,6 +490,16 @@ success merely because cancellation was requested.</p>
 <p>Remember only successful paper, margins and relative destination, separately for
 each canonical root and kind. Every prompt can cancel without spawning or writing.
 The active editor's workspace wins; otherwise offer all folders explicitly.</p>
+<p>When Export PDF discovers a workspace manifest, that manifest denotes one ordered
+series operation rather than a publication choice. Every project must declare
+<code>pdf</code> before snapshots or helper work begin. The adapter then invokes the helper
+once with <code>pdf &lt;manifest-root&gt; --json</code>. The request carries project-relative
+snapshots keyed by publication ID; the helper reads paper, margins, and every
+manifest-relative output from the manifest. Snapshots remain isolated, while one
+helper lifecycle compiles the complete series and commits its PDFs together.
+Manifest-relative PDF paths may resolve outside a publication root. Export LaTeX
+and workspaces without a manifest retain the interactive single-publication
+protocol.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e002000700072006f006d007000740073" aria-label="Definition of publication extension prompts">&lt;&lt;publication extension prompts&gt;&gt;=</a></div>
 <div class="code">
@@ -492,8 +521,9 @@ The active editor's workspace wins; otherwise offer all folders explicitly.</p>
     <span class="hljs-attr">workspaceRoot</span>: <span class="hljs-built_in">string</span>;
     <span class="hljs-attr">root</span>: <span class="hljs-built_in">string</span>;
     project?: <span class="hljs-title">PublicationProject</span>;
+    series?: <span class="hljs-title">PublicationWorkspace</span>;
 }
-<span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">choosePublication</span>(): <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">SelectedPublication</span> | <span class="hljs-literal">undefined</span>&gt; {
+<span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">choosePublication</span>(<span class="hljs-params">kind: Kind</span>): <span class="hljs-title">Promise</span>&lt;<span class="hljs-title">SelectedPublication</span> | <span class="hljs-literal">undefined</span>&gt; {
     <span class="hljs-keyword">const</span> folder = <span class="hljs-keyword">await</span> <span class="hljs-title">chooseFolder</span>();
     <span class="hljs-keyword">if</span> (!folder) { <span class="hljs-keyword">return</span> <span class="hljs-literal">undefined</span>; }
     <span class="hljs-keyword">const</span> folderRoot = <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalRoot</span>(folder);
@@ -502,6 +532,11 @@ The active editor's workspace wins; otherwise offer all folders explicitly.</p>
     <span class="hljs-keyword">const</span> workspaceRoot = path.<span class="hljs-title">dirname</span>(manifestPath);
     <span class="hljs-keyword">await</span> <span class="hljs-title">checkPath</span>(workspaceRoot, publicationWorkspaceManifest);
     <span class="hljs-keyword">const</span> workspace = <span class="hljs-title">parsePublicationWorkspace</span>(<span class="hljs-keyword">await</span> fs.<span class="hljs-title">readFile</span>(manifestPath, <span class="hljs-string">'utf8'</span>));
+    <span class="hljs-keyword">if</span> (kind === <span class="hljs-string">'pdf'</span>) {
+        <span class="hljs-keyword">const</span> missing = workspace.<span class="hljs-property">publications</span>.<span class="hljs-title">filter</span>(<span class="hljs-params">project</span><span class="hljs-function"> =&gt;</span> !project.<span class="hljs-property">pdf</span>).<span class="hljs-title">map</span>(<span class="hljs-params">project</span><span class="hljs-function"> =&gt;</span> project.<span class="hljs-property">id</span>);
+        <span class="hljs-keyword">if</span> (missing.<span class="hljs-property">length</span>) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Every publication must declare pdf for series export; missing: </span><span class="hljs-subst">${missing.join(</span><span class="hljs-string">', '</span><span class="hljs-subst">)}</span><span class="hljs-string">`</span>); }
+        <span class="hljs-keyword">return</span> { folder, workspaceRoot, <span class="hljs-attr">root</span>: workspaceRoot, <span class="hljs-attr">series</span>: workspace };
+    }
     <span class="hljs-keyword">const</span> active = vscode.<span class="hljs-property">window</span>.<span class="hljs-property">activeTextEditor</span>?.<span class="hljs-property">document</span>.<span class="hljs-property">uri</span>;
     <span class="hljs-keyword">const</span> relative = active?.<span class="hljs-property">scheme</span> === <span class="hljs-string">'file'</span> &amp;&amp; !active.<span class="hljs-property">authority</span> ?
         path.<span class="hljs-title">relative</span>(workspaceRoot, active.<span class="hljs-property">fsPath</span>).<span class="hljs-title">split</span>(path.<span class="hljs-property">sep</span>).<span class="hljs-title">join</span>(<span class="hljs-string">'/'</span>) : <span class="hljs-literal">undefined</span>;
@@ -611,15 +646,15 @@ are resolved only after a destination has been chosen.</p>
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" aria-label="Definition of publication extension commands">&lt;&lt;publication extension commands&gt;&gt;=+</a></div>
 <div class="code">
 <pre><code>        <span class="hljs-keyword">try</span> {
-            <span class="hljs-keyword">const</span> selected = <span class="hljs-keyword">await</span> <span class="hljs-title">choosePublication</span>();
+            <span class="hljs-keyword">const</span> selected = <span class="hljs-keyword">await</span> <span class="hljs-title">choosePublication</span>(kind);
             <span class="hljs-keyword">if</span> (!selected) { <span class="hljs-keyword">return</span>; }
-            <span class="hljs-keyword">const</span> { folder, workspaceRoot, root, project } = selected;
+            <span class="hljs-keyword">const</span> { folder, workspaceRoot, root, project, series } = selected;
             operation.<span class="hljs-property">folder</span> = folder;
             <span class="hljs-title">cancelled</span>(token);
             <span class="hljs-title">authority</span>();
             <span class="hljs-keyword">const</span> key = <span class="hljs-string">`literate.publication:v3:</span><span class="hljs-subst">${kind}</span><span class="hljs-string">:</span><span class="hljs-subst">${workspaceRoot}</span><span class="hljs-string">:</span><span class="hljs-subst">${project?.id ?? </span><span class="hljs-string">''</span><span class="hljs-subst">}</span><span class="hljs-string">`</span>;
-            <span class="hljs-keyword">const</span> choice = <span class="hljs-keyword">await</span> <span class="hljs-title">chooseOutput</span>(root, kind, context.<span class="hljs-property">workspaceState</span>.<span class="hljs-property">get</span>&lt;<span class="hljs-title">Choice</span>&gt;(key));
-            <span class="hljs-keyword">if</span> (!choice) { <span class="hljs-keyword">return</span>; }
+            <span class="hljs-keyword">const</span> choice = series ? <span class="hljs-literal">undefined</span> : <span class="hljs-keyword">await</span> <span class="hljs-title">chooseOutput</span>(root, kind, context.<span class="hljs-property">workspaceState</span>.<span class="hljs-property">get</span>&lt;<span class="hljs-title">Choice</span>&gt;(key));
+            <span class="hljs-keyword">if</span> (!series &amp;&amp; !choice) { <span class="hljs-keyword">return</span>; }
             <span class="hljs-title">cancelled</span>(token);
             <span class="hljs-title">authority</span>();
             <span class="hljs-keyword">const</span> node = <span class="hljs-title">executable</span>(<span class="hljs-string">'nodePath'</span>, <span class="hljs-literal">true</span>)!;
@@ -649,28 +684,59 @@ the queue on resolution or rejection, never merely on a cancellation request.</p
                         <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalRoot</span>(folder);
                         <span class="hljs-keyword">if</span> (project) { <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalProjectRoot</span>(workspaceRoot, project.<span class="hljs-property">root</span>); }
                         <span class="hljs-title">authority</span>();
-                        <span class="hljs-keyword">const</span> documents = <span class="hljs-keyword">await</span> <span class="hljs-title">capturePublicationSnapshot</span>(root, token);
-                        <span class="hljs-keyword">const</span> args = [kind, root, <span class="hljs-string">'--output'</span>, choice.<span class="hljs-property">destination</span>, <span class="hljs-string">'--paper'</span>, choice.<span class="hljs-property">paper</span>];
-                        [<span class="hljs-string">'top'</span>, <span class="hljs-string">'outer'</span>, <span class="hljs-string">'bottom'</span>, <span class="hljs-string">'inner'</span>].<span class="hljs-title">forEach</span>(<span class="hljs-function">(</span><span class="hljs-params">side, index</span><span class="hljs-function">) =&gt;</span> {
-                            args.<span class="hljs-title">push</span>(<span class="hljs-string">`--margin-</span><span class="hljs-subst">${side}</span><span class="hljs-string">`</span>, <span class="hljs-string">`</span><span class="hljs-subst">${choice.margins.split(</span><span class="hljs-string">','</span><span class="hljs-subst">)[index]}</span><span class="hljs-string">mm`</span>);
-                        });
-                        <span class="hljs-keyword">if</span> (browser) { args.<span class="hljs-title">push</span>(<span class="hljs-string">'--browser'</span>, browser); }
-                        <span class="hljs-keyword">if</span> (manifest) { <span class="hljs-keyword">await</span> <span class="hljs-title">checkPath</span>(root, manifest); args.<span class="hljs-title">push</span>(<span class="hljs-string">'--font-manifest'</span>, manifest); }
-                        args.<span class="hljs-title">push</span>(<span class="hljs-string">'--json'</span>);
-                        <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalRoot</span>(folder);
-                        <span class="hljs-keyword">if</span> (project) { <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalProjectRoot</span>(workspaceRoot, project.<span class="hljs-property">root</span>); }
-                        <span class="hljs-keyword">await</span> <span class="hljs-title">checkPath</span>(root, choice.<span class="hljs-property">destination</span>);
-                        <span class="hljs-title">authority</span>();
-                        <span class="hljs-title">cancelled</span>(token);
-                        <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">await</span> <span class="hljs-title">bridge</span>(node, context.<span class="hljs-title">asAbsolutePath</span>(<span class="hljs-string">'out/publication-helper.cjs'</span>), root,
-                            { args, documents }, token, <span class="hljs-params">text</span><span class="hljs-function"> =&gt;</span> { output.<span class="hljs-title">appendLine</span>(text); progress.<span class="hljs-title">report</span>({ <span class="hljs-attr">message</span>: text }); });
-                        <span class="hljs-keyword">if</span> (result.<span class="hljs-property">stderr</span>) { output.<span class="hljs-title">appendLine</span>(result.<span class="hljs-property">stderr</span>); }
-                        <span class="hljs-keyword">const</span> outcome = <span class="hljs-title">publicationOutcome</span>(result, kind, choice.<span class="hljs-property">destination</span>);
-                        completed = path.<span class="hljs-title">join</span>(root, choice.<span class="hljs-property">destination</span>);
-                        output.<span class="hljs-title">appendLine</span>(<span class="hljs-string">`Publication completed: </span><span class="hljs-subst">${completed}</span><span class="hljs-string">`</span>);
-                        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> warning <span class="hljs-keyword">of</span> outcome.<span class="hljs-property">warnings</span>) { output.<span class="hljs-title">appendLine</span>(<span class="hljs-string">`Warning: </span><span class="hljs-subst">${warning}</span><span class="hljs-string">`</span>); }
-                        <span class="hljs-keyword">if</span> (outcome.<span class="hljs-property">elapsedMs</span> !== <span class="hljs-literal">undefined</span>) {
-                            output.<span class="hljs-title">appendLine</span>(<span class="hljs-string">`Publication finished in </span><span class="hljs-subst">${elapsedPublicationTime(outcome.elapsedMs)}</span><span class="hljs-string">`</span>);
+                        <span class="hljs-keyword">if</span> (series) {
+                            <span class="hljs-keyword">const</span> <span class="hljs-attr">publicationDocuments</span>: <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">SourceDocument</span>[]&gt; = <span class="hljs-title">Object</span>.<span class="hljs-title">create</span>(<span class="hljs-literal">null</span>);
+                            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> item <span class="hljs-keyword">of</span> series.<span class="hljs-property">publications</span>) {
+                                <span class="hljs-title">cancelled</span>(token);
+                                <span class="hljs-keyword">const</span> projectRoot = <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalProjectRoot</span>(workspaceRoot, item.<span class="hljs-property">root</span>);
+                                <span class="hljs-title">authority</span>();
+                                publicationDocuments[item.<span class="hljs-property">id</span>] = <span class="hljs-keyword">await</span> <span class="hljs-title">capturePublicationSnapshot</span>(projectRoot, token);
+                                <span class="hljs-keyword">if</span> (manifest) { <span class="hljs-keyword">await</span> <span class="hljs-title">checkPath</span>(projectRoot, manifest); }
+                            }
+                            <span class="hljs-keyword">const</span> args = [<span class="hljs-string">'pdf'</span>, workspaceRoot];
+                            <span class="hljs-keyword">if</span> (browser) { args.<span class="hljs-title">push</span>(<span class="hljs-string">'--browser'</span>, browser); }
+                            <span class="hljs-keyword">if</span> (manifest) { args.<span class="hljs-title">push</span>(<span class="hljs-string">'--font-manifest'</span>, manifest); }
+                            args.<span class="hljs-title">push</span>(<span class="hljs-string">'--json'</span>);
+                            <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalRoot</span>(folder);
+                            <span class="hljs-title">authority</span>();
+                            <span class="hljs-title">cancelled</span>(token);
+                            <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">await</span> <span class="hljs-title">bridge</span>(node, context.<span class="hljs-title">asAbsolutePath</span>(<span class="hljs-string">'out/publication-helper.cjs'</span>), workspaceRoot,
+                                { args, <span class="hljs-attr">documents</span>: [], publicationDocuments }, token,
+                                <span class="hljs-params">text</span><span class="hljs-function"> =&gt;</span> { output.<span class="hljs-title">appendLine</span>(text); progress.<span class="hljs-title">report</span>({ <span class="hljs-attr">message</span>: text }); });
+                            <span class="hljs-keyword">if</span> (result.<span class="hljs-property">stderr</span>) { output.<span class="hljs-title">appendLine</span>(result.<span class="hljs-property">stderr</span>); }
+                            <span class="hljs-keyword">const</span> outcome = <span class="hljs-title">seriesPublicationOutcome</span>(result, series.<span class="hljs-property">publications</span>.<span class="hljs-title">map</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span> item.<span class="hljs-property">pdf</span>!));
+                            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> item <span class="hljs-keyword">of</span> series.<span class="hljs-property">publications</span>) {
+                                completed = path.<span class="hljs-title">resolve</span>(workspaceRoot, item.<span class="hljs-property">pdf</span>!);
+                                output.<span class="hljs-title">appendLine</span>(<span class="hljs-string">`Publication completed: </span><span class="hljs-subst">${completed}</span><span class="hljs-string">`</span>);
+                            }
+                            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> warning <span class="hljs-keyword">of</span> outcome.<span class="hljs-property">warnings</span>) { output.<span class="hljs-title">appendLine</span>(<span class="hljs-string">`Warning: </span><span class="hljs-subst">${warning}</span><span class="hljs-string">`</span>); }
+                            <span class="hljs-keyword">if</span> (outcome.<span class="hljs-property">elapsedMs</span> !== <span class="hljs-literal">undefined</span>) {
+                                output.<span class="hljs-title">appendLine</span>(<span class="hljs-string">`Publication finished in </span><span class="hljs-subst">${elapsedPublicationTime(outcome.elapsedMs)}</span><span class="hljs-string">`</span>);
+                            }
+                        } <span class="hljs-keyword">else</span> {
+                            <span class="hljs-keyword">const</span> documents = <span class="hljs-keyword">await</span> <span class="hljs-title">capturePublicationSnapshot</span>(root, token);
+                            <span class="hljs-keyword">const</span> args = [kind, root, <span class="hljs-string">'--output'</span>, choice!.<span class="hljs-property">destination</span>, <span class="hljs-string">'--paper'</span>, choice!.<span class="hljs-property">paper</span>];
+                            [<span class="hljs-string">'top'</span>, <span class="hljs-string">'outer'</span>, <span class="hljs-string">'bottom'</span>, <span class="hljs-string">'inner'</span>].<span class="hljs-title">forEach</span>(<span class="hljs-function">(</span><span class="hljs-params">side, index</span><span class="hljs-function">) =&gt;</span> {
+                                args.<span class="hljs-title">push</span>(<span class="hljs-string">`--margin-</span><span class="hljs-subst">${side}</span><span class="hljs-string">`</span>, <span class="hljs-string">`</span><span class="hljs-subst">${choice!.margins.split(</span><span class="hljs-string">','</span><span class="hljs-subst">)[index]}</span><span class="hljs-string">mm`</span>);
+                            });
+                            <span class="hljs-keyword">if</span> (browser) { args.<span class="hljs-title">push</span>(<span class="hljs-string">'--browser'</span>, browser); }
+                            <span class="hljs-keyword">if</span> (manifest) { <span class="hljs-keyword">await</span> <span class="hljs-title">checkPath</span>(root, manifest); args.<span class="hljs-title">push</span>(<span class="hljs-string">'--font-manifest'</span>, manifest); }
+                            args.<span class="hljs-title">push</span>(<span class="hljs-string">'--json'</span>);
+                            <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalRoot</span>(folder);
+                            <span class="hljs-keyword">if</span> (project) { <span class="hljs-keyword">await</span> <span class="hljs-title">canonicalProjectRoot</span>(workspaceRoot, project.<span class="hljs-property">root</span>); }
+                            <span class="hljs-keyword">await</span> <span class="hljs-title">checkPath</span>(root, choice!.<span class="hljs-property">destination</span>);
+                            <span class="hljs-title">authority</span>();
+                            <span class="hljs-title">cancelled</span>(token);
+                            <span class="hljs-keyword">const</span> result = <span class="hljs-keyword">await</span> <span class="hljs-title">bridge</span>(node, context.<span class="hljs-title">asAbsolutePath</span>(<span class="hljs-string">'out/publication-helper.cjs'</span>), root,
+                                { args, documents }, token, <span class="hljs-params">text</span><span class="hljs-function"> =&gt;</span> { output.<span class="hljs-title">appendLine</span>(text); progress.<span class="hljs-title">report</span>({ <span class="hljs-attr">message</span>: text }); });
+                            <span class="hljs-keyword">if</span> (result.<span class="hljs-property">stderr</span>) { output.<span class="hljs-title">appendLine</span>(result.<span class="hljs-property">stderr</span>); }
+                            <span class="hljs-keyword">const</span> outcome = <span class="hljs-title">publicationOutcome</span>(result, kind, choice!.<span class="hljs-property">destination</span>);
+                            completed = path.<span class="hljs-title">join</span>(root, choice!.<span class="hljs-property">destination</span>);
+                            output.<span class="hljs-title">appendLine</span>(<span class="hljs-string">`Publication completed: </span><span class="hljs-subst">${completed}</span><span class="hljs-string">`</span>);
+                            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> warning <span class="hljs-keyword">of</span> outcome.<span class="hljs-property">warnings</span>) { output.<span class="hljs-title">appendLine</span>(<span class="hljs-string">`Warning: </span><span class="hljs-subst">${warning}</span><span class="hljs-string">`</span>); }
+                            <span class="hljs-keyword">if</span> (outcome.<span class="hljs-property">elapsedMs</span> !== <span class="hljs-literal">undefined</span>) {
+                                output.<span class="hljs-title">appendLine</span>(<span class="hljs-string">`Publication finished in </span><span class="hljs-subst">${elapsedPublicationTime(outcome.elapsedMs)}</span><span class="hljs-string">`</span>);
+                            }
                         }
                     });
                 } <span class="hljs-keyword">finally</span> { forwarding.<span class="hljs-title">dispose</span>(); }
@@ -689,13 +755,18 @@ its cleanup and releases the publication guard immediately. PDFs open via
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d0065007800740065006e00730069006f006e002e006c0069007400650072006100740065-4"><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" data-literate-target="f-007000750062006c00690063006100740069006f006e00200065007800740065006e00730069006f006e00200063006f006d006d0061006e00640073" aria-label="Definition of publication extension commands">&lt;&lt;publication extension commands&gt;&gt;=+</a></div>
 <div class="code">
 <pre><code>            <span class="hljs-title">authority</span>();
-            <span class="hljs-keyword">await</span> context.<span class="hljs-property">workspaceState</span>.<span class="hljs-title">update</span>(key, choice);
-            <span class="hljs-title">authority</span>();
-            publishing = <span class="hljs-literal">false</span>;
-            <span class="hljs-keyword">const</span> action = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showInformationMessage</span>(<span class="hljs-string">`Exported </span><span class="hljs-subst">${choice.destination}</span><span class="hljs-string">`</span>, <span class="hljs-string">'Open Output'</span>);
-            <span class="hljs-keyword">if</span> (action === <span class="hljs-string">'Open Output'</span>) {
+            <span class="hljs-keyword">if</span> (series) {
+                publishing = <span class="hljs-literal">false</span>;
+                <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showInformationMessage</span>(<span class="hljs-string">`Exported </span><span class="hljs-subst">${series.publications.length}</span><span class="hljs-string"> PDFs`</span>);
+            } <span class="hljs-keyword">else</span> {
+                <span class="hljs-keyword">await</span> context.<span class="hljs-property">workspaceState</span>.<span class="hljs-title">update</span>(key, choice);
                 <span class="hljs-title">authority</span>();
-                <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">commands</span>.<span class="hljs-title">executeCommand</span>(<span class="hljs-string">'vscode.open'</span>, vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title">file</span>(path.<span class="hljs-title">join</span>(root, choice.<span class="hljs-property">destination</span>)));
+                publishing = <span class="hljs-literal">false</span>;
+                <span class="hljs-keyword">const</span> action = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">window</span>.<span class="hljs-title">showInformationMessage</span>(<span class="hljs-string">`Exported </span><span class="hljs-subst">${choice!.destination}</span><span class="hljs-string">`</span>, <span class="hljs-string">'Open Output'</span>);
+                <span class="hljs-keyword">if</span> (action === <span class="hljs-string">'Open Output'</span>) {
+                    <span class="hljs-title">authority</span>();
+                    <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">commands</span>.<span class="hljs-title">executeCommand</span>(<span class="hljs-string">'vscode.open'</span>, vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title">file</span>(path.<span class="hljs-title">join</span>(root, choice!.<span class="hljs-property">destination</span>)));
+                }
             }
         } <span class="hljs-keyword">catch</span> (error) {
             <span class="hljs-keyword">const</span> detail = completed

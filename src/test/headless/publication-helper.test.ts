@@ -9,10 +9,14 @@ const request = { args: ['latex', '--output', 'book.tex', '--json'], documents: 
 
 test('helper accepts only one publication JSON request', () => {
     assert.deepEqual(parseRequest(JSON.stringify(request)), request);
+    const series = { args: ['pdf', '/series', '--json'], documents: [],
+        publicationDocuments: { one: [{ path: 'index.literate', text: '# One' }] } };
+    assert.deepEqual(parseRequest(JSON.stringify(series)), series);
     for (const value of [null, [], {}, { ...request, extra: true },
         { ...request, args: ['generate', '--json'] },
         { ...request, args: ['pdf'] }, { ...request, args: ['latex', '--json', '--help'] },
-        { ...request, args: ['pdf', '--json', 1] }, { ...request, documents: {} }]) {
+        { ...request, args: ['pdf', '--json', 1] }, { ...request, documents: {} },
+        { ...request, publicationDocuments: [] }, { ...request, publicationDocuments: { one: {} } }]) {
         assert.throws(() => parseRequest(JSON.stringify(value)));
     }
     assert.throws(() => parseRequest('{}\n{}'));

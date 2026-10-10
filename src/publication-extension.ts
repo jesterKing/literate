@@ -6,11 +6,15 @@ import { discoveryExcludedDirectories, safeRelativePath } from './engine';
 import type { SourceDocument } from './engine';
 import { parsePublicationWorkspace, publicationForPath, publicationWorkspaceManifest,
     selectPublication } from './workspace-projects';
-import type { PublicationProject } from './workspace-projects';
+import type { PublicationProject, PublicationWorkspace } from './workspace-projects';
 
 type Kind = 'latex' | 'pdf';
 interface Choice { paper: string; margins: string; destination: string; }
-export interface PublicationRequest { args: string[]; documents: SourceDocument[]; }
+export interface PublicationRequest {
+    args: string[];
+    documents: SourceDocument[];
+    publicationDocuments?: Record<string, SourceDocument[]>;
+}
 export interface HelperResult { stdout: string; stderr: string; }
 export type PublicationQueue = <T>(operation: () => Promise<T>) => Promise<T>;
 export type PublicationBridge = (node: string, helper: string, root: string,
@@ -215,6 +219,21 @@ function publicationOutcome(result: HelperResult, kind: string, destination: str
     return { warnings: Array.isArray(warnings) ? warnings.map(String) : [],
         ...(Number.isInteger(elapsed) && elapsed >= 0 ? { elapsedMs: elapsed } : {}) };
 }
+function seriesPublicationOutcome(result: HelperResult, destinations: string[]): PublicationOutcome {
+    let response;
+    try { response = JSON.parse(result.stdout); }
+    catch { throw new Error(`Invalid JSON from publication helper:\n${result.stdout}`); }
+    const outputs = Array.isArray(response?.outputs) ? response.outputs : [];
+    if (response?.schemaVersion !== 1 || response.command !== 'pdf' || response.ok !== true ||
+        destinations.some(destination => !outputs.some((item: { path?: string; status?: string }) =>
+            item?.path === destination && ['written', 'current'].includes(item.status ?? '')))) {
+        throw new Error(`Publication did not report successful series outputs:\n${result.stdout}`);
+    }
+    const warnings: unknown = response.publication?.warnings;
+    const elapsed = response.elapsedMs;
+    return { warnings: Array.isArray(warnings) ? warnings.map(String) : [],
+        ...(Number.isInteger(elapsed) && elapsed >= 0 ? { elapsedMs: elapsed } : {}) };
+}
 function elapsedPublicationTime(elapsedMs: number): string {
     if (elapsedMs < 1000) { return `${elapsedMs} ms`; }
     const seconds = Math.floor(elapsedMs / 1000);
@@ -238,8 +257,9 @@ interface SelectedPublication {
     workspaceRoot: string;
     root: string;
     project?: PublicationProject;
+    series?: PublicationWorkspace;
 }
-async function choosePublication(): Promise<SelectedPublication | undefined> {
+async function choosePublication(kind: Kind): Promise<SelectedPublication | undefined> {
     const folder = await chooseFolder();
     if (!folder) { return undefined; }
     const folderRoot = await canonicalRoot(folder);
@@ -248,6 +268,11 @@ async function choosePublication(): Promise<SelectedPublication | undefined> {
     const workspaceRoot = path.dirname(manifestPath);
     await checkPath(workspaceRoot, publicationWorkspaceManifest);
     const workspace = parsePublicationWorkspace(await fs.readFile(manifestPath, 'utf8'));
+    if (kind === 'pdf') {
+        const missing = workspace.publications.filter(project => !project.pdf).map(project => project.id);
+        if (missing.length) { throw new Error(`Every publication must declare pdf for series export; missing: ${missing.join(', ')}`); }
+        return { folder, workspaceRoot, root: workspaceRoot, series: workspace };
+    }
     const active = vscode.window.activeTextEditor?.document.uri;
     const relative = active?.scheme === 'file' && !active.authority ?
         path.relative(workspaceRoot, active.fsPath).split(path.sep).join('/') : undefined;
@@ -326,15 +351,15 @@ export function registerPublicationCommands(context: vscode.ExtensionContext,
             allowed(operation.folder);
         };
         try {
-            const selected = await choosePublication();
+            const selected = await choosePublication(kind);
             if (!selected) { return; }
-            const { folder, workspaceRoot, root, project } = selected;
+            const { folder, workspaceRoot, root, project, series } = selected;
             operation.folder = folder;
             cancelled(token);
             authority();
             const key = `literate.publication:v3:${kind}:${workspaceRoot}:${project?.id ?? ''}`;
-            const choice = await chooseOutput(root, kind, context.workspaceState.get<Choice>(key));
-            if (!choice) { return; }
+            const choice = series ? undefined : await chooseOutput(root, kind, context.workspaceState.get<Choice>(key));
+            if (!series && !choice) { return; }
             cancelled(token);
             authority();
             const node = executable('nodePath', true)!;
@@ -353,40 +378,76 @@ export function registerPublicationCommands(context: vscode.ExtensionContext,
                         await canonicalRoot(folder);
                         if (project) { await canonicalProjectRoot(workspaceRoot, project.root); }
                         authority();
-                        const documents = await capturePublicationSnapshot(root, token);
-                        const args = [kind, root, '--output', choice.destination, '--paper', choice.paper];
-                        ['top', 'outer', 'bottom', 'inner'].forEach((side, index) => {
-                            args.push(`--margin-${side}`, `${choice.margins.split(',')[index]}mm`);
-                        });
-                        if (browser) { args.push('--browser', browser); }
-                        if (manifest) { await checkPath(root, manifest); args.push('--font-manifest', manifest); }
-                        args.push('--json');
-                        await canonicalRoot(folder);
-                        if (project) { await canonicalProjectRoot(workspaceRoot, project.root); }
-                        await checkPath(root, choice.destination);
-                        authority();
-                        cancelled(token);
-                        const result = await bridge(node, context.asAbsolutePath('out/publication-helper.cjs'), root,
-                            { args, documents }, token, text => { output.appendLine(text); progress.report({ message: text }); });
-                        if (result.stderr) { output.appendLine(result.stderr); }
-                        const outcome = publicationOutcome(result, kind, choice.destination);
-                        completed = path.join(root, choice.destination);
-                        output.appendLine(`Publication completed: ${completed}`);
-                        for (const warning of outcome.warnings) { output.appendLine(`Warning: ${warning}`); }
-                        if (outcome.elapsedMs !== undefined) {
-                            output.appendLine(`Publication finished in ${elapsedPublicationTime(outcome.elapsedMs)}`);
+                        if (series) {
+                            const publicationDocuments: Record<string, SourceDocument[]> = Object.create(null);
+                            for (const item of series.publications) {
+                                cancelled(token);
+                                const projectRoot = await canonicalProjectRoot(workspaceRoot, item.root);
+                                authority();
+                                publicationDocuments[item.id] = await capturePublicationSnapshot(projectRoot, token);
+                                if (manifest) { await checkPath(projectRoot, manifest); }
+                            }
+                            const args = ['pdf', workspaceRoot];
+                            if (browser) { args.push('--browser', browser); }
+                            if (manifest) { args.push('--font-manifest', manifest); }
+                            args.push('--json');
+                            await canonicalRoot(folder);
+                            authority();
+                            cancelled(token);
+                            const result = await bridge(node, context.asAbsolutePath('out/publication-helper.cjs'), workspaceRoot,
+                                { args, documents: [], publicationDocuments }, token,
+                                text => { output.appendLine(text); progress.report({ message: text }); });
+                            if (result.stderr) { output.appendLine(result.stderr); }
+                            const outcome = seriesPublicationOutcome(result, series.publications.map(item => item.pdf!));
+                            for (const item of series.publications) {
+                                completed = path.resolve(workspaceRoot, item.pdf!);
+                                output.appendLine(`Publication completed: ${completed}`);
+                            }
+                            for (const warning of outcome.warnings) { output.appendLine(`Warning: ${warning}`); }
+                            if (outcome.elapsedMs !== undefined) {
+                                output.appendLine(`Publication finished in ${elapsedPublicationTime(outcome.elapsedMs)}`);
+                            }
+                        } else {
+                            const documents = await capturePublicationSnapshot(root, token);
+                            const args = [kind, root, '--output', choice!.destination, '--paper', choice!.paper];
+                            ['top', 'outer', 'bottom', 'inner'].forEach((side, index) => {
+                                args.push(`--margin-${side}`, `${choice!.margins.split(',')[index]}mm`);
+                            });
+                            if (browser) { args.push('--browser', browser); }
+                            if (manifest) { await checkPath(root, manifest); args.push('--font-manifest', manifest); }
+                            args.push('--json');
+                            await canonicalRoot(folder);
+                            if (project) { await canonicalProjectRoot(workspaceRoot, project.root); }
+                            await checkPath(root, choice!.destination);
+                            authority();
+                            cancelled(token);
+                            const result = await bridge(node, context.asAbsolutePath('out/publication-helper.cjs'), root,
+                                { args, documents }, token, text => { output.appendLine(text); progress.report({ message: text }); });
+                            if (result.stderr) { output.appendLine(result.stderr); }
+                            const outcome = publicationOutcome(result, kind, choice!.destination);
+                            completed = path.join(root, choice!.destination);
+                            output.appendLine(`Publication completed: ${completed}`);
+                            for (const warning of outcome.warnings) { output.appendLine(`Warning: ${warning}`); }
+                            if (outcome.elapsedMs !== undefined) {
+                                output.appendLine(`Publication finished in ${elapsedPublicationTime(outcome.elapsedMs)}`);
+                            }
                         }
                     });
                 } finally { forwarding.dispose(); }
             });
             authority();
-            await context.workspaceState.update(key, choice);
-            authority();
-            publishing = false;
-            const action = await vscode.window.showInformationMessage(`Exported ${choice.destination}`, 'Open Output');
-            if (action === 'Open Output') {
+            if (series) {
+                publishing = false;
+                await vscode.window.showInformationMessage(`Exported ${series.publications.length} PDFs`);
+            } else {
+                await context.workspaceState.update(key, choice);
                 authority();
-                await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(path.join(root, choice.destination)));
+                publishing = false;
+                const action = await vscode.window.showInformationMessage(`Exported ${choice!.destination}`, 'Open Output');
+                if (action === 'Open Output') {
+                    authority();
+                    await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(path.join(root, choice!.destination)));
+                }
             }
         } catch (error) {
             const detail = completed

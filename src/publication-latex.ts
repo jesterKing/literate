@@ -1,5 +1,6 @@
 import type { ParsedProject, PublicationContribution, GenerationDiagnostic } from './engine';
 import { preparePandoc, PandocInline } from './publication-pandoc';
+import type { PublicationLinkResolver } from './publication-pandoc';
 import { publicationRail, RailFragment, RailNote, RailTerm } from './publication-rail';
 import { resolvePublicationSettings } from './publication-settings';
 import { checkFontFace, fontFaces, fontFile, PortableFont } from './publication-fonts';
@@ -11,6 +12,7 @@ import { highlightContribution, syntaxStyle } from './publication-highlight';
 export const publicationTemplateVersion = 5;
 export interface LatexOptions {
     assetPath?: (asset: PublicationAsset) => string;
+    publicationLink?: PublicationLinkResolver;
     theme?: string;
     paper?: 'A4' | 'A5' | 'letter' | 'legal';
     marginMm?: number;
@@ -647,7 +649,7 @@ export async function renderLatex(parsed: ParsedProject, options: LatexOptions,
         const budget = annotationBudget(parsed);
         const prepared = preparePandoc(parsed, part =>
             contribution(part, parsed, checked.theme, definitions), options.assetPath
-                ? asset => imageBlock(asset, options.assetPath!) : undefined);
+                ? asset => imageBlock(asset, options.assetPath!) : undefined, options.publicationLink);
         if (!prepared.document) { return { diagnostics: prepared.diagnostics }; }
         prepared.document.blocks = ordinaryCode(prepared.document.blocks, checked.theme);
         stage = 'latex-conversion';

@@ -120,6 +120,14 @@ test('Pandoc replaces nested contributions in place with zero or multiple blocks
     assert.equal(JSON.stringify(project), before, 'preparation must not mutate the parsed snapshot');
 });
 
+test('Pandoc delegates links outside the current publication', () => {
+    const result = preparePandoc(parse('[Other](../other/index.literate#title)'), () => [], undefined,
+        (href, source) => href === '../other/index.literate#title' && source === 'index.literate'
+            ? '../other.pdf#title' : undefined);
+    assert.deepEqual(result.diagnostics, []);
+    assert.match(JSON.stringify(result.document), /\.\.\/other\.pdf#title/);
+});
+
 test('Pandoc accepts safe external links and resolves included documents with spaces and parent traversal', () => {
     const project = parseProject([
         { path: 'index.literate', text: '[Chapter](<chapters/a b.html> "chapter title")' },

@@ -142,7 +142,11 @@ here, not in ordinary CLI commands. No readiness chatter is sent on stdout.</p>
 <span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">Readable</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'node:stream'</span>;
 
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">const</span> maximumRequestBytes = <span class="hljs-number">32</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>;
-<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationRequest</span> { <span class="hljs-attr">args</span>: <span class="hljs-built_in">string</span>[]; <span class="hljs-attr">documents</span>: <span class="hljs-title">SourceDocument</span>[]; }
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationRequest</span> {
+    <span class="hljs-attr">args</span>: <span class="hljs-built_in">string</span>[];
+    <span class="hljs-attr">documents</span>: <span class="hljs-title">SourceDocument</span>[];
+    publicationDocuments?: <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">SourceDocument</span>[]&gt;;
+}
 
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">function</span> <span class="hljs-title">validateRuntime</span>(<span class="hljs-params">versions: </span><span class="hljs-params">{ node: </span><span class="hljs-built_in">string</span><span class="hljs-params">; electron?: </span><span class="hljs-built_in">string</span><span class="hljs-params"> }</span><span class="hljs-params"> = process.versions</span>): <span class="hljs-built_in">void</span> {
     <span class="hljs-keyword">const</span> [major, minor] = versions.<span class="hljs-property">node</span>.<span class="hljs-title">split</span>(<span class="hljs-string">'.'</span>).<span class="hljs-title">map</span>(<span class="hljs-title">Number</span>);
@@ -158,11 +162,15 @@ here, not in ordinary CLI commands. No readiness chatter is sent on stdout.</p>
         <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Expected a publication request object'</span>);
     }
     <span class="hljs-keyword">const</span> request = value <span class="hljs-keyword">as</span> <span class="hljs-title">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">unknown</span>&gt;;
-    <span class="hljs-keyword">if</span> (<span class="hljs-title">Object</span>.<span class="hljs-title">keys</span>(request).<span class="hljs-title">some</span>(<span class="hljs-params">key</span><span class="hljs-function"> =&gt;</span> key !== <span class="hljs-string">'args'</span> &amp;&amp; key !== <span class="hljs-string">'documents'</span>)
+    <span class="hljs-keyword">const</span> publicationDocuments = request.<span class="hljs-property">publicationDocuments</span>;
+    <span class="hljs-keyword">if</span> (<span class="hljs-title">Object</span>.<span class="hljs-title">keys</span>(request).<span class="hljs-title">some</span>(<span class="hljs-params">key</span><span class="hljs-function"> =&gt;</span> ![<span class="hljs-string">'args'</span>, <span class="hljs-string">'documents'</span>, <span class="hljs-string">'publicationDocuments'</span>].<span class="hljs-title">includes</span>(key))
         || !<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(request.<span class="hljs-property">args</span>) || !request.<span class="hljs-property">args</span>.<span class="hljs-title">every</span>(<span class="hljs-params">arg</span><span class="hljs-function"> =&gt;</span> <span class="hljs-keyword">typeof</span> arg === <span class="hljs-string">'string'</span>)
         || ![<span class="hljs-string">'latex'</span>, <span class="hljs-string">'pdf'</span>].<span class="hljs-title">includes</span>(request.<span class="hljs-property">args</span>[<span class="hljs-number">0</span>]) || !request.<span class="hljs-property">args</span>.<span class="hljs-title">includes</span>(<span class="hljs-string">'--json'</span>)
         || request.<span class="hljs-property">args</span>.<span class="hljs-title">some</span>(<span class="hljs-params">arg</span><span class="hljs-function"> =&gt;</span> [<span class="hljs-string">'--help'</span>, <span class="hljs-string">'-h'</span>].<span class="hljs-title">includes</span>(arg))
-        || !<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(request.<span class="hljs-property">documents</span>)) {
+        || !<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(request.<span class="hljs-property">documents</span>)
+        || publicationDocuments !== <span class="hljs-literal">undefined</span> &amp;&amp; (!publicationDocuments || <span class="hljs-keyword">typeof</span> publicationDocuments !== <span class="hljs-string">'object'</span>
+            || <span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(publicationDocuments)
+            || <span class="hljs-title">Object</span>.<span class="hljs-title">values</span>(publicationDocuments).<span class="hljs-title">some</span>(<span class="hljs-params">value</span><span class="hljs-function"> =&gt;</span> !<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(value)))) {
         <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Expected {args, documents}: latex or pdf first, --json required, no help'</span>);
     }
     <span class="hljs-keyword">return</span> request <span class="hljs-keyword">as</span> <span class="hljs-built_in">unknown</span> <span class="hljs-keyword">as</span> <span class="hljs-title">PublicationRequest</span>;
@@ -229,7 +237,8 @@ JavaScript starts uses Node's default nonzero termination and cannot write files
         <span class="hljs-keyword">const</span> code = <span class="hljs-keyword">await</span> <span class="hljs-title">run</span>(request.<span class="hljs-property">args</span>, {
             <span class="hljs-attr">stdout</span>: <span class="hljs-params">text</span><span class="hljs-function"> =&gt;</span> { output += text; },
             <span class="hljs-attr">stderr</span>: <span class="hljs-function">() =&gt;</span> { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Unexpected non-JSON publication output'</span>); }
-        }, <span class="hljs-literal">undefined</span>, <span class="hljs-literal">undefined</span>, <span class="hljs-literal">undefined</span>, <span class="hljs-literal">undefined</span>, { <span class="hljs-attr">documents</span>: request.<span class="hljs-property">documents</span> });
+        }, <span class="hljs-literal">undefined</span>, <span class="hljs-literal">undefined</span>, <span class="hljs-literal">undefined</span>, <span class="hljs-literal">undefined</span>,
+            { <span class="hljs-attr">documents</span>: request.<span class="hljs-property">documents</span>, <span class="hljs-attr">publicationDocuments</span>: request.<span class="hljs-property">publicationDocuments</span> });
         process.<span class="hljs-property">stdout</span>.<span class="hljs-title">write</span>(output);
         <span class="hljs-keyword">return</span> code;
     } <span class="hljs-keyword">catch</span> (error) {

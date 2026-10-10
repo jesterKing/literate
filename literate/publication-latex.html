@@ -143,6 +143,7 @@ spelled with their original delimiters. Exceptions pass through the bridge gate.
 <div class="code">
 <pre><code><span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">ParsedProject</span>, <span class="hljs-title">PublicationContribution</span>, <span class="hljs-title">GenerationDiagnostic</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
 <span class="hljs-keyword">import</span> { preparePandoc, <span class="hljs-title">PandocInline</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-pandoc'</span>;
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">PublicationLinkResolver</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-pandoc'</span>;
 <span class="hljs-keyword">import</span> { publicationRail, <span class="hljs-title">RailFragment</span>, <span class="hljs-title">RailNote</span>, <span class="hljs-title">RailTerm</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-rail'</span>;
 <span class="hljs-keyword">import</span> { resolvePublicationSettings } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-settings'</span>;
 <span class="hljs-keyword">import</span> { checkFontFace, fontFaces, fontFile, <span class="hljs-title">PortableFont</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-fonts'</span>;
@@ -165,6 +166,7 @@ cross the template boundary.</p>
 <pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">const</span> publicationTemplateVersion = <span class="hljs-number">5</span>;
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">LatexOptions</span> {
     assetPath?: <span class="hljs-function">(</span><span class="hljs-params">asset: PublicationAsset</span><span class="hljs-function">) =&gt;</span> <span class="hljs-built_in">string</span>;
+    publicationLink?: <span class="hljs-title">PublicationLinkResolver</span>;
     theme?: <span class="hljs-built_in">string</span>;
     paper?: <span class="hljs-string">'A4'</span> | <span class="hljs-string">'A5'</span> | <span class="hljs-string">'letter'</span> | <span class="hljs-string">'legal'</span>;
     marginMm?: <span class="hljs-built_in">number</span>;
@@ -1055,7 +1057,7 @@ The first document provides a stable location for non-source-specific failures.<
         <span class="hljs-keyword">const</span> budget = <span class="hljs-title">annotationBudget</span>(parsed);
         <span class="hljs-keyword">const</span> prepared = <span class="hljs-title">preparePandoc</span>(parsed, <span class="hljs-params">part</span><span class="hljs-function"> =&gt;</span>
             <span class="hljs-title">contribution</span>(part, parsed, checked.<span class="hljs-property">theme</span>, definitions), options.<span class="hljs-property">assetPath</span>
-                ? <span class="hljs-params">asset</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">imageBlock</span>(asset, options.<span class="hljs-property">assetPath</span>!) : <span class="hljs-literal">undefined</span>);
+                ? <span class="hljs-params">asset</span><span class="hljs-function"> =&gt;</span> <span class="hljs-title">imageBlock</span>(asset, options.<span class="hljs-property">assetPath</span>!) : <span class="hljs-literal">undefined</span>, options.<span class="hljs-property">publicationLink</span>);
         <span class="hljs-keyword">if</span> (!prepared.<span class="hljs-property">document</span>) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">diagnostics</span>: prepared.<span class="hljs-property">diagnostics</span> }; }
         prepared.<span class="hljs-property">document</span>.<span class="hljs-property">blocks</span> = <span class="hljs-title">ordinaryCode</span>(prepared.<span class="hljs-property">document</span>.<span class="hljs-property">blocks</span>, checked.<span class="hljs-property">theme</span>);
 </code></pre>

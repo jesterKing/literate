@@ -167,7 +167,7 @@ converter's behavior.
 ```ts : <<publication Pandoc preparation>>=
 export function preparePandoc(
     project: ParsedProject, renderContribution: (part: PublicationContribution) => PandocBlock[],
-    renderAsset?: AssetRenderer
+    renderAsset?: AssetRenderer, external?: PublicationLinkResolver
 ): PandocPreparationResult {
     const diagnostics = project.diagnostics.map(diagnostic => ({ ...diagnostic }));
     if (diagnostics.length) { return { diagnostics }; }
@@ -178,7 +178,7 @@ export function preparePandoc(
     const parts = new Map(project.publication.contributions.map(part => [part.target, part]));
     const pending: PendingBlock[] = project.documents.map(document => {
         const contributions = contributionIndex(document, parts, diagnostics);
-        const body = readBlocks({ document, index: 0, contributions, targets, diagnostics,
+        const body = readBlocks({ document, index: 0, contributions, targets, diagnostics, external,
             annotations: project.annotations, publication: project.publication, assets: !!renderAsset });
         return { t: 'Div', c: [[targets.get(document.path)!.id, [], []], body] };
     });
