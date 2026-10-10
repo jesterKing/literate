@@ -1,5 +1,12 @@
 # Change Log
 
+## 0.17.0
+
+* Add manifest-driven multi-book workspaces and atomic series PDF export.
+* Add cross-book chapter, heading, term, fragment, and diagram links ( #7 ).
+* Add stable authored Mermaid diagram IDs.
+* Add book-and-page print citations with grouped references.
+
 ## 0.16.0
 
 * Rewrite and restructure the book with a stronger prose-first narrative.
@@ -11,7 +18,7 @@
 * LSP-based editor capabilities: hover, completion, signature, rename ( #5 )
 * Add exporting to PDF
 * Mermaid diagrams now also render into HTML and PDF
-* Fully self-hosted, should be able to debug extension again ( #7 )
+* Fully self-hosted, should be able to debug extension again ( #41 )
 * Theme support, CSS cleanup
 
 
