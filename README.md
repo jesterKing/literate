@@ -399,7 +399,9 @@ A manifest containing one publication is selected automatically for
 non-series commands. A series with several publications requires an
 exact ID for inspection and generation. Outputs, templates, settings,
 fragments, and diagnostics remain relative to the selected project
-root. VS Code rejects multiple manifests in one workspace folder as
+root. Ordinary VS Code processing also keeps each declared fragment
+graph and its diagnostics separate, so publications may reuse fragment
+names. VS Code rejects multiple manifests in one workspace folder as
 ambiguous. Workspaces without a manifest keep the existing
 single-project behavior.
 

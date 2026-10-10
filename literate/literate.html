@@ -376,6 +376,7 @@ flag also makes already-queued processing requests inert.</p>
       <span class="hljs-variable">this</span>.<span class="hljs-property">sourceDocuments</span>.<span class="hljs-title">clear</span>();
       <span class="hljs-variable">this</span>.<span class="hljs-property">previewThemes</span>.<span class="hljs-title">clear</span>();
       <span class="hljs-variable">this</span>.<span class="hljs-property">occurrences</span>.<span class="hljs-title">clear</span>();
+      <span class="hljs-variable">this</span>.<span class="hljs-property">projectsForWorkspaceFolders</span>.<span class="hljs-title">clear</span>();
 }
 </code></pre>
 
@@ -395,6 +396,32 @@ properly. We'll need an instance of a properly configured <em>MarkdownIt</em> pa
 <span class="hljs-keyword">private</span> inputTimers = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">ReturnType</span>&lt;<span class="hljs-keyword">typeof</span> <span class="hljs-built_in">setTimeout</span>&gt;&gt;();
 <span class="hljs-keyword">private</span> <span class="hljs-attr">inputSubscriptions</span>: vscode.<span class="hljs-property">Disposable</span>[] = [];
 <span class="hljs-keyword">private</span> generatedOutputs = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;&gt;();
+<span class="hljs-keyword">private</span> projectsForWorkspaceFolders = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, vscode.<span class="hljs-property">WorkspaceFolder</span>[]&gt;();
+<span class="hljs-keyword">private</span> <span class="hljs-keyword">async</span> <span class="hljs-title">publicationProjects</span>(<span class="hljs-attr">folder</span>: vscode.<span class="hljs-property">WorkspaceFolder</span>): <span class="hljs-title">Promise</span>&lt;vscode.<span class="hljs-property">WorkspaceFolder</span>[]&gt; {
+  <span class="hljs-keyword">const</span> cached = <span class="hljs-variable">this</span>.<span class="hljs-property">projectsForWorkspaceFolders</span>.<span class="hljs-title">get</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>());
+  <span class="hljs-keyword">if</span> (cached) { <span class="hljs-keyword">return</span> cached; }
+  <span class="hljs-keyword">const</span> manifests = <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">findFiles</span>(
+    <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">RelativePattern</span>(folder, <span class="hljs-string">`**/</span><span class="hljs-subst">${publicationWorkspaceManifest}</span><span class="hljs-string">`</span>), <span class="hljs-literal">null</span>, <span class="hljs-number">2</span>);
+  <span class="hljs-keyword">if</span> (!manifests.<span class="hljs-property">length</span>) {
+    <span class="hljs-keyword">const</span> projects = [folder];
+    <span class="hljs-variable">this</span>.<span class="hljs-property">projectsForWorkspaceFolders</span>.<span class="hljs-title">set</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>(), projects);
+    <span class="hljs-keyword">return</span> projects;
+  }
+  <span class="hljs-keyword">if</span> (manifests.<span class="hljs-property">length</span> &gt; <span class="hljs-number">1</span>) {
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Multiple </span><span class="hljs-subst">${publicationWorkspaceManifest}</span><span class="hljs-string"> files found; open a narrower workspace folder`</span>);
+  }
+  <span class="hljs-keyword">const</span> manifest = manifests[<span class="hljs-number">0</span>];
+  <span class="hljs-keyword">const</span> workspace = <span class="hljs-title">parsePublicationWorkspace</span>(<span class="hljs-keyword">new</span> <span class="hljs-title">TextDecoder</span>(<span class="hljs-string">'utf-8'</span>).<span class="hljs-title">decode</span>(
+    <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">fs</span>.<span class="hljs-title">readFile</span>(manifest)));
+  <span class="hljs-keyword">const</span> manifestRoot = vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title">joinPath</span>(manifest, <span class="hljs-string">'..'</span>);
+  <span class="hljs-keyword">const</span> projects = workspace.<span class="hljs-property">publications</span>.<span class="hljs-title">map</span>((publication, index): vscode.<span class="hljs-property">WorkspaceFolder</span> =&gt; ({
+    <span class="hljs-attr">uri</span>: vscode.<span class="hljs-property">Uri</span>.<span class="hljs-title">joinPath</span>(manifestRoot, ...publication.<span class="hljs-property">root</span>.<span class="hljs-title">split</span>(<span class="hljs-string">'/'</span>)),
+    <span class="hljs-attr">name</span>: publication.<span class="hljs-property">title</span>,
+    index
+  }));
+  <span class="hljs-variable">this</span>.<span class="hljs-property">projectsForWorkspaceFolders</span>.<span class="hljs-title">set</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>(), projects);
+  <span class="hljs-keyword">return</span> projects;
+}
 </code></pre>
 
 </div>
@@ -406,6 +433,10 @@ chapter's dependencies.</p>
 <div class="fragmentname" id="c-0066007200610067006d0065006e00740020007200650070006f007300690074006f007200790020006d0065006d0062006500720020007600610072006900610062006c00650073-006c0069007400650072006100740065002f006c0069007400650072006100740065002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-0066007200610067006d0065006e00740020007200650070006f007300690074006f007200790020006d0065006d0062006500720020007600610072006900610062006c00650073" data-literate-target="f-0066007200610067006d0065006e00740020007200650070006f007300690074006f007200790020006d0065006d0062006500720020007600610072006900610062006c00650073" aria-label="Definition of fragment repository member variables">&lt;&lt;fragment repository member variables&gt;&gt;=+</a></div>
 <div class="code">
 <pre><code><span class="hljs-keyword">private</span> <span class="hljs-title">isWatchedInput</span>(<span class="hljs-attr">uri</span>: vscode.<span class="hljs-property">Uri</span>, <span class="hljs-attr">folder</span>: vscode.<span class="hljs-property">WorkspaceFolder</span>): <span class="hljs-built_in">boolean</span> {
+  folder = <span class="hljs-variable">this</span>.<span class="hljs-property">projectsForWorkspaceFolders</span>.<span class="hljs-title">get</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>())?.<span class="hljs-title">find</span>(<span class="hljs-params">project</span><span class="hljs-function"> =&gt;</span> {
+    <span class="hljs-keyword">const</span> relative = path.<span class="hljs-property">posix</span>.<span class="hljs-title">relative</span>(project.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>, uri.<span class="hljs-property">path</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-title">safeRelativePath</span>(relative) === relative;
+  }) ?? folder;
   <span class="hljs-keyword">if</span> (<span class="hljs-variable">this</span>.<span class="hljs-property">generatedOutputs</span>.<span class="hljs-title">get</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>())?.<span class="hljs-title">has</span>(uri.<span class="hljs-title">toString</span>())) { <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>; }
   <span class="hljs-keyword">const</span> relative = path.<span class="hljs-property">posix</span>.<span class="hljs-title">relative</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>, uri.<span class="hljs-property">path</span>);
   <span class="hljs-keyword">if</span> (relative.<span class="hljs-title">split</span>(<span class="hljs-string">'/'</span>).<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, -<span class="hljs-number">1</span>).<span class="hljs-title">some</span>(<span class="hljs-params">part</span><span class="hljs-function"> =&gt;</span> discoveryExcludedDirectories.<span class="hljs-title">includes</span>(part))) {
@@ -416,7 +447,8 @@ chapter's dependencies.</p>
     .<span class="hljs-title">map</span>(<span class="hljs-params">document</span><span class="hljs-function"> =&gt;</span> [<span class="hljs-variable">document</span>.<span class="hljs-property">path</span>, <span class="hljs-variable">document</span>]));
   <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> <span class="hljs-variable">document</span> <span class="hljs-keyword">of</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">textDocuments</span>) {
     <span class="hljs-keyword">if</span> (!<span class="hljs-variable">document</span>.<span class="hljs-property">isClosed</span> &amp;&amp; <span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'.literate'</span>)
-      &amp;&amp; vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">getWorkspaceFolder</span>(<span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>)?.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>() === folder.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>()) {
+      &amp;&amp; <span class="hljs-title">safeRelativePath</span>(path.<span class="hljs-property">posix</span>.<span class="hljs-title">relative</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>, <span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>)) ===
+        path.<span class="hljs-property">posix</span>.<span class="hljs-title">relative</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>, <span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>)) {
       <span class="hljs-keyword">const</span> name = path.<span class="hljs-property">posix</span>.<span class="hljs-title">relative</span>(folder.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>, <span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>);
       <span class="hljs-keyword">if</span> (!name.<span class="hljs-title">split</span>(<span class="hljs-string">'/'</span>).<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, -<span class="hljs-number">1</span>).<span class="hljs-title">some</span>(<span class="hljs-params">part</span><span class="hljs-function"> =&gt;</span> discoveryExcludedDirectories.<span class="hljs-title">includes</span>(part))) {
         documents.<span class="hljs-title">set</span>(name, { <span class="hljs-attr">path</span>: name, <span class="hljs-attr">text</span>: <span class="hljs-variable">document</span>.<span class="hljs-title">getText</span>() });
@@ -727,7 +759,9 @@ processing queue cannot deadlock with a preview request.</p>
       ? <span class="hljs-title">determineWorkspaceFolder</span>(trigger) : trigger);
     <span class="hljs-keyword">const</span> folders = trigger ? (folder ? [folder] : [])
       : vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">workspaceFolders</span> || [];
-    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> workspaceFolder <span class="hljs-keyword">of</span> folders) {
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> folder <span class="hljs-keyword">of</span> folders) {
+      <span class="hljs-keyword">const</span> projects = <span class="hljs-keyword">await</span> <span class="hljs-variable">this</span>.<span class="hljs-title">publicationProjects</span>(folder);
+      <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> workspaceFolder <span class="hljs-keyword">of</span> projects) {
       <span data-literate-explore="f-0073006e0061007000730068006f007400200077006f0072006b0073007000610063006500200064006f00630075006d0065006e0074007300200061006e00640020007400680065006d0065"><a class="literate-tag-name" href="#f-0073006e0061007000730068006f007400200077006f0072006b0073007000610063006500200064006f00630075006d0065006e0074007300200061006e00640020007400680065006d0065" data-literate-target="f-0073006e0061007000730068006f007400200077006f0072006b0073007000610063006500200064006f00630075006d0065006e0074007300200061006e00640020007400680065006d0065" aria-label="Definition of snapshot workspace documents and theme">&lt;&lt;snapshot workspace documents and theme&gt;&gt;</a></span>
       <span data-literate-explore="f-006c006f0061006400200073006e0061007000730068006f0074002000740065006d0070006c0061007400650073"><a class="literate-tag-name" href="#f-006c006f0061006400200073006e0061007000730068006f0074002000740065006d0070006c0061007400650073" data-literate-target="f-006c006f0061006400200073006e0061007000730068006f0074002000740065006d0070006c0061007400650073" aria-label="Definition of load snapshot templates">&lt;&lt;load snapshot templates&gt;&gt;</a></span>
       <span class="hljs-keyword">const</span> result = <span class="hljs-title">generateProject</span>(documents, templates);
@@ -739,6 +773,7 @@ processing queue cannot deadlock with a preview request.</p>
       <span data-literate-explore="f-007000610072007300650020006e0061007600690067006100740069006f006e00200073006e0061007000730068006f0074"><a class="literate-tag-name" href="#f-007000610072007300650020006e0061007600690067006100740069006f006e00200073006e0061007000730068006f0074" data-literate-target="f-007000610072007300650020006e0061007600690067006100740069006f006e00200073006e0061007000730068006f0074" aria-label="Definition of parse navigation snapshot">&lt;&lt;parse navigation snapshot&gt;&gt;</a></span>
       <span data-literate-explore="f-0072006500660072006500730068002000730065006d0061006e0074006900630020007000720065007600690065007700200073006e0061007000730068006f0074"><a class="literate-tag-name" href="#f-0072006500660072006500730068002000730065006d0061006e0074006900630020007000720065007600690065007700200073006e0061007000730068006f0074" data-literate-target="f-0072006500660072006500730068002000730065006d0061006e0074006900630020007000720065007600690065007700200073006e0061007000730068006f0074" aria-label="Definition of refresh semantic preview snapshot">&lt;&lt;refresh semantic preview snapshot&gt;&gt;</a></span>
       <span data-literate-explore="f-0063006f006d006d00690074002000760061006c0069006400200072006500710075006500730074006500640020006f007500740070007500740073"><a class="literate-tag-name" href="#f-0063006f006d006d00690074002000760061006c0069006400200072006500710075006500730074006500640020006f007500740070007500740073" data-literate-target="f-0063006f006d006d00690074002000760061006c0069006400200072006500710075006500730074006500640020006f007500740070007500740073" aria-label="Definition of commit valid requested outputs">&lt;&lt;commit valid requested outputs&gt;&gt;</a></span>
+      }
     }
   });
   <span class="hljs-variable">this</span>.<span class="hljs-property">processingQueue</span> = operation.<span class="hljs-title">catch</span>(<span class="hljs-params">error</span><span class="hljs-function"> =&gt;</span> {
@@ -858,9 +893,8 @@ diagnostics owned by other workspace folders.</p>
 <div class="code">
 <pre><code><span class="hljs-keyword">const</span> <span class="hljs-attr">stale</span>: vscode.<span class="hljs-property">Uri</span>[] = [];
 <span class="hljs-variable">this</span>.<span class="hljs-property">diagnostics</span>.<span class="hljs-title">forEach</span>(<span class="hljs-params">uri</span><span class="hljs-function"> =&gt;</span> {
-  <span class="hljs-keyword">if</span> (vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">getWorkspaceFolder</span>(uri)?.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>() === workspaceFolder.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>()) {
-    stale.<span class="hljs-title">push</span>(uri);
-  }
+  <span class="hljs-keyword">const</span> relative = path.<span class="hljs-property">posix</span>.<span class="hljs-title">relative</span>(workspaceFolder.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>, uri.<span class="hljs-property">path</span>);
+  <span class="hljs-keyword">if</span> (<span class="hljs-title">safeRelativePath</span>(relative) === relative) { stale.<span class="hljs-title">push</span>(uri); }
 });
 <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> uri <span class="hljs-keyword">of</span> stale) { <span class="hljs-variable">this</span>.<span class="hljs-property">diagnostics</span>.<span class="hljs-title">delete</span>(uri); }
 <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [uri, entries] <span class="hljs-keyword">of</span> diagnostics) {
@@ -2421,16 +2455,18 @@ use Process after changing a template without changing a literate document.</p>
 <pre><code><span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title">getLiterateFileUris</span>(<span class="hljs-params">workspaceFolder: vscode.WorkspaceFolder</span>): <span class="hljs-title">Promise</span>&lt;vscode.<span class="hljs-property">Uri</span>[]&gt; {
   <span class="hljs-keyword">const</span> uris = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, vscode.<span class="hljs-property">Uri</span>&gt;();
   <span class="hljs-keyword">const</span> excluded = <span class="hljs-keyword">new</span> <span class="hljs-title">Set</span>&lt;<span class="hljs-built_in">string</span>&gt;(discoveryExcludedDirectories);
-  <span class="hljs-keyword">const</span> included = (<span class="hljs-attr">uri</span>: vscode.<span class="hljs-property">Uri</span>): <span class="hljs-params">boolean</span><span class="hljs-function"> =&gt;</span> !path.<span class="hljs-property">posix</span>
-    .<span class="hljs-title">relative</span>(workspaceFolder.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>, uri.<span class="hljs-property">path</span>).<span class="hljs-title">split</span>(<span class="hljs-string">'/'</span>).<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, -<span class="hljs-number">1</span>)
-    .<span class="hljs-title">some</span>(<span class="hljs-params">directory</span><span class="hljs-function"> =&gt;</span> excluded.<span class="hljs-title">has</span>(directory));
+  <span class="hljs-keyword">const</span> included = (<span class="hljs-attr">uri</span>: vscode.<span class="hljs-property">Uri</span>): <span class="hljs-params">boolean</span><span class="hljs-function"> =&gt;</span> {
+    <span class="hljs-keyword">const</span> relative = path.<span class="hljs-property">posix</span>.<span class="hljs-title">relative</span>(workspaceFolder.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>, uri.<span class="hljs-property">path</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-title">safeRelativePath</span>(relative) === relative &amp;&amp; !relative.<span class="hljs-title">split</span>(<span class="hljs-string">'/'</span>).<span class="hljs-title">slice</span>(<span class="hljs-number">0</span>, -<span class="hljs-number">1</span>)
+      .<span class="hljs-title">some</span>(<span class="hljs-params">directory</span><span class="hljs-function"> =&gt;</span> excluded.<span class="hljs-title">has</span>(directory));
+  };
   <span class="hljs-keyword">const</span> pattern = <span class="hljs-keyword">new</span> vscode.<span class="hljs-title">RelativePattern</span>(workspaceFolder, <span class="hljs-string">'**/*.literate'</span>);
   <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> uri <span class="hljs-keyword">of</span> <span class="hljs-keyword">await</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">findFiles</span>(pattern, <span class="hljs-literal">null</span>)) {
     <span class="hljs-keyword">if</span> (<span class="hljs-title">included</span>(uri)) { uris.<span class="hljs-title">set</span>(uri.<span class="hljs-title">toString</span>(), uri); }
   }
   <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> <span class="hljs-variable">document</span> <span class="hljs-keyword">of</span> vscode.<span class="hljs-property">workspace</span>.<span class="hljs-property">textDocuments</span>) {
     <span class="hljs-keyword">if</span> (<span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-property">path</span>.<span class="hljs-title">endsWith</span>(<span class="hljs-string">'.literate'</span>) &amp;&amp; <span class="hljs-title">included</span>(<span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>) &amp;&amp;
-        vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">getWorkspaceFolder</span>(<span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>)?.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>() === workspaceFolder.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>()) {
+        vscode.<span class="hljs-property">workspace</span>.<span class="hljs-title">getWorkspaceFolder</span>(<span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>)) {
       uris.<span class="hljs-title">set</span>(<span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>.<span class="hljs-title">toString</span>(), <span class="hljs-variable">document</span>.<span class="hljs-property">uri</span>);
     }
   }
@@ -2527,6 +2563,7 @@ services on which the editor adapter depends.</p>
   renderScreenExploration } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-screen'</span>;
 <span class="hljs-keyword">import</span> { registerPublicationCommands } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-extension'</span>;
 <span class="hljs-keyword">import</span> { registerLanguageFeatures, <span class="hljs-title">LanguageSnapshot</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./language-features'</span>;
+<span class="hljs-keyword">import</span> { parsePublicationWorkspace, publicationWorkspaceManifest } <span class="hljs-keyword">from</span> <span class="hljs-string">'./workspace-projects'</span>;
 
 <span class="hljs-keyword">import</span> <span class="hljs-title">StateCore</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">'markdown-it/lib/rules_core/state_core'</span>);
 <span class="hljs-keyword">import</span> <span class="hljs-title">Token</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">'markdown-it/lib/token'</span>);

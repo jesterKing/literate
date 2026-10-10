@@ -26,6 +26,7 @@ import { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAn
   renderScreenExploration } from './publication-screen';
 import { registerPublicationCommands } from './publication-extension';
 import { registerLanguageFeatures, LanguageSnapshot } from './language-features';
+import { parsePublicationWorkspace, publicationWorkspaceManifest } from './workspace-projects';
 
 import StateCore = require('markdown-it/lib/rules_core/state_core');
 import Token = require('markdown-it/lib/token');
@@ -706,7 +707,37 @@ export class FragmentRepository {
   private inputTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private inputSubscriptions: vscode.Disposable[] = [];
   private generatedOutputs = new Map<string, Set<string>>();
+  private projectsForWorkspaceFolders = new Map<string, vscode.WorkspaceFolder[]>();
+  private async publicationProjects(folder: vscode.WorkspaceFolder): Promise<vscode.WorkspaceFolder[]> {
+    const cached = this.projectsForWorkspaceFolders.get(folder.uri.toString());
+    if (cached) { return cached; }
+    const manifests = await vscode.workspace.findFiles(
+      new vscode.RelativePattern(folder, `**/${publicationWorkspaceManifest}`), null, 2);
+    if (!manifests.length) {
+      const projects = [folder];
+      this.projectsForWorkspaceFolders.set(folder.uri.toString(), projects);
+      return projects;
+    }
+    if (manifests.length > 1) {
+      throw new Error(`Multiple ${publicationWorkspaceManifest} files found; open a narrower workspace folder`);
+    }
+    const manifest = manifests[0];
+    const workspace = parsePublicationWorkspace(new TextDecoder('utf-8').decode(
+      await vscode.workspace.fs.readFile(manifest)));
+    const manifestRoot = vscode.Uri.joinPath(manifest, '..');
+    const projects = workspace.publications.map((publication, index): vscode.WorkspaceFolder => ({
+      uri: vscode.Uri.joinPath(manifestRoot, ...publication.root.split('/')),
+      name: publication.title,
+      index
+    }));
+    this.projectsForWorkspaceFolders.set(folder.uri.toString(), projects);
+    return projects;
+  }
   private isWatchedInput(uri: vscode.Uri, folder: vscode.WorkspaceFolder): boolean {
+    folder = this.projectsForWorkspaceFolders.get(folder.uri.toString())?.find(project => {
+      const relative = path.posix.relative(project.uri.path, uri.path);
+      return safeRelativePath(relative) === relative;
+    }) ?? folder;
     if (this.generatedOutputs.get(folder.uri.toString())?.has(uri.toString())) { return false; }
     const relative = path.posix.relative(folder.uri.path, uri.path);
     if (relative.split('/').slice(0, -1).some(part => discoveryExcludedDirectories.includes(part))) {
@@ -717,7 +748,8 @@ export class FragmentRepository {
       .map(document => [document.path, document]));
     for (const document of vscode.workspace.textDocuments) {
       if (!document.isClosed && document.uri.path.endsWith('.literate')
-        && vscode.workspace.getWorkspaceFolder(document.uri)?.uri.toString() === folder.uri.toString()) {
+        && safeRelativePath(path.posix.relative(folder.uri.path, document.uri.path)) ===
+          path.posix.relative(folder.uri.path, document.uri.path)) {
         const name = path.posix.relative(folder.uri.path, document.uri.path);
         if (!name.split('/').slice(0, -1).some(part => discoveryExcludedDirectories.includes(part))) {
           documents.set(name, { path: name, text: document.getText() });
@@ -840,7 +872,9 @@ export class FragmentRepository {
         ? determineWorkspaceFolder(trigger) : trigger);
       const folders = trigger ? (folder ? [folder] : [])
         : vscode.workspace.workspaceFolders || [];
-      for (const workspaceFolder of folders) {
+      for (const folder of folders) {
+        const projects = await this.publicationProjects(folder);
+        for (const workspaceFolder of projects) {
         const documents: SourceDocument[] = [];
         for (const uri of await getLiterateFileUris(workspaceFolder)) {
           documents.push({
@@ -885,9 +919,8 @@ export class FragmentRepository {
         }
         const stale: vscode.Uri[] = [];
         this.diagnostics.forEach(uri => {
-          if (vscode.workspace.getWorkspaceFolder(uri)?.uri.toString() === workspaceFolder.uri.toString()) {
-            stale.push(uri);
-          }
+          const relative = path.posix.relative(workspaceFolder.uri.path, uri.path);
+          if (safeRelativePath(relative) === relative) { stale.push(uri); }
         });
         for (const uri of stale) { this.diagnostics.delete(uri); }
         for (const [uri, entries] of diagnostics) {
@@ -928,6 +961,7 @@ export class FragmentRepository {
           vscode.Uri.joinPath(workspaceFolder.uri, file.path).toString())));
         const outputs = await this.preflightOutputs(workspaceFolder.uri, result.files);
         await this.writeChangedOutputs(outputs);
+        }
       }
     });
     this.processingQueue = operation.catch(error => {
@@ -1188,6 +1222,7 @@ export class FragmentRepository {
         this.sourceDocuments.clear();
         this.previewThemes.clear();
         this.occurrences.clear();
+        this.projectsForWorkspaceFolders.clear();
   }
 }
 export class LiterateRenameProvider implements vscode.RenameProvider
@@ -1479,16 +1514,18 @@ export async function activate(context: vscode.ExtensionContext) {
 async function getLiterateFileUris(workspaceFolder: vscode.WorkspaceFolder): Promise<vscode.Uri[]> {
   const uris = new Map<string, vscode.Uri>();
   const excluded = new Set<string>(discoveryExcludedDirectories);
-  const included = (uri: vscode.Uri): boolean => !path.posix
-    .relative(workspaceFolder.uri.path, uri.path).split('/').slice(0, -1)
-    .some(directory => excluded.has(directory));
+  const included = (uri: vscode.Uri): boolean => {
+    const relative = path.posix.relative(workspaceFolder.uri.path, uri.path);
+    return safeRelativePath(relative) === relative && !relative.split('/').slice(0, -1)
+      .some(directory => excluded.has(directory));
+  };
   const pattern = new vscode.RelativePattern(workspaceFolder, '**/*.literate');
   for (const uri of await vscode.workspace.findFiles(pattern, null)) {
     if (included(uri)) { uris.set(uri.toString(), uri); }
   }
   for (const document of vscode.workspace.textDocuments) {
     if (document.uri.path.endsWith('.literate') && included(document.uri) &&
-        vscode.workspace.getWorkspaceFolder(document.uri)?.uri.toString() === workspaceFolder.uri.toString()) {
+        vscode.workspace.getWorkspaceFolder(document.uri)) {
       uris.set(document.uri.toString(), document.uri);
     }
   }

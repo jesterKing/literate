@@ -194,7 +194,8 @@ export const runPublicationHelper: PublicationBridge = (node, helper, root, requ
                     .filter(Boolean).join('\n')));
             } else {
                 try {
-                    publicationOutcome(result, request.args[0], request.args[request.args.indexOf('--output') + 1]);
+                    if (request.publicationDocuments) { publicationBatchOutcome(result, request.args[0]); }
+                    else { publicationOutcome(result, request.args[0], request.args[request.args.indexOf('--output') + 1]); }
                     resolve(result);
                 } catch (error) { reject(error); }
             }
@@ -218,6 +219,17 @@ function publicationOutcome(result: HelperResult, kind: string, destination: str
     const elapsed = response.elapsedMs;
     return { warnings: Array.isArray(warnings) ? warnings.map(String) : [],
         ...(Number.isInteger(elapsed) && elapsed >= 0 ? { elapsedMs: elapsed } : {}) };
+}
+function publicationBatchOutcome(result: HelperResult, kind: string): void {
+    let response;
+    try { response = JSON.parse(result.stdout); }
+    catch { throw new Error(`Invalid JSON from publication helper:\n${result.stdout}`); }
+    if (response?.schemaVersion !== 1 || response.command !== kind || response.ok !== true ||
+        !Array.isArray(response.outputs) || !response.outputs.length ||
+        response.outputs.some((item: { path?: string; status?: string }) =>
+            typeof item?.path !== 'string' || !['written', 'current'].includes(item.status ?? ''))) {
+        throw new Error(`Publication did not report successful batch outputs:\n${result.stdout}`);
+    }
 }
 function seriesPublicationOutcome(result: HelperResult, destinations: string[]): PublicationOutcome {
     let response;

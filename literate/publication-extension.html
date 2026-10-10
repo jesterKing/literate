@@ -427,7 +427,8 @@ This is a bounded execution budget, not an unsafe hard cleanup deadline.</p>
                     .<span class="hljs-title">filter</span>(<span class="hljs-title">Boolean</span>).<span class="hljs-title">join</span>(<span class="hljs-string">'</span><span class="hljs-string">\n</span><span class="hljs-string">'</span>)));
             } <span class="hljs-keyword">else</span> {
                 <span class="hljs-keyword">try</span> {
-                    <span class="hljs-title">publicationOutcome</span>(result, request.<span class="hljs-property">args</span>[<span class="hljs-number">0</span>], request.<span class="hljs-property">args</span>[request.<span class="hljs-property">args</span>.<span class="hljs-title">indexOf</span>(<span class="hljs-string">'--output'</span>) + <span class="hljs-number">1</span>]);
+                    <span class="hljs-keyword">if</span> (request.<span class="hljs-property">publicationDocuments</span>) { <span class="hljs-title">publicationBatchOutcome</span>(result, request.<span class="hljs-property">args</span>[<span class="hljs-number">0</span>]); }
+                    <span class="hljs-keyword">else</span> { <span class="hljs-title">publicationOutcome</span>(result, request.<span class="hljs-property">args</span>[<span class="hljs-number">0</span>], request.<span class="hljs-property">args</span>[request.<span class="hljs-property">args</span>.<span class="hljs-title">indexOf</span>(<span class="hljs-string">'--output'</span>) + <span class="hljs-number">1</span>]); }
                     <span class="hljs-title">resolve</span>(result);
                 } <span class="hljs-keyword">catch</span> (error) { <span class="hljs-title">reject</span>(error); }
             }
@@ -462,6 +463,17 @@ success merely because cancellation was requested.</p>
     <span class="hljs-keyword">const</span> elapsed = response.<span class="hljs-property">elapsedMs</span>;
     <span class="hljs-keyword">return</span> { <span class="hljs-attr">warnings</span>: <span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(warnings) ? warnings.<span class="hljs-title">map</span>(<span class="hljs-title">String</span>) : [],
         ...(<span class="hljs-title">Number</span>.<span class="hljs-title">isInteger</span>(elapsed) &amp;&amp; elapsed &gt;= <span class="hljs-number">0</span> ? { <span class="hljs-attr">elapsedMs</span>: elapsed } : {}) };
+}
+<span class="hljs-keyword">function</span> <span class="hljs-title">publicationBatchOutcome</span>(<span class="hljs-params">result: HelperResult, kind: </span><span class="hljs-built_in">string</span>): <span class="hljs-built_in">void</span> {
+    <span class="hljs-keyword">let</span> response;
+    <span class="hljs-keyword">try</span> { response = <span class="hljs-title">JSON</span>.<span class="hljs-title">parse</span>(result.<span class="hljs-property">stdout</span>); }
+    <span class="hljs-keyword">catch</span> { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Invalid JSON from publication helper:</span><span class="hljs-string">\n</span><span class="hljs-subst">${result.stdout}</span><span class="hljs-string">`</span>); }
+    <span class="hljs-keyword">if</span> (response?.<span class="hljs-property">schemaVersion</span> !== <span class="hljs-number">1</span> || response.<span class="hljs-property">command</span> !== kind || response.<span class="hljs-property">ok</span> !== <span class="hljs-literal">true</span> ||
+        !<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(response.<span class="hljs-property">outputs</span>) || !response.<span class="hljs-property">outputs</span>.<span class="hljs-property">length</span> ||
+        response.<span class="hljs-property">outputs</span>.<span class="hljs-title">some</span>(<span class="hljs-function">(</span><span class="hljs-params">item: </span><span class="hljs-params">{ path?: </span><span class="hljs-built_in">string</span><span class="hljs-params">; status?: </span><span class="hljs-built_in">string</span><span class="hljs-params"> }</span><span class="hljs-function">) =&gt;</span>
+            <span class="hljs-keyword">typeof</span> item?.<span class="hljs-property">path</span> !== <span class="hljs-string">'string'</span> || ![<span class="hljs-string">'written'</span>, <span class="hljs-string">'current'</span>].<span class="hljs-title">includes</span>(item.<span class="hljs-property">status</span> ?? <span class="hljs-string">''</span>))) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Publication did not report successful batch outputs:</span><span class="hljs-string">\n</span><span class="hljs-subst">${result.stdout}</span><span class="hljs-string">`</span>);
+    }
 }
 <span class="hljs-keyword">function</span> <span class="hljs-title">seriesPublicationOutcome</span>(<span class="hljs-params">result: HelperResult, destinations: </span><span class="hljs-built_in">string</span><span class="hljs-params">[]</span>): <span class="hljs-title">PublicationOutcome</span> {
     <span class="hljs-keyword">let</span> response;

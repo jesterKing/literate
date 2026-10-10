@@ -709,6 +709,21 @@ for (const scenario of ['success', 'exit', 'signal', 'spawn-error', 'stdin-error
     }));
 }
 
+test('process bridge accepts a successful multi-output batch response', () => using(async f => {
+    const child = fakeChild(); f.child = child;
+    const request = { args: ['pdf', f.root, '--json'], documents: [],
+        publicationDocuments: { one: [{ path: 'index.literate', text: '# One' }] } };
+    const running = f.api.runPublicationHelper('/node', '/helper', f.root, request, f.token, () => undefined);
+    const stdout = JSON.stringify({ schemaVersion: 1, command: 'pdf', ok: true, outputs: [
+        { path: '../publications/one.pdf', status: 'written' },
+        { path: '../publications/two.pdf', status: 'current' }
+    ] });
+    child.stdout.write(stdout);
+    child.emit('exit', 0, null);
+    child.emit('close', 0, null);
+    assert.deepEqual(await running, { stdout, stderr: '' });
+}));
+
 test('deadline requests graceful termination, reports stalled cleanup and never force-kills', () => using(async f => {
     f.fakeTimers = true;
     f.child = fakeChild();

@@ -111,6 +111,21 @@ test('discovery ignores duplicate vendor fragments on disk and in buffers using 
         documents.map(document => document.path).sort());
 });
 
+test('workspace manifest isolates same-named fragments and diagnostics', { timeout: 5000 }, async () => {
+    const f = fixture();
+    f.put('series/literate-workspace.json', JSON.stringify({ schemaVersion: 1, publications: [
+        { id: 'python', root: '../books/python' }, { id: 'zig', root: '../books/zig' }
+    ] }));
+    f.put('books/python/index.literate', root('python'));
+    f.put('books/zig/index.literate', root('zig'));
+    await f.process(true);
+    assert.equal(f.diagnostics.size, 0);
+    assert.equal(f.disk.get(f.uri('books/python/generated/main.txt'))?.toString(), 'python\n');
+    assert.equal(f.disk.get(f.uri('books/zig/generated/main.txt'))?.toString(), 'zig\n');
+    assert.ok(f.disk.has(f.uri('books/python/index.html')));
+    assert.ok(f.disk.has(f.uri('books/zig/index.html')));
+});
+
 test('adapter skips unchanged files and rewrites only changed disk output', { timeout: 5000 }, async () => {
     const f = fixture();
     f.put('index.literate', root('hello'));

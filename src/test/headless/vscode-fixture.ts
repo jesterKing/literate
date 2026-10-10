@@ -281,12 +281,14 @@ export function fixture(workspaceUri = 'file:///project') {
                 onDidDelete: fileEvents.delete.event,
                 dispose() { for (const event of Object.values(fileEvents)) { event.dispose(); } } };
         },
-        async findFiles(pattern: RelativePattern, exclude: unknown) {
+        async findFiles(pattern: RelativePattern, exclude: unknown, maximum?: number) {
             assert.equal(exclude, null, 'discovery must not apply editor search exclusions');
-            discoveries++;
+            if (!pattern.pattern.endsWith('literate-workspace.json')) { discoveries++; }
             await tick();
+            const suffix = pattern.pattern.endsWith('literate-workspace.json')
+                ? 'literate-workspace.json' : '.literate';
             return [...disk.keys()].filter(key => key.startsWith(pattern.base.uri.toString() + '/')
-                && key.endsWith('.literate')).reverse().map(Uri.parse);
+                && key.endsWith(suffix)).reverse().slice(0, maximum).map(Uri.parse);
         },
         fs: {
             async stat(uri: Uri) {
