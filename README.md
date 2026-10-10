@@ -339,7 +339,42 @@ project root. The CLI reads saved files, whereas the extension uses
 open buffers; do not run both generators concurrently against the same
 project.
 
-After `yarn build:cli`, the direct executable is
+### Several projects in one workspace
+
+Add `literate-workspace.json` at the workspace root to declare a series
+of independent projects:
+
+```json
+{
+  "schemaVersion": 1,
+  "publications": [
+    { "id": "book-one", "title": "Book One", "root": "books/one" },
+    { "id": "book-two", "title": "Book Two", "root": "books/two" }
+  ]
+}
+```
+
+Publication IDs use lowercase letters, digits, dots, underscores, and
+hyphens. Roots are portable workspace-relative directories and may not
+overlap. Optional `entry` and `pdf` fields name the project-relative
+entry document and workspace-relative PDF destination; they default to
+`index.literate` and no declared PDF.
+
+Select one project before discovery with `--publication`:
+
+```sh
+yarn literate inspect . --publication book-one
+yarn literate generate . --publication book-one
+yarn literate pdf . --publication book-one --output book.pdf
+```
+
+A manifest containing one publication is selected automatically. A
+series with several publications requires an exact ID. Outputs,
+templates, settings, fragments, and diagnostics remain relative to the
+selected project root. Workspaces without a manifest keep the existing
+single-project behavior.
+
+After `yarn build:cli`,  the direct executable is
 `node out/cli-entry.js` (for example,
 `node out/cli-entry.js check`). `out/cli.js` is a library module, not
 the executable entry point.

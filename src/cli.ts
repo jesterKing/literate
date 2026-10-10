@@ -10,6 +10,7 @@ import type { DiagramRenderer } from './publication-mermaid';
 import { resolvePublicationSettings } from './publication-settings';
 import { commitOutputs, OutputTransactionError, TransactionIO } from './output-transactions';
 import { discoveryExcludedDirectories, generateProject, parseProject, resolveProjectTheme, safeRelativePath, templateReferences, SourceDocument } from './engine';
+import { parsePublicationWorkspace, publicationWorkspaceManifest, selectPublication } from './workspace-projects';
 
 export interface CliIO {
     stdout(message: string): void;
@@ -27,6 +28,8 @@ interface CliResponse {
     command: string;
     ok: boolean;
     root?: string;
+    workspaceRoot?: string;
+    publicationId?: string;
     diagnostics: Generation['diagnostics'];
     errors: string[];
     outputs: { path: string; status: OutputStatus }[];
@@ -43,12 +46,16 @@ const latexMarginOptions = [
     ['--margin-bottom', 'marginBottomMm'], ['--margin-left', 'marginLeftMm'],
     ['--margin-inner', 'marginInnerMm'], ['--margin-outer', 'marginOuterMm']
 ] as const;
+const projectValueFlags = ['--publication'];
 const latexValueFlags = ['--output', '--paper', '--font-manifest', '--browser', ...latexMarginOptions.map(([flag]) => flag)];
-const latexUsage = 'latex [root] --output path.tex [--paper a4|a5|letter|legal] [--margin 20mm]'
+const valueFlags = [...projectValueFlags, ...latexValueFlags];
+const projectUsage = '[--publication id]';
+const latexUsage = `latex [root] ${projectUsage} --output path.tex [--paper a4|a5|letter|legal] [--margin 20mm]`
     + ' [--margin-top Nmm] [--margin-right Nmm] [--margin-bottom Nmm] [--margin-left Nmm]'
     + ' [--margin-inner Nmm] [--margin-outer Nmm] [--font-manifest path.json] [--browser /absolute/path] [--json]';
-const pdfUsage = latexUsage.replace('latex [root] --output path.tex', 'pdf [root] --output path.pdf') + ' [--keep-build]';
-const usage = 'Usage: node out/cli-entry.js generate|check|inspect|self-check [root] [--json]\n'
+const pdfUsage = latexUsage.replace(/^latex/, 'pdf').replace('path.tex', 'path.pdf') + ' [--keep-build]';
+const usage = `Usage: node out/cli-entry.js generate|check|inspect [root] ${projectUsage} [--json]\n`
+    + '       node out/cli-entry.js self-check [root] [--json]\n'
     + `       node out/cli-entry.js ${latexUsage}\n`
     + `       node out/cli-entry.js ${pdfUsage}\n`
     + '       node out/cli-entry.js <command> --help [--json]\n       node out/cli-entry.js --help [--json]\n';
@@ -168,6 +175,9 @@ async function discover(root: string): Promise<SourceDocument[]> {
     const documents: SourceDocument[] = [];
     const visit = async (directory: string): Promise<void> => {
         const entries = await fs.readdir(path.join(root, directory), { withFileTypes: true });
+        if (directory && entries.some(entry => entry.isFile() && entry.name === publicationWorkspaceManifest)) {
+            return;
+        }
         entries.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
         for (const entry of entries) {
             if (entry.isSymbolicLink()) { continue; }
@@ -397,7 +407,7 @@ export async function run(args: string[], io: CliIO = defaultIO,
     };
     for (let index = 0; index < args.length; index++) {
         const arg = args[index];
-        if (latexValueFlags.includes(arg)) {
+        if (valueFlags.includes(arg)) {
             if (flags.has(arg)) { response.errors.push(`Duplicate flag: ${arg}`); }
             flags.add(arg);
             const value = args[index + 1];
@@ -424,6 +434,9 @@ export async function run(args: string[], io: CliIO = defaultIO,
     if ((!command && !help) || positional.some(arg => !arg) || positional.length > 2 ||
         (helpCommand && flags.has('--help')) || (helpCommand && topic && !commands.includes(topic))) {
         response.errors.push('Invalid arguments');
+    }
+    if (topic === 'self-check' && flags.has('--publication')) {
+        response.errors.push('--publication is not valid for self-check');
     }
     if (topic !== 'pdf' && flags.has('--keep-build')) {
         response.errors.push('--keep-build is only valid for pdf');
@@ -487,7 +500,8 @@ export async function run(args: string[], io: CliIO = defaultIO,
     if (help) {
         response.command = 'help';
         response.usage = topic
-            ? `Usage: node out/cli-entry.js ${topic === 'latex' ? latexUsage : topic === 'pdf' ? pdfUsage : topic + ' [root] [--json]'}\n${descriptions[topic]}\n`
+            ? `Usage: node out/cli-entry.js ${topic === 'latex' ? latexUsage : topic === 'pdf' ? pdfUsage :
+                topic + ' [root]' + (topic === 'self-check' ? '' : ` ${projectUsage}`) + ' [--json]'}\n${descriptions[topic]}\n`
             : usage;
         if (!json) { io.stdout(response.usage); }
         return finish(0);
@@ -506,9 +520,29 @@ export async function run(args: string[], io: CliIO = defaultIO,
     }
     try {
         const snapshot = options.documents === undefined ? undefined : validateSnapshot(options.documents);
-        const root = await fs.realpath(path.resolve(positional[1] || process.cwd()));
+        const workspaceRoot = await fs.realpath(path.resolve(positional[1] || process.cwd()));
+        response.workspaceRoot = workspaceRoot;
+        if (!(await fs.stat(workspaceRoot)).isDirectory()) { throw new Error('Root is not a directory'); }
+        let root = workspaceRoot;
+        const hasManifest = await inspect(workspaceRoot, publicationWorkspaceManifest);
+        if (hasManifest) {
+            const workspace = parsePublicationWorkspace(await fs.readFile(
+                path.join(workspaceRoot, publicationWorkspaceManifest), 'utf8'));
+            const selected = selectPublication(workspace, values.get('--publication'));
+            let selectedRoot = workspaceRoot;
+            for (const component of selected.root.split('/')) {
+                selectedRoot = path.join(selectedRoot, component);
+                const stat = await fs.lstat(selectedRoot);
+                if (stat.isSymbolicLink() || !stat.isDirectory()) {
+                    throw new Error(`Publication root is not a regular directory: ${selected.root}`);
+                }
+            }
+            root = selectedRoot;
+            response.publicationId = selected.id;
+        } else if (values.has('--publication')) {
+            throw new Error(`No ${publicationWorkspaceManifest} found for --publication`);
+        }
         response.root = root;
-        if (!(await fs.stat(root)).isDirectory()) { throw new Error('Root is not a directory'); }
         const documents = snapshot ?? await discover(root);
         if (!documents.length) { throw new Error('No literate documents found'); }
         const templates: Record<string, string> = Object.create(null);

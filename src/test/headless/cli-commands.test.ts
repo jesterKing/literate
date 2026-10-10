@@ -14,6 +14,8 @@ interface Response {
     command: string;
     ok: boolean;
     root?: string;
+    workspaceRoot?: string;
+    publicationId?: string;
     diagnostics: GenerationDiagnostic[];
     errors: string[];
     outputs: { path: string; status: string }[];
@@ -76,6 +78,59 @@ test('inspect JSON locates definitions and references without generating or read
     assert.deepEqual(main?.definitions, [{ path: 'index.literate', line: 0, column: 0 }]);
     assert.deepEqual(main?.references.map(reference => reference.name), ['piece', 'piece']);
     assert.deepEqual(snapshot(root), before);
+});
+
+test('workspace manifests select one isolated publication before discovery and writes', t => {
+    const root = fixture(t);
+    for (const id of ['python', 'zig']) {
+        fs.mkdirSync(path.join(root, 'books', id), { recursive: true });
+        fs.writeFileSync(path.join(root, 'books', id, 'index.literate'), source(id));
+    }
+    fs.writeFileSync(path.join(root, 'literate-workspace.json'), JSON.stringify({ schemaVersion: 1,
+        publications: [
+            { id: 'python', title: 'Python Quicksort', root: 'books/python' },
+            { id: 'zig', title: 'Zig Quicksort', root: 'books/zig' }
+        ] }));
+    const missing = run(['inspect', root, '--json'], root);
+    assert.equal(missing.status, 1);
+    assert.match(missing.response.errors.join(' '), /Select a publication: python, zig/);
+    const unknown = run(['inspect', root, '--publication', 'haskell', '--json'], root);
+    assert.equal(unknown.status, 1);
+    assert.match(unknown.response.errors.join(' '), /Unknown publication haskell/);
+
+    const inspected = run(['inspect', root, '--publication', 'python', '--json'], root);
+    assert.equal(inspected.status, 0, JSON.stringify(inspected.response));
+    assert.equal(inspected.response.workspaceRoot, root);
+    assert.equal(inspected.response.root, path.join(root, 'books', 'python'));
+    assert.equal(inspected.response.publicationId, 'python');
+    assert.deepEqual(inspected.response.inspection?.documents, ['index.literate']);
+    assert.deepEqual(inspected.response.inspection?.fragments.map(item => item.name), ['main.*', 'piece']);
+
+    const generated = run(['generate', root, '--publication', 'python', '--json'], root);
+    assert.equal(generated.status, 0);
+    assert.equal(fs.readFileSync(path.join(root, 'books', 'python', 'result.txt'), 'utf8'), 'python\n');
+    assert.equal(fs.existsSync(path.join(root, 'books', 'zig', 'result.txt')), false);
+});
+
+test('legacy discovery treats nested publication workspaces as isolated boundaries', t => {
+    const root = fixture(t);
+    fs.writeFileSync(path.join(root, 'index.literate'), source());
+    fs.mkdirSync(path.join(root, 'series', 'books', 'other'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'series', 'literate-workspace.json'), JSON.stringify({ schemaVersion: 1,
+        publications: [{ id: 'other', root: 'books/other' }] }));
+    fs.writeFileSync(path.join(root, 'series', 'books', 'other', 'index.literate'),
+        '```text : <<broken>>=\n<<missing>>\n```\n');
+    const result = run(['inspect', root, '--json'], root);
+    assert.equal(result.status, 0, JSON.stringify(result.response));
+    assert.deepEqual(result.response.inspection?.documents, ['index.literate']);
+});
+
+test('publication selectors require a workspace manifest', t => {
+    const root = fixture(t);
+    fs.writeFileSync(path.join(root, 'index.literate'), source());
+    const result = run(['inspect', root, '--publication', 'book', '--json'], root);
+    assert.equal(result.status, 1);
+    assert.match(result.response.errors.join(' '), /No literate-workspace\.json found/);
 });
 
 test('inspect returns partial metadata and zero-based diagnostics for a broken project', t => {
@@ -173,7 +228,7 @@ test('CLI-only bootstrap succeeds without compiling broken extension source', t 
     const root = fixture(t);
     const sourceRoot = path.resolve(__dirname, '../../../src');
     for (const name of ['cli-entry.ts', 'cli.ts', 'engine.ts', 'themes.ts', 'self-hosting.ts', 'output-transactions.ts',
-            'publication-latex.ts', 'publication-pandoc.ts', 'publication-highlight.ts', 'publication-screen.ts', 'publication-settings.ts', 'publication-fonts.ts', 'publication-assets.ts', 'publication-mermaid.ts', 'publication-pdf.ts', 'publication-annotations.ts', 'publication-rail.ts', 'publication-exploration.ts', 'publication-exploration-browser.js']) {
+            'publication-latex.ts', 'publication-pandoc.ts', 'publication-highlight.ts', 'publication-screen.ts', 'publication-settings.ts', 'publication-fonts.ts', 'publication-assets.ts', 'publication-mermaid.ts', 'publication-pdf.ts', 'publication-annotations.ts', 'publication-rail.ts', 'publication-exploration.ts', 'publication-exploration-browser.js', 'workspace-projects.ts']) {
         fs.copyFileSync(path.join(sourceRoot, name), path.join(root, name));
     }
     fs.writeFileSync(path.join(root, 'extension.ts'), 'this is not TypeScript');
