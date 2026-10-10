@@ -29,6 +29,10 @@ export function publicationDefinitions(project: ParsedProject): PublicationDefin
     const definitions: PublicationDefinition[] = project.annotations.terms.map(term => ({
         kind: 'term', id: term.key, target: term.target, definition: term.at
     }));
+    definitions.push(...project.diagrams.map(diagram => ({
+        kind: 'diagram' as const, id: diagram.id, target: diagram.target,
+        definition: diagram.definition
+    })));
     for (const family of project.publication.fragments) {
         const contribution = project.publication.contributions.find(item =>
             family.contributions.includes(item.target));

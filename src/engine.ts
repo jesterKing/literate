@@ -63,8 +63,15 @@ interface Header { name: string; language: string; append: boolean; output?: str
 interface Part { content: string; location: Location; definition: Location; columns: number[]; }
 interface Fragment { header: Header; parts: Part[]; location: Location; }
 
+export interface PublicationDiagram {
+    id: string;
+    target: string;
+    definition: PublicationLocation;
+    tokenIndex: number;
+}
 export interface ParsedProject {
     annotations: PublicationAnnotations;
+    diagrams: PublicationDiagram[];
     documents: readonly ParsedDocument[];
     diagnostics: GenerationDiagnostic[];
     inspection: ProjectInspection;
@@ -538,7 +545,39 @@ function collectProject(documents: SourceDocument[], policy?: CollectionPolicy) 
         path: document.path, text: document.source, tokens: document.tokens
     })));
     diagnostics.push(...annotations.diagnostics);
-    const parsed: ParsedProject = { documents: parsedDocuments, diagnostics, inspection, publication, annotations };
+    const diagrams: PublicationDiagram[] = [];
+    const diagramIds = new Map<string, PublicationDiagram[]>();
+    for (const document of parsedDocuments) {
+        document.tokens.forEach((token, tokenIndex) => {
+            if (token.type !== 'fence' || token.info.includes('<<')) { return; }
+            const info = token.info.trim();
+            if (!/^mermaid(?:\s|$)/i.test(info) || info.toLowerCase() === 'mermaid') { return; }
+            const match = /^mermaid\s+id=([A-Za-z][A-Za-z0-9_.:-]{0,99})$/i.exec(info);
+            const definition = { path: document.path, line: token.map?.[0] ?? 0, column: 0 };
+            if (!match) {
+                diagnostics.push({ ...definition, code: 'diagram-header',
+                    message: 'Expected mermaid or mermaid id=<portable-id>' });
+                return;
+            }
+            const id = match[1];
+            const target = `diagram-${id.split('').map(char =>
+                char.charCodeAt(0).toString(16).padStart(4, '0')).join('')}`;
+            const diagram = { id, target, definition, tokenIndex };
+            diagrams.push(diagram);
+            const matches = diagramIds.get(id) ?? [];
+            matches.push(diagram);
+            diagramIds.set(id, matches);
+        });
+    }
+    for (const [id, matches] of diagramIds) {
+        if (matches.length < 2) { continue; }
+        for (const diagram of matches) {
+            diagnostics.push({ ...diagram.definition, code: 'diagram-duplicate',
+                message: `Duplicate diagram ID: ${id}` });
+        }
+    }
+    const parsed: ParsedProject = { documents: parsedDocuments, diagnostics, inspection,
+        publication, annotations, diagrams };
     return { parsed, md, tokens, order, fragments, headers, sourceTemplates, references };
 }
 
@@ -676,7 +715,12 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
         const header = headers.get(token);
         const language = header?.language || token.info.trim().split(/\s+/)[0];
         const code = token.content.replace(/\\<</g, () => '<<');
-        if (!header && language === 'mermaid') { return `<pre class="literate-mermaid">\n${escape(code)}</pre>\n`; }
+        const diagram = !header && collected.parsed.diagrams.find(item =>
+            item.definition.path === env.path && item.tokenIndex === index);
+        if ((!header && token.info.trim() === 'mermaid') || diagram) {
+            const identity = diagram ? ` id="${escape(diagram.target)}"` : '';
+            return `<pre${identity} class="literate-mermaid">\n${escape(code)}</pre>\n`;
+        }
         const part = screenIndex(publication).tokens.get(env.path)?.get(index);
         const rendered = part ? renderScreenCode(part, publication, 'html')
             : language && hljs.getLanguage(language) ? hljs.highlight(code, { language }).value : escape(code);

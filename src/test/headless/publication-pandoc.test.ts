@@ -198,6 +198,20 @@ test('Pandoc keeps HTML- and TeX-looking author prose as data, never RawBlock', 
     ] }]);
 });
 
+test('Pandoc wraps authored Mermaid assets in their stable destination', () => {
+    const project = parse(fence('mermaid id=partition-flow', 'flowchart TD\nA-->B'));
+    const result = preparePandoc(project, marker, () => [para('diagram')]);
+    assert.deepEqual(result.diagnostics, []);
+    assert.ok(result.document);
+    const blocks = chapter(result.document).blocks;
+    assert.equal(blocks.length, 1);
+    assert.equal(blocks[0].t, 'Div');
+    if (blocks[0].t === 'Div') {
+        assert.equal(blocks[0].c[0][0], project.diagrams[0].target);
+        assert.deepEqual(blocks[0].c[1], [para('diagram')]);
+    }
+});
+
 for (const [name, text, code] of [
     ['image', '![alt](image.png)', 'unsupported-pandoc-token'],
     ['table', '| a | b |\n| --- | --- |\n| x | y |', 'unsupported-pandoc-token'],

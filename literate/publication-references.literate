@@ -4,8 +4,7 @@ Ordinary Markdown links can name a semantic definition without exposing the
 renderer-specific target stored in generated HTML or PDF. The fragment part of
 the destination reserves three namespaces: `term/`, `fragment/`, and `diagram/`.
 This host-neutral module parses those authored references and resolves the kinds
-already represented by a parsed project. Diagram definitions join the same index
-when authored diagram identities are introduced.
+represented by a parsed project, including authored diagram identities.
 
 ## Contracts
 
@@ -64,6 +63,10 @@ export function publicationDefinitions(project: ParsedProject): PublicationDefin
     const definitions: PublicationDefinition[] = project.annotations.terms.map(term => ({
         kind: 'term', id: term.key, target: term.target, definition: term.at
     }));
+    definitions.push(...project.diagrams.map(diagram => ({
+        kind: 'diagram' as const, id: diagram.id, target: diagram.target,
+        definition: diagram.definition
+    })));
     for (const family of project.publication.fragments) {
         const contribution = project.publication.contributions.find(item =>
             family.contributions.includes(item.target));

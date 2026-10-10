@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import assert = require('node:assert/strict');
 import { test } from 'node:test';
-import { discoveryExcludedDirectories, generateProject, resolveProjectTheme, safeRelativePath, SourceDocument } from '../../engine';
+import { discoveryExcludedDirectories, generateProject, parseProject, resolveProjectTheme, safeRelativePath, SourceDocument } from '../../engine';
 import { defaultThemeName, getTheme, themeCss, themes } from '../../themes';
 
 function fence(header: string, content = ''): string {
@@ -231,6 +231,23 @@ test('every canonical theme embeds its CSS and uses the local Mermaid runtime pr
         }
         assert.match(files.find(file => file.path === 'nested/chapter.html')!.content, /<pre class="literate-mermaid">/);
     }
+});
+
+test('authored Mermaid identities are stable and diagnosed before publication', () => {
+    const valid = parseProject([document(fence('mermaid id=partition-flow', 'flowchart TD\nA-->B'))]);
+    assert.deepEqual(valid.diagnostics, []);
+    assert.equal(valid.diagrams.length, 1);
+    assert.equal(valid.diagrams[0].id, 'partition-flow');
+    assert.match(valid.diagrams[0].target, /^diagram-/);
+    const html = successful([document(fence('mermaid id=partition-flow', 'flowchart TD\nA-->B'))])[0].content;
+    assert.ok(html.includes(`<pre id="${valid.diagrams[0].target}" class="literate-mermaid">`));
+
+    const invalid = parseProject([document(fence('mermaid id=two words', 'flowchart TD'))]);
+    assert.deepEqual(invalid.diagnostics.map(item => item.code), ['diagram-header']);
+    const duplicate = parseProject([document(fence('mermaid id=same', 'flowchart TD')
+        + fence('mermaid id=same', 'flowchart LR'))]);
+    assert.deepEqual(duplicate.diagnostics.map(item => item.code),
+        ['diagram-duplicate', 'diagram-duplicate']);
 });
 
 test('default HTML has accessible metadata, a local runtime, and injection-safe settings', () => {

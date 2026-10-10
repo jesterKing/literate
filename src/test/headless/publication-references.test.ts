@@ -6,7 +6,8 @@ import { parsePublicationReference, publicationDefinitions, resolvePublicationRe
 
 const project = parseProject([{ path: 'index.literate', text: [
     '```TERM pivot "Pivot"', 'A partition value.', '```', '',
-    '```python : <<partition values>>=', 'pass', '```', ''
+    '```python : <<partition values>>=', 'pass', '```', '',
+    '```mermaid id=partition-flow', 'flowchart TD', '```', ''
 ].join('\n') }]);
 
 test('semantic publication references parse exact namespaced identifiers', () => {
@@ -24,11 +25,14 @@ test('semantic publication references parse exact namespaced identifiers', () =>
 test('semantic publication references resolve terms and fragment families', () => {
     const definitions = publicationDefinitions(project);
     assert.deepEqual(definitions.map(item => [item.kind, item.id]), [
-        ['term', 'pivot'], ['fragment', 'partition values']
+        ['term', 'pivot'], ['diagram', 'partition-flow'], ['fragment', 'partition values']
     ]);
     const term = resolvePublicationReference(project, { kind: 'term', id: 'pivot' });
     const fragment = resolvePublicationReference(project, { kind: 'fragment', id: 'partition values' });
+    const diagram = resolvePublicationReference(project, { kind: 'diagram', id: 'partition-flow' });
     assert.equal(term.status, 'resolved');
     assert.equal(fragment.status, 'resolved');
+    assert.equal(diagram.status, 'resolved');
+    if (diagram.status === 'resolved') { assert.match(diagram.value.target, /^diagram-/); }
     assert.equal(resolvePublicationReference(project, { kind: 'diagram', id: 'missing' }).status, 'missing');
 });

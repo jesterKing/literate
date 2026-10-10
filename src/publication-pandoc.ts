@@ -43,6 +43,7 @@ type PendingBlock = PandocLeafBlock
     | { t: 'Div'; c: [PandocAttr, PendingBlock[]] };
 export interface PublicationAsset {
     kind: 'image' | 'mermaid'; source: string; caption: string; at: PublicationLocation;
+    target?: string;
 }
 export type AssetRenderer = (asset: PublicationAsset) => PandocBlock[];
 export type PublicationLinkResolver = (href: string, source: string) => string | undefined;
@@ -308,6 +309,7 @@ function readLink(reader: InlineReader, token: Token, depth: number): PandocInli
 interface BlockReader {
     annotations: PublicationAnnotations;
     publication: ParsedProject['publication'];
+    diagrams: ParsedProject['diagrams'];
     annotationBody?: boolean;
     document: ParsedDocument;
     index: number;
@@ -444,9 +446,11 @@ function readFence(reader: BlockReader, token: Token, index: number): PendingBlo
     const part = reader.contributions.get(index);
     const language = part?.language ?? token.info.trim().split(/\s+/)[0];
     if (language.toLowerCase() === 'mermaid') {
-        if (!part && reader.assets && token.info.trim().toLowerCase() === 'mermaid') {
+        const diagram = reader.diagrams.find(item =>
+            item.definition.path === reader.document.path && item.tokenIndex === index);
+        if (!part && reader.assets && (token.info.trim().toLowerCase() === 'mermaid' || diagram)) {
             return [{ t: 'Asset', asset: { kind: 'mermaid', source: token.content, caption: '',
-                at: tokenLocation(reader.document, token) } }];
+                at: tokenLocation(reader.document, token), target: diagram?.target } }];
         }
         report(reader.diagnostics, tokenLocation(reader.document, token), 'unsupported-mermaid',
             'Mermaid requires an ordinary fence and a publication asset renderer');
@@ -482,7 +486,12 @@ function materialize(
         if (diagnostics.length) { break; }
         switch (block.t) {
             case 'Asset':
-                try { result.push(...asset!(block.asset)); }
+                try {
+                    const rendered = asset!(block.asset);
+                    if (block.asset.target) {
+                        result.push({ t: 'Div', c: [[block.asset.target, [], []], rendered] });
+                    } else { result.push(...rendered); }
+                }
                 catch (error) { report(diagnostics, block.asset.at, 'asset-render-failed', String(error)); }
                 break;
             case 'Contribution':
@@ -525,7 +534,8 @@ export function preparePandoc(
     const pending: PendingBlock[] = project.documents.map(document => {
         const contributions = contributionIndex(document, parts, diagnostics);
         const body = readBlocks({ document, index: 0, contributions, targets, diagnostics, external,
-            annotations: project.annotations, publication: project.publication, assets: !!renderAsset });
+            annotations: project.annotations, publication: project.publication,
+            diagrams: project.diagrams, assets: !!renderAsset });
         return { t: 'Div', c: [[targets.get(document.path)!.id, [], []], body] };
     });
     if (diagnostics.length) { return { diagnostics }; }

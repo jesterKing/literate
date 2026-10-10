@@ -291,8 +291,15 @@ only by generation's existing expansion traversal.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-6"><a class="literate-tag-name" href="#f-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073" data-literate-target="f-0065006e00670069006e006500200069006e0074006500720066006100630065007300200061006e006400200064006500700065006e00640065006e0063006900650073" aria-label="Definition of engine interfaces and dependencies">&lt;&lt;engine interfaces and dependencies&gt;&gt;=+</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">ParsedProject</span> {
+<pre><code><span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationDiagram</span> {
+    <span class="hljs-attr">id</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">target</span>: <span class="hljs-built_in">string</span>;
+    <span class="hljs-attr">definition</span>: <span class="hljs-title">PublicationLocation</span>;
+    <span class="hljs-attr">tokenIndex</span>: <span class="hljs-built_in">number</span>;
+}
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">ParsedProject</span> {
     <span class="hljs-attr">annotations</span>: <span class="hljs-title">PublicationAnnotations</span>;
+    <span class="hljs-attr">diagrams</span>: <span class="hljs-title">PublicationDiagram</span>[];
     <span class="hljs-attr">documents</span>: <span class="hljs-keyword">readonly</span> <span class="hljs-title">ParsedDocument</span>[];
     <span class="hljs-attr">diagnostics</span>: <span class="hljs-title">GenerationDiagnostic</span>[];
     <span class="hljs-attr">inspection</span>: <span class="hljs-title">ProjectInspection</span>;
@@ -1208,6 +1215,11 @@ collector diagnostics, blocking strict generation and exports that check parser
 diagnostics. Preview adapters may still use the retained model. Renderers must
 consume occurrence resolutions rather than emit unresolved <code>term:</code> destinations.
 The annotation chapter defines the exact grammar and body policy.</p>
+<p>Plain Mermaid fences may add one portable authored identity with
+<code>mermaid id=&lt;id&gt;</code>. The identity is renderer-neutral and points to the opening fence.
+A Mermaid fence containing a named-fragment declaration remains code. Invalid and
+duplicate IDs are diagnostics; duplicate definitions retain distinct source
+locations but do not acquire an arbitrary shared target.</p>
 <div class="codefragment">
 <div class="fragmentname" id="c-0065006e00670069006e0065002000660069006e006900730068002000730068006100720065006400200063006f006c006c0065006300740069006f006e-006c0069007400650072006100740065002f0065006e00670069006e0065002e006c0069007400650072006100740065-2"><a class="literate-tag-name" href="#f-0065006e00670069006e0065002000660069006e006900730068002000730068006100720065006400200063006f006c006c0065006300740069006f006e" data-literate-target="f-0065006e00670069006e0065002000660069006e006900730068002000730068006100720065006400200063006f006c006c0065006300740069006f006e" aria-label="Definition of engine finish shared collection">&lt;&lt;engine finish shared collection&gt;&gt;=+</a></div>
 <div class="code">
@@ -1215,7 +1227,39 @@ The annotation chapter defines the exact grammar and body policy.</p>
         <span class="hljs-attr">path</span>: <span class="hljs-variable">document</span>.<span class="hljs-property">path</span>, <span class="hljs-attr">text</span>: <span class="hljs-variable">document</span>.<span class="hljs-property">source</span>, <span class="hljs-attr">tokens</span>: <span class="hljs-variable">document</span>.<span class="hljs-property">tokens</span>
     })));
     diagnostics.<span class="hljs-title">push</span>(...annotations.<span class="hljs-property">diagnostics</span>);
-    <span class="hljs-keyword">const</span> <span class="hljs-attr">parsed</span>: <span class="hljs-title">ParsedProject</span> = { <span class="hljs-attr">documents</span>: parsedDocuments, diagnostics, inspection, publication, annotations };
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">diagrams</span>: <span class="hljs-title">PublicationDiagram</span>[] = [];
+    <span class="hljs-keyword">const</span> diagramIds = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-title">PublicationDiagram</span>[]&gt;();
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> <span class="hljs-variable">document</span> <span class="hljs-keyword">of</span> parsedDocuments) {
+        <span class="hljs-variable">document</span>.<span class="hljs-property">tokens</span>.<span class="hljs-title">forEach</span>(<span class="hljs-function">(</span><span class="hljs-params">token, tokenIndex</span><span class="hljs-function">) =&gt;</span> {
+            <span class="hljs-keyword">if</span> (token.<span class="hljs-property">type</span> !== <span class="hljs-string">'fence'</span> || token.<span class="hljs-property">info</span>.<span class="hljs-title">includes</span>(<span class="hljs-string">'&lt;&lt;'</span>)) { <span class="hljs-keyword">return</span>; }
+            <span class="hljs-keyword">const</span> info = token.<span class="hljs-property">info</span>.<span class="hljs-title">trim</span>();
+            <span class="hljs-keyword">if</span> (!<span class="hljs-regexp">/^mermaid(?:</span><span class="hljs-regexp">\s</span><span class="hljs-regexp">|$)/i</span>.<span class="hljs-title">test</span>(info) || info.<span class="hljs-title">toLowerCase</span>() === <span class="hljs-string">'mermaid'</span>) { <span class="hljs-keyword">return</span>; }
+            <span class="hljs-keyword">const</span> match = <span class="hljs-regexp">/^mermaid</span><span class="hljs-regexp">\s</span><span class="hljs-regexp">+id=(</span><span class="hljs-regexp">[A-Za-z]</span><span class="hljs-regexp">[A-Za-z0-9_.:-]</span><span class="hljs-regexp">{0,99})$/i</span>.<span class="hljs-title">exec</span>(info);
+            <span class="hljs-keyword">const</span> definition = { <span class="hljs-attr">path</span>: <span class="hljs-variable">document</span>.<span class="hljs-property">path</span>, <span class="hljs-attr">line</span>: token.<span class="hljs-property">map</span>?.[<span class="hljs-number">0</span>] ?? <span class="hljs-number">0</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span> };
+            <span class="hljs-keyword">if</span> (!match) {
+                diagnostics.<span class="hljs-title">push</span>({ ...definition, <span class="hljs-attr">code</span>: <span class="hljs-string">'diagram-header'</span>,
+                    <span class="hljs-attr">message</span>: <span class="hljs-string">'Expected mermaid or mermaid id=&lt;portable-id&gt;'</span> });
+                <span class="hljs-keyword">return</span>;
+            }
+            <span class="hljs-keyword">const</span> id = match[<span class="hljs-number">1</span>];
+            <span class="hljs-keyword">const</span> target = <span class="hljs-string">`diagram-</span><span class="hljs-subst">${id.split(</span><span class="hljs-string">''</span><span class="hljs-subst">).map(char =&gt;
+                char.charCodeAt(</span><span class="hljs-number">0</span><span class="hljs-subst">).toString(</span><span class="hljs-number">16</span><span class="hljs-subst">).padStart(</span><span class="hljs-number">4</span><span class="hljs-subst">, </span><span class="hljs-string">'0'</span><span class="hljs-subst">)).join(</span><span class="hljs-string">''</span><span class="hljs-subst">)}</span><span class="hljs-string">`</span>;
+            <span class="hljs-keyword">const</span> diagram = { id, target, definition, tokenIndex };
+            diagrams.<span class="hljs-title">push</span>(diagram);
+            <span class="hljs-keyword">const</span> matches = diagramIds.<span class="hljs-title">get</span>(id) ?? [];
+            matches.<span class="hljs-title">push</span>(diagram);
+            diagramIds.<span class="hljs-title">set</span>(id, matches);
+        });
+    }
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [id, matches] <span class="hljs-keyword">of</span> diagramIds) {
+        <span class="hljs-keyword">if</span> (matches.<span class="hljs-property">length</span> &lt; <span class="hljs-number">2</span>) { <span class="hljs-keyword">continue</span>; }
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> diagram <span class="hljs-keyword">of</span> matches) {
+            diagnostics.<span class="hljs-title">push</span>({ ...diagram.<span class="hljs-property">definition</span>, <span class="hljs-attr">code</span>: <span class="hljs-string">'diagram-duplicate'</span>,
+                <span class="hljs-attr">message</span>: <span class="hljs-string">`Duplicate diagram ID: </span><span class="hljs-subst">${id}</span><span class="hljs-string">`</span> });
+        }
+    }
+    <span class="hljs-keyword">const</span> <span class="hljs-attr">parsed</span>: <span class="hljs-title">ParsedProject</span> = { <span class="hljs-attr">documents</span>: parsedDocuments, diagnostics, inspection,
+        publication, annotations, diagrams };
     <span class="hljs-keyword">return</span> { parsed, md, tokens, order, fragments, headers, sourceTemplates, references };
 }
 
@@ -1463,7 +1507,12 @@ md.<span class="hljs-property">renderer</span>.<span class="hljs-property">rules
     <span class="hljs-keyword">const</span> header = headers.<span class="hljs-title">get</span>(token);
     <span class="hljs-keyword">const</span> language = header?.<span class="hljs-property">language</span> || token.<span class="hljs-property">info</span>.<span class="hljs-title">trim</span>().<span class="hljs-title">split</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\s</span><span class="hljs-regexp">+/</span>)[<span class="hljs-number">0</span>];
     <span class="hljs-keyword">const</span> code = token.<span class="hljs-property">content</span>.<span class="hljs-title">replace</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\\</span><span class="hljs-regexp">&lt;&lt;/g</span>, <span class="hljs-function">() =&gt;</span> <span class="hljs-string">'&lt;&lt;'</span>);
-    <span class="hljs-keyword">if</span> (!header &amp;&amp; language === <span class="hljs-string">'mermaid'</span>) { <span class="hljs-keyword">return</span> <span class="hljs-string">`&lt;pre class=&quot;literate-mermaid&quot;&gt;</span><span class="hljs-string">\n</span><span class="hljs-subst">${</span><span class="hljs-built_in">escape</span><span class="hljs-subst">(code)}</span><span class="hljs-string">&lt;/pre&gt;</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>; }
+    <span class="hljs-keyword">const</span> diagram = !header &amp;&amp; collected.<span class="hljs-property">parsed</span>.<span class="hljs-property">diagrams</span>.<span class="hljs-title">find</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span>
+        item.<span class="hljs-property">definition</span>.<span class="hljs-property">path</span> === env.<span class="hljs-property">path</span> &amp;&amp; item.<span class="hljs-property">tokenIndex</span> === index);
+    <span class="hljs-keyword">if</span> ((!header &amp;&amp; token.<span class="hljs-property">info</span>.<span class="hljs-title">trim</span>() === <span class="hljs-string">'mermaid'</span>) || diagram) {
+        <span class="hljs-keyword">const</span> identity = diagram ? <span class="hljs-string">` id=&quot;</span><span class="hljs-subst">${</span><span class="hljs-built_in">escape</span><span class="hljs-subst">(diagram.target)}</span><span class="hljs-string">&quot;`</span> : <span class="hljs-string">''</span>;
+        <span class="hljs-keyword">return</span> <span class="hljs-string">`&lt;pre</span><span class="hljs-subst">${identity}</span><span class="hljs-string"> class=&quot;literate-mermaid&quot;&gt;</span><span class="hljs-string">\n</span><span class="hljs-subst">${</span><span class="hljs-built_in">escape</span><span class="hljs-subst">(code)}</span><span class="hljs-string">&lt;/pre&gt;</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>;
+    }
     <span class="hljs-keyword">const</span> part = <span class="hljs-title">screenIndex</span>(publication).<span class="hljs-property">tokens</span>.<span class="hljs-title">get</span>(env.<span class="hljs-property">path</span>)?.<span class="hljs-title">get</span>(index);
     <span class="hljs-keyword">const</span> rendered = part ? <span class="hljs-title">renderScreenCode</span>(part, publication, <span class="hljs-string">'html'</span>)
         : language &amp;&amp; hljs.<span class="hljs-title">getLanguage</span>(language) ? hljs.<span class="hljs-title">highlight</span>(code, { language }).<span class="hljs-property">value</span> : <span class="hljs-built_in">escape</span>(code);

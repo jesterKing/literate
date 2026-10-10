@@ -17,7 +17,7 @@ import { commitOutputs, TransactionDirectoryError, TransactionFile, TransactionI
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { randomBytes } from 'crypto';
-import { parseProject, discoveryExcludedDirectories, generateProject, resolveProjectTheme, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection } from './engine';
+import { parseProject, discoveryExcludedDirectories, generateProject, resolveProjectTheme, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection, PublicationDiagram } from './engine';
 import { collectFragmentOccurrences, planFragmentRename, FragmentOccurrence } from './symbols';
 import { defaultThemeName } from './themes';
 import { installFragmentReferenceSyntax } from './engine';
@@ -328,7 +328,8 @@ function installPreviewDocument(md: MarkdownIt, repository: FragmentRepository, 
     const literateScreen = { model: snapshot.publication, annotations: snapshot.annotations,
       path: snapshot.path, format: 'preview' as const, destination };
     const renderEnv = { ...env, literatePublication: snapshot.publication, literatePath: snapshot.path,
-      literateTokens: snapshot.tokens, literateDestination: destination, literateScreen,
+      literateTokens: snapshot.tokens, literateDiagrams: snapshot.diagrams,
+      literateDestination: destination, literateScreen,
             literateUseTargets: screenTermUseAnchors(tokens, snapshot.annotations, snapshot.path) };
     const style = snapshot.annotations.terms.length || snapshot.annotations.notes.length ? `<style>${screenStyle}</style>` : '';
     const body = style + originalRender.call(this, tokens, options, renderEnv)
@@ -351,9 +352,12 @@ function installPreviewFences(md: MarkdownIt): void {
       return renderScreenAnnotation(annotation, context);
     }
     if (token.info.includes('SETTINGS')) { return ''; }
-    if (token.info.trim() === 'mermaid') {
+    const diagram = env?.literateDiagrams?.find((item: PublicationDiagram) =>
+      item.definition.path === context?.path && item.tokenIndex === idx);
+    if (token.info.trim() === 'mermaid' || diagram) {
       const line = token.map ? ` data-line="${token.map[0]}"` : '';
-      return `<pre class="literate-mermaid source-line"${line}>${md.utils.escapeHtml(token.content)}</pre>\n`;
+      const identity = diagram ? ` id="${md.utils.escapeHtml(diagram.target)}"` : '';
+      return `<pre${identity} class="literate-mermaid source-line"${line}>${md.utils.escapeHtml(token.content)}</pre>\n`;
     }
     const header = parseFragmentHeader(token.info);
     if (!header) {
@@ -849,7 +853,7 @@ export class FragmentRepository {
     const inputs = [...documents.values()];
     const parsed = parseProject(inputs);
     return { path: currentPath, publication: parsed.publication, annotations: parsed.annotations,
-        paths: parsed.documents.map(value => value.path),
+        diagrams: parsed.diagrams, paths: parsed.documents.map(value => value.path),
       tokens: parsed.documents.find(value => value.path === currentPath)?.tokens,
       theme: folder ? previewThemeName(inputs) : defaultThemeName };
   }

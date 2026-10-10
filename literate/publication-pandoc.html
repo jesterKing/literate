@@ -220,6 +220,7 @@ string placeholders that could collide with author text.</p>
     | { <span class="hljs-attr">t</span>: <span class="hljs-string">'Div'</span>; <span class="hljs-attr">c</span>: [<span class="hljs-title">PandocAttr</span>, <span class="hljs-title">PendingBlock</span>[]] };
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">PublicationAsset</span> {
     <span class="hljs-attr">kind</span>: <span class="hljs-string">'image'</span> | <span class="hljs-string">'mermaid'</span>; <span class="hljs-attr">source</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">caption</span>: <span class="hljs-built_in">string</span>; <span class="hljs-attr">at</span>: <span class="hljs-title">PublicationLocation</span>;
+    target?: <span class="hljs-built_in">string</span>;
 }
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title">AssetRenderer</span> = <span class="hljs-function">(</span><span class="hljs-params">asset: PublicationAsset</span><span class="hljs-function">) =&gt;</span> <span class="hljs-title">PandocBlock</span>[];
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">type</span> <span class="hljs-title">PublicationLinkResolver</span> = <span class="hljs-function">(</span><span class="hljs-params">href: </span><span class="hljs-built_in">string</span><span class="hljs-params">, source: </span><span class="hljs-built_in">string</span><span class="hljs-function">) =&gt;</span> <span class="hljs-built_in">string</span> | <span class="hljs-literal">undefined</span>;
@@ -657,6 +658,7 @@ cursor, preserving nesting and authored order across each contribution.</p>
 <pre><code><span class="hljs-keyword">interface</span> <span class="hljs-title">BlockReader</span> {
     <span class="hljs-attr">annotations</span>: <span class="hljs-title">PublicationAnnotations</span>;
     <span class="hljs-attr">publication</span>: <span class="hljs-title">ParsedProject</span>[<span class="hljs-string">'publication'</span>];
+    <span class="hljs-attr">diagrams</span>: <span class="hljs-title">ParsedProject</span>[<span class="hljs-string">'diagrams'</span>];
     annotationBody?: <span class="hljs-built_in">boolean</span>;
     <span class="hljs-attr">document</span>: <span class="hljs-title">ParsedDocument</span>;
     <span class="hljs-attr">index</span>: <span class="hljs-built_in">number</span>;
@@ -823,9 +825,11 @@ a tag-looking string there is not a contribution or dependency.</p>
     <span class="hljs-keyword">const</span> part = reader.<span class="hljs-property">contributions</span>.<span class="hljs-title">get</span>(index);
     <span class="hljs-keyword">const</span> language = part?.<span class="hljs-property">language</span> ?? token.<span class="hljs-property">info</span>.<span class="hljs-title">trim</span>().<span class="hljs-title">split</span>(<span class="hljs-regexp">/</span><span class="hljs-regexp">\s</span><span class="hljs-regexp">+/</span>)[<span class="hljs-number">0</span>];
     <span class="hljs-keyword">if</span> (language.<span class="hljs-title">toLowerCase</span>() === <span class="hljs-string">'mermaid'</span>) {
-        <span class="hljs-keyword">if</span> (!part &amp;&amp; reader.<span class="hljs-property">assets</span> &amp;&amp; token.<span class="hljs-property">info</span>.<span class="hljs-title">trim</span>().<span class="hljs-title">toLowerCase</span>() === <span class="hljs-string">'mermaid'</span>) {
+        <span class="hljs-keyword">const</span> diagram = reader.<span class="hljs-property">diagrams</span>.<span class="hljs-title">find</span>(<span class="hljs-params">item</span><span class="hljs-function"> =&gt;</span>
+            item.<span class="hljs-property">definition</span>.<span class="hljs-property">path</span> === reader.<span class="hljs-property">document</span>.<span class="hljs-property">path</span> &amp;&amp; item.<span class="hljs-property">tokenIndex</span> === index);
+        <span class="hljs-keyword">if</span> (!part &amp;&amp; reader.<span class="hljs-property">assets</span> &amp;&amp; (token.<span class="hljs-property">info</span>.<span class="hljs-title">trim</span>().<span class="hljs-title">toLowerCase</span>() === <span class="hljs-string">'mermaid'</span> || diagram)) {
             <span class="hljs-keyword">return</span> [{ <span class="hljs-attr">t</span>: <span class="hljs-string">'Asset'</span>, <span class="hljs-attr">asset</span>: { <span class="hljs-attr">kind</span>: <span class="hljs-string">'mermaid'</span>, <span class="hljs-attr">source</span>: token.<span class="hljs-property">content</span>, <span class="hljs-attr">caption</span>: <span class="hljs-string">''</span>,
-                <span class="hljs-attr">at</span>: <span class="hljs-title">tokenLocation</span>(reader.<span class="hljs-property">document</span>, token) } }];
+                <span class="hljs-attr">at</span>: <span class="hljs-title">tokenLocation</span>(reader.<span class="hljs-property">document</span>, token), <span class="hljs-attr">target</span>: diagram?.<span class="hljs-property">target</span> } }];
         }
         <span class="hljs-title">report</span>(reader.<span class="hljs-property">diagnostics</span>, <span class="hljs-title">tokenLocation</span>(reader.<span class="hljs-property">document</span>, token), <span class="hljs-string">'unsupported-mermaid'</span>,
             <span class="hljs-string">'Mermaid requires an ordinary fence and a publication asset renderer'</span>);
@@ -915,7 +919,12 @@ mutate the shared parsed snapshot.</p>
         <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">break</span>; }
         <span class="hljs-keyword">switch</span> (block.<span class="hljs-property">t</span>) {
             <span class="hljs-keyword">case</span> <span class="hljs-string">'Asset'</span>:
-                <span class="hljs-keyword">try</span> { result.<span class="hljs-title">push</span>(...asset!(block.<span class="hljs-property">asset</span>)); }
+                <span class="hljs-keyword">try</span> {
+                    <span class="hljs-keyword">const</span> rendered = asset!(block.<span class="hljs-property">asset</span>);
+                    <span class="hljs-keyword">if</span> (block.<span class="hljs-property">asset</span>.<span class="hljs-property">target</span>) {
+                        result.<span class="hljs-title">push</span>({ <span class="hljs-attr">t</span>: <span class="hljs-string">'Div'</span>, <span class="hljs-attr">c</span>: [[block.<span class="hljs-property">asset</span>.<span class="hljs-property">target</span>, [], []], rendered] });
+                    } <span class="hljs-keyword">else</span> { result.<span class="hljs-title">push</span>(...rendered); }
+                }
                 <span class="hljs-keyword">catch</span> (error) { <span class="hljs-title">report</span>(diagnostics, block.<span class="hljs-property">asset</span>.<span class="hljs-property">at</span>, <span class="hljs-string">'asset-render-failed'</span>, <span class="hljs-title">String</span>(error)); }
                 <span class="hljs-keyword">break</span>;
             <span class="hljs-keyword">case</span> <span class="hljs-string">'Contribution'</span>:
