@@ -127,7 +127,10 @@ function pageLink(id: string, label: string): string {
     const destination = target(id);
     return `\\hyperref[${destination}]{${label}\\textsuperscript{\\notefont\\pageref*{${destination}}}}`;
 }
-function anchor(id: string): string { return `\\phantomsection\\label{${target(id)}}`; }
+function anchor(id: string): string {
+    if (!/^[A-Za-z0-9-]+$/.test(id)) { throw new Error('Invalid publication destination'); }
+    return `\\hypertarget{${id}}{}\\phantomsection\\label{${id}}\\label{${target(id)}}`;
+}
 function fontCommand(command: string, family: string, options: CheckedOptions, code = false): string {
     const features = code ? `Ligatures=Common,Contextuals=Alternate,${options.codeLigatures ? '' : 'RawFeature={-calt},'}` : '';
     if (options.portableFonts !== undefined) {

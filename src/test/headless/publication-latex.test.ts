@@ -25,6 +25,19 @@ const convert: LatexConverter = async (document, options) => {
     return raw(document.blocks);
 };
 
+test('LaTeX emits logical PDF destinations for terms and fragment families', async () => {
+    const project = parseProject([{ path: 'book.literate', text:
+        '```TERM pivot "Pivot"\nA partition value.\n```\n\n'
+        + fence('partition values', 'const pivot = 0;') }]);
+    const result = await renderLatex(project, {}, convert);
+    assert.deepEqual(result.diagnostics, []);
+    assert.ok(result.latex);
+    const term = project.annotations.terms[0].target;
+    const family = project.publication.fragments[0].target;
+    assert.ok(result.latex.includes(`\\hypertarget{${term}}{}\\phantomsection\\label{${term}}`));
+    assert.ok(result.latex.includes(`\\hypertarget{${family}}{}\\phantomsection\\label{${family}}`));
+});
+
 for (const theme of themes) {
     test(`LaTeX accepts catalogue theme ${theme.name} without print remapping`, async () => {
         const result = await renderLatex(parse(fence('part', 'const n = 1; // comment')), { theme: theme.name }, convert);
@@ -78,7 +91,7 @@ test('LaTeX links full hanging names and indents contribution blocks', async () 
     }
     assert.match(latex, /\\ensuremath\{\+\\equiv\}/);
     const labels = [...latex.matchAll(/\\label\{([^}]+)\}/g)].map(match => match[1]);
-    assert.equal(labels.length, 5); assert.equal(new Set(labels).size, 5);
+    assert.equal(labels.length, 10); assert.equal(new Set(labels).size, 10);
     assert.ok(latex.indexOf('before') < latex.indexOf('\\LitReferenceA{}'));
     assert.ok(latex.indexOf('\\LitReferenceA{}') < latex.indexOf('after'));
     assert.doesNotMatch(latex.slice(latex.indexOf('\\begin{document}')), /\\parbox/);
