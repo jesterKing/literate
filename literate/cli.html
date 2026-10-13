@@ -251,7 +251,7 @@ load compiler tooling until verification is requested.</p>
 <span class="hljs-keyword">import</span> { parsePublicationReference, resolvePublicationReference } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-references'</span>;
 <span class="hljs-keyword">import</span> { resolvePublicationSettings } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-settings'</span>;
 <span class="hljs-keyword">import</span> { commitOutputs, <span class="hljs-title">OutputTransactionError</span>, <span class="hljs-title">TransactionIO</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./output-transactions'</span>;
-<span class="hljs-keyword">import</span> { discoveryExcludedDirectories, generateProject, parseProject, resolveProjectTheme, safeRelativePath, templateReferences, <span class="hljs-title">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
+<span class="hljs-keyword">import</span> { hasErrors, discoveryExcludedDirectories, generateProject, parseProject, resolveProjectTheme, safeRelativePath, templateReferences, <span class="hljs-title">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
 <span class="hljs-keyword">import</span> { parsePublicationWorkspace, publicationWorkspaceManifest, selectPublication } <span class="hljs-keyword">from</span> <span class="hljs-string">'./workspace-projects'</span>;
 <span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> { <span class="hljs-title">PublicationProject</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./workspace-projects'</span>;
 
@@ -816,10 +816,10 @@ the companion bytes in one output plan; diagnostics discard the entire plan.</p>
         <span class="hljs-keyword">if</span> (!companion) { <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Unplanned publication image'</span>); }
         <span class="hljs-keyword">return</span> companion;
     } }, convert);
-<span class="hljs-keyword">if</span> (!rendered.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span> &amp;&amp; rendered.<span class="hljs-property">latex</span> === <span class="hljs-literal">undefined</span>) {
+<span class="hljs-keyword">if</span> (!<span class="hljs-title">hasErrors</span>(rendered.<span class="hljs-property">diagnostics</span>) &amp;&amp; rendered.<span class="hljs-property">latex</span> === <span class="hljs-literal">undefined</span>) {
     <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'LaTeX renderer returned no document'</span>);
 }
-<span class="hljs-keyword">return</span> { <span class="hljs-attr">diagnostics</span>: rendered.<span class="hljs-property">diagnostics</span>, <span class="hljs-attr">files</span>: rendered.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span> ? []
+<span class="hljs-keyword">return</span> { <span class="hljs-attr">diagnostics</span>: rendered.<span class="hljs-property">diagnostics</span>, <span class="hljs-attr">files</span>: <span class="hljs-title">hasErrors</span>(rendered.<span class="hljs-property">diagnostics</span>) ? []
     : [{ <span class="hljs-attr">path</span>: output, <span class="hljs-attr">content</span>: rendered.<span class="hljs-property">latex</span>! }, ...(companions?.<span class="hljs-property">files</span> ?? []), ...assets.<span class="hljs-property">files</span>] };
 </code></pre>
 
@@ -990,7 +990,7 @@ to or above project roots without weakening path inspection.</p>
             fontManifest ? <span class="hljs-title">relative</span>(fontManifest) : <span class="hljs-literal">undefined</span>, browser, diagrams,
             { <span class="hljs-attr">destinations</span>: [<span class="hljs-string">`.literate-series/</span><span class="hljs-subst">${publication.id}</span><span class="hljs-string">/result.pdf`</span>] });
         response.<span class="hljs-property">diagnostics</span>.<span class="hljs-title">push</span>(...result.<span class="hljs-property">diagnostics</span>);
-        <span class="hljs-keyword">if</span> (result.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> <span class="hljs-title">finish</span>(<span class="hljs-number">1</span>); }
+        <span class="hljs-keyword">if</span> (<span class="hljs-title">hasErrors</span>(result.<span class="hljs-property">diagnostics</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-title">finish</span>(<span class="hljs-number">1</span>); }
         <span class="hljs-keyword">try</span> {
             <span class="hljs-keyword">const</span> built = <span class="hljs-keyword">await</span> <span class="hljs-title">compile</span>(result.<span class="hljs-property">files</span>, entry, { <span class="hljs-attr">keepBuild</span>: round &gt; <span class="hljs-number">0</span> &amp;&amp; keepBuild, checkCancelled });
             warnings.<span class="hljs-title">push</span>(...built.<span class="hljs-property">warnings</span>.<span class="hljs-title">map</span>(<span class="hljs-params">value</span><span class="hljs-function"> =&gt;</span> <span class="hljs-string">`</span><span class="hljs-subst">${publication.id}</span><span class="hljs-string">: </span><span class="hljs-subst">${value}</span><span class="hljs-string">`</span>));
@@ -1377,10 +1377,10 @@ response.<span class="hljs-property">diagnostics</span> = result.<span class="hl
 <span class="hljs-keyword">if</span> (result.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) {
     <span class="hljs-keyword">if</span> (!json) {
         <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> diagnostic <span class="hljs-keyword">of</span> result.<span class="hljs-property">diagnostics</span>) {
-            io.<span class="hljs-title">stderr</span>(<span class="hljs-string">`</span><span class="hljs-subst">${diagnostic.path}</span><span class="hljs-string">:</span><span class="hljs-subst">${diagnostic.line + </span><span class="hljs-number">1</span><span class="hljs-subst">}</span><span class="hljs-string">:</span><span class="hljs-subst">${diagnostic.column + </span><span class="hljs-number">1</span><span class="hljs-subst">}</span><span class="hljs-string">: </span><span class="hljs-subst">${diagnostic.message}</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>);
+            io.<span class="hljs-title">stderr</span>(<span class="hljs-string">`</span><span class="hljs-subst">${diagnostic.path}</span><span class="hljs-string">:</span><span class="hljs-subst">${diagnostic.line + </span><span class="hljs-number">1</span><span class="hljs-subst">}</span><span class="hljs-string">:</span><span class="hljs-subst">${diagnostic.column + </span><span class="hljs-number">1</span><span class="hljs-subst">}</span><span class="hljs-string">: </span><span class="hljs-subst">${diagnostic.severity === </span><span class="hljs-string">'warning'</span><span class="hljs-subst"> ? </span><span class="hljs-string">'warning: '</span><span class="hljs-subst"> : </span><span class="hljs-string">''</span><span class="hljs-subst">}</span><span class="hljs-subst">${diagnostic.message}</span><span class="hljs-string">\n</span><span class="hljs-string">`</span>);
         }
     }
-    <span class="hljs-keyword">return</span> <span class="hljs-title">finish</span>(<span class="hljs-number">1</span>);
+    <span class="hljs-keyword">if</span> (<span class="hljs-title">hasErrors</span>(result.<span class="hljs-property">diagnostics</span>)) { <span class="hljs-keyword">return</span> <span class="hljs-title">finish</span>(<span class="hljs-number">1</span>); }
 }
 <span class="hljs-keyword">if</span> (command === <span class="hljs-string">'inspect'</span>) { <span class="hljs-keyword">return</span> <span class="hljs-title">finish</span>(<span class="hljs-number">0</span>); }
 </code></pre>

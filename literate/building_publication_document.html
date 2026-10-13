@@ -266,9 +266,9 @@ converter's behavior.</p>
     renderAsset?: AssetRenderer, external?: PublicationLinkResolver
 </span>): <span class="hljs-title">PandocPreparationResult</span> {
     <span class="hljs-keyword">const</span> diagnostics = project.<span class="hljs-property">diagnostics</span>.<span class="hljs-title">map</span>(<span class="hljs-params">diagnostic</span><span class="hljs-function"> =&gt;</span> ({ ...diagnostic }));
-    <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { diagnostics }; }
+    <span class="hljs-keyword">if</span> (<span class="hljs-title">hasErrors</span>(diagnostics)) { <span class="hljs-keyword">return</span> { diagnostics }; }
     diagnostics.<span class="hljs-title">push</span>(...project.<span class="hljs-property">annotations</span>.<span class="hljs-property">diagnostics</span>.<span class="hljs-title">map</span>(<span class="hljs-params">diagnostic</span><span class="hljs-function"> =&gt;</span> ({ ...diagnostic })));
-    <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { diagnostics }; }
+    <span class="hljs-keyword">if</span> (<span class="hljs-title">hasErrors</span>(diagnostics)) { <span class="hljs-keyword">return</span> { diagnostics }; }
     <span class="hljs-title">validateReferences</span>(project, diagnostics);
     <span class="hljs-keyword">const</span> targets = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>(project.<span class="hljs-property">documents</span>.<span class="hljs-title">map</span>(<span class="hljs-params">document</span><span class="hljs-function"> =&gt;</span> [<span class="hljs-variable">document</span>.<span class="hljs-property">path</span>, <span class="hljs-title">headingDestinations</span>(<span class="hljs-variable">document</span>)]));
     <span class="hljs-keyword">const</span> parts = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>(project.<span class="hljs-property">publication</span>.<span class="hljs-property">contributions</span>.<span class="hljs-title">map</span>(<span class="hljs-params">part</span><span class="hljs-function"> =&gt;</span> [part.<span class="hljs-property">target</span>, part]));
@@ -279,9 +279,9 @@ converter's behavior.</p>
             <span class="hljs-attr">diagrams</span>: project.<span class="hljs-property">diagrams</span>, <span class="hljs-attr">assets</span>: !!renderAsset });
         <span class="hljs-keyword">return</span> { <span class="hljs-attr">t</span>: <span class="hljs-string">'Div'</span>, <span class="hljs-attr">c</span>: [[targets.<span class="hljs-title">get</span>(<span class="hljs-variable">document</span>.<span class="hljs-property">path</span>)!.<span class="hljs-property">id</span>, [], []], body] };
     });
-    <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { diagnostics }; }
+    <span class="hljs-keyword">if</span> (<span class="hljs-title">hasErrors</span>(diagnostics)) { <span class="hljs-keyword">return</span> { diagnostics }; }
     <span class="hljs-keyword">const</span> blocks = <span class="hljs-title">materialize</span>(pending, renderContribution, diagnostics, renderAsset);
-    <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { diagnostics }; }
+    <span class="hljs-keyword">if</span> (<span class="hljs-title">hasErrors</span>(diagnostics)) { <span class="hljs-keyword">return</span> { diagnostics }; }
     <span class="hljs-keyword">return</span> { <span class="hljs-attr">document</span>: { <span class="hljs-string">'pandoc-api-version'</span>: [<span class="hljs-number">1</span>, <span class="hljs-number">23</span>, <span class="hljs-number">1</span>], <span class="hljs-attr">meta</span>: {}, blocks }, diagnostics };
 }
 </code></pre>

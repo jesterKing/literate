@@ -148,7 +148,7 @@ This conservative rule can omit a multiline hover range while preserving its tex
 <div class="codefragment">
 <div class="fragmentname" id="c-00700072006f006a0065006300740069006f006e00200063006f006e007400720061006300740073-006c0069007400650072006100740065002f006c0061006e00670075006100670065002d00700072006f006a0065006300740069006f006e002e006c0069007400650072006100740065-1"><span id="f-00700072006f006a0065006300740069006f006e00200063006f006e007400720061006300740073"></span><a class="literate-tag-name" href="#f-00700072006f006a0065006300740069006f006e00200063006f006e007400720061006300740073" data-literate-target="f-00700072006f006a0065006300740069006f006e00200063006f006e007400720061006300740073" aria-label="Definition of projection contracts">&lt;&lt;projection contracts&gt;&gt;=</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">import</span> { collectLanguageProject, <span class="hljs-title">GenerationDiagnostic</span>, safeRelativePath, <span class="hljs-title">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
+<pre><code><span class="hljs-keyword">import</span> { hasErrors, collectLanguageProject, <span class="hljs-title">GenerationDiagnostic</span>, safeRelativePath, <span class="hljs-title">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
 
 <span class="hljs-keyword">export</span> <span class="hljs-keyword">interface</span> <span class="hljs-title">ProjectionMapping</span> {
     <span class="hljs-attr">sourcePath</span>: <span class="hljs-built_in">string</span>;
@@ -236,7 +236,7 @@ cycle, or reference operator anywhere blocks all projections.</p>
             }
         }
     }
-    <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">files</span>: [], diagnostics }; }
+    <span class="hljs-keyword">if</span> (<span class="hljs-title">hasErrors</span>(diagnostics)) { <span class="hljs-keyword">return</span> { <span class="hljs-attr">files</span>: [], diagnostics }; }
 </code></pre>
 
 </div>
@@ -368,7 +368,7 @@ output occurrence; identity is never shared between repeated expansions.</p>
             files.<span class="hljs-title">push</span>(file);
         }
     } <span class="hljs-keyword">catch</span> (error) { <span class="hljs-title">report</span>(error <span class="hljs-keyword">instanceof</span> <span class="hljs-title">Error</span> ? error.<span class="hljs-property">message</span> : <span class="hljs-title">String</span>(error)); }
-    <span class="hljs-keyword">return</span> { <span class="hljs-attr">files</span>: diagnostics.<span class="hljs-property">length</span> ? [] : files, diagnostics };
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">files</span>: <span class="hljs-title">hasErrors</span>(diagnostics) ? [] : files, diagnostics };
 </code></pre>
 
 </div>

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
-import { parseProject, parseFragmentHeader, scanFragmentTags, SourceDocument } from './engine';
+import { hasErrors, parseProject, parseFragmentHeader, scanFragmentTags, SourceDocument } from './engine';
 import { LanguageClient } from './language-client';
 import { LanguageDiagnostics } from './language-diagnostics';
 import { mapLanguageCodeActions } from './language-actions';
@@ -534,7 +534,7 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
             }
             phase = 'projection';
             const projected = projectLanguageSources(documents, templates);
-            if (projected.diagnostics.length) {
+            if (hasErrors(projected.diagnostics)) {
                 invalidateFolder(folder);
                 for (const diagnostic of projected.diagnostics) {
                     reportOnce('Language projection unavailable: ' + projectionReason(diagnostic.message));
@@ -667,7 +667,7 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext,
             templatePaths.set(key, paths);
             if ([...captureChanges].some(name => paths.has(name))) { invalidateInputs(); return; }
             const projected = projectLanguageSources(documents, templates);
-            if (!matchesBuffers(folder, documents) || projected.diagnostics.length) { invalidateFolder(folder); return; }
+            if (!matchesBuffers(folder, documents) || hasErrors(projected.diagnostics)) { invalidateFolder(folder); return; }
             for (const id of new Set(projected.files.map(file => language(file.language)))) {
                 if (!fresh()) { break; }
                 if (!configured[id]) { continue; }

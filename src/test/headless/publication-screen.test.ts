@@ -104,8 +104,8 @@ function checkBlocks(html: string, path: string, model: PublicationModel, format
 for (const prefix of ['', 'Inserted prose.\n\n']) {
     test(`screen blocks map to publication contributions through real renderers (${prefix ? 'shifted' : 'original'})`, async () => {
         const inputs = documents(prefix), parsed = parseProject(inputs), generated = generateProject(inputs);
-        assert.deepEqual(parsed.diagnostics, []);
-        assert.deepEqual(generated.diagnostics, []);
+        assert.deepEqual(parsed.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
+        assert.deepEqual(generated.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
         assert.deepEqual(parsed.documents.map(doc => doc.path), ['index.literate', 'defs.literate', 'more.literate']);
         assert.equal(generated.files.find(file => file.path === 'result.txt')?.content,
             'before first\n second\n third / other / first\n second\n third after\n<<literal>>\n');

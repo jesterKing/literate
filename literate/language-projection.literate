@@ -22,7 +22,7 @@ not guess across repeated occurrences, indentation, escapes, or reference seams.
 This conservative rule can omit a multiline hover range while preserving its text.
 
 ```ts : <<projection contracts>>=
-import { collectLanguageProject, GenerationDiagnostic, safeRelativePath, SourceDocument } from './engine';
+import { hasErrors, collectLanguageProject, GenerationDiagnostic, safeRelativePath, SourceDocument } from './engine';
 
 export interface ProjectionMapping {
     sourcePath: string;
@@ -107,7 +107,7 @@ cycle, or reference operator anywhere blocks all projections.
             }
         }
     }
-    if (diagnostics.length) { return { files: [], diagnostics }; }
+    if (hasErrors(diagnostics)) { return { files: [], diagnostics }; }
 ```
 
 Each literal slice is split at original lines. The unchanged suffix calculation
@@ -231,7 +231,7 @@ output occurrence; identity is never shared between repeated expansions.
             files.push(file);
         }
     } catch (error) { report(error instanceof Error ? error.message : String(error)); }
-    return { files: diagnostics.length ? [] : files, diagnostics };
+    return { files: hasErrors(diagnostics) ? [] : files, diagnostics };
 ```
 
 Final segment creation also consumes the segment budget: a line with many escaped

@@ -62,7 +62,7 @@ test('parseProject does not apply theme, template availability, destination or d
         + fence('ts: <<main.*>>= index.literate $ template=missing.source', '<<absent>>=\n<<cycle>>')
         + fence(': <<cycle>>=', '<<main.*>>') }];
     const parsed = parseProject(documents);
-    assert.deepEqual(parsed.diagnostics, []);
+    assert.deepEqual(parsed.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
     assert.deepEqual(parsed.inspection.templates, ['missing.html', 'missing.source']);
     const references = parsed.publication.contributions.flatMap(part => part.segments).filter(segment => segment.kind === 'reference');
     assert.equal(references.length, 3);
@@ -105,7 +105,7 @@ test('parsing orders chapters and accepts empty documents and EOF fences without
         { path: 'index.literate', text: '[Z](z.html)\n' }
     ];
     const parsed = parseProject(documents);
-    assert.deepEqual(parsed.diagnostics, []);
+    assert.deepEqual(parsed.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
     assert.deepEqual(parsed.documents.map(document => document.path), ['index.literate', 'z.literate', 'a.literate']);
     for (const document of parsed.documents) { assertCoverage(document); }
     assert.deepEqual(parsed.documents[2].tokens, []);

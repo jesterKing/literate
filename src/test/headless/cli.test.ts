@@ -7,6 +7,23 @@ import { spawnSync } from 'node:child_process';
 
 const cli = path.resolve(__dirname, '../../cli-entry.js');
 
+test('legacy entry links report warnings in text and JSON without blocking CLI outputs', t => {
+    const { root } = fixture(t);
+    write(root, 'index.literate', '[chapter](chapter.html#heading)');
+    write(root, 'chapter.literate', '# Heading');
+    const generated = run(root, 'generate');
+    succeeded(generated);
+    assert.match(generated.stderr, /warning:.*chapter\.literate#heading/);
+    assert.ok(fs.existsSync(path.join(root, 'index.html')));
+    for (const command of ['generate', 'check', 'inspect']) {
+        const result = run(root, command, '--json');
+        succeeded(result);
+        const response = JSON.parse(result.stdout);
+        assert.equal(response.ok, true);
+        assert.equal(response.diagnostics[0].severity, 'warning');
+    }
+});
+
 function fixture(t: { after(callback: () => void): void }) {
     const base = fs.mkdtempSync(path.join(os.tmpdir(), 'literate headless '));
     t.after(() => fs.rmSync(base, { recursive: true, force: true }));

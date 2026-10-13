@@ -1108,9 +1108,9 @@ existing document limits.</p>
         <span class="hljs-keyword">const</span> cited = <span class="hljs-title">printedCitations</span>(body, options.<span class="hljs-property">printedCitation</span>);
         stage = <span class="hljs-string">'latex-template'</span>;
         <span class="hljs-keyword">return</span> { <span class="hljs-attr">latex</span>: <span class="hljs-title">template</span>(cited.<span class="hljs-property">body</span> + (hasRail ? <span class="hljs-title">annotationIndexes</span>(parsed) : <span class="hljs-string">''</span>) + cited.<span class="hljs-property">references</span>,
-            checked, definitions, annotations), <span class="hljs-attr">diagnostics</span>: [] };
+            checked, definitions, annotations), <span class="hljs-attr">diagnostics</span>: prepared.<span class="hljs-property">diagnostics</span> };
     } <span class="hljs-keyword">catch</span> (error) {
-        <span class="hljs-keyword">return</span> { <span class="hljs-attr">diagnostics</span>: [{ <span class="hljs-attr">path</span>: parsed.<span class="hljs-property">documents</span>[<span class="hljs-number">0</span>]?.<span class="hljs-property">path</span> ?? <span class="hljs-string">''</span>, <span class="hljs-attr">line</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span>,
+        <span class="hljs-keyword">return</span> { <span class="hljs-attr">diagnostics</span>: [...parsed.<span class="hljs-property">diagnostics</span>, { <span class="hljs-attr">path</span>: parsed.<span class="hljs-property">documents</span>[<span class="hljs-number">0</span>]?.<span class="hljs-property">path</span> ?? <span class="hljs-string">''</span>, <span class="hljs-attr">line</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">column</span>: <span class="hljs-number">0</span>,
             <span class="hljs-attr">code</span>: stage, <span class="hljs-attr">message</span>: error <span class="hljs-keyword">instanceof</span> <span class="hljs-title">Error</span> ? error.<span class="hljs-property">message</span> : <span class="hljs-title">String</span>(error) }] };
     }
 }

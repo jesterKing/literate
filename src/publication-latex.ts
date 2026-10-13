@@ -688,9 +688,9 @@ export async function renderLatex(parsed: ParsedProject, options: LatexOptions,
         const cited = printedCitations(body, options.printedCitation);
         stage = 'latex-template';
         return { latex: template(cited.body + (hasRail ? annotationIndexes(parsed) : '') + cited.references,
-            checked, definitions, annotations), diagnostics: [] };
+            checked, definitions, annotations), diagnostics: prepared.diagnostics };
     } catch (error) {
-        return { diagnostics: [{ path: parsed.documents[0]?.path ?? '', line: 0, column: 0,
+        return { diagnostics: [...parsed.diagnostics, { path: parsed.documents[0]?.path ?? '', line: 0, column: 0,
             code: stage, message: error instanceof Error ? error.message : String(error) }] };
     }
 }

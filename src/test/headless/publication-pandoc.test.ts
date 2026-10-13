@@ -15,9 +15,9 @@ const para = (text: string): PandocBlock => ({ t: 'Para', c: [word(text)] });
 const marker = (part: PublicationContribution): PandocBlock[] => [para(part.target)];
 
 function prepared(project: ParsedProject, render = marker): PandocDocument {
-    assert.deepEqual(project.diagnostics, []);
+    assert.deepEqual(project.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
     const result = preparePandoc(project, render);
-    assert.deepEqual(result.diagnostics, []);
+    assert.deepEqual(result.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
     assert.ok(result.document);
     assert.deepEqual(result.document['pandoc-api-version'], [1, 23, 1]);
     assert.deepEqual(result.document.meta, {});
@@ -34,7 +34,7 @@ function chapter(document: PandocDocument, index = 0) {
 }
 
 function rejected(project: ParsedProject, code: string, line: number, column = 0, path = 'index.literate') {
-    assert.deepEqual(project.diagnostics, []);
+    assert.deepEqual(project.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
     let calls = 0;
     const result = preparePandoc(project, part => { calls++; return marker(part); });
     assert.equal(calls, 0, 'all callbacks must be gated, including earlier contributions');

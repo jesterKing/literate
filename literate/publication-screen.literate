@@ -335,8 +335,24 @@ export function installScreenPublicationLinks(md: MarkdownIt): void {
         const token = tokens[index], href = token.attrGet('href') || '';
         const hash = href.indexOf('#');
         const reference = hash >= 0 ? parsePublicationReference(href.slice(hash + 1)) : undefined;
-        if (!reference) { return open ? open(tokens, index, options, env, renderer)
-            : renderer.renderToken(tokens, index, options); }
+        if (!reference) {
+            const context = env?.literateScreen as ScreenAnnotationContext | undefined;
+            if (!/^(?:[a-z][a-z0-9+.-]*:|\/\/|\/)/i.test(href)) {
+                if (context?.format === 'html') {
+                    token.attrSet('href', href.replace(/\.literate(?=[?#]|$)/, '.html'));
+                } else if (context?.format === 'preview') {
+                    const source = href.split(/[?#]/)[0].replace(/\.html$/, '.literate');
+                    let path: string;
+                    try { path = posix.normalize(posix.join(posix.dirname(context.path), decodeURIComponent(source))); }
+                    catch { path = ''; }
+                    if (context.model.documents.some(document => document.path === path)) {
+                        token.attrSet('href', href.replace(/\.html(?=[?#]|$)/, '.literate'));
+                    }
+                }
+            }
+            try { return open ? open(tokens, index, options, env, renderer) : renderer.renderToken(tokens, index, options); }
+            finally { token.attrSet('href', href); }
+        }
         const context = env?.literateScreen as ScreenAnnotationContext | undefined;
         const target = publicationReferenceTarget(reference);
         const document = href.slice(0, hash);

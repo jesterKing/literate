@@ -11,7 +11,7 @@ import { publicationDestination } from './publication-pandoc';
 import { parsePublicationReference, resolvePublicationReference } from './publication-references';
 import { resolvePublicationSettings } from './publication-settings';
 import { commitOutputs, OutputTransactionError, TransactionIO } from './output-transactions';
-import { discoveryExcludedDirectories, generateProject, parseProject, resolveProjectTheme, safeRelativePath, templateReferences, SourceDocument } from './engine';
+import { hasErrors, discoveryExcludedDirectories, generateProject, parseProject, resolveProjectTheme, safeRelativePath, templateReferences, SourceDocument } from './engine';
 import { parsePublicationWorkspace, publicationWorkspaceManifest, selectPublication } from './workspace-projects';
 import type { PublicationProject } from './workspace-projects';
 
@@ -351,10 +351,10 @@ async function planLatex(root: string, documents: SourceDocument[], output: stri
             if (!companion) { throw new Error('Unplanned publication image'); }
             return companion;
         } }, convert);
-    if (!rendered.diagnostics.length && rendered.latex === undefined) {
+    if (!hasErrors(rendered.diagnostics) && rendered.latex === undefined) {
         throw new Error('LaTeX renderer returned no document');
     }
-    return { diagnostics: rendered.diagnostics, files: rendered.diagnostics.length ? []
+    return { diagnostics: rendered.diagnostics, files: hasErrors(rendered.diagnostics) ? []
         : [{ path: output, content: rendered.latex! }, ...(companions?.files ?? []), ...assets.files] };
 }
 async function protectLatexAliases(root: string, inputs: string[], outputs: string[],
@@ -500,7 +500,7 @@ async function publishSeriesPdf(rootArgument: string | undefined, response: CliR
             fontManifest ? relative(fontManifest) : undefined, browser, diagrams,
             { destinations: [`.literate-series/${publication.id}/result.pdf`] });
         response.diagnostics.push(...result.diagnostics);
-        if (result.diagnostics.length) { return finish(1); }
+        if (hasErrors(result.diagnostics)) { return finish(1); }
         try {
             const built = await compile(result.files, entry, { keepBuild: round > 0 && keepBuild, checkCancelled });
             warnings.push(...built.warnings.map(value => `${publication.id}: ${value}`));
@@ -762,10 +762,10 @@ export async function run(args: string[], io: CliIO = defaultIO,
         if (result.diagnostics.length) {
             if (!json) {
                 for (const diagnostic of result.diagnostics) {
-                    io.stderr(`${diagnostic.path}:${diagnostic.line + 1}:${diagnostic.column + 1}: ${diagnostic.message}\n`);
+                    io.stderr(`${diagnostic.path}:${diagnostic.line + 1}:${diagnostic.column + 1}: ${diagnostic.severity === 'warning' ? 'warning: ' : ''}${diagnostic.message}\n`);
                 }
             }
-            return finish(1);
+            if (hasErrors(result.diagnostics)) { return finish(1); }
         }
         if (command === 'inspect') { return finish(0); }
         if (command === 'pdf') {

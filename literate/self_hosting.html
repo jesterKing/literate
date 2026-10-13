@@ -424,7 +424,7 @@ is reported through execFile's completion callback rather than an unhandled even
 
 </div>
 </div><h3>Reject diagnostics and malformed protocol data</h3>
-<p>Valid JSON alone is insufficient. Any generator diagnostic fails the fixed-point
+<p>Valid JSON alone is insufficient. Any generator error diagnostic fails the fixed-point
 claim, and each output must have a unique string path and string content before
 comparison can begin. Parse errors are reported by the enclosing stage boundary.</p>
 <div class="codefragment">
@@ -434,7 +434,7 @@ comparison can begin. Parse errors are reported by the enclosing stage boundary.
 <span class="hljs-keyword">if</span> (!regenerated || !<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(regenerated.<span class="hljs-property">files</span>) || !<span class="hljs-title">Array</span>.<span class="hljs-title">isArray</span>(regenerated.<span class="hljs-property">diagnostics</span>)) {
     <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">'Invalid engine result: expected files and diagnostics arrays'</span>);
 }
-<span class="hljs-keyword">if</span> (regenerated.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) {
+<span class="hljs-keyword">if</span> (regenerated.<span class="hljs-property">diagnostics</span>.<span class="hljs-title">some</span>(<span class="hljs-function">(</span><span class="hljs-params">diagnostic: </span><span class="hljs-params">{ severity?: </span><span class="hljs-built_in">string</span><span class="hljs-params"> }</span><span class="hljs-function">) =&gt;</span> diagnostic.<span class="hljs-property">severity</span> !== <span class="hljs-string">'warning'</span>)) {
     <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title">Error</span>(<span class="hljs-string">`Regenerated engine diagnostics: </span><span class="hljs-subst">${</span><span class="hljs-built_in">JSON</span><span class="hljs-subst">.stringify(regenerated.diagnostics)}</span><span class="hljs-string">`</span>);
 }
 <span class="hljs-keyword">const</span> actual = <span class="hljs-keyword">new</span> <span class="hljs-title">Map</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">string</span>&gt;();

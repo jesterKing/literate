@@ -144,7 +144,8 @@ annotation parser; this bridge imports no Node filesystem/process facilities.</p
 <div class="codefragment">
 <div class="fragmentname" id="c-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200064006500700065006e00640065006e0063006900650073-006c0069007400650072006100740065002f007000750062006c00690063006100740069006f006e002d00700061006e0064006f0063002e006c0069007400650072006100740065-1"><span id="f-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200064006500700065006e00640065006e0063006900650073"></span><a class="literate-tag-name" href="#f-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200064006500700065006e00640065006e0063006900650073" data-literate-target="f-007000750062006c00690063006100740069006f006e002000500061006e0064006f006300200064006500700065006e00640065006e0063006900650073" aria-label="Definition of publication Pandoc dependencies">&lt;&lt;publication Pandoc dependencies&gt;&gt;=</a></div>
 <div class="code">
-<pre><code><span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> <span class="hljs-title">Token</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">'markdown-it/lib/token'</span>);
+<pre><code><span class="hljs-keyword">import</span> { hasErrors } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
+<span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> <span class="hljs-title">Token</span> = <span class="hljs-built_in">require</span>(<span class="hljs-string">'markdown-it/lib/token'</span>);
 <span class="hljs-keyword">import</span> { parseAnnotationBody, resolveTermHref, <span class="hljs-title">PublicationAnnotations</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./publication-annotations'</span>;
 <span class="hljs-keyword">import</span> <span class="hljs-keyword">type</span> {
     <span class="hljs-title">GenerationDiagnostic</span>, <span class="hljs-title">ParsedDocument</span>, <span class="hljs-title">ParsedProject</span>,
@@ -916,7 +917,7 @@ mutate the shared parsed snapshot.</p>
 </span>): <span class="hljs-title">PandocBlock</span>[] {
     <span class="hljs-keyword">const</span> <span class="hljs-attr">result</span>: <span class="hljs-title">PandocBlock</span>[] = [];
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> block <span class="hljs-keyword">of</span> pending) {
-        <span class="hljs-keyword">if</span> (diagnostics.<span class="hljs-property">length</span>) { <span class="hljs-keyword">break</span>; }
+        <span class="hljs-keyword">if</span> (<span class="hljs-title">hasErrors</span>(diagnostics)) { <span class="hljs-keyword">break</span>; }
         <span class="hljs-keyword">switch</span> (block.<span class="hljs-property">t</span>) {
             <span class="hljs-keyword">case</span> <span class="hljs-string">'Asset'</span>:
                 <span class="hljs-keyword">try</span> {

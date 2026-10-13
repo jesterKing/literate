@@ -55,7 +55,11 @@ import { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAn
 import { defaultThemeName, getTheme, themeCss } from './themes';
 
 export interface SourceDocument { path: string; text: string; }
-export interface GenerationDiagnostic { path: string; line: number; column: number; message: string; code?: string; }
+export interface GenerationDiagnostic { path: string; line: number; column: number; message: string; code?: string; severity?: 'error' | 'warning'; }
+/** Diagnostics without severity remain errors for backwards compatibility. */
+export function hasErrors(diagnostics: readonly GenerationDiagnostic[]): boolean {
+    return diagnostics.some(diagnostic => diagnostic.severity !== 'warning');
+}
 export interface GeneratedFile { path: string; content: string; }
 ```
 
@@ -678,10 +682,31 @@ order. Template loading also records dependencies for inspection, including a
 valid template path whose contents are missing. Only the root index controls
 project-level HTML settings.
 
+Source-document links should use `.literate`; HTML publication rewrites their
+local suffix while preserving queries and fragments. Legacy `.html` links remain
+valid. Only entry-index links to actual sources receive an advisory warning;
+external destinations and standalone HTML assets are not migration candidates.
+Warnings never suppress output, whereas absent severity continues to mean error.
+
 ```ts : <<engine generation inputs and settings>>=+
     const tokens = new Map<string, Token[]>();
     for (const document of sources.values()) { tokens.set(document.path, md.parse(document.text, {})); }
     const order = orderSourceDocuments(Array.from(sources.values())).map(document => document.path);
+    for (const token of tokens.get('index.literate') || []) {
+        for (const child of token.children || []) {
+            if (child.type !== 'link_open') { continue; }
+            const href = child.attrGet('href') || '';
+            if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|\/)/i.test(href)) { continue; }
+            let target = href.split(/[?#]/)[0];
+            try { target = decodeURIComponent(target); } catch { continue; }
+            if (!target.endsWith('.html')) { continue; }
+            const source = safeRelativePath(target.replace(/\.html$/, '.literate'));
+            if (!source || !sources.has(source)) { continue; }
+            diagnostics.push({ path: 'index.literate', line: token.map?.[0] ?? 0, column: 0,
+                severity: 'warning', code: 'legacy-document-link',
+                message: `Prefer source document link ${href.replace(/\.html(?=[?#]|$)/, '.literate')} instead of ${href}` });
+        }
+    }
     const inspection: ProjectInspection = { documents: order, templates: [], fragments: [] };
     const referencedTemplates = new Set<string>();
     const loadTemplate = (value: string, location: Location): string | undefined => {
@@ -1233,7 +1258,7 @@ so invalid operators are reported once per occurrence, not once per resume.
         frames.push({ name, expansion, step: expansion.next() });
     };
     <<engine drive expansion frames>>
-    if (diagnostics.length) { return { files: [], diagnostics, inspection, publication }; }
+    if (hasErrors(diagnostics)) { return { files: [], diagnostics, inspection, publication }; }
 ```
 
 Every collected fragment enters the driver, including unused ones. A frame stays

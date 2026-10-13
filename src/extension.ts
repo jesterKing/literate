@@ -17,7 +17,7 @@ import { commitOutputs, TransactionDirectoryError, TransactionFile, TransactionI
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { randomBytes } from 'crypto';
-import { parseProject, discoveryExcludedDirectories, generateProject, resolveProjectTheme, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection, PublicationDiagram } from './engine';
+import { hasErrors, parseProject, discoveryExcludedDirectories, generateProject, resolveProjectTheme, orderSourceDocuments, safeRelativePath, templateReferences, scanFragmentTags, parseFragmentHeader, SourceDocument, FragmentInspection, PublicationDiagram } from './engine';
 import { collectFragmentOccurrences, planFragmentRename, FragmentOccurrence } from './symbols';
 import { parsePublicationReference, resolvePublicationReference } from './publication-references';
 import { defaultThemeName } from './themes';
@@ -919,7 +919,7 @@ export class FragmentRepository {
           const range = new vscode.Range(diagnostic.line, diagnostic.column,
             diagnostic.line, diagnostic.column + 1);
           const entry = new vscode.Diagnostic(range, diagnostic.message,
-            vscode.DiagnosticSeverity.Error);
+            diagnostic.severity === 'warning' ? vscode.DiagnosticSeverity.Warning : vscode.DiagnosticSeverity.Error);
           if (diagnostic.code !== undefined) { entry.code = diagnostic.code; }
           entries.push(entry);
           diagnostics.set(key, entries);
@@ -963,7 +963,7 @@ export class FragmentRepository {
             || JSON.stringify(previousPreview.annotations) !== JSON.stringify(parseProject(documents).annotations)) {
           void vscode.commands.executeCommand('markdown.preview.refresh').then(undefined, () => undefined);
         }
-        if (!writeFiles || result.diagnostics.length) { continue; }
+        if (!writeFiles || hasErrors(result.diagnostics)) { continue; }
         this.generatedOutputs.set(key, new Set(result.files.map(file =>
           vscode.Uri.joinPath(workspaceFolder.uri, file.path).toString())));
         const outputs = await this.preflightOutputs(workspaceFolder.uri, result.files);

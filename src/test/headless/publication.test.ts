@@ -26,7 +26,7 @@ test('publication orders documents and interleaved contributions, retaining each
     ];
     const result = generateProject(documents);
     const model = result.publication;
-    assert.deepEqual(result.diagnostics, []);
+    assert.deepEqual(result.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
     assert.deepEqual(model.documents.map(document => document.path), ['index.literate', 'z.literate', 'a.literate']);
     assert.deepEqual(model.fragments.map(fragment => fragment.name), ['main.*', 'piece', 'leaf']);
     assert.deepEqual(model.contributions.map(part => part.language), ['text', 'ts', 'text', 'json', 'python', 'js']);

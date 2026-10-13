@@ -24,7 +24,7 @@ test('publication commands remain registered after a read-only startup template 
 
 function expected(documents: SourceDocument[], templates: Record<string, string> = {}) {
     const result = generateProject(documents, templates);
-    assert.deepEqual(result.diagnostics, []);
+    assert.deepEqual(result.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
     return result.files;
 }
 

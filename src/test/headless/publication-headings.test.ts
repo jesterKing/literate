@@ -25,7 +25,7 @@ function target(slug: string, path = 'index.literate'): string {
 function prepare(sources: SourceDocument[]): PandocDocument {
     const project = parseProject(sources), before = JSON.stringify(project);
     const result = preparePandoc(project, () => [{ t: 'Para', c: [{ t: 'Str', c: 'CONTRIBUTION' }] }]);
-    assert.deepEqual(result.diagnostics, []);
+    assert.deepEqual(result.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
     assert.equal(JSON.stringify(project), before);
     assert.ok(result.document);
     return result.document;

@@ -17,7 +17,7 @@ never includes configuration values, source, protocol errors or stderr.
 ```ts : <<language feature imports>>=
 import * as vscode from 'vscode';
 import * as path from 'node:path';
-import { parseProject, parseFragmentHeader, scanFragmentTags, SourceDocument } from './engine';
+import { hasErrors, parseProject, parseFragmentHeader, scanFragmentTags, SourceDocument } from './engine';
 import { LanguageClient } from './language-client';
 import { LanguageDiagnostics } from './language-diagnostics';
 import { mapLanguageCodeActions } from './language-actions';
@@ -714,7 +714,7 @@ Markdown-wide trigger registrations are needed.
             }
             phase = 'projection';
             const projected = projectLanguageSources(documents, templates);
-            if (projected.diagnostics.length) {
+            if (hasErrors(projected.diagnostics)) {
                 invalidateFolder(folder);
                 for (const diagnostic of projected.diagnostics) {
                     reportOnce('Language projection unavailable: ' + projectionReason(diagnostic.message));
@@ -886,7 +886,7 @@ Capture template inputs under an input revision, not an editor-focus epoch.
             templatePaths.set(key, paths);
             if ([...captureChanges].some(name => paths.has(name))) { invalidateInputs(); return; }
             const projected = projectLanguageSources(documents, templates);
-            if (!matchesBuffers(folder, documents) || projected.diagnostics.length) { invalidateFolder(folder); return; }
+            if (!matchesBuffers(folder, documents) || hasErrors(projected.diagnostics)) { invalidateFolder(folder); return; }
 ```
 
 Only configured output languages may start shared sessions.

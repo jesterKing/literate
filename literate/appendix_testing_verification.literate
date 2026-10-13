@@ -586,7 +586,7 @@ function target(slug: string, path = 'index.literate'): string {
 function prepare(sources: SourceDocument[]): PandocDocument {
     const project = parseProject(sources), before = JSON.stringify(project);
     const result = preparePandoc(project, () => [{ t: 'Para', c: [{ t: 'Str', c: 'CONTRIBUTION' }] }]);
-    assert.deepEqual(result.diagnostics, []);
+    assert.deepEqual(result.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
     assert.equal(JSON.stringify(project), before);
     assert.ok(result.document);
     return result.document;
@@ -2020,8 +2020,8 @@ before a reference to indent its continuation lines; the oracle retains that pol
 for (const prefix of ['', 'Inserted prose.\n\n']) {
     test(`screen blocks map to publication contributions through real renderers (${prefix ? 'shifted' : 'original'})`, async () => {
         const inputs = documents(prefix), parsed = parseProject(inputs), generated = generateProject(inputs);
-        assert.deepEqual(parsed.diagnostics, []);
-        assert.deepEqual(generated.diagnostics, []);
+        assert.deepEqual(parsed.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
+        assert.deepEqual(generated.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
         assert.deepEqual(parsed.documents.map(doc => doc.path), ['index.literate', 'defs.literate', 'more.literate']);
         assert.equal(generated.files.find(file => file.path === 'result.txt')?.content,
             'before first\n second\n third / other / first\n second\n third after\n\<<literal>>\n');

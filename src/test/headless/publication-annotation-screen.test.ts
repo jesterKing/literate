@@ -45,7 +45,7 @@ function hrefFor(html: string, target: string): string {
 
 test('actual HTML and activated preview render annotation prose, indexes and accepted source maps', async () => {
     const docs = inputs(), parsed = parseProject(docs), generated = generateProject(docs);
-    assert.deepEqual(generated.diagnostics, []);
+    assert.deepEqual(generated.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
     const p = await preview(docs);
     try {
         const term = parsed.annotations.terms[0], explanatory = parsed.annotations.notes[0];
@@ -170,7 +170,7 @@ test('body aliases and autolinks align with collected uses and every project ind
     docs[1].text = docs[1].text.replace(definition, fence('TERM alpha "Alpha"', body));
     const parsed = parseProject(docs), generated = generateProject(docs), p = await preview(docs);
     try {
-        assert.deepEqual(generated.diagnostics, []);
+        assert.deepEqual(generated.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
         const annotations = [...parsed.annotations.terms, ...parsed.annotations.notes];
         for (const annotation of annotations.filter(value => value.body.includes('[Alias]'))) {
             const uses = parsed.annotations.uses.filter(use => use.owner === annotation.target);
@@ -245,7 +245,7 @@ test('legacy books have no indexes; without root index only first document owns 
     assert.doesNotMatch(legacy.files[0].content, /Term index|Fragment index|literate-annotation/);
     const docs = [{ path: 'b.literate', text: definition }, { path: 'a.literate', text: note }];
     const generated = generateProject(docs);
-    assert.deepEqual(generated.diagnostics, []);
+    assert.deepEqual(generated.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
     assert.match(generated.files.find(file => file.path === 'a.html')!.content, /Term index/);
     assert.doesNotMatch(generated.files.find(file => file.path === 'b.html')!.content, /Term index/);
 });

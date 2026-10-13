@@ -144,7 +144,7 @@ never includes configuration values, source, protocol errors or stderr.</p>
 <div class="code">
 <pre><code><span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> vscode <span class="hljs-keyword">from</span> <span class="hljs-string">'vscode'</span>;
 <span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> path <span class="hljs-keyword">from</span> <span class="hljs-string">'node:path'</span>;
-<span class="hljs-keyword">import</span> { parseProject, parseFragmentHeader, scanFragmentTags, <span class="hljs-title">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
+<span class="hljs-keyword">import</span> { hasErrors, parseProject, parseFragmentHeader, scanFragmentTags, <span class="hljs-title">SourceDocument</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./engine'</span>;
 <span class="hljs-keyword">import</span> { <span class="hljs-title">LanguageClient</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./language-client'</span>;
 <span class="hljs-keyword">import</span> { <span class="hljs-title">LanguageDiagnostics</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'./language-diagnostics'</span>;
 <span class="hljs-keyword">import</span> { mapLanguageCodeActions } <span class="hljs-keyword">from</span> <span class="hljs-string">'./language-actions'</span>;
@@ -914,7 +914,7 @@ Markdown-wide trigger registrations are needed.</p>
             }
             phase = <span class="hljs-string">'projection'</span>;
             <span class="hljs-keyword">const</span> projected = <span class="hljs-title">projectLanguageSources</span>(documents, templates);
-            <span class="hljs-keyword">if</span> (projected.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) {
+            <span class="hljs-keyword">if</span> (<span class="hljs-title">hasErrors</span>(projected.<span class="hljs-property">diagnostics</span>)) {
                 <span class="hljs-title">invalidateFolder</span>(folder);
                 <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> diagnostic <span class="hljs-keyword">of</span> projected.<span class="hljs-property">diagnostics</span>) {
                     <span class="hljs-title">reportOnce</span>(<span class="hljs-string">'Language projection unavailable: '</span> + <span class="hljs-title">projectionReason</span>(diagnostic.<span class="hljs-property">message</span>));
@@ -1108,7 +1108,7 @@ edit. Even malicious replacement edits remain inert. Optional metadata failure i
             templatePaths.<span class="hljs-title">set</span>(key, paths);
             <span class="hljs-keyword">if</span> ([...captureChanges].<span class="hljs-title">some</span>(<span class="hljs-params">name</span><span class="hljs-function"> =&gt;</span> paths.<span class="hljs-title">has</span>(name))) { <span class="hljs-title">invalidateInputs</span>(); <span class="hljs-keyword">return</span>; }
             <span class="hljs-keyword">const</span> projected = <span class="hljs-title">projectLanguageSources</span>(documents, templates);
-            <span class="hljs-keyword">if</span> (!<span class="hljs-title">matchesBuffers</span>(folder, documents) || projected.<span class="hljs-property">diagnostics</span>.<span class="hljs-property">length</span>) { <span class="hljs-title">invalidateFolder</span>(folder); <span class="hljs-keyword">return</span>; }
+            <span class="hljs-keyword">if</span> (!<span class="hljs-title">matchesBuffers</span>(folder, documents) || <span class="hljs-title">hasErrors</span>(projected.<span class="hljs-property">diagnostics</span>)) { <span class="hljs-title">invalidateFolder</span>(folder); <span class="hljs-keyword">return</span>; }
 </code></pre>
 
 </div>

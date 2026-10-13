@@ -10,7 +10,11 @@ import { renderScreenCode, renderScreenContribution, screenIndex, renderScreenAn
 import { defaultThemeName, getTheme, themeCss } from './themes';
 
 export interface SourceDocument { path: string; text: string; }
-export interface GenerationDiagnostic { path: string; line: number; column: number; message: string; code?: string; }
+export interface GenerationDiagnostic { path: string; line: number; column: number; message: string; code?: string; severity?: 'error' | 'warning'; }
+/** Diagnostics without severity remain errors for backwards compatibility. */
+export function hasErrors(diagnostics: readonly GenerationDiagnostic[]): boolean {
+    return diagnostics.some(diagnostic => diagnostic.severity !== 'warning');
+}
 export interface GeneratedFile { path: string; content: string; }
 export interface ProjectInspection { documents: string[]; templates: string[]; fragments: FragmentInspection[]; }
 export interface FragmentInspection {
@@ -336,6 +340,21 @@ function collectProject(documents: SourceDocument[], policy?: CollectionPolicy) 
     const tokens = new Map<string, Token[]>();
     for (const document of sources.values()) { tokens.set(document.path, md.parse(document.text, {})); }
     const order = orderSourceDocuments(Array.from(sources.values())).map(document => document.path);
+    for (const token of tokens.get('index.literate') || []) {
+        for (const child of token.children || []) {
+            if (child.type !== 'link_open') { continue; }
+            const href = child.attrGet('href') || '';
+            if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|\/)/i.test(href)) { continue; }
+            let target = href.split(/[?#]/)[0];
+            try { target = decodeURIComponent(target); } catch { continue; }
+            if (!target.endsWith('.html')) { continue; }
+            const source = safeRelativePath(target.replace(/\.html$/, '.literate'));
+            if (!source || !sources.has(source)) { continue; }
+            diagnostics.push({ path: 'index.literate', line: token.map?.[0] ?? 0, column: 0,
+                severity: 'warning', code: 'legacy-document-link',
+                message: `Prefer source document link ${href.replace(/\.html(?=[?#]|$)/, '.literate')} instead of ${href}` });
+        }
+    }
     const inspection: ProjectInspection = { documents: order, templates: [], fragments: [] };
     const referencedTemplates = new Set<string>();
     const loadTemplate = (value: string, location: Location): string | undefined => {
@@ -699,7 +718,7 @@ export function generateProject(documents: SourceDocument[], templates: Record<s
             }
         }
     }
-    if (diagnostics.length) { return { files: [], diagnostics, inspection, publication }; }
+    if (hasErrors(diagnostics)) { return { files: [], diagnostics, inspection, publication }; }
     for (const fragment of fragments.values()) {
         if (!fragment.header.output) { continue; }
         const code = expanded.get(fragment.header.name)!.replace(/\\<</g, () => '<<');

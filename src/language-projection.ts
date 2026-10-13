@@ -1,4 +1,4 @@
-import { collectLanguageProject, GenerationDiagnostic, safeRelativePath, SourceDocument } from './engine';
+import { hasErrors, collectLanguageProject, GenerationDiagnostic, safeRelativePath, SourceDocument } from './engine';
 
 export interface ProjectionMapping {
     sourcePath: string;
@@ -64,7 +64,7 @@ export function projectLanguageSources(documents: SourceDocument[], templates: R
             }
         }
     }
-    if (diagnostics.length) { return { files: [], diagnostics }; }
+    if (hasErrors(diagnostics)) { return { files: [], diagnostics }; }
     interface LiteralLine { offset: number; body: string; lineStart: number; original: string; suffix: number; }
     const literalLines = new Map<Part, LiteralLine[]>();
     function prepare(part: Part): LiteralLine[] {
@@ -165,7 +165,7 @@ export function projectLanguageSources(documents: SourceDocument[], templates: R
             files.push(file);
         }
     } catch (error) { report(error instanceof Error ? error.message : String(error)); }
-    return { files: diagnostics.length ? [] : files, diagnostics };
+    return { files: hasErrors(diagnostics) ? [] : files, diagnostics };
     function applyTemplate(file: LanguageProjection, body: Piece[], template: string): void {
         let slots = 0, cursor = 0, slot: number;
         while ((slot = template.indexOf('[CODE]', cursor)) !== -1) { slots++; cursor = slot + 6; }

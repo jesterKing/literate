@@ -6,7 +6,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as ts from 'typescript';
 import { EventEmitter } from 'node:events';
-import { parseProject, parseFragmentHeader, scanFragmentTags } from '../../engine';
+import { hasErrors, parseProject, parseFragmentHeader, scanFragmentTags } from '../../engine';
 import * as projection from '../../language-projection';
 import { generatedFromBook } from './authoritative-book';
 
@@ -156,7 +156,7 @@ function fixture(body = 'console.lo') {
         } }; }
         if (name === './language-client') { return { LanguageClient: Client }; }
         if (name === './language-projection') { return projection; }
-        if (name === './engine') { return { parseProject, parseFragmentHeader, scanFragmentTags }; }
+        if (name === './engine') { return { hasErrors, parseProject, parseFragmentHeader, scanFragmentTags }; }
         throwIfUnexpected(name); return require(name);
     }, exports);
     exports.registerLanguageFeatures({ subscriptions }, async (value: any) => {

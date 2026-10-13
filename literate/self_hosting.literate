@@ -290,7 +290,7 @@ const stdout = await new Promise<string>((resolve, reject) => {
 
 ### Reject diagnostics and malformed protocol data
 
-Valid JSON alone is insufficient. Any generator diagnostic fails the fixed-point
+Valid JSON alone is insufficient. Any generator error diagnostic fails the fixed-point
 claim, and each output must have a unique string path and string content before
 comparison can begin. Parse errors are reported by the enclosing stage boundary.
 
@@ -299,7 +299,7 @@ const regenerated = JSON.parse(stdout);
 if (!regenerated || !Array.isArray(regenerated.files) || !Array.isArray(regenerated.diagnostics)) {
     throw new Error('Invalid engine result: expected files and diagnostics arrays');
 }
-if (regenerated.diagnostics.length) {
+if (regenerated.diagnostics.some((diagnostic: { severity?: string }) => diagnostic.severity !== 'warning')) {
     throw new Error(`Regenerated engine diagnostics: ${JSON.stringify(regenerated.diagnostics)}`);
 }
 const actual = new Map<string, string>();

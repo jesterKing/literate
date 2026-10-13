@@ -1,3 +1,4 @@
+import { hasErrors } from './engine';
 import type Token = require('markdown-it/lib/token');
 import { parseAnnotationBody, resolveTermHref, PublicationAnnotations } from './publication-annotations';
 import type {
@@ -483,7 +484,7 @@ function materialize(
 ): PandocBlock[] {
     const result: PandocBlock[] = [];
     for (const block of pending) {
-        if (diagnostics.length) { break; }
+        if (hasErrors(diagnostics)) { break; }
         switch (block.t) {
             case 'Asset':
                 try {
@@ -525,9 +526,9 @@ export function preparePandoc(
     renderAsset?: AssetRenderer, external?: PublicationLinkResolver
 ): PandocPreparationResult {
     const diagnostics = project.diagnostics.map(diagnostic => ({ ...diagnostic }));
-    if (diagnostics.length) { return { diagnostics }; }
+    if (hasErrors(diagnostics)) { return { diagnostics }; }
     diagnostics.push(...project.annotations.diagnostics.map(diagnostic => ({ ...diagnostic })));
-    if (diagnostics.length) { return { diagnostics }; }
+    if (hasErrors(diagnostics)) { return { diagnostics }; }
     validateReferences(project, diagnostics);
     const targets = new Map(project.documents.map(document => [document.path, headingDestinations(document)]));
     const parts = new Map(project.publication.contributions.map(part => [part.target, part]));
@@ -538,9 +539,9 @@ export function preparePandoc(
             diagrams: project.diagrams, assets: !!renderAsset });
         return { t: 'Div', c: [[targets.get(document.path)!.id, [], []], body] };
     });
-    if (diagnostics.length) { return { diagnostics }; }
+    if (hasErrors(diagnostics)) { return { diagnostics }; }
     const blocks = materialize(pending, renderContribution, diagnostics, renderAsset);
-    if (diagnostics.length) { return { diagnostics }; }
+    if (hasErrors(diagnostics)) { return { diagnostics }; }
 // eslint-disable-next-line @typescript-eslint/naming-convention -- Pandoc's wire-format key.
     return { document: { 'pandoc-api-version': [1, 23, 1], meta: {}, blocks }, diagnostics };
 }

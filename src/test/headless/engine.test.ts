@@ -15,7 +15,7 @@ function document(text: string, path = 'index.literate'): SourceDocument {
 
 function successful(documents: SourceDocument[], templates: Record<string, string> = {}) {
     const result = generateProject(documents, templates);
-    assert.deepEqual(result.diagnostics, []);
+    assert.deepEqual(result.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
     return result.files;
 }
 
@@ -235,7 +235,7 @@ test('every canonical theme embeds its CSS and uses the local Mermaid runtime pr
 
 test('authored Mermaid identities are stable and diagnosed before publication', () => {
     const valid = parseProject([document(fence('mermaid id=partition-flow', 'flowchart TD\nA-->B'))]);
-    assert.deepEqual(valid.diagnostics, []);
+    assert.deepEqual(valid.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
     assert.equal(valid.diagrams.length, 1);
     assert.equal(valid.diagrams[0].id, 'partition-flow');
     assert.match(valid.diagrams[0].target, /^diagram-/);

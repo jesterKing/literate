@@ -47,7 +47,7 @@ test('inspection follows index links and keeps every append definition and refer
             + fence(': <<piece>>=', 'index <<leaf>>') + fence(': <<leaf>>=', 'L') }
     ];
     const result = generateProject(documents);
-    assert.deepEqual(result.diagnostics, []);
+    assert.deepEqual(result.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
     assert.deepEqual(generateProject([...documents].reverse()), result);
     assert.deepEqual(result.inspection.documents, ['index.literate', 'chapter two.literate', 'a.literate', 'z.literate']);
     assert.deepEqual(result.inspection.fragments.map(fragment => fragment.name), ['main.*', 'piece', 'leaf']);

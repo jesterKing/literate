@@ -140,7 +140,7 @@ export async function verifySelfHosting(
         if (!regenerated || !Array.isArray(regenerated.files) || !Array.isArray(regenerated.diagnostics)) {
             throw new Error('Invalid engine result: expected files and diagnostics arrays');
         }
-        if (regenerated.diagnostics.length) {
+        if (regenerated.diagnostics.some((diagnostic: { severity?: string }) => diagnostic.severity !== 'warning')) {
             throw new Error(`Regenerated engine diagnostics: ${JSON.stringify(regenerated.diagnostics)}`);
         }
         const actual = new Map<string, string>();

@@ -36,7 +36,7 @@ test('real screen renderer keeps links and literal escapes inert without dead bu
     const documents = sources();
     documents[0].text = '```SETTINGS\ntemplate=page.template\n```\n' + documents[0].text;
     const generated = generateProject(documents, { 'page.template': '[CONTENT]' });
-    assert.deepEqual(generated.diagnostics, []);
+    assert.deepEqual(generated.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
     const html = generated.files.find(file => file.path === 'index.html')!.content;
     assert.match(html, /literate-exploration-data/);
     const inline = html.match(/<script>([^]*?)<\/script>/);
@@ -65,7 +65,7 @@ test('exploration is absent without usable document-local reference uses', () =>
 test('content-only templates preserve ordinary Markdown without exploration scripts', () => {
     const text = '```SETTINGS\ntemplate=page.template\n```\n\nOrdinary prose.\n';
     const result = generateProject([{ path: 'index.literate', text }], { 'page.template': '[CONTENT]' });
-    assert.deepEqual(result.diagnostics, []);
+    assert.deepEqual(result.diagnostics.filter(diagnostic => diagnostic.severity !== 'warning'), []);
     const html = result.files.find(file => file.path === 'index.html')!.content;
     assert.equal(html.slice(html.indexOf('<div class="literate-document"')),
         '<div class="literate-document" data-literate-theme="rosepine-dawn"><p>Ordinary prose.</p>\n</div>');
